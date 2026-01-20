@@ -8,6 +8,21 @@ const corsHeaders = {
 
 const OCR_SPACE_KEY = 'K82045193188957';
 
+// ✅ Função segura para converter Uint8Array para Base64 (evita stack overflow)
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  const CHUNK_SIZE = 32768; // 32KB chunks para evitar stack overflow
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length));
+    // Usa spread operator em chunks pequenos (seguros)
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+// Limite máximo para envio ao OCR.space (512KB)
+const MAX_OCR_SIZE = 512 * 1024;
+
 // Keywords para validar qualidade do texto
 const KEYWORDS = [
   'NOME', 'CPF', 'CNPJ', 'SEGURADO', 'TITULAR', 'ESTIPULANTE',
@@ -215,14 +230,22 @@ serve(async (req) => {
           console.log(`✅ [${textSource}] Texto ACEITO! ${extractedText.length} chars em ${Math.round(performance.now() - fileStart)}ms`);
         } else {
           // Fallback: OCR.space no mini PDF
-          if (miniPdfBytes.length > 1024 * 1024) {
-            console.log(`⚠️ [OCR] Arquivo grande demais, usando texto local disponível`);
+          if (miniPdfBytes.length > MAX_OCR_SIZE) {
+            console.log(`⚠️ [OCR] Arquivo ${fileSizeKB}KB > 512KB, usando texto local disponível`);
             if (localText.length > 50) extractedText = localText;
           } else {
             console.log(`🔍 [OCR] Chamando OCR.space para ${file.fileName}...`);
             
-            // Converte miniPdfBytes para base64
-            const miniBase64 = btoa(String.fromCharCode.apply(null, miniPdfBytes as unknown as number[]));
+            // ✅ Usa função segura de conversão (evita stack overflow)
+            let miniBase64: string;
+            try {
+              miniBase64 = uint8ArrayToBase64(miniPdfBytes);
+            } catch (conversionError: any) {
+              console.error(`💥 [CONVERSION] Erro ao converter para base64:`, conversionError.message);
+              ocrErrors.push(`${file.fileName}: Erro na conversão base64 - ${conversionError.message}`);
+              if (localText.length > 50) extractedText = localText;
+              continue; // Pula para o próximo arquivo
+            }
             
             const formData = new FormData();
             formData.append('apikey', OCR_SPACE_KEY);

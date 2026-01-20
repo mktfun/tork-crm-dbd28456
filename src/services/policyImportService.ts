@@ -227,11 +227,34 @@ async function findClientByEmail(email: string, userId: string) {
 }
 
 // ============================================================
-// Fuzzy Matching for Seguradora (Insurance Company)
+// Fuzzy Matching for Seguradora (Insurance Company) with Aliases
 // ============================================================
+
+// Common aliases for insurance companies
+const seguradoraAliases: Record<string, string[]> = {
+  'porto seguro': ['porto', 'ps', 'porto seguro cia', 'porto seguro sa', 'portoseguro'],
+  'bradesco': ['bradesco seguros', 'bradesco auto', 'bradesco saude'],
+  'hdi': ['hdi seguros', 'hdi brasil', 'hdi seguros s a', 'hdi seguros sa'],
+  'tokio marine': ['tokio', 'tokiomarine', 'tokio marine seguradora'],
+  'allianz': ['allianz seguros', 'allianz brasil', 'allianz cia'],
+  'sulamerica': ['sulamerica', 'sul america', 'sul-america', 'sulamérica'],
+  'liberty': ['liberty seguros', 'liberty mutual'],
+  'mapfre': ['mapfre seguros', 'mapfre brasil'],
+  'zurich': ['zurich seguros', 'zurich brasil'],
+  'azul': ['azul seguros', 'azul cia'],
+  'sompo': ['sompo seguros', 'yasuda', 'marítima', 'maritima'],
+  'itau': ['itau seguros', 'itaú seguros'],
+  'caixa': ['caixa seguros', 'caixa seguradora'],
+  'bb seguros': ['bb seguros', 'banco do brasil seguros'],
+  'icatu': ['icatu seguros', 'icatu hartford'],
+  'mitsui': ['mitsui sumitomo', 'mitsui'],
+  'alfa': ['alfa seguros', 'alfa seguradora'],
+};
 
 export async function matchSeguradora(nome: string, userId: string): Promise<{ id: string; name: string; score: number } | null> {
   if (!nome) return null;
+
+  const normalizedInput = normalizeText(nome);
 
   const { data: companies, error } = await supabase
     .from('companies')
@@ -243,7 +266,24 @@ export async function matchSeguradora(nome: string, userId: string): Promise<{ i
     return null;
   }
 
-  // Score each company
+  // 1. Try alias match first
+  for (const [canonical, aliases] of Object.entries(seguradoraAliases)) {
+    const allAliases = [canonical, ...aliases];
+    if (allAliases.some(a => normalizedInput.includes(normalizeText(a)) || normalizeText(a).includes(normalizedInput))) {
+      // Find company that matches the canonical name
+      const match = companies.find(c => 
+        normalizeText(c.name).includes(normalizeText(canonical)) ||
+        allAliases.some(a => normalizeText(c.name).includes(normalizeText(a)))
+      );
+      
+      if (match) {
+        console.log(`✅ [ALIAS] Seguradora "${nome}" → "${match.name}" (alias: ${canonical})`);
+        return { ...match, score: 0.95 };
+      }
+    }
+  }
+
+  // 2. Score each company with fuzzy matching
   const scored = companies.map(c => ({
     ...c,
     score: similarity(nome, c.name)
@@ -256,8 +296,23 @@ export async function matchSeguradora(nome: string, userId: string): Promise<{ i
   const THRESHOLD = 0.5;
   
   if (scored[0]?.score >= THRESHOLD) {
-    console.log(`✅ [MATCH] Seguradora "${nome}" → "${scored[0].name}" (${(scored[0].score * 100).toFixed(0)}%)`);
+    console.log(`✅ [FUZZY] Seguradora "${nome}" → "${scored[0].name}" (${(scored[0].score * 100).toFixed(0)}%)`);
     return scored[0];
+  }
+
+  // 3. Try LIKE fallback for partial matches
+  if (nome.length >= 3) {
+    const { data: likeResults } = await supabase
+      .from('companies')
+      .select('id, name')
+      .eq('user_id', userId)
+      .ilike('name', `%${nome.substring(0, 10)}%`)
+      .limit(1);
+    
+    if (likeResults?.[0]) {
+      console.log(`✅ [LIKE] Seguradora "${nome}" → "${likeResults[0].name}"`);
+      return { ...likeResults[0], score: 0.6 };
+    }
   }
 
   console.warn(`⚠️ [NO MATCH] Seguradora "${nome}" não encontrada (melhor: ${scored[0]?.name} ${(scored[0]?.score * 100).toFixed(0)}%)`);
@@ -369,8 +424,40 @@ export async function matchRamo(nome: string, userId: string): Promise<{ id: str
 }
 
 // ============================================================
-// Client Reconciliation
+// Client Reconciliation with Fuzzy Name Matching
 // ============================================================
+
+/**
+ * Find client by name with fuzzy matching (90%+ threshold)
+ */
+async function findClientByNameFuzzy(name: string, userId: string) {
+  if (!name || name.length < 3) return null;
+
+  const { data: clients, error } = await supabase
+    .from('clientes')
+    .select('id, name, cpf_cnpj, email')
+    .eq('user_id', userId)
+    .limit(200); // Limit for performance
+
+  if (error || !clients?.length) return null;
+
+  // Calculate similarity for each client
+  const scored = clients.map(c => ({
+    ...c,
+    score: similarity(name, c.name)
+  }));
+
+  scored.sort((a, b) => b.score - a.score);
+
+  // Threshold of 90%
+  const FUZZY_THRESHOLD = 0.9;
+  if (scored[0]?.score >= FUZZY_THRESHOLD) {
+    console.log(`✅ [FUZZY CLIENT] "${name}" → "${scored[0].name}" (${(scored[0].score * 100).toFixed(0)}%)`);
+    return scored[0];
+  }
+
+  return null;
+}
 
 export async function reconcileClient(
   extracted: ExtractedPolicyData,
@@ -378,9 +465,9 @@ export async function reconcileClient(
 ): Promise<{
   status: ClientReconcileStatus;
   clientId?: string;
-  matchedBy?: 'cpf_cnpj' | 'email';
+  matchedBy?: 'cpf_cnpj' | 'email' | 'name_fuzzy';
 }> {
-  // Primeiro tenta por CPF/CNPJ
+  // 1. Primeiro tenta por CPF/CNPJ (prioridade máxima)
   if (extracted.cliente.cpf_cnpj) {
     const clientByCpf = await findClientByCpfCnpj(extracted.cliente.cpf_cnpj, userId);
     if (clientByCpf) {
@@ -392,7 +479,7 @@ export async function reconcileClient(
     }
   }
 
-  // Depois tenta por email
+  // 2. Depois tenta por email
   if (extracted.cliente.email) {
     const clientByEmail = await findClientByEmail(extracted.cliente.email, userId);
     if (clientByEmail) {
@@ -400,6 +487,18 @@ export async function reconcileClient(
         status: 'matched',
         clientId: clientByEmail.id,
         matchedBy: 'email',
+      };
+    }
+  }
+
+  // 3. NEW: Try fuzzy name matching (90%+ threshold)
+  if (extracted.cliente.nome_completo) {
+    const clientByName = await findClientByNameFuzzy(extracted.cliente.nome_completo, userId);
+    if (clientByName) {
+      return {
+        status: 'matched',
+        clientId: clientByName.id,
+        matchedBy: 'name_fuzzy',
       };
     }
   }
