@@ -14,6 +14,65 @@ export type Database = {
   }
   public: {
     Tables: {
+      apolice_itens: {
+        Row: {
+          ano_fabricacao: number | null
+          ano_modelo: number | null
+          apolice_id: string
+          cep: string | null
+          chassi: string | null
+          created_at: string | null
+          dados_extras: Json | null
+          endereco: string | null
+          id: string
+          marca: string | null
+          modelo: string | null
+          placa: string | null
+          tipo_item: string
+          user_id: string
+        }
+        Insert: {
+          ano_fabricacao?: number | null
+          ano_modelo?: number | null
+          apolice_id: string
+          cep?: string | null
+          chassi?: string | null
+          created_at?: string | null
+          dados_extras?: Json | null
+          endereco?: string | null
+          id?: string
+          marca?: string | null
+          modelo?: string | null
+          placa?: string | null
+          tipo_item?: string
+          user_id: string
+        }
+        Update: {
+          ano_fabricacao?: number | null
+          ano_modelo?: number | null
+          apolice_id?: string
+          cep?: string | null
+          chassi?: string | null
+          created_at?: string | null
+          dados_extras?: Json | null
+          endereco?: string | null
+          id?: string
+          marca?: string | null
+          modelo?: string | null
+          placa?: string | null
+          tipo_item?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apolice_itens_apolice_id_fkey"
+            columns: ["apolice_id"]
+            isOneToOne: false
+            referencedRelation: "apolices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apolices: {
         Row: {
           automatic_renewal: boolean
