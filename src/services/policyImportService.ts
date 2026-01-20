@@ -1,5 +1,185 @@
 import { supabase } from '@/integrations/supabase/client';
-import { ExtractedPolicyData, PolicyImportItem, ClientReconcileStatus } from '@/types/policyImport';
+import { ExtractedPolicyData, PolicyImportItem, ClientReconcileStatus, ImportError } from '@/types/policyImport';
+
+// ============================================================
+// PHASE 1: Text Normalization & Fuzzy Matching Utilities
+// ============================================================
+
+/**
+ * Remove acentos e normaliza string para matching
+ */
+export function normalizeText(text: string): string {
+  if (!text) return '';
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacríticos
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')           // Múltiplos espaços → um
+    .replace(/[^\w\s]/g, '');       // Remove pontuação
+}
+
+/**
+ * Calcula distância de Levenshtein entre duas strings
+ */
+function levenshteinDistance(s1: string, s2: string): number {
+  const m = s1.length;
+  const n = s2.length;
+  
+  if (m === 0) return n;
+  if (n === 0) return m;
+  
+  const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+  
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,      // deletion
+        dp[i][j - 1] + 1,      // insertion
+        dp[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+  
+  return dp[m][n];
+}
+
+/**
+ * Calcula similaridade entre duas strings (0-1)
+ */
+export function similarity(s1: string, s2: string): number {
+  const a = normalizeText(s1);
+  const b = normalizeText(s2);
+  
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  
+  // Check if one contains the other
+  if (a.includes(b) || b.includes(a)) return 0.9;
+  
+  // Check word-level overlap
+  const wordsA = a.split(' ').filter(w => w.length > 2);
+  const wordsB = b.split(' ').filter(w => w.length > 2);
+  const commonWords = wordsA.filter(w => wordsB.some(wb => wb.includes(w) || w.includes(wb)));
+  const wordOverlap = commonWords.length / Math.max(wordsA.length, wordsB.length, 1);
+  
+  if (wordOverlap >= 0.5) return 0.7 + (wordOverlap * 0.2);
+  
+  // Levenshtein distance-based similarity
+  const longer = a.length > b.length ? a : b;
+  const shorter = a.length > b.length ? b : a;
+  
+  if (longer.length === 0) return 1;
+  const editDistance = levenshteinDistance(longer, shorter);
+  return (longer.length - editDistance) / longer.length;
+}
+
+// ============================================================
+// PHASE 2: CPF/CNPJ Validation & Client Type Detection
+// ============================================================
+
+export type ClientType = 'PF' | 'PJ';
+
+/**
+ * Detecta se o documento é CPF (PF) ou CNPJ (PJ)
+ */
+export function detectClientType(cpfCnpj: string | null): ClientType {
+  if (!cpfCnpj) return 'PF';
+  const digits = cpfCnpj.replace(/\D/g, '');
+  return digits.length === 14 ? 'PJ' : 'PF';
+}
+
+/**
+ * Valida CPF (11 dígitos)
+ */
+export function validaCPF(cpf: string): boolean {
+  const digits = cpf.replace(/\D/g, '');
+  if (digits.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(digits)) return false; // Todos dígitos iguais
+  
+  // Primeiro dígito verificador
+  let soma = 0;
+  for (let i = 0; i < 9; i++) soma += parseInt(digits[i]) * (10 - i);
+  let resto = (soma * 10) % 11;
+  if (resto === 10) resto = 0;
+  if (resto !== parseInt(digits[9])) return false;
+  
+  // Segundo dígito verificador
+  soma = 0;
+  for (let i = 0; i < 10; i++) soma += parseInt(digits[i]) * (11 - i);
+  resto = (soma * 10) % 11;
+  if (resto === 10) resto = 0;
+  return resto === parseInt(digits[10]);
+}
+
+/**
+ * Valida CNPJ (14 dígitos)
+ */
+export function validaCNPJ(cnpj: string): boolean {
+  const digits = cnpj.replace(/\D/g, '');
+  if (digits.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(digits)) return false; // Todos dígitos iguais
+  
+  const pesos1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const pesos2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  
+  // Primeiro dígito verificador
+  let soma = 0;
+  for (let i = 0; i < 12; i++) soma += parseInt(digits[i]) * pesos1[i];
+  let resto = soma % 11;
+  const d1 = resto < 2 ? 0 : 11 - resto;
+  if (d1 !== parseInt(digits[12])) return false;
+  
+  // Segundo dígito verificador
+  soma = 0;
+  for (let i = 0; i < 13; i++) soma += parseInt(digits[i]) * pesos2[i];
+  resto = soma % 11;
+  const d2 = resto < 2 ? 0 : 11 - resto;
+  return d2 === parseInt(digits[13]);
+}
+
+/**
+ * Valida CPF ou CNPJ baseado no tamanho
+ */
+export function validaCpfCnpj(value: string | null): { valid: boolean; type: ClientType; error?: string } {
+  if (!value) return { valid: true, type: 'PF' }; // Opcional
+  
+  const digits = value.replace(/\D/g, '');
+  
+  if (digits.length === 0) return { valid: true, type: 'PF' };
+  
+  if (digits.length === 11) {
+    const isValid = validaCPF(digits);
+    return { 
+      valid: isValid, 
+      type: 'PF',
+      error: isValid ? undefined : `CPF inválido: ${value}`
+    };
+  }
+  
+  if (digits.length === 14) {
+    const isValid = validaCNPJ(digits);
+    return { 
+      valid: isValid, 
+      type: 'PJ',
+      error: isValid ? undefined : `CNPJ inválido: ${value}`
+    };
+  }
+  
+  return { 
+    valid: false, 
+    type: digits.length > 11 ? 'PJ' : 'PF',
+    error: `CPF/CNPJ com formato inválido (${digits.length} dígitos): ${value}`
+  };
+}
+
+// ============================================================
+// Original Helper Functions (Updated)
+// ============================================================
 
 // Normaliza CPF/CNPJ removendo formatação
 function normalizeCpfCnpj(value: string | null): string | null {
@@ -46,89 +226,152 @@ async function findClientByEmail(email: string, userId: string) {
   return data?.[0] || null;
 }
 
-// Busca seguradora pelo nome
-export async function matchSeguradora(nome: string, userId: string) {
+// ============================================================
+// Fuzzy Matching for Seguradora (Insurance Company)
+// ============================================================
+
+export async function matchSeguradora(nome: string, userId: string): Promise<{ id: string; name: string; score: number } | null> {
   if (!nome) return null;
 
-  const normalizedName = nome.toLowerCase().trim();
-
-  const { data, error } = await supabase
+  const { data: companies, error } = await supabase
     .from('companies')
     .select('id, name')
     .eq('user_id', userId);
 
-  if (error) {
-    console.error('Error fetching companies:', error);
+  if (error || !companies || companies.length === 0) {
+    console.warn('⚠️ [MATCH] Nenhuma seguradora encontrada no banco');
     return null;
   }
 
-  // Tenta encontrar match parcial
-  const match = data?.find(company => 
-    company.name.toLowerCase().includes(normalizedName) ||
-    normalizedName.includes(company.name.toLowerCase())
-  );
+  // Score each company
+  const scored = companies.map(c => ({
+    ...c,
+    score: similarity(nome, c.name)
+  }));
 
-  return match || null;
+  // Sort by score descending
+  scored.sort((a, b) => b.score - a.score);
+
+  // Threshold of 0.5 (50% similarity)
+  const THRESHOLD = 0.5;
+  
+  if (scored[0]?.score >= THRESHOLD) {
+    console.log(`✅ [MATCH] Seguradora "${nome}" → "${scored[0].name}" (${(scored[0].score * 100).toFixed(0)}%)`);
+    return scored[0];
+  }
+
+  console.warn(`⚠️ [NO MATCH] Seguradora "${nome}" não encontrada (melhor: ${scored[0]?.name} ${(scored[0]?.score * 100).toFixed(0)}%)`);
+  return null;
 }
 
-// Busca ramo pelo nome
-export async function matchRamo(nome: string, userId: string) {
+// ============================================================
+// Expanded Fuzzy Matching for Ramo (Branch)
+// ============================================================
+
+// Expanded keyword mapping for ramos
+const ramoKeywords: Record<string, string[]> = {
+  // Automóvel
+  'auto': ['auto', 'automóvel', 'automovel', 'veículo', 'veiculo', 'carro', 'moto', 'caminhao', 'caminhão', 'frota', 'pessoa física auto', 'pessoa juridica auto', 'pf auto', 'pj auto', 'auto pf', 'auto pj'],
+  
+  // Residencial  
+  'residencial': ['residencial', 'residência', 'residencia', 'casa', 'apartamento', 'lar', 'moradia', 'incêndio residencial', 'incendio residencial', 'condomínio', 'condominio'],
+  
+  // Vida
+  'vida': ['vida', 'vida em grupo', 'vida individual', 'ap', 'acidentes pessoais', 'invalidez', 'morte', 'funeral', 'prestamista'],
+  
+  // Empresarial
+  'empresarial': ['empresarial', 'empresa', 'comercial', 'negócio', 'negocio', 'incêndio comercial', 'incendio comercial', 'pj', 'riscos nomeados', 'riscos operacionais'],
+  
+  // Saúde
+  'saude': ['saúde', 'saude', 'médico', 'medico', 'dental', 'odonto', 'odontológico', 'odontologico', 'hospitalar', 'plano de saude', 'plano de saúde'],
+  
+  // Responsabilidade Civil
+  'responsabilidade': ['responsabilidade', 'rc', 'civil', 'rc profissional', 'rc médico', 'rc medico', 'rc obras', 'rc geral', 'd&o', 'directors', 'officers', 'e&o'],
+  
+  // Transporte
+  'transporte': ['transporte', 'carga', 'mercadoria', 'rctr-c', 'rctrc', 'cargas', 'embarcador'],
+  
+  // Garantia
+  'garantia': ['garantia', 'fiança', 'fianca', 'locatícia', 'locaticia', 'fiança locatícia', 'seguro fiança', 'performance', 'judicial'],
+  
+  // Viagem
+  'viagem': ['viagem', 'travel', 'internacional', 'exterior', 'turismo'],
+  
+  // Equipamentos
+  'equipamentos': ['equipamentos', 'eletrônicos', 'eletronicos', 'portáteis', 'portateis', 'notebook', 'celular', 'riscos de engenharia'],
+  
+  // Consórcio
+  'consorcio': ['consórcio', 'consorcio', 'carta de crédito', 'carta de credito', 'contemplado'],
+  
+  // Rural/Agrícola
+  'rural': ['rural', 'agrícola', 'agricola', 'agro', 'safra', 'pecuário', 'pecuario', 'máquinas agrícolas', 'maquinas agricolas'],
+};
+
+export async function matchRamo(nome: string, userId: string): Promise<{ id: string; nome: string; score: number } | null> {
   if (!nome) return null;
 
-  const normalizedName = nome.toLowerCase().trim();
+  const normalizedName = normalizeText(nome);
 
   const { data, error } = await supabase
     .from('ramos')
     .select('id, nome')
     .eq('user_id', userId);
 
-  if (error) {
-    console.error('Error fetching ramos:', error);
+  if (error || !data || data.length === 0) {
+    console.warn('⚠️ [MATCH] Nenhum ramo encontrado no banco');
     return null;
   }
 
-  // Mapeamento de variações comuns
-  const ramoKeywords: Record<string, string[]> = {
-    'auto': ['auto', 'automóvel', 'automovel', 'veículo', 'veiculo', 'carro'],
-    'residencial': ['residencial', 'residência', 'residencia', 'casa', 'apartamento'],
-    'vida': ['vida', 'pessoal'],
-    'empresarial': ['empresarial', 'empresa', 'comercial', 'negócio', 'negocio'],
-    'saúde': ['saúde', 'saude', 'médico', 'medico'],
-    'viagem': ['viagem', 'travel'],
-    'responsabilidade civil': ['responsabilidade', 'rc', 'civil'],
-    'transporte': ['transporte', 'carga', 'mercadoria'],
-  };
-
-  // Primeiro tenta match direto
-  let match = data?.find(ramo => 
-    ramo.nome.toLowerCase() === normalizedName
+  // First try exact match
+  const exactMatch = data.find(ramo => 
+    normalizeText(ramo.nome) === normalizedName
   );
+  
+  if (exactMatch) {
+    console.log(`✅ [MATCH] Ramo "${nome}" → "${exactMatch.nome}" (100% - exato)`);
+    return { ...exactMatch, score: 1 };
+  }
 
-  if (!match) {
-    // Tenta match por keywords
-    for (const [key, keywords] of Object.entries(ramoKeywords)) {
-      if (keywords.some(kw => normalizedName.includes(kw))) {
-        match = data?.find(ramo => 
-          ramo.nome.toLowerCase().includes(key) ||
-          keywords.some(kw => ramo.nome.toLowerCase().includes(kw))
-        );
-        if (match) break;
+  // Try keyword-based matching
+  for (const [key, keywords] of Object.entries(ramoKeywords)) {
+    // Check if input matches any keyword
+    if (keywords.some(kw => normalizedName.includes(normalizeText(kw)))) {
+      // Find a ramo that matches this category
+      const match = data.find(ramo => {
+        const ramoNorm = normalizeText(ramo.nome);
+        return ramoNorm.includes(normalizeText(key)) ||
+               keywords.some(kw => ramoNorm.includes(normalizeText(kw)));
+      });
+      
+      if (match) {
+        console.log(`✅ [MATCH] Ramo "${nome}" → "${match.nome}" (keyword: ${key})`);
+        return { ...match, score: 0.8 };
       }
     }
   }
 
-  if (!match) {
-    // Tenta match parcial
-    match = data?.find(ramo => 
-      ramo.nome.toLowerCase().includes(normalizedName) ||
-      normalizedName.includes(ramo.nome.toLowerCase())
-    );
+  // Try fuzzy matching with similarity score
+  const scored = data.map(ramo => ({
+    ...ramo,
+    score: similarity(nome, ramo.nome)
+  }));
+  
+  scored.sort((a, b) => b.score - a.score);
+  
+  const THRESHOLD = 0.4;
+  if (scored[0]?.score >= THRESHOLD) {
+    console.log(`✅ [MATCH] Ramo "${nome}" → "${scored[0].nome}" (${(scored[0].score * 100).toFixed(0)}% fuzzy)`);
+    return scored[0];
   }
 
-  return match || null;
+  console.warn(`⚠️ [NO MATCH] Ramo "${nome}" não encontrado (melhor: ${scored[0]?.nome} ${(scored[0]?.score * 100).toFixed(0)}%)`);
+  return null;
 }
 
-// Reconcilia clientes extraídos com a base de dados
+// ============================================================
+// Client Reconciliation
+// ============================================================
+
 export async function reconcileClient(
   extracted: ExtractedPolicyData,
   userId: string
@@ -165,18 +408,19 @@ export async function reconcileClient(
   return { status: 'new' };
 }
 
-// Extrai CEP do endereço
+// ============================================================
+// Address Extraction Helpers
+// ============================================================
+
 function extractCep(endereco: string | null | undefined): string | null {
   if (!endereco) return null;
   const match = endereco.match(/\d{5}-?\d{3}/);
   return match ? match[0].replace('-', '') : null;
 }
 
-// Extrai cidade e UF do endereço (heurística simples)
 function extractCityState(endereco: string | null | undefined): { city: string | null; state: string | null } {
   if (!endereco) return { city: null, state: null };
   
-  // Procura por padrão "Cidade - UF" ou "Cidade/UF" ou "Cidade, UF"
   const ufMatch = endereco.match(/([A-Za-zÀ-ÿ\s]+)[\s\-\/,]+([A-Z]{2})\s*(?:\d{5}|$)/i);
   if (ufMatch) {
     return { 
@@ -188,12 +432,14 @@ function extractCityState(endereco: string | null | undefined): { city: string |
   return { city: null, state: null };
 }
 
-// Cria um novo cliente com dados completos (usa dados da IA)
+// ============================================================
+// Client Creation Functions
+// ============================================================
+
 export async function createClient(
   data: ExtractedPolicyData['cliente'] & { cep?: string | null },
   userId: string
 ): Promise<{ id: string } | null> {
-  // Extrair CEP se não veio separado
   const cep = data.cep || extractCep(data.endereco_completo);
   const { city, state } = extractCityState(data.endereco_completo);
   
@@ -222,8 +468,10 @@ export async function createClient(
   return newClient;
 }
 
-// Cria cliente usando dados EDITADOS da tabela (não da IA)
-// Isso garante que o corretor pode corrigir nomes/CPFs antes de salvar
+/**
+ * Creates client with validation for CPF/CNPJ
+ * Throws ImportError if validation fails
+ */
 export async function createClientFromEdited(
   clientName: string,
   cpfCnpj: string | null,
@@ -231,7 +479,14 @@ export async function createClientFromEdited(
   telefone: string | null,
   endereco: string | null,
   userId: string
-): Promise<{ id: string } | null> {
+): Promise<{ id: string }> {
+  // Validate CPF/CNPJ
+  const validation = validaCpfCnpj(cpfCnpj);
+  if (!validation.valid && validation.error) {
+    console.error('❌ [VALIDATION]', validation.error);
+    throw new Error(validation.error);
+  }
+  
   const cep = extractCep(endereco);
   const { city, state } = extractCityState(endereco);
   
@@ -240,7 +495,7 @@ export async function createClientFromEdited(
     .insert({
       user_id: userId,
       name: clientName,
-      cpf_cnpj: cpfCnpj,
+      cpf_cnpj: normalizeCpfCnpj(cpfCnpj),
       email: email || '',
       phone: telefone || '',
       address: endereco || '',
@@ -254,16 +509,17 @@ export async function createClientFromEdited(
 
   if (error) {
     console.error('Error creating client from edited data:', error);
-    return null;
+    throw new Error(`Falha ao criar cliente: ${error.message}`);
   }
 
-  console.log('✅ [CREATE] Cliente criado com dados editados:', clientName, cpfCnpj);
+  console.log(`✅ [CREATE] Cliente criado (${validation.type}):`, clientName, cpfCnpj);
   return newClient;
 }
 
-// Upload do PDF para o Storage com nome estruturado
-// 🔴 FIX RLS: userId DEVE ser o primeiro segmento do path para passar na política de RLS
-// Estrutura: userId/brokerageId/cpf/timestamp_arquivo.pdf
+// ============================================================
+// PDF Upload
+// ============================================================
+
 export async function uploadPolicyPdf(
   file: File,
   userId: string,
@@ -273,16 +529,11 @@ export async function uploadPolicyPdf(
 ): Promise<string | null> {
   const timestamp = Date.now();
   
-  // Limpar CPF/CNPJ - usar fallback único se não tiver
   const rawCpf = cpfCnpj?.replace(/[^\d]/g, '');
   const cleanCpf = rawCpf && rawCpf.length >= 11 ? rawCpf : `novo-${timestamp}`;
   
-  // Limpar nome do arquivo original para usar no path
   const originalName = file.name.replace(/[^\w.\-]/g, '_').substring(0, 50);
   
-  // 🔴 FIX CRÍTICO: userId DEVE ser o primeiro segmento para passar na RLS
-  // A política exige: (auth.uid())::text = (storage.foldername(name))[1]
-  // Estrutura: userId/brokerageId/cpf/timestamp_arquivo.pdf
   const brokerageSegment = brokerageId ? `/${brokerageId}` : '';
   const fileName = `${userId}${brokerageSegment}/${cleanCpf}/${timestamp}_${originalName}`;
   
@@ -297,7 +548,7 @@ export async function uploadPolicyPdf(
 
   if (error) {
     console.error('❌ [UPLOAD] Erro no Storage:', error.message, error);
-    return null;
+    throw new Error(`Upload do PDF falhou: ${error.message}`);
   }
 
   const { data: urlData } = supabase.storage
@@ -308,7 +559,10 @@ export async function uploadPolicyPdf(
   return urlData.publicUrl;
 }
 
-// Valida um item de importação
+// ============================================================
+// Validation Function
+// ============================================================
+
 export function validateImportItem(item: PolicyImportItem): string[] {
   const errors: string[] = [];
 
@@ -348,5 +602,126 @@ export function validateImportItem(item: PolicyImportItem): string[] {
     errors.push('Prêmio líquido deve ser maior que zero');
   }
 
+  // Validate CPF/CNPJ if provided
+  if (item.clientCpfCnpj) {
+    const validation = validaCpfCnpj(item.clientCpfCnpj);
+    if (!validation.valid && validation.error) {
+      errors.push(validation.error);
+    }
+  }
+
   return errors;
+}
+
+// ============================================================
+// PHASE 4: Create Seguradora/Ramo on-the-fly
+// ============================================================
+
+export async function createSeguradora(
+  nome: string,
+  userId: string
+): Promise<{ id: string; name: string } | null> {
+  if (!nome?.trim()) return null;
+  
+  const { data, error } = await supabase
+    .from('companies')
+    .insert({ 
+      user_id: userId, 
+      name: nome.trim() 
+    })
+    .select('id, name')
+    .single();
+    
+  if (error) {
+    console.error('❌ [CREATE] Erro ao criar seguradora:', error);
+    return null;
+  }
+  
+  console.log(`✅ [CREATE] Seguradora criada: ${data.name}`);
+  return data;
+}
+
+export async function createRamo(
+  nome: string,
+  userId: string
+): Promise<{ id: string; nome: string } | null> {
+  if (!nome?.trim()) return null;
+  
+  const { data, error } = await supabase
+    .from('ramos')
+    .insert({ 
+      user_id: userId, 
+      nome: nome.trim() 
+    })
+    .select('id, nome')
+    .single();
+    
+  if (error) {
+    console.error('❌ [CREATE] Erro ao criar ramo:', error);
+    return null;
+  }
+  
+  console.log(`✅ [CREATE] Ramo criado: ${data.nome}`);
+  return data;
+}
+
+// ============================================================
+// Error Classification Helper
+// ============================================================
+
+export function classifyImportError(error: any, item: PolicyImportItem): ImportError {
+  const baseError: ImportError = {
+    itemId: item.id,
+    fileName: item.fileName,
+    clientName: item.clientName,
+    stage: 'apolice',
+    errorCode: 'UNKNOWN',
+    errorMessage: error.message || 'Erro desconhecido',
+  };
+  
+  const msg = error.message?.toLowerCase() || '';
+  
+  // CPF/CNPJ errors
+  if (msg.includes('cpf inválido') || msg.includes('cpf invalido')) {
+    return { ...baseError, stage: 'cliente', errorCode: 'INVALID_CPF' };
+  }
+  if (msg.includes('cnpj inválido') || msg.includes('cnpj invalido')) {
+    return { ...baseError, stage: 'cliente', errorCode: 'INVALID_CNPJ' };
+  }
+  if (msg.includes('cpf/cnpj') || msg.includes('formato inválido')) {
+    return { ...baseError, stage: 'cliente', errorCode: 'INVALID_DOCUMENT' };
+  }
+  
+  // Client creation errors
+  if (msg.includes('cliente') || msg.includes('client')) {
+    return { ...baseError, stage: 'cliente', errorCode: 'CLIENT_CREATION_FAILED' };
+  }
+  
+  // Upload errors
+  if (msg.includes('upload') || msg.includes('storage') || msg.includes('pdf')) {
+    return { ...baseError, stage: 'upload', errorCode: 'UPLOAD_FAILED' };
+  }
+  
+  // Foreign key violations
+  if (error.code === '23503' || msg.includes('foreign key')) {
+    return { 
+      ...baseError, 
+      stage: 'apolice', 
+      errorCode: 'FK_VIOLATION',
+      errorMessage: 'Seguradora ou Ramo não encontrado',
+      details: error.details || error.hint
+    };
+  }
+  
+  // Duplicate key
+  if (error.code === '23505' || msg.includes('duplicate')) {
+    return { 
+      ...baseError, 
+      stage: 'apolice', 
+      errorCode: 'DUPLICATE',
+      errorMessage: 'Apólice já existe no sistema'
+    };
+  }
+  
+  return baseError;
 }
