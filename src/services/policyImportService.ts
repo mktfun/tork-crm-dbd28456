@@ -187,24 +187,53 @@ function normalizeCpfCnpj(value: string | null): string | null {
   return value.replace(/[^\d]/g, '');
 }
 
-// Busca cliente por CPF/CNPJ
+// ✅ Busca cliente por CPF/CNPJ com match EXATO (normalizado)
 async function findClientByCpfCnpj(cpfCnpj: string, userId: string) {
   const normalized = normalizeCpfCnpj(cpfCnpj);
-  if (!normalized) return null;
+  if (!normalized || normalized.length < 11) return null;
 
+  // Tenta busca exata primeiro (mais performático)
   const { data, error } = await supabase
     .from('clientes')
     .select('id, name, cpf_cnpj, email')
     .eq('user_id', userId)
-    .ilike('cpf_cnpj', `%${normalized}%`)
+    .eq('cpf_cnpj', normalized)
     .limit(1);
 
   if (error) {
-    console.error('Error finding client by CPF/CNPJ:', error);
-    return null;
+    console.error('Error finding client by CPF/CNPJ (exact):', error);
   }
 
-  return data?.[0] || null;
+  if (data?.[0]) {
+    console.log(`✅ [CPF/CNPJ EXACT] Match encontrado: ${data[0].name}`);
+    return data[0];
+  }
+
+  // Fallback: busca com pontuação comum (111.222.333-44 ou 11.222.333/0001-44)
+  const formattedCpf = normalized.length === 11 
+    ? `${normalized.slice(0,3)}.${normalized.slice(3,6)}.${normalized.slice(6,9)}-${normalized.slice(9)}`
+    : null;
+  const formattedCnpj = normalized.length === 14
+    ? `${normalized.slice(0,2)}.${normalized.slice(2,5)}.${normalized.slice(5,8)}/${normalized.slice(8,12)}-${normalized.slice(12)}`
+    : null;
+
+  const { data: formatted, error: err2 } = await supabase
+    .from('clientes')
+    .select('id, name, cpf_cnpj, email')
+    .eq('user_id', userId)
+    .or(`cpf_cnpj.eq.${formattedCpf || 'NULL'},cpf_cnpj.eq.${formattedCnpj || 'NULL'}`)
+    .limit(1);
+
+  if (err2) {
+    console.error('Error finding client by formatted CPF/CNPJ:', err2);
+  }
+
+  if (formatted?.[0]) {
+    console.log(`✅ [CPF/CNPJ FORMATTED] Match encontrado: ${formatted[0].name}`);
+    return formatted[0];
+  }
+
+  return null;
 }
 
 // Busca cliente por email
@@ -428,32 +457,56 @@ export async function matchRamo(nome: string, userId: string): Promise<{ id: str
 // ============================================================
 
 /**
- * Find client by name with fuzzy matching (90%+ threshold)
+ * Remove títulos e sufixos comuns de nomes para melhor matching
+ */
+function cleanNameForMatching(name: string): string {
+  if (!name) return '';
+  return name
+    .replace(/^(dr\.?|dra\.?|sr\.?|sra\.?|prof\.?|me\.?)\s+/gi, '') // Títulos
+    .replace(/\s+(junior|jr\.?|filho|neto|sobrinho|segundo|terceiro|ii|iii|iv)$/gi, '') // Sufixos
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Find client by name with fuzzy matching (85%+ threshold - more flexible)
+ * Busca em até 500 clientes para garantir cobertura adequada
  */
 async function findClientByNameFuzzy(name: string, userId: string) {
   if (!name || name.length < 3) return null;
 
+  // Limpa títulos e sufixos do nome buscado
+  const cleanedInputName = cleanNameForMatching(name);
+  
   const { data: clients, error } = await supabase
     .from('clientes')
     .select('id, name, cpf_cnpj, email')
     .eq('user_id', userId)
-    .limit(200); // Limit for performance
+    .limit(500); // Aumentado para cobrir bases maiores
 
   if (error || !clients?.length) return null;
 
-  // Calculate similarity for each client
-  const scored = clients.map(c => ({
-    ...c,
-    score: similarity(name, c.name)
-  }));
+  // Calculate similarity for each client (usando nome limpo)
+  const scored = clients.map(c => {
+    const cleanedClientName = cleanNameForMatching(c.name);
+    return {
+      ...c,
+      score: similarity(cleanedInputName, cleanedClientName)
+    };
+  });
 
   scored.sort((a, b) => b.score - a.score);
 
-  // Threshold of 90%
-  const FUZZY_THRESHOLD = 0.9;
+  // ✅ Threshold de 85% (mais flexível para variações de nome)
+  const FUZZY_THRESHOLD = 0.85;
   if (scored[0]?.score >= FUZZY_THRESHOLD) {
     console.log(`✅ [FUZZY CLIENT] "${name}" → "${scored[0].name}" (${(scored[0].score * 100).toFixed(0)}%)`);
     return scored[0];
+  }
+
+  // Log para debug quando não encontra match
+  if (scored[0]) {
+    console.log(`⚠️ [FUZZY CLIENT] "${name}" melhor match: "${scored[0].name}" (${(scored[0].score * 100).toFixed(0)}% < 85%)`);
   }
 
   return null;
@@ -762,6 +815,105 @@ export async function createRamo(
   
   console.log(`✅ [CREATE] Ramo criado: ${data.nome}`);
   return data;
+}
+
+// ============================================================
+// PHASE 5: Salvar Itens da Apólice (Veículos, Imóveis)
+// ============================================================
+
+export interface ApoliceItem {
+  tipo_item: 'VEICULO' | 'IMOVEL' | 'OUTRO';
+  placa?: string;
+  chassi?: string;
+  modelo?: string;
+  marca?: string;
+  ano_fabricacao?: number;
+  ano_modelo?: number;
+  cep?: string;
+  endereco?: string;
+  dados_extras?: Record<string, unknown>;
+}
+
+/**
+ * Extrai dados estruturados de veículo do texto
+ */
+export function extractVehicleData(objetoSegurado: string, identificacao?: string): ApoliceItem | null {
+  if (!objetoSegurado) return null;
+  
+  // Regex para placas (formato antigo e Mercosul)
+  const placaMatch = identificacao?.match(/([A-Z]{3}[0-9][A-Z0-9][0-9]{2})/i) 
+    || objetoSegurado.match(/([A-Z]{3}[0-9][A-Z0-9][0-9]{2})/i);
+  
+  // Regex para chassi (17 caracteres alfanuméricos)
+  const chassiMatch = objetoSegurado.match(/([A-HJ-NPR-Z0-9]{17})/i);
+  
+  // Extrai modelo (geralmente primeiras palavras antes de código numérico)
+  const modeloMatch = objetoSegurado
+    .replace(/^\d+\s*[\-‑–—]\s*/, '') // Remove código HDI
+    .split(/[\-–—]/)[0]?.trim();
+  
+  // Se tem placa ou chassi, é um veículo
+  if (placaMatch || chassiMatch || objetoSegurado.toLowerCase().includes('auto')) {
+    return {
+      tipo_item: 'VEICULO',
+      placa: placaMatch?.[1]?.toUpperCase(),
+      chassi: chassiMatch?.[1]?.toUpperCase(),
+      modelo: modeloMatch?.substring(0, 100),
+    };
+  }
+  
+  return null;
+}
+
+/**
+ * Salva itens da apólice na tabela apolice_itens
+ */
+export async function saveApoliceItens(
+  apoliceId: string,
+  ramoNome: string,
+  objetoSegurado: string,
+  identificacao: string | null,
+  userId: string
+): Promise<void> {
+  // Detecta se é ramo de auto baseado no nome
+  const isAutoRamo = ['auto', 'automóvel', 'automovel', 'veículo', 'veiculo']
+    .some(kw => ramoNome?.toLowerCase().includes(kw));
+  
+  if (!isAutoRamo) {
+    console.log(`⏭️ [ITENS] Ramo "${ramoNome}" não é Auto, pulando extração de itens`);
+    return;
+  }
+  
+  const vehicleData = extractVehicleData(objetoSegurado, identificacao || undefined);
+  
+  if (!vehicleData) {
+    console.log(`⚠️ [ITENS] Não foi possível extrair dados estruturados de: ${objetoSegurado}`);
+    return;
+  }
+  
+  const itemData = {
+    apolice_id: apoliceId,
+    user_id: userId,
+    tipo_item: vehicleData.tipo_item,
+    placa: vehicleData.placa || null,
+    chassi: vehicleData.chassi || null,
+    modelo: vehicleData.modelo || null,
+    marca: vehicleData.marca || null,
+    ano_fabricacao: vehicleData.ano_fabricacao || null,
+    ano_modelo: vehicleData.ano_modelo || null,
+    dados_extras: vehicleData.dados_extras || {},
+  };
+  
+  const { error } = await supabase
+    .from('apolice_itens' as any)
+    .insert(itemData as any);
+  
+  if (error) {
+    console.error('❌ [ITENS] Erro ao salvar item:', error);
+    // Não propagar erro para não bloquear a importação
+  } else {
+    console.log(`✅ [ITENS] Veículo salvo: Placa=${vehicleData.placa || 'N/A'}, Modelo=${vehicleData.modelo || 'N/A'}`);
+  }
 }
 
 // ============================================================

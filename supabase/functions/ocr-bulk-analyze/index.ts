@@ -8,14 +8,15 @@ const corsHeaders = {
 
 const OCR_SPACE_KEY = 'K82045193188957';
 
-// ✅ Função segura para converter Uint8Array para Base64 (evita stack overflow)
+// ✅ Função ULTRA-SEGURA para converter Uint8Array para Base64 (loop byte-a-byte)
+// MOTIVO: String.fromCharCode.apply() e spread operator (...) estouram a pilha
+// em arrays > 65.536 elementos. Este loop é O(n) e não usa recursão.
 function uint8ArrayToBase64(bytes: Uint8Array): string {
-  const CHUNK_SIZE = 32768; // 32KB chunks para evitar stack overflow
+  // Loop byte-a-byte: NUNCA estoura a pilha, independente do tamanho
   let binary = '';
-  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-    const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length));
-    // Usa spread operator em chunks pequenos (seguros)
-    binary += String.fromCharCode(...chunk);
+  const len = bytes.length;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary);
 }

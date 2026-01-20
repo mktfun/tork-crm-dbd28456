@@ -42,7 +42,8 @@ import {
   validateImportItem,
   classifyImportError,
   createSeguradora,
-  createRamo
+  createRamo,
+  saveApoliceItens
 } from '@/services/policyImportService';
 import { useAppStore } from '@/store';
 import { useQueryClient } from '@tanstack/react-query';
@@ -105,7 +106,7 @@ const PremiumStepper = ({ phase }: StepperProps) => {
       {steps.map((step, idx) => {
         const status = getStepStatus(step.id);
         return (
-          <React.Fragment key={step.id}>
+          <div key={step.id} className="contents">
             <div className={cn(
               "flex items-center gap-2 transition-all duration-300",
               status === 'active' && "scale-105",
@@ -142,7 +143,7 @@ const PremiumStepper = ({ phase }: StepperProps) => {
                   : "bg-zinc-800"
               )} />
             )}
-          </React.Fragment>
+          </div>
         );
       })}
     </div>
@@ -632,7 +633,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         nomenclaturaElite += ` - ${seguradoraSigla} - ${tipoDoc}`;
         const insuredAssetFinal = nomenclaturaElite.substring(0, 100);
         
-        await addPolicy({
+        const newPolicy = await addPolicy({
           clientId: clientId!,
           policyNumber: item.numeroApolice,
           insuranceCompany: item.seguradoraId!,
@@ -649,6 +650,21 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           pdfUrl,
           brokerageId: activeBrokerageId ? Number(activeBrokerageId) : undefined,
         });
+
+        // 🚗 Salvar itens estruturados (veículos) se for ramo Auto
+        if (newPolicy?.id && item.ramoNome) {
+          try {
+            await saveApoliceItens(
+              newPolicy.id,
+              item.ramoNome,
+              item.objetoSegurado || '',
+              item.identificacaoAdicional,
+              user.id
+            );
+          } catch (itemError) {
+            console.warn('⚠️ [ITENS] Erro ao salvar itens, mas apólice criada:', itemError);
+          }
+        }
 
         success++;
       } catch (error: any) {
