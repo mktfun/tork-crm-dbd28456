@@ -19,17 +19,6 @@ const KEYWORDS = [
   'RESIDENCIAL', 'IMOVEL', 'VIDA', 'EMPRESA'
 ];
 
-// Converte Uint8Array para Base64 de forma segura (evita stack overflow)
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  const CHUNK_SIZE = 32768; // 32KB chunks - seguro para o call stack
-  let binaryString = '';
-  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-    const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length));
-    binaryString += String.fromCharCode(...chunk);
-  }
-  return btoa(binaryString);
-}
-
 // Avalia qualidade do texto extraído
 function evaluateTextQuality(text: string): { score: number; keywordHits: number } {
   const upperText = text.toUpperCase();
@@ -232,8 +221,8 @@ serve(async (req) => {
           } else {
             console.log(`🔍 [OCR] Chamando OCR.space para ${file.fileName}...`);
             
-            // Converte miniPdfBytes para base64 (usa função segura para evitar stack overflow)
-            const miniBase64 = uint8ArrayToBase64(miniPdfBytes);
+            // Converte miniPdfBytes para base64
+            const miniBase64 = btoa(String.fromCharCode.apply(null, miniPdfBytes as unknown as number[]));
             
             const formData = new FormData();
             formData.append('apikey', OCR_SPACE_KEY);
