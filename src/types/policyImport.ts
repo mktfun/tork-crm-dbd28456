@@ -36,6 +36,22 @@ export type ClientReconcileStatus = 'matched' | 'new';
 // Tipo de documento detectado pela IA
 export type DocumentType = 'APOLICE' | 'PROPOSTA' | 'ORCAMENTO' | 'ENDOSSO';
 
+// ============================================================
+// PHASE 3: Import Error Interface
+// ============================================================
+
+export type ImportErrorStage = 'cliente' | 'upload' | 'apolice';
+
+export interface ImportError {
+  itemId: string;
+  fileName: string;
+  clientName: string;
+  stage: ImportErrorStage;
+  errorCode: string;
+  errorMessage: string;
+  details?: string;
+}
+
 // Item processado para a tabela de revisão
 export interface PolicyImportItem {
   id: string;              // UUID temporário

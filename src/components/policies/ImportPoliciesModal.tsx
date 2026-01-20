@@ -11,8 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Upload, FileText, Check, AlertCircle, Loader2, UserCheck, UserPlus, X, Sparkles, Clock, AlertTriangle, Zap, Eye, ExternalLink, Car } from 'lucide-react';
+import { Upload, FileText, Check, AlertCircle, Loader2, UserCheck, UserPlus, X, Sparkles, Clock, AlertTriangle, Zap, Eye, ExternalLink, Car, Plus, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSupabaseCompanies } from '@/hooks/useSupabaseCompanies';
@@ -27,7 +29,8 @@ import {
   PolicyImportItem, 
   BulkOCRExtractedPolicy,
   BulkOCRResponse,
-  DocumentType
+  DocumentType,
+  ImportError
 } from '@/types/policyImport';
 import { 
   reconcileClient, 
@@ -36,9 +39,13 @@ import {
   createClient,
   createClientFromEdited,
   uploadPolicyPdf,
-  validateImportItem 
+  validateImportItem,
+  classifyImportError,
+  createSeguradora,
+  createRamo
 } from '@/services/policyImportService';
 import { useAppStore } from '@/store';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ImportPoliciesModalProps {
   open: boolean;
@@ -152,6 +159,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
   const activeBrokerageId = useAppStore(state => state.activeBrokerageId);
   const setActiveBrokerage = useAppStore(state => state.setActiveBrokerage);
   const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
   
   useEffect(() => {
     if (!activeBrokerageId && brokerages.length > 0 && open) {
@@ -166,6 +174,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
   const [items, setItems] = useState<PolicyImportItem[]>([]);
   const [processingIndex, setProcessingIndex] = useState(0);
   const [importResults, setImportResults] = useState({ success: 0, errors: 0 });
+  const [importErrors, setImportErrors] = useState<ImportError[]>([]);
   const [processingStatus, setProcessingStatus] = useState<Map<number, FileProcessingStatus>>(new Map());
   
   const [batchProducerId, setBatchProducerId] = useState<string>('');
@@ -196,6 +205,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     setItems([]);
     setProcessingIndex(0);
     setImportResults({ success: 0, errors: 0 });
+    setImportErrors([]);
     setBatchProducerId('');
     setBatchCommissionRate('');
     setProcessingStatus(new Map());
@@ -564,9 +574,11 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
 
     setStep('processing');
     setProcessingIndex(0);
+    setImportErrors([]);
     
     let success = 0;
     let errors = 0;
+    const collectedErrors: ImportError[] = [];
 
     for (let i = 0; i < validItems.length; i++) {
       setProcessingIndex(i);
@@ -584,9 +596,6 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
             item.extracted.cliente.endereco_completo,
             user.id
           );
-          if (!newClient) {
-            throw new Error('Falha ao criar cliente');
-          }
           clientId = newClient.id;
         }
 
@@ -642,12 +651,27 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         });
 
         success++;
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ [ERROR] Falha ao importar:', item.fileName, error);
+        
+        // Classify and collect error
+        const importError = classifyImportError(error, item);
+        collectedErrors.push(importError);
+        
+        // Log formatted error
+        console.table([{
+          arquivo: item.fileName,
+          cliente: item.clientName,
+          etapa: importError.stage,
+          codigo: importError.errorCode,
+          mensagem: importError.errorMessage
+        }]);
+        
         errors++;
       }
     }
 
+    setImportErrors(collectedErrors);
     setImportResults({ success, errors });
     setStep('complete');
   };
@@ -1410,7 +1434,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
 
         {/* Step: Complete - BLACK & SILVER */}
         {step === 'complete' && (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6">
+          <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6 overflow-auto">
             <div className="w-20 h-20 rounded-full bg-zinc-800/50 flex items-center justify-center border border-zinc-600/50 shadow-lg shadow-zinc-500/10">
               <Check className="w-10 h-10 text-zinc-200" />
             </div>
@@ -1427,6 +1451,50 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
               <Badge variant="outline" className="text-zinc-300 border-zinc-500/50 px-4 py-2">
                 ⚡ Tempo total: {processingMetrics.totalDurationSec}s
               </Badge>
+            )}
+
+            {/* Error Details Table */}
+            {importErrors.length > 0 && (
+              <Collapsible className="w-full max-w-2xl">
+                <CollapsibleTrigger className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors w-full justify-center">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span className="text-sm font-medium">{importErrors.length} erro(s) detalhado(s)</span>
+                  <ChevronDown className="w-4 h-4" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <div className="border border-zinc-700/50 rounded-lg overflow-hidden bg-zinc-900/50">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-b border-zinc-700/50 hover:bg-transparent">
+                          <TableHead className="text-zinc-500 text-xs">Arquivo</TableHead>
+                          <TableHead className="text-zinc-500 text-xs">Cliente</TableHead>
+                          <TableHead className="text-zinc-500 text-xs">Etapa</TableHead>
+                          <TableHead className="text-zinc-500 text-xs">Erro</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {importErrors.map((err, idx) => (
+                          <TableRow key={idx} className="border-b border-zinc-800/50">
+                            <TableCell className="text-zinc-400 text-xs max-w-[150px] truncate">{err.fileName}</TableCell>
+                            <TableCell className="text-zinc-300 text-xs">{err.clientName}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={cn(
+                                "text-[10px]",
+                                err.stage === 'cliente' && "border-yellow-500/50 text-yellow-400",
+                                err.stage === 'upload' && "border-blue-500/50 text-blue-400",
+                                err.stage === 'apolice' && "border-red-500/50 text-red-400"
+                              )}>
+                                {err.stage}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-red-400 text-xs">{err.errorMessage}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             )}
 
             <Button 
