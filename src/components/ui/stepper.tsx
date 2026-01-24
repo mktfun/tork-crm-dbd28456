@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Check, Circle } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StepperProps {
@@ -11,7 +11,7 @@ interface StepperProps {
 
 export function Stepper({ steps, currentStep, className }: StepperProps) {
   return (
-    <div className={cn("flex items-center justify-between w-full mb-8", className)}>
+    <div className={cn("flex items-center justify-center w-full mb-8", className)}>
       {steps.map((step, index) => {
         const stepNumber = index + 1;
         const isCompleted = stepNumber < currentStep;
@@ -23,22 +23,26 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
             <div className="flex flex-col items-center">
               <div
                 className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all duration-200",
-                  (isCompleted || isActive) ? "bg-blue-600 border-blue-600 text-white" : "bg-slate-800 border-slate-600 text-slate-400"
+                  "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300",
+                  isCompleted 
+                    ? "bg-primary border-primary text-primary-foreground" 
+                    : isActive 
+                      ? "bg-primary/10 border-primary text-primary" 
+                      : "bg-muted/50 border-muted-foreground/30 text-muted-foreground"
                 )}
               >
                 {isCompleted ? (
-                  <Check size={16} />
+                  <Check className="h-5 w-5" strokeWidth={3} />
                 ) : (
-                  <Circle size={16} fill="currentColor" />
+                  <span className="text-sm font-semibold">{stepNumber}</span>
                 )}
               </div>
               
               {/* Step Label */}
               <span
                 className={cn(
-                  "mt-2 text-xs font-medium transition-colors duration-200",
-                  (isActive || isCompleted) ? "text-blue-400" : "text-slate-400"
+                  "mt-2 text-xs font-medium transition-colors duration-200 whitespace-nowrap",
+                  isActive ? "text-primary" : isCompleted ? "text-foreground" : "text-muted-foreground"
                 )}
               >
                 {step}
@@ -49,8 +53,8 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
             {index < steps.length - 1 && (
               <div
                 className={cn(
-                  "h-0.5 w-16 mx-4 transition-colors duration-200",
-                  stepNumber < currentStep ? "bg-blue-600" : "bg-slate-600"
+                  "h-0.5 w-12 sm:w-20 mx-2 sm:mx-4 transition-colors duration-300",
+                  stepNumber < currentStep ? "bg-primary" : "bg-muted-foreground/20"
                 )}
               />
             )}
@@ -60,3 +64,4 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
     </div>
   );
 }
+

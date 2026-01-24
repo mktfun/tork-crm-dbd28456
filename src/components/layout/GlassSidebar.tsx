@@ -16,7 +16,8 @@ import {
   Megaphone,
   Kanban,
   Wallet,
-  BookOpen
+  BookOpen,
+  Bot
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChangelogs } from '@/hooks/useChangelogs';
@@ -43,6 +44,7 @@ const menuSections = [
     title: 'Comercial',
     items: [
       { id: 'crm', name: 'CRM', icon: Kanban, path: '/dashboard/crm' },
+      { id: 'automation', name: 'Automação IA', icon: Bot, path: '/dashboard/crm/automation' },
     ]
   },
   {
