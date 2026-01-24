@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -25,10 +24,10 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
                 className={cn(
                   "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300",
                   isCompleted 
-                    ? "bg-primary border-primary text-primary-foreground" 
+                    ? "bg-zinc-700 border-zinc-700 text-zinc-100" 
                     : isActive 
-                      ? "bg-primary/10 border-primary text-primary" 
-                      : "bg-muted/50 border-muted-foreground/30 text-muted-foreground"
+                      ? "bg-zinc-900 border-zinc-500 text-zinc-100" 
+                      : "bg-zinc-900/50 border-zinc-800 text-zinc-500"
                 )}
               >
                 {isCompleted ? (
@@ -42,7 +41,7 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
               <span
                 className={cn(
                   "mt-2 text-xs font-medium transition-colors duration-200 whitespace-nowrap",
-                  isActive ? "text-primary" : isCompleted ? "text-foreground" : "text-muted-foreground"
+                  isActive ? "text-zinc-100" : isCompleted ? "text-zinc-300" : "text-zinc-500"
                 )}
               >
                 {step}
@@ -54,7 +53,7 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
               <div
                 className={cn(
                   "h-0.5 w-12 sm:w-20 mx-2 sm:mx-4 transition-colors duration-300",
-                  stepNumber < currentStep ? "bg-primary" : "bg-muted-foreground/20"
+                  stepNumber < currentStep ? "bg-zinc-600" : "bg-zinc-800"
                 )}
               />
             )}
@@ -64,4 +63,3 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
     </div>
   );
 }
-
