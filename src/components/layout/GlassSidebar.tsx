@@ -91,11 +91,17 @@ export function GlassSidebar() {
     setIsCollapsed(!isCollapsed);
   };
 
-  // Helper function to check if current path is active
+  // Helper function to check if current path is active - exact match for parent routes
   const isPathActive = (itemPath: string) => {
+    // Dashboard raiz: match exato
     if (itemPath === '/dashboard') {
       return location.pathname === '/dashboard' || location.pathname === '/dashboard/';
     }
+    // CRM raiz: match exato (evita highlight duplo com /crm/automation)
+    if (itemPath === '/dashboard/crm') {
+      return location.pathname === '/dashboard/crm' || location.pathname === '/dashboard/crm/';
+    }
+    // Todas as outras rotas: prefixo
     return location.pathname.startsWith(itemPath);
   };
 

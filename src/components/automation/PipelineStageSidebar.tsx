@@ -86,15 +86,15 @@ function SortableStageItem({
         isDragging && "z-50"
       )}
     >
-      {/* Connector Line */}
-      <div className="absolute left-6 top-full w-0.5 h-4 bg-gradient-to-b from-border/50 to-transparent" />
+      {/* Connector Line - simplified */}
+      <div className="absolute left-5 top-full w-px h-3 bg-zinc-800" />
       
       <div
         className={cn(
-          "relative flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer",
+          "relative flex items-center gap-2 p-2.5 rounded-lg border transition-all duration-150 cursor-pointer",
           isSelected
-            ? "border-primary bg-primary/10 shadow-lg shadow-primary/10"
-            : "border-border/50 bg-card/50 hover:border-primary/30 hover:bg-card/80",
+            ? "border-primary/50 bg-primary/5"
+            : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-900",
           isDragging && "opacity-50"
         )}
         onClick={onSelect}
@@ -110,8 +110,8 @@ function SortableStageItem({
 
         {/* Color Indicator */}
         <div
-          className="w-3 h-3 rounded-full ring-2 ring-offset-2 ring-offset-background"
-          style={{ backgroundColor: stage.color, boxShadow: `0 0 8px ${stage.color}40` }}
+          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+          style={{ backgroundColor: stage.color }}
         />
 
         {/* Stage Name */}
@@ -230,29 +230,20 @@ export function PipelineStageSidebar({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border/50">
-        <div className="flex items-center gap-2">
-          <Bot className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold text-foreground">Etapas do Funil</h3>
-        </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onAddStage}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Adicionar etapa</TooltipContent>
-        </Tooltip>
+      <div className="flex items-center justify-between p-3 border-b border-zinc-800">
+        <h3 className="text-sm font-medium text-foreground">Etapas</h3>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onAddStage}>
+          <Plus className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Stages List */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-3">
         {sortedStages.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Bot className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">Nenhuma etapa criada</p>
-            <Button variant="link" size="sm" onClick={onAddStage} className="mt-2">
-              Criar primeira etapa
+          <div className="text-center py-6 text-muted-foreground">
+            <p className="text-xs">Nenhuma etapa</p>
+            <Button variant="link" size="sm" onClick={onAddStage} className="mt-1 text-xs">
+              Criar etapa
             </Button>
           </div>
         ) : (
@@ -265,7 +256,7 @@ export function PipelineStageSidebar({
               items={sortedStages.map((s) => s.id)}
               strategy={verticalListSortingStrategy}
             >
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {sortedStages.map((stage) => {
                   const aiSetting = aiSettings.find((s) => s.stage_id === stage.id);
                   const isAiActive = aiSetting?.is_active ?? false;

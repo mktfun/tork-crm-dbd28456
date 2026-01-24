@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Save, Sparkles, Info, AlertCircle } from 'lucide-react';
+import { Bot, Save, Sparkles, Info, AlertCircle, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { GlassCard } from '@/components/ui/glass-card';
 import { cn } from '@/lib/utils';
+import { AI_PERSONA_PRESETS, AIPreset } from './aiPresets';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface StageAIConfigPanelProps {
   stage: {
@@ -129,21 +138,28 @@ export function StageAIConfigPanel({
     );
   }
 
+  const applyPreset = (preset: AIPreset) => {
+    setAiPersona(preset.persona);
+    setAiObjective(preset.objective);
+    setAiCustomRules(preset.rules);
+    setHasChanges(true);
+  };
+
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden bg-zinc-950/50">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 sm:p-6 border-b border-border/50">
+      <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/5 bg-zinc-900/50">
         <div className="flex items-center gap-3">
           <div
-            className="w-4 h-4 rounded-full ring-2 ring-offset-2 ring-offset-background"
-            style={{ backgroundColor: stage.color, boxShadow: `0 0 12px ${stage.color}50` }}
+            className="w-4 h-4 rounded-full ring-2 ring-offset-2 ring-offset-zinc-900"
+            style={{ backgroundColor: stage.color }}
           />
           <div>
             <h2 className="text-lg font-semibold text-foreground">
-              DNA da Etapa: {stage.name}
+              {stage.name}
             </h2>
             <p className="text-sm text-muted-foreground">
-              Configure como a IA deve se comportar nesta etapa
+              Configuração do agente para esta etapa
             </p>
           </div>
         </div>
@@ -151,141 +167,157 @@ export function StageAIConfigPanel({
         <Button
           onClick={handleSave}
           disabled={!hasChanges || isSaving}
-          className={cn(
-            "gap-2 transition-all",
-            hasChanges && "animate-pulse"
-          )}
+          size="sm"
         >
-          <Save className="h-4 w-4" />
-          {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+          <Save className="h-4 w-4 mr-2" />
+          {isSaving ? 'Salvando...' : 'Salvar'}
         </Button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-        {/* AI Toggle */}
-        <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-primary/5 to-transparent border border-primary/20">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
-              isActive ? "bg-emerald-500/20" : "bg-muted"
-            )}>
-              <Sparkles className={cn(
-                "h-5 w-5 transition-colors",
-                isActive ? "text-emerald-400" : "text-muted-foreground"
-              )} />
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+        {/* AI Toggle Card */}
+        <GlassCard className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center",
+                isActive ? "bg-emerald-500/20" : "bg-zinc-800"
+              )}>
+                <Sparkles className={cn(
+                  "h-4 w-4",
+                  isActive ? "text-emerald-400" : "text-muted-foreground"
+                )} />
+              </div>
+              <div>
+                <Label className="font-medium">Agente de IA</Label>
+                <p className="text-xs text-muted-foreground">
+                  {isActive ? "Ativo" : "Manual"}
+                </p>
+              </div>
             </div>
-            <div>
-              <Label className="text-base font-medium">Agente de IA Ativo</Label>
-              <p className="text-sm text-muted-foreground">
-                {isActive 
-                  ? "A IA responderá automaticamente nesta etapa" 
-                  : "Atendimento manual - a IA não responderá"
-                }
-              </p>
-            </div>
+            <Switch checked={isActive} onCheckedChange={setIsActive} />
           </div>
-          <Switch
-            checked={isActive}
-            onCheckedChange={setIsActive}
-          />
-        </div>
+        </GlassCard>
 
         {!isActive && (
-          <Alert>
+          <Alert className="bg-zinc-900/50 border-zinc-800">
             <Info className="h-4 w-4" />
-            <AlertDescription>
-              A IA está desativada nesta etapa. As configurações abaixo serão aplicadas quando você ativar o agente.
+            <AlertDescription className="text-sm">
+              IA desativada. Configure para uso futuro.
             </AlertDescription>
           </Alert>
         )}
 
+        {/* Preset Selector */}
+        <GlassCard className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <Label className="flex items-center gap-2">
+              <Wand2 className="h-4 w-4 text-primary" />
+              Aplicar Preset
+            </Label>
+          </div>
+          <Select onValueChange={(id) => {
+            const preset = AI_PERSONA_PRESETS.find(p => p.id === id);
+            if (preset) applyPreset(preset);
+          }}>
+            <SelectTrigger className="bg-zinc-900/50 border-zinc-800">
+              <SelectValue placeholder="Selecione um modelo de persona..." />
+            </SelectTrigger>
+            <SelectContent>
+              {AI_PERSONA_PRESETS.map((preset) => (
+                <SelectItem key={preset.id} value={preset.id}>
+                  <span className="flex items-center gap-2">
+                    <span>{preset.emoji}</span>
+                    <span>{preset.name}</span>
+                    <span className="text-xs text-muted-foreground">— {preset.description}</span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-2">
+            Presets preenchem os campos abaixo. Você pode editá-los depois.
+          </p>
+        </GlassCard>
+
         {/* Form Fields */}
-        <div className="grid gap-6">
-          {/* Agent Name Override */}
+        <GlassCard className="p-4 space-y-4">
+          {/* Agent Name */}
           <div className="space-y-2">
-            <Label htmlFor="aiName" className="flex items-center gap-2">
-              <Bot className="h-4 w-4 text-primary" />
-              Nome do Agente (nesta etapa)
+            <Label htmlFor="aiName" className="text-sm flex items-center gap-2">
+              <Bot className="h-3.5 w-3.5 text-primary" />
+              Nome do Agente
             </Label>
             <Input
               id="aiName"
-              placeholder={globalConfig?.agent_name || "Nome do agente..."}
+              placeholder={globalConfig?.agent_name || "Nome..."}
               value={aiName}
               onChange={(e) => setAiName(e.target.value)}
-              className="bg-background/50"
+              className="bg-zinc-900/50 border-zinc-800"
             />
-            <p className="text-xs text-muted-foreground">
-              Deixe em branco para usar o nome global: "{globalConfig?.agent_name}"
-            </p>
           </div>
 
           {/* Persona */}
           <div className="space-y-2">
-            <Label htmlFor="aiPersona">Personalidade / Persona</Label>
+            <Label htmlFor="aiPersona" className="text-sm">Personalidade</Label>
             <Textarea
               id="aiPersona"
-              placeholder="Ex: Você é um consultor de seguros experiente e empático. Sempre demonstre interesse genuíno pelo cliente..."
+              placeholder="Descreva como o agente deve se comportar..."
               value={aiPersona}
               onChange={(e) => setAiPersona(e.target.value)}
-              className="min-h-[100px] bg-background/50 resize-none"
+              className="min-h-[80px] bg-zinc-900/50 border-zinc-800 resize-none text-sm"
             />
           </div>
 
           {/* Objective */}
           <div className="space-y-2">
-            <Label htmlFor="aiObjective">Objetivo Principal</Label>
+            <Label htmlFor="aiObjective" className="text-sm">Objetivo</Label>
             <Textarea
               id="aiObjective"
-              placeholder="Ex: Qualificar o lead identificando: tipo de seguro desejado, orçamento disponível e urgência. Ao final, agendar uma ligação."
+              placeholder="O que o agente deve alcançar nesta etapa..."
               value={aiObjective}
               onChange={(e) => setAiObjective(e.target.value)}
-              className="min-h-[100px] bg-background/50 resize-none"
+              className="min-h-[80px] bg-zinc-900/50 border-zinc-800 resize-none text-sm"
             />
           </div>
 
           {/* Custom Rules */}
           <div className="space-y-2">
-            <Label htmlFor="aiCustomRules">Regras Específicas</Label>
+            <Label htmlFor="aiCustomRules" className="text-sm">Regras Específicas</Label>
             <Textarea
               id="aiCustomRules"
-              placeholder="Ex: Nunca mencione preços antes de coletar todas as informações. Se o cliente perguntar sobre sinistros, transfira para atendimento humano."
+              placeholder="Regras e restrições para esta etapa..."
               value={aiCustomRules}
               onChange={(e) => setAiCustomRules(e.target.value)}
-              className="min-h-[120px] bg-background/50 resize-none"
+              className="min-h-[100px] bg-zinc-900/50 border-zinc-800 resize-none text-sm"
             />
           </div>
 
           {/* Max Messages */}
-          <div className="space-y-2">
-            <Label htmlFor="maxMessages">Máximo de Mensagens antes de Transferir</Label>
-            <div className="flex items-center gap-4">
-              <Input
-                id="maxMessages"
-                type="number"
-                min={1}
-                max={50}
-                value={maxMessages}
-                onChange={(e) => setMaxMessages(parseInt(e.target.value) || 10)}
-                className="w-24 bg-background/50"
-              />
-              <span className="text-sm text-muted-foreground">
-                mensagens antes de escalar para humano
-              </span>
-            </div>
+          <div className="flex items-center justify-between pt-2 border-t border-zinc-800">
+            <Label htmlFor="maxMessages" className="text-sm">
+              Limite de mensagens antes de escalar
+            </Label>
+            <Input
+              id="maxMessages"
+              type="number"
+              min={1}
+              max={50}
+              value={maxMessages}
+              onChange={(e) => setMaxMessages(parseInt(e.target.value) || 10)}
+              className="w-20 bg-zinc-900/50 border-zinc-800 text-center"
+            />
           </div>
-        </div>
+        </GlassCard>
 
-        {/* Global Config Info */}
+        {/* Global Config Reference */}
         {globalConfig?.base_instructions && (
-          <Alert className="bg-muted/30">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Instruções Base Globais:</strong> "{globalConfig.base_instructions.substring(0, 100)}..."
-              <br />
-              <span className="text-xs">Estas instruções são aplicadas em todas as etapas.</span>
-            </AlertDescription>
-          </Alert>
+          <GlassCard className="p-3 bg-zinc-900/30">
+            <p className="text-xs text-muted-foreground">
+              <strong>Base Global:</strong> {globalConfig.base_instructions.substring(0, 80)}...
+            </p>
+          </GlassCard>
         )}
       </div>
     </div>
