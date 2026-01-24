@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { KanbanBoard } from '@/components/crm/KanbanBoard';
+import { AutomationCenter } from '@/components/crm/AutomationCenter';
 import { PipelineSelector } from '@/components/crm/PipelineSelector';
 import { PipelineManagerModal } from '@/components/crm/PipelineManagerModal';
 import { useCRMPipelines } from '@/hooks/useCRMPipelines';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, MessageCircle, Loader2, Plus, Sparkles } from 'lucide-react';
+import { RefreshCw, MessageCircle, Loader2, Plus, Sparkles, Bot, LayoutGrid } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
@@ -14,6 +15,7 @@ export default function CRM() {
   const { pipelines, isLoading, createPipeline } = useCRMPipelines();
   const [selectedPipelineId, setSelectedPipelineId] = useLocalStorage<string | null>('crm-selected-pipeline', null);
   const [showPipelineManager, setShowPipelineManager] = useState(false);
+  const [activeTab, setActiveTab] = useState<'kanban' | 'automation'>('kanban');
 
   // Auto-selecionar pipeline default se nenhum selecionado
   useEffect(() => {
@@ -122,6 +124,28 @@ export default function CRM() {
             onManage={() => setShowPipelineManager(true)}
           />
           
+          {/* Tab Switcher */}
+          <div className="flex items-center rounded-lg bg-muted/50 p-1">
+            <Button 
+              variant={activeTab === 'kanban' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('kanban')}
+              className="h-8"
+            >
+              <LayoutGrid className="h-4 w-4 mr-2" />
+              Kanban
+            </Button>
+            <Button 
+              variant={activeTab === 'automation' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('automation')}
+              className="h-8"
+            >
+              <Bot className="h-4 w-4 mr-2" />
+              Automação IA
+            </Button>
+          </div>
+          
           <Button variant="outline" size="sm">
             <RefreshCw className="h-4 w-4 mr-2" />
             Sincronizar
@@ -137,13 +161,15 @@ export default function CRM() {
         </div>
       </motion.div>
 
-      {/* Kanban Board */}
+      {/* Content based on active tab */}
       <motion.div
+        key={activeTab}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <KanbanBoard pipelineId={selectedPipelineId} />
+        {activeTab === 'kanban' && <KanbanBoard pipelineId={selectedPipelineId} />}
+        {activeTab === 'automation' && <AutomationCenter pipelineId={selectedPipelineId} />}
       </motion.div>
 
       {/* Pipeline Manager Modal */}
