@@ -137,59 +137,56 @@ export function AIAutomationDashboard() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 sm:p-6 border-b border-border/50 bg-background/50 backdrop-blur-sm">
+    <div className="flex flex-col h-full bg-zinc-950">
+      {/* Header - Clean, minimal */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 sm:p-6 border-b border-zinc-800 bg-zinc-900/50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center">
-            <Bot className="h-5 w-5 text-primary" />
-          </div>
+          <Bot className="h-5 w-5 text-primary" />
           <div>
-            <h1 className="text-xl font-bold text-foreground">Centro de Automação</h1>
-            <p className="text-sm text-muted-foreground">Configure o DNA da IA para cada etapa</p>
+            <h1 className="text-lg font-semibold text-foreground">Centro de Automação</h1>
+            <p className="text-xs text-muted-foreground">Configure o DNA da IA por etapa</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          {/* Pipeline Selector */}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Select
             value={selectedPipelineId || undefined}
             onValueChange={setSelectedPipelineId}
           >
-            <SelectTrigger className="w-full sm:w-[200px] bg-background/50">
-              <SelectValue placeholder="Selecione um funil" />
+            <SelectTrigger className="w-full sm:w-[180px] bg-zinc-900 border-zinc-800 h-9">
+              <SelectValue placeholder="Funil" />
             </SelectTrigger>
             <SelectContent>
               {pipelines.map((pipeline) => (
                 <SelectItem key={pipeline.id} value={pipeline.id}>
                   {pipeline.name}
-                  {pipeline.is_default && " (padrão)"}
+                  {pipeline.is_default && " ★"}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          {/* Pipeline Actions */}
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
+            className="h-9 w-9"
             onClick={() => setEditingPipeline(selectedPipeline)}
             disabled={!selectedPipeline}
           >
             <Settings className="h-4 w-4" />
           </Button>
 
-          <Button onClick={() => setShowNewPipeline(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Novo Funil</span>
+          <Button onClick={() => setShowNewPipeline(true)} size="sm" className="h-9">
+            <Plus className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Funil</span>
           </Button>
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content - Two columns */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Sidebar - Stages List */}
-        <div className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r border-border/50 bg-card/30 overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-full lg:w-72 border-b lg:border-b-0 lg:border-r border-zinc-800 bg-zinc-900/30 overflow-hidden">
           <PipelineStageSidebar
             stages={stages}
             aiSettings={aiSettings}
@@ -202,8 +199,8 @@ export function AIAutomationDashboard() {
           />
         </div>
 
-        {/* Main Panel - Stage Config */}
-        <div className="flex-1 overflow-hidden bg-background/30">
+        {/* Config Panel */}
+        <div className="flex-1 overflow-hidden">
           <StageAIConfigPanel
             stage={selectedStage}
             aiSetting={selectedAiSetting}
