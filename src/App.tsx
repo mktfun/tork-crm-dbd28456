@@ -33,6 +33,7 @@ import TransactionSettings from "./pages/settings/TransactionSettings";
 import RamoSettings from "./pages/settings/RamoSettings";
 import Novidades from "./pages/Novidades";
 import CRM from "./pages/CRM";
+import AIAutomation from "./pages/AIAutomation";
 import ChatTorkSettings from "./pages/settings/ChatTorkSettings";
 import PortalSettings from "./pages/settings/PortalSettings";
 import Documentation from "./pages/Documentation";
@@ -110,6 +111,7 @@ function App() {
                   <Route path="reports" element={<Reports />} />
                   <Route path="novidades" element={<Novidades />} />
                   <Route path="crm" element={<CRM />} />
+                  <Route path="crm/automation" element={<AIAutomation />} />
                   <Route path="documentacao" element={<Documentation />} />
                   <Route path="demo/mobile-menu" element={<ModernMobileMenuDemo />} />
                   

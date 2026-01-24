@@ -622,6 +622,42 @@ export type Database = {
           },
         ]
       }
+      crm_ai_global_config: {
+        Row: {
+          agent_name: string | null
+          base_instructions: string | null
+          company_name: string | null
+          created_at: string | null
+          id: string
+          onboarding_completed: boolean | null
+          updated_at: string | null
+          user_id: string
+          voice_tone: string | null
+        }
+        Insert: {
+          agent_name?: string | null
+          base_instructions?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          id?: string
+          onboarding_completed?: boolean | null
+          updated_at?: string | null
+          user_id: string
+          voice_tone?: string | null
+        }
+        Update: {
+          agent_name?: string | null
+          base_instructions?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          id?: string
+          onboarding_completed?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+          voice_tone?: string | null
+        }
+        Relationships: []
+      }
       crm_ai_settings: {
         Row: {
           ai_custom_rules: string | null
