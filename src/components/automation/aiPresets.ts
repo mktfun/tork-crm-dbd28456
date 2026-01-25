@@ -20,6 +20,8 @@ export const DYNAMIC_VARIABLES = [
   { variable: '{{ai_name}}', description: 'Nome do agente configurado' },
   { variable: '{{company_name}}', description: 'Nome da empresa' },
   { variable: '{{lead_name}}', description: 'Nome do lead (se disponível)' },
+  { variable: '{{deal_title}}', description: 'Título do negócio/oportunidade' },
+  { variable: '{{pipeline_name}}', description: 'Nome do funil de vendas' },
 ];
 
 // Regras globais anti-robô - injetar em todos os prompts no system prompt da LLM
