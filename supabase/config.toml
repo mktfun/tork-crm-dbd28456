@@ -1,1 +1,37 @@
 project_id = "jaouwhckqqnaxqyfvgyq"
+
+[functions.ai-assistant]
+verify_jwt = false
+
+[functions.ai-sandbox]
+verify_jwt = false
+
+[functions.analyze-policy]
+verify_jwt = false
+
+[functions.analyze-receipt]
+verify_jwt = false
+
+[functions.auto-changelog]
+verify_jwt = false
+
+[functions.backfill-commissions]
+verify_jwt = false
+
+[functions.chatwoot-sync]
+verify_jwt = false
+
+[functions.chatwoot-webhook]
+verify_jwt = false
+
+[functions.create-next-appointment]
+verify_jwt = false
+
+[functions.enrich-old-transactions]
+verify_jwt = false
+
+[functions.extract-quote-data]
+verify_jwt = false
+
+[functions.ocr-bulk-analyze]
+verify_jwt = false
