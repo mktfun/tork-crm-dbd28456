@@ -709,13 +709,6 @@ export type Database = {
             referencedRelation: "crm_stages"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "crm_ai_settings_stage_id_fkey"
-            columns: ["stage_id"]
-            isOneToOne: true
-            referencedRelation: "v_n8n_agent_config"
-            referencedColumns: ["stage_id"]
-          },
         ]
       }
       crm_deals: {
@@ -789,12 +782,58 @@ export type Database = {
             referencedRelation: "crm_stages"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      crm_pipeline_ai_defaults: {
+        Row: {
+          ai_custom_rules: string | null
+          ai_name: string | null
+          ai_objective: string | null
+          ai_persona: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          max_messages_before_human: number | null
+          pipeline_id: string
+          updated_at: string | null
+          user_id: string
+          voice_id: string | null
+        }
+        Insert: {
+          ai_custom_rules?: string | null
+          ai_name?: string | null
+          ai_objective?: string | null
+          ai_persona?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_messages_before_human?: number | null
+          pipeline_id: string
+          updated_at?: string | null
+          user_id: string
+          voice_id?: string | null
+        }
+        Update: {
+          ai_custom_rules?: string | null
+          ai_name?: string | null
+          ai_objective?: string | null
+          ai_persona?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_messages_before_human?: number | null
+          pipeline_id?: string
+          updated_at?: string | null
+          user_id?: string
+          voice_id?: string | null
+        }
+        Relationships: [
           {
-            foreignKeyName: "crm_deals_stage_id_fkey"
-            columns: ["stage_id"]
-            isOneToOne: false
-            referencedRelation: "v_n8n_agent_config"
-            referencedColumns: ["stage_id"]
+            foreignKeyName: "crm_pipeline_ai_defaults_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: true
+            referencedRelation: "crm_pipelines"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2184,15 +2223,19 @@ export type Database = {
           ai_persona: string | null
           chatwoot_conversation_id: number | null
           chatwoot_label: string | null
+          client_email: string | null
           client_name: string | null
           client_phone: string | null
+          company_name: string | null
+          config_source: string | null
           deal_id: string | null
           deal_title: string | null
           max_messages: number | null
-          stage_id: string | null
+          pipeline_name: string | null
           stage_name: string | null
           user_id: string | null
           voice_id: string | null
+          voice_tone: string | null
         }
         Relationships: []
       }
