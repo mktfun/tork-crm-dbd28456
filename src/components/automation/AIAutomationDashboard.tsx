@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Plus, Settings, Loader2 } from 'lucide-react';
+import { Bot, Plus, Settings, Loader2, Dna } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCRMPipelines } from '@/hooks/useCRMPipelines';
 import { useCRMStages } from '@/hooks/useCRMDeals';
 import { useCrmAiSettings } from '@/hooks/useCrmAiSettings';
 import { useGlobalAiConfig } from '@/hooks/useGlobalAiConfig';
+import { usePipelineAiDefaults } from '@/hooks/usePipelineAiDefaults';
 import { PipelineStageSidebar } from './PipelineStageSidebar';
 import { StageAIConfigPanel } from './StageAIConfigPanel';
+import { PipelineAiDefaultsModal } from './PipelineAiDefaultsModal';
 import { NewPipelineModal } from '@/components/crm/NewPipelineModal';
 import { NewStageModal } from '@/components/crm/NewStageModal';
 import { StageEditModal } from '@/components/crm/StageEditModal';
@@ -23,6 +25,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function AIAutomationDashboard() {
   const { pipelines, isLoading: pipelinesLoading, deletePipeline } = useCRMPipelines();
@@ -38,6 +46,9 @@ export function AIAutomationDashboard() {
   // Get AI settings for selected pipeline
   const { aiSettings, upsertSetting, isLoading: aiSettingsLoading } = useCrmAiSettings(selectedPipeline?.id);
   
+  // Get pipeline AI defaults
+  const { pipelineDefault, resetStageToDefault, isLoading: pipelineDefaultLoading } = usePipelineAiDefaults(selectedPipeline?.id || null);
+  
   // Selected stage for editing
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const selectedStage = stages.find(s => s.id === selectedStageId) || null;
@@ -46,6 +57,7 @@ export function AIAutomationDashboard() {
   // Modals
   const [showNewPipeline, setShowNewPipeline] = useState(false);
   const [showNewStage, setShowNewStage] = useState(false);
+  const [showPipelineDefaults, setShowPipelineDefaults] = useState(false);
   const [editingStage, setEditingStage] = useState<any>(null);
   const [editingPipeline, setEditingPipeline] = useState<any>(null);
   const [deleteStageId, setDeleteStageId] = useState<string | null>(null);
@@ -96,6 +108,14 @@ export function AIAutomationDashboard() {
     }
   };
 
+  const handleResetToDefault = async (stageId: string) => {
+    try {
+      await resetStageToDefault.mutateAsync(stageId);
+    } catch (error) {
+      console.error('Error resetting stage:', error);
+    }
+  };
+
   const handleDeleteStage = async () => {
     if (!deleteStageId) return;
     try {
@@ -107,7 +127,14 @@ export function AIAutomationDashboard() {
     }
   };
 
-  const isLoading = pipelinesLoading || stagesLoading || aiSettingsLoading;
+  // Build stage config map for sidebar badges
+  const stageConfigMap = new Map<string, boolean>();
+  aiSettings.forEach(setting => {
+    // A stage has custom config if it has an ID (was saved to DB)
+    stageConfigMap.set(setting.stage_id, !!setting.id);
+  });
+
+  const isLoading = pipelinesLoading || stagesLoading || aiSettingsLoading || pipelineDefaultLoading;
 
   if (isLoading && pipelines.length === 0) {
     return (
@@ -177,6 +204,26 @@ export function AIAutomationDashboard() {
             </SelectContent>
           </Select>
 
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+                  onClick={() => setShowPipelineDefaults(true)}
+                  disabled={!selectedPipeline}
+                >
+                  <Dna className="h-4 w-4" />
+                  <span className="hidden sm:inline">DNA Padrão</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="bg-zinc-800 border-zinc-700 text-zinc-100">
+                Configurar DNA padrão do funil
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           <Button
             variant="ghost"
             size="icon"
@@ -205,6 +252,8 @@ export function AIAutomationDashboard() {
           <PipelineStageSidebar
             stages={stages}
             aiSettings={aiSettings}
+            stageConfigMap={stageConfigMap}
+            hasPipelineDefault={!!pipelineDefault}
             selectedStageId={selectedStageId}
             onSelectStage={setSelectedStageId}
             onReorderStages={handleReorderStages}
@@ -221,8 +270,11 @@ export function AIAutomationDashboard() {
             stage={selectedStage}
             aiSetting={selectedAiSetting}
             globalConfig={globalConfig}
+            pipelineDefault={pipelineDefault}
             onSave={handleSaveAiConfig}
+            onResetToDefault={handleResetToDefault}
             isSaving={upsertSetting.isPending}
+            isResetting={resetStageToDefault.isPending}
           />
         </div>
       </div>
@@ -238,6 +290,15 @@ export function AIAutomationDashboard() {
         onOpenChange={setShowNewStage}
         pipelineId={selectedPipeline?.id}
       />
+
+      {selectedPipeline && (
+        <PipelineAiDefaultsModal
+          open={showPipelineDefaults}
+          onOpenChange={setShowPipelineDefaults}
+          pipelineId={selectedPipeline.id}
+          pipelineName={selectedPipeline.name}
+        />
+      )}
 
       {editingStage && (
         <StageEditModal

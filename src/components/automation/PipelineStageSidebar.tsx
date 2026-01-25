@@ -1,5 +1,5 @@
 import React from 'react';
-import { GripVertical, Plus, Trash2, Settings } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Settings, Sparkles, GitBranch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -22,6 +22,12 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Stage {
   id: string;
@@ -38,6 +44,8 @@ interface AiSetting {
 interface PipelineStageSidebarProps {
   stages: Stage[];
   aiSettings: AiSetting[];
+  stageConfigMap?: Map<string, boolean>;
+  hasPipelineDefault?: boolean;
   selectedStageId: string | null;
   onSelectStage: (stageId: string) => void;
   onReorderStages: (stageIds: string[]) => void;
@@ -51,6 +59,8 @@ interface SortableStageItemProps {
   stage: Stage;
   isSelected: boolean;
   isAiActive: boolean;
+  hasCustomConfig: boolean;
+  hasPipelineDefault: boolean;
   onSelect: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -62,6 +72,8 @@ function SortableStageItem({
   stage,
   isSelected,
   isAiActive,
+  hasCustomConfig,
+  hasPipelineDefault,
   onSelect,
   onEdit,
   onDelete,
@@ -81,6 +93,35 @@ function SortableStageItem({
     transform: CSS.Transform.toString(transform),
     transition,
   };
+
+  // Determine inheritance badge
+  const getInheritanceBadge = () => {
+    if (hasCustomConfig) {
+      return {
+        label: 'DNA Próprio',
+        icon: Sparkles,
+        className: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+        tooltip: 'Esta etapa tem configuração customizada',
+      };
+    }
+    if (hasPipelineDefault) {
+      return {
+        label: 'Herda',
+        icon: GitBranch,
+        className: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+        tooltip: 'Usando DNA padrão do funil',
+      };
+    }
+    return {
+      label: 'Padrão',
+      icon: GitBranch,
+      className: 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20',
+      tooltip: 'Sem configuração definida',
+    };
+  };
+
+  const inheritanceBadge = getInheritanceBadge();
+  const InheritanceIcon = inheritanceBadge.icon;
 
   return (
     <div ref={setNodeRef} style={style}>
@@ -118,19 +159,41 @@ function SortableStageItem({
             <div className="font-medium text-zinc-100 truncate">
               {stage.name}
             </div>
-          </button>
+            <div className="flex items-center gap-1.5 mt-1">
+              {/* Inheritance Badge */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge 
+                      variant="outline"
+                      className={cn(
+                        "text-[10px] px-1.5 py-0 border font-medium",
+                        inheritanceBadge.className
+                      )}
+                    >
+                      <InheritanceIcon className="h-2.5 w-2.5 mr-0.5" />
+                      {inheritanceBadge.label}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="bg-zinc-800 border-zinc-700 text-zinc-100 text-xs">
+                    {inheritanceBadge.tooltip}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-          {/* AI Status Badge */}
-          <Badge 
-            className={cn(
-              "text-xs border-0 flex-shrink-0",
-              isAiActive 
-                ? "bg-zinc-800 text-emerald-400" 
-                : "bg-zinc-800/50 text-zinc-500"
-            )}
-          >
-            {isAiActive ? 'IA' : 'Manual'}
-          </Badge>
+              {/* AI Status Badge */}
+              <Badge 
+                className={cn(
+                  "text-[10px] px-1.5 py-0 border-0",
+                  isAiActive 
+                    ? "bg-zinc-800 text-emerald-400" 
+                    : "bg-zinc-800/50 text-zinc-500"
+                )}
+              >
+                {isAiActive ? 'IA' : 'Manual'}
+              </Badge>
+            </div>
+          </button>
         </div>
 
         {/* Actions Row */}
@@ -188,6 +251,8 @@ function SortableStageItem({
 export function PipelineStageSidebar({
   stages,
   aiSettings,
+  stageConfigMap = new Map(),
+  hasPipelineDefault = false,
   selectedStageId,
   onSelectStage,
   onReorderStages,
@@ -275,6 +340,8 @@ export function PipelineStageSidebar({
                     stage={stage}
                     isSelected={selectedStageId === stage.id}
                     isAiActive={getAiSetting(stage.id)}
+                    hasCustomConfig={stageConfigMap.get(stage.id) ?? false}
+                    hasPipelineDefault={hasPipelineDefault}
                     onSelect={() => onSelectStage(stage.id)}
                     onEdit={() => onEditStage(stage)}
                     onDelete={() => onDeleteStage(stage.id)}
