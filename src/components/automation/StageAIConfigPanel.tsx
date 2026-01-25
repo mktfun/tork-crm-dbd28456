@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
-import { AI_PERSONA_PRESETS, AIPreset, XML_TAGS_REFERENCE } from './aiPresets';
+import { AI_PERSONA_PRESETS, AIPreset, XML_TAGS_REFERENCE, DYNAMIC_VARIABLES } from './aiPresets';
 import {
   Select,
   SelectContent,
@@ -274,7 +274,13 @@ export function StageAIConfigPanel({
               className="min-h-[280px] bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 resize-none text-sm font-mono leading-relaxed"
             />
             <p className="text-xs text-zinc-500">
-              Use <span className="text-emerald-400 font-mono">{"{{company_name}}"}</span> para inserir o nome da empresa dinamicamente.
+              Variáveis disponíveis:{' '}
+              {DYNAMIC_VARIABLES.map((v, i) => (
+                <span key={v.variable}>
+                  <span className="text-emerald-400 font-mono">{v.variable}</span>
+                  {i < DYNAMIC_VARIABLES.length - 1 && ', '}
+                </span>
+              ))}
             </p>
           </div>
 
