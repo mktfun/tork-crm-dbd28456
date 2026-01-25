@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
-import { AI_PERSONA_PRESETS, AIPreset } from './aiPresets';
+import { AI_PERSONA_PRESETS, AIPreset, XML_TAGS_REFERENCE } from './aiPresets';
 import {
   Select,
   SelectContent,
@@ -55,9 +55,7 @@ export function StageAIConfigPanel({
   isSaving = false,
 }: StageAIConfigPanelProps) {
   const [aiName, setAiName] = useState('');
-  const [aiPersona, setAiPersona] = useState('');
-  const [aiObjective, setAiObjective] = useState('');
-  const [aiCustomRules, setAiCustomRules] = useState('');
+  const [xmlPrompt, setXmlPrompt] = useState('');
   const [isActive, setIsActive] = useState(false);
   const [maxMessages, setMaxMessages] = useState(10);
   const [hasChanges, setHasChanges] = useState(false);
@@ -66,16 +64,13 @@ export function StageAIConfigPanel({
   useEffect(() => {
     if (aiSetting) {
       setAiName(aiSetting.ai_name || globalConfig?.agent_name || '');
-      setAiPersona(aiSetting.ai_persona || '');
-      setAiObjective(aiSetting.ai_objective || '');
-      setAiCustomRules(aiSetting.ai_custom_rules || '');
+      // Use ai_persona to store the full XML prompt
+      setXmlPrompt(aiSetting.ai_persona || '');
       setIsActive(aiSetting.is_active ?? false);
       setMaxMessages(aiSetting.max_messages_before_human ?? 10);
     } else {
       setAiName(globalConfig?.agent_name || '');
-      setAiPersona('');
-      setAiObjective('');
-      setAiCustomRules('');
+      setXmlPrompt('');
       setIsActive(false);
       setMaxMessages(10);
     }
@@ -87,22 +82,18 @@ export function StageAIConfigPanel({
     if (!stage) return;
     
     const originalName = aiSetting?.ai_name || globalConfig?.agent_name || '';
-    const originalPersona = aiSetting?.ai_persona || '';
-    const originalObjective = aiSetting?.ai_objective || '';
-    const originalRules = aiSetting?.ai_custom_rules || '';
+    const originalPrompt = aiSetting?.ai_persona || '';
     const originalActive = aiSetting?.is_active ?? false;
     const originalMaxMessages = aiSetting?.max_messages_before_human ?? 10;
 
     const changed = 
       aiName !== originalName ||
-      aiPersona !== originalPersona ||
-      aiObjective !== originalObjective ||
-      aiCustomRules !== originalRules ||
+      xmlPrompt !== originalPrompt ||
       isActive !== originalActive ||
       maxMessages !== originalMaxMessages;
 
     setHasChanges(changed);
-  }, [aiName, aiPersona, aiObjective, aiCustomRules, isActive, maxMessages, aiSetting, globalConfig, stage]);
+  }, [aiName, xmlPrompt, isActive, maxMessages, aiSetting, globalConfig, stage]);
 
   const handleSave = async () => {
     if (!stage) return;
@@ -110,9 +101,7 @@ export function StageAIConfigPanel({
     await onSave({
       stage_id: stage.id,
       ai_name: aiName.trim() || undefined,
-      ai_persona: aiPersona.trim() || undefined,
-      ai_objective: aiObjective.trim() || undefined,
-      ai_custom_rules: aiCustomRules.trim() || undefined,
+      ai_persona: xmlPrompt.trim() || undefined, // Store full XML in ai_persona
       is_active: isActive,
       max_messages_before_human: maxMessages,
     });
@@ -135,9 +124,7 @@ export function StageAIConfigPanel({
   }
 
   const applyPreset = (preset: AIPreset) => {
-    setAiPersona(preset.persona);
-    setAiObjective(preset.objective);
-    setAiCustomRules(preset.rules);
+    setXmlPrompt(preset.xmlPrompt);
     setHasChanges(true);
   };
 
@@ -234,7 +221,7 @@ export function StageAIConfigPanel({
             </SelectContent>
           </Select>
           <p className="text-xs text-zinc-600 mt-2">
-            Presets preenchem os campos abaixo. Você pode editá-los depois.
+            Presets preenchem o prompt abaixo. Você pode editá-lo depois.
           </p>
         </div>
 
@@ -255,46 +242,40 @@ export function StageAIConfigPanel({
             />
           </div>
 
-          {/* Persona */}
-          <div className="space-y-2">
-            <Label htmlFor="aiPersona" className="text-zinc-400 text-sm">
-              Personalidade
-            </Label>
-            <Textarea
-              id="aiPersona"
-              placeholder="Descreva como o agente deve se comportar..."
-              value={aiPersona}
-              onChange={(e) => setAiPersona(e.target.value)}
-              className="min-h-[80px] bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 resize-none text-sm"
-            />
+          {/* XML Tags Reference */}
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
+            <p className="text-xs font-medium text-zinc-400 mb-2">Referência de Tags XML:</p>
+            <div className="grid grid-cols-1 gap-1 text-xs font-mono">
+              {XML_TAGS_REFERENCE.map(({ tag, description }) => (
+                <div key={tag} className="flex gap-2">
+                  <span className="text-emerald-400">{tag}</span>
+                  <span className="text-zinc-500">{description}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Objective */}
+          {/* XML Structured Prompt */}
           <div className="space-y-2">
-            <Label htmlFor="aiObjective" className="text-zinc-400 text-sm">
-              Objetivo
+            <Label htmlFor="xmlPrompt" className="text-zinc-400 text-sm">
+              Prompt Estruturado (XML)
             </Label>
             <Textarea
-              id="aiObjective"
-              placeholder="O que o agente deve alcançar nesta etapa..."
-              value={aiObjective}
-              onChange={(e) => setAiObjective(e.target.value)}
-              className="min-h-[80px] bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 resize-none text-sm"
-            />
-          </div>
+              id="xmlPrompt"
+              placeholder="<identity>Descreva quem é o agente...</identity>
 
-          {/* Custom Rules */}
-          <div className="space-y-2">
-            <Label htmlFor="aiCustomRules" className="text-zinc-400 text-sm">
-              Regras Específicas
-            </Label>
-            <Textarea
-              id="aiCustomRules"
-              placeholder="- Regra 1&#10;- Regra 2&#10;- Regra 3"
-              value={aiCustomRules}
-              onChange={(e) => setAiCustomRules(e.target.value)}
-              className="min-h-[100px] bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 resize-none text-sm font-mono"
+<flow_control>Regras de fluxo...</flow_control>
+
+<business_logic>Regras de negócio...</business_logic>
+
+<output_formatting>Formato de saída...</output_formatting>"
+              value={xmlPrompt}
+              onChange={(e) => setXmlPrompt(e.target.value)}
+              className="min-h-[280px] bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 resize-none text-sm font-mono leading-relaxed"
             />
+            <p className="text-xs text-zinc-500">
+              Use <span className="text-emerald-400 font-mono">{"{{company_name}}"}</span> para inserir o nome da empresa dinamicamente.
+            </p>
           </div>
 
           {/* Max Messages */}
@@ -318,11 +299,11 @@ export function StageAIConfigPanel({
         {globalConfig?.base_instructions && (
           <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-4">
             <p className="text-xs text-zinc-600 uppercase tracking-wide mb-2">
-              Instruções Globais
+              Instruções Globais (Base)
             </p>
-            <p className="text-sm text-zinc-400 line-clamp-3">
-              {globalConfig.base_instructions.substring(0, 120)}...
-            </p>
+            <pre className="text-xs text-zinc-400 font-mono whitespace-pre-wrap line-clamp-4 overflow-hidden">
+              {globalConfig.base_instructions.substring(0, 200)}...
+            </pre>
           </div>
         )}
       </div>

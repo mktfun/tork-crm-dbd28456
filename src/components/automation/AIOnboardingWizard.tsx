@@ -30,10 +30,8 @@ export function AIOnboardingWizard() {
 
   const handlePresetSelect = (preset: AIPreset) => {
     setSelectedPreset(preset.id);
-    // Auto-fill base instructions with preset content
-    setBaseInstructions(
-      `${preset.persona}\n\nObjetivo:\n${preset.objective}\n\nRegras:\n${preset.rules}`
-    );
+    // Auto-fill base instructions with XML-structured prompt
+    setBaseInstructions(preset.xmlPrompt);
   };
 
   const handleNext = () => {
@@ -182,23 +180,49 @@ export function AIOnboardingWizard() {
             <div className="space-y-6 animate-in fade-in duration-300">
               <div className="text-center mb-6">
                 <h2 className="text-xl font-semibold text-zinc-100 mb-2">
-                  Instruções Base
+                  Prompt Estruturado (XML)
                 </h2>
                 <p className="text-sm text-zinc-400">
                   Revise e personalize as instruções do seu agente
                 </p>
               </div>
 
+              {/* XML Tags Reference */}
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
+                <p className="text-xs font-medium text-zinc-400 mb-2">Referência de Tags XML:</p>
+                <div className="grid grid-cols-1 gap-1 text-xs font-mono">
+                  <div className="flex gap-2">
+                    <span className="text-emerald-400">&lt;identity&gt;</span>
+                    <span className="text-zinc-500">Quem é o agente</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-emerald-400">&lt;flow_control&gt;</span>
+                    <span className="text-zinc-500">Regras de fluxo de conversa</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-emerald-400">&lt;business_logic&gt;</span>
+                    <span className="text-zinc-500">Regras de negócio</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-emerald-400">&lt;reasoning_engine&gt;</span>
+                    <span className="text-zinc-500">Ordem de raciocínio (opcional)</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-emerald-400">&lt;output_formatting&gt;</span>
+                    <span className="text-zinc-500">Formato de saída</span>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-4">
                 <Textarea
-                  placeholder="Descreva como o agente deve se comportar..."
+                  placeholder="<identity>Descreva quem é o agente...</identity>"
                   value={baseInstructions}
                   onChange={(e) => setBaseInstructions(e.target.value)}
-                  className="min-h-[240px] bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 resize-none font-mono text-sm"
+                  className="min-h-[280px] bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 resize-none font-mono text-sm leading-relaxed"
                 />
                 <p className="text-xs text-zinc-500">
-                  Estas instruções serão aplicadas em todas as etapas do funil. 
-                  Você poderá personalizar cada etapa individualmente depois.
+                  Use <span className="text-emerald-400 font-mono">{"{{company_name}}"}</span> para inserir o nome da empresa dinamicamente.
                 </p>
               </div>
             </div>
