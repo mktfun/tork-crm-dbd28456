@@ -307,7 +307,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     });
   };
 
-  const processBulkOCR = async () => {
+  // ========== PROCESSAMENTO INDIVIDUAL (v2.0) ==========
+  // Cada arquivo é processado separadamente para isolar falhas
+  const processFilesIndividually = async () => {
     if (!user || files.length === 0) return;
     
     setStep('processing');
@@ -322,180 +324,170 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     files.forEach((_, i) => initialStatus.set(i, 'pending'));
     setProcessingStatus(initialStatus);
     
-    try {
-      const progressInterval = setInterval(() => {
-        setOcrProgress(prev => {
-          if (prev < files.length - 1) return prev + 1;
-          return prev;
-        });
-      }, 1500);
+    const startTime = performance.now();
+    const results: BulkOCRExtractedPolicy[] = [];
+    const errors: { fileName: string; error: string }[] = [];
+    
+    // Process each file individually
+    for (let idx = 0; idx < files.length; idx++) {
+      const file = files[idx];
+      setProcessingStatus(prev => new Map(prev).set(idx, 'processing'));
+      setOcrProgress(idx);
       
-      const filesBase64 = await Promise.all(
-        files.map(async (file, idx) => {
-          setProcessingStatus(prev => new Map(prev).set(idx, 'processing'));
-          const base64 = await fileToBase64(file);
-          return {
-            base64,
-            fileName: file.name,
-            mimeType: file.type
-          };
-        })
-      );
-      
-      setBulkPhase('ai');
-      
-      const { data, error } = await supabase.functions.invoke<ExtendedBulkOCRResponse>('ocr-bulk-analyze', {
-        body: { files: filesBase64 }
-      });
-      
-      clearInterval(progressInterval);
-      setOcrProgress(files.length);
-      
-      if (error) {
-        console.error('Bulk OCR error:', error);
-        files.forEach((_, i) => {
-          setProcessingStatus(prev => new Map(prev).set(i, 'error'));
+      try {
+        console.log(`📄 [${idx + 1}/${files.length}] Processando: ${file.name}`);
+        
+        const base64 = await fileToBase64(file);
+        
+        // 🔥 Individual call to analyze-policy-single
+        const { data, error } = await supabase.functions.invoke('analyze-policy-single', {
+          body: { 
+            base64, 
+            fileName: file.name, 
+            mimeType: file.type 
+          }
         });
         
-        if (error.message?.includes('429')) {
-          toast.error('Rate limit da IA atingido. Aguarde e tente novamente.');
-        } else if (error.message?.includes('402')) {
-          toast.error('Créditos insuficientes. Adicione créditos na sua conta.');
-        } else {
-          toast.error(`Erro no processamento: ${error.message}`);
+        if (error) {
+          console.error(`❌ [INVOKE ERROR] ${file.name}:`, error);
+          throw new Error(error.message || 'Erro ao invocar função');
         }
-        setStep('upload');
-        return;
-      }
-      
-      if (!data?.success) {
-        toast.error(data?.error || 'Erro desconhecido no processamento');
-        setStep('upload');
-        return;
-      }
-      
-      if (data.metrics) {
-        setProcessingMetrics(data.metrics);
-      }
-      
-      data.processedFiles?.forEach((fileName) => {
-        const fileIdx = files.findIndex(f => f.name === fileName);
-        if (fileIdx !== -1) {
-          setProcessingStatus(prev => new Map(prev).set(fileIdx, 'success'));
+        
+        if (!data?.success) {
+          throw new Error(data?.error || 'Extração falhou');
         }
-      });
-      
-      data.errors?.forEach(({ fileName }) => {
-        const fileIdx = files.findIndex(f => f.name === fileName);
-        if (fileIdx !== -1) {
-          setProcessingStatus(prev => new Map(prev).set(fileIdx, 'error'));
-        }
-      });
-      
-      setBulkPhase('reconciling');
-      
-      const allPolicies: BulkOCRExtractedPolicy[] = data.data || [];
-      
-      const processedItems: PolicyImportItem[] = await Promise.all(
-        allPolicies.map(async (policy) => {
-          const file = fileMap.get(policy.arquivo_origem) || files[0];
-          
-          const extracted: ExtractedPolicyData = {
-            cliente: {
-              nome_completo: policy.nome_cliente,
-              cpf_cnpj: policy.cpf_cnpj,
-              email: policy.email,
-              telefone: policy.telefone,
-              endereco_completo: policy.endereco_completo || null,
-            },
-            apolice: {
-              numero_apolice: policy.numero_apolice,
-              nome_seguradora: policy.nome_seguradora,
-              data_inicio: policy.data_inicio,
-              data_fim: policy.data_fim,
-              ramo_seguro: policy.ramo_seguro,
-            },
-            objeto_segurado: {
-              descricao_bem: policy.descricao_bem || policy.objeto_segurado || '',
-            },
-            valores: {
-              premio_liquido: sanitizePremio(policy.premio_liquido),
-              premio_total: sanitizePremio(policy.premio_total),
-            },
-          };
-          
-          const clientResult = await reconcileClient(extracted, user.id);
-          const seguradoraMatch = await matchSeguradora(policy.nome_seguradora, user.id);
-          const ramoMatch = await matchRamo(policy.ramo_seguro, user.id);
-          
-          const objetoCompleto = policy.objeto_segurado 
-            ? (policy.identificacao_adicional 
-                ? `${policy.objeto_segurado} - ${policy.identificacao_adicional}` 
-                : policy.objeto_segurado)
-            : policy.descricao_bem || '';
-          
-          const item: PolicyImportItem = {
-            id: crypto.randomUUID(),
-            file,
-            filePreviewUrl: URL.createObjectURL(file),
-            fileName: policy.arquivo_origem,
-            extracted,
-            clientStatus: clientResult.status,
-            clientId: clientResult.clientId,
-            clientName: policy.nome_cliente,
-            clientCpfCnpj: policy.cpf_cnpj,
-            matchedBy: clientResult.matchedBy,
-            seguradoraId: seguradoraMatch?.id || null,
-            seguradoraNome: policy.nome_seguradora,
-            ramoId: ramoMatch?.id || null,
-            ramoNome: policy.ramo_seguro,
-            producerId: null,
-            commissionRate: 15,
-            numeroApolice: policy.numero_apolice || policy.numero_proposta || '',
-            dataInicio: policy.data_inicio,
-            dataFim: policy.data_fim,
-            objetoSegurado: objetoCompleto,
-            premioLiquido: sanitizePremio(policy.premio_liquido),
-            premioTotal: sanitizePremio(policy.premio_total),
-            tipoDocumento: policy.tipo_documento || null,
-            tipoOperacao: policy.tipo_operacao || null,
-            endossoMotivo: policy.endosso_motivo || null,
-            tituloSugerido: policy.titulo_sugerido || '',
-            identificacaoAdicional: policy.identificacao_adicional || null,
-            estimatedCommission: sanitizePremio(policy.premio_liquido) * 0.15,
-            isValid: false,
-            validationErrors: [],
-            isProcessing: false,
-            isProcessed: true,
-          };
-          
-          item.validationErrors = validateImportItem(item);
-          item.isValid = item.validationErrors.length === 0;
-          
-          return item;
-        })
-      );
-      
-      setItems(processedItems);
-      if (processedItems.length > 0) {
-        setSelectedItemId(processedItems[0].id);
+        
+        console.log(`✅ [SUCCESS] ${file.name}:`, data.stats);
+        results.push(data.data);
+        setProcessingStatus(prev => new Map(prev).set(idx, 'success'));
+        
+      } catch (err: any) {
+        console.error(`❌ [FAIL] ${file.name}:`, err.message);
+        errors.push({ fileName: file.name, error: err.message });
+        setProcessingStatus(prev => new Map(prev).set(idx, 'error'));
+        // ✅ Continue with next files (don't break the loop)
       }
-      
-      if (processedItems.length === 0) {
-        toast.error('Nenhum documento foi processado com sucesso');
-        setStep('upload');
-        return;
-      }
-      
-      toast.success(`${processedItems.length} apólice(s) extraída(s) com sucesso!`);
-      setStep('review');
-      
-    } catch (error: any) {
-      console.error('Bulk OCR error:', error);
-      toast.error(error.message || 'Erro ao processar documentos');
-      setStep('upload');
     }
+    
+    setOcrProgress(files.length);
+    
+    const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
+    setProcessingMetrics({
+      totalDurationSec: totalDuration,
+      filesProcessed: files.length,
+      policiesExtracted: results.length,
+    });
+    
+    if (results.length === 0) {
+      toast.error('Nenhum arquivo processado com sucesso');
+      if (errors.length > 0) {
+        toast.error(`Erros: ${errors.map(e => e.fileName).join(', ')}`);
+      }
+      setStep('upload');
+      return;
+    }
+    
+    // Show toast with stats
+    if (errors.length > 0) {
+      toast.warning(`${results.length} processados, ${errors.length} com erro`);
+    } else {
+      toast.success(`${results.length} arquivo(s) processados com sucesso!`);
+    }
+    
+    // ========== RECONCILIATION PHASE ==========
+    setBulkPhase('reconciling');
+    
+    const processedItems: PolicyImportItem[] = await Promise.all(
+      results.map(async (policy) => {
+        const file = fileMap.get(policy.arquivo_origem) || files[0];
+        
+        const extracted: ExtractedPolicyData = {
+          cliente: {
+            nome_completo: policy.nome_cliente,
+            cpf_cnpj: policy.cpf_cnpj,
+            email: policy.email,
+            telefone: policy.telefone,
+            endereco_completo: policy.endereco_completo || null,
+          },
+          apolice: {
+            numero_apolice: policy.numero_apolice,
+            nome_seguradora: policy.nome_seguradora,
+            data_inicio: policy.data_inicio,
+            data_fim: policy.data_fim,
+            ramo_seguro: policy.ramo_seguro,
+          },
+          objeto_segurado: {
+            descricao_bem: policy.descricao_bem || policy.objeto_segurado || '',
+          },
+          valores: {
+            premio_liquido: sanitizePremio(policy.premio_liquido),
+            premio_total: sanitizePremio(policy.premio_total),
+          },
+        };
+        
+        const clientResult = await reconcileClient(extracted, user.id);
+        const seguradoraMatch = await matchSeguradora(policy.nome_seguradora, user.id);
+        const ramoMatch = await matchRamo(policy.ramo_seguro, user.id);
+        
+        const objetoCompleto = policy.objeto_segurado 
+          ? (policy.identificacao_adicional 
+              ? `${policy.objeto_segurado} - ${policy.identificacao_adicional}` 
+              : policy.objeto_segurado)
+          : policy.descricao_bem || '';
+        
+        const item: PolicyImportItem = {
+          id: crypto.randomUUID(),
+          file,
+          filePreviewUrl: URL.createObjectURL(file),
+          fileName: policy.arquivo_origem,
+          extracted,
+          clientStatus: clientResult.status,
+          clientId: clientResult.clientId,
+          clientName: policy.nome_cliente,
+          clientCpfCnpj: policy.cpf_cnpj,
+          matchedBy: clientResult.matchedBy,
+          seguradoraId: seguradoraMatch?.id || null,
+          seguradoraNome: policy.nome_seguradora,
+          ramoId: ramoMatch?.id || null,
+          ramoNome: policy.ramo_seguro,
+          producerId: null,
+          commissionRate: 15,
+          numeroApolice: policy.numero_apolice || policy.numero_proposta || '',
+          dataInicio: policy.data_inicio,
+          dataFim: policy.data_fim,
+          objetoSegurado: objetoCompleto,
+          premioLiquido: sanitizePremio(policy.premio_liquido),
+          premioTotal: sanitizePremio(policy.premio_total),
+          tipoDocumento: policy.tipo_documento || null,
+          tipoOperacao: policy.tipo_operacao || null,
+          endossoMotivo: policy.endosso_motivo || null,
+          tituloSugerido: policy.titulo_sugerido || '',
+          identificacaoAdicional: policy.identificacao_adicional || null,
+          estimatedCommission: sanitizePremio(policy.premio_liquido) * 0.15,
+          isValid: false,
+          validationErrors: [],
+          isProcessing: false,
+          isProcessed: true,
+        };
+        
+        item.validationErrors = validateImportItem(item);
+        item.isValid = item.validationErrors.length === 0;
+        
+        return item;
+      })
+    );
+    
+    setItems(processedItems);
+    if (processedItems.length > 0) {
+      setSelectedItemId(processedItems[0].id);
+    }
+    
+    toast.success(`${processedItems.length} apólice(s) pronta(s) para revisão!`);
+    setStep('review');
   };
+  
+  // Keep legacy function name for compatibility
+  const processBulkOCR = processFilesIndividually;
 
   const updateItem = (id: string, updates: Partial<PolicyImportItem>) => {
     setItems(prev => prev.map(item => {
