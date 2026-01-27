@@ -8,69 +8,11 @@ const corsHeaders = {
 };
 
 // ============================================================
-// PROMPT OTIMIZADO PARA EXTRAÇÃO DE APÓLICES (v3.0 Veicular)
+// OCR-ONLY MODE - ZERO IA DEPENDENCY
+// Extração de texto puro via OCR.space Engine 2
 // ============================================================
-const EXTRACTION_PROMPT = `Você é um especialista em extração de dados de apólices de seguro brasileiras.
-Analise TODAS as páginas (1-4) deste documento e extraia os dados com MÁXIMA PRECISÃO.
 
-🔴 REGRAS DE OURO:
-
-1. **RAMO DO SEGURO**:
-   - Se houver PLACA, CHASSI, MARCA, MODELO de veículo → Ramo = "AUTOMÓVEL"
-   - Se houver endereço residencial como objeto → Ramo = "RESIDENCIAL"
-   - Se houver nome de pessoa como beneficiário → Ramo = "VIDA"
-   - Se houver empresa/CNPJ como segurado → Ramo = "EMPRESARIAL"
-
-2. **OBJETO SEGURADO** (FORMATO EXATO):
-   - Para AUTOMÓVEL: "MARCA MODELO ANO - Placa: XXX-0000"
-     Exemplo: "VW GOLF GTI 2024 - Placa: ABC-1234"
-   - Para RESIDENCIAL: "Tipo Imóvel - Endereço Resumido"
-     Exemplo: "Apartamento - Rua das Flores, 123"
-   - Para VIDA: "Seguro de Vida - Nome do Titular"
-
-3. **CLIENTE (SEGURADO)**:
-   - Priorize dados que aparecem na seção "DADOS DO SEGURADO" ou "PROPONENTE"
-   - CPF/CNPJ: Extraia e remova pontos/traços (apenas números)
-   - IGNORE nomes de corretores, produtores ou representantes
-
-4. **VALORES MONETÁRIOS**:
-   - Extraia como NÚMEROS puros (sem R$, sem pontos de milhar)
-   - Use ponto como separador decimal: 1234.56
-   - Premio líquido é a base para comissão
-
-5. **VIGÊNCIA**:
-   - Busque nas 4 primeiras páginas por datas de início e fim
-   - Formato obrigatório: YYYY-MM-DD
-
-6. **IDENTIFICAÇÃO ADICIONAL**:
-   - Para veículos: Placa + Chassi (se disponível)
-   - Para imóveis: CEP + Número
-
-Retorne APENAS um JSON válido com os campos especificados.`;
-
-// Schema para carteirinha (mantido para compatibilidade)
-const CARD_PROMPT = `Você é um extrator de dados especialista em carteirinhas de seguro brasileiras.
-Analise esta imagem de carteirinha de seguro e extraia as seguintes informações:
-
-**DADOS DA CARTEIRINHA:**
-- nome_segurado (string) - Nome completo do titular/segurado
-- numero_carteirinha (string | null) - Número da carteirinha ou apólice
-- seguradora (string) - Nome da seguradora
-- tipo_seguro (string) - Tipo do seguro (Auto, Saúde, Vida, Residencial, etc.)
-- vigencia_inicio (string | null) - Data início da vigência no formato YYYY-MM-DD
-- vigencia_fim (string | null) - Data fim da vigência no formato YYYY-MM-DD
-- telefone_assistencia (string | null) - Telefone de assistência 24h
-- placa (string | null) - Placa do veículo (se for seguro auto)
-- chassi (string | null) - Número do chassi (se houver)
-- cpf_cnpj (string | null) - CPF ou CNPJ do segurado
-
-REGRAS:
-1. Se não encontrar um campo, retorne null
-2. Datas DEVEM estar no formato YYYY-MM-DD
-3. Telefones: mantenha a formatação original
-4. Para tipo_seguro, normalize para: "Auto", "Residencial", "Vida", "Empresarial", "Saúde", "Viagem", ou "Outros"
-
-Retorne APENAS um objeto JSON válido, sem texto adicional.`;
+const OCR_SPACE_API_URL = 'https://api.ocr.space/parse/image';
 
 // ============================================================
 // UTILITÁRIOS
@@ -86,30 +28,184 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-async function trimPdfTo4Pages(base64: string): Promise<string> {
+/**
+ * Corta PDF para 2 páginas (máx 512KB para OCR.space gratuito)
+ */
+async function trimPdfTo2Pages(base64: string): Promise<string> {
   try {
     const pdfBytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const pageCount = pdfDoc.getPageCount();
     
-    if (pageCount <= 4) {
+    if (pageCount <= 2) {
       console.log(`📄 PDF tem ${pageCount} páginas, mantendo todas`);
       return base64;
     }
     
-    // Remove páginas excedentes (mantém apenas 1-4)
-    const pagesToRemove = pageCount - 4;
+    // Remove páginas excedentes (mantém apenas 1-2)
+    const pagesToRemove = pageCount - 2;
     for (let i = 0; i < pagesToRemove; i++) {
-      pdfDoc.removePage(4); // Sempre remove a página 5 (índice 4)
+      pdfDoc.removePage(2); // Sempre remove a página 3 (índice 2)
     }
     
     const trimmedBytes = await pdfDoc.save();
-    console.log(`✂️ PDF cortado: ${pageCount} → 4 páginas`);
+    console.log(`✂️ PDF cortado: ${pageCount} → 2 páginas`);
     return uint8ArrayToBase64(new Uint8Array(trimmedBytes));
   } catch (error) {
     console.error('Erro ao cortar PDF:', error);
     return base64;
   }
+}
+
+/**
+ * Extrai texto de streams do PDF (sem OCR)
+ * Funciona para PDFs com texto selecionável
+ */
+function extractTextFromPdfBuffer(base64: string): string {
+  try {
+    const decoded = atob(base64);
+    
+    // Regex para capturar streams de texto em PDFs
+    const textMatches: string[] = [];
+    
+    // Busca por objetos de texto (BT...ET blocks)
+    const btEtRegex = /BT\s*([\s\S]*?)\s*ET/g;
+    let match;
+    while ((match = btEtRegex.exec(decoded)) !== null) {
+      // Extrai strings entre parênteses ou <hex>
+      const textBlock = match[1];
+      const stringRegex = /\((.*?)\)|<([0-9A-Fa-f]+)>/g;
+      let strMatch;
+      while ((strMatch = stringRegex.exec(textBlock)) !== null) {
+        if (strMatch[1]) {
+          textMatches.push(strMatch[1]);
+        } else if (strMatch[2]) {
+          // Hex string - tenta decodificar
+          try {
+            const hex = strMatch[2];
+            let str = '';
+            for (let i = 0; i < hex.length; i += 2) {
+              str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+            }
+            textMatches.push(str);
+          } catch { /* ignore */ }
+        }
+      }
+    }
+    
+    // Também busca por Tj/TJ operators
+    const tjRegex = /\[(.*?)\]\s*TJ|\((.*?)\)\s*Tj/g;
+    while ((match = tjRegex.exec(decoded)) !== null) {
+      const content = match[1] || match[2];
+      if (content) {
+        // Limpa operadores e extrai texto
+        const cleaned = content.replace(/\(\d+\)/g, ' ').replace(/[\[\]]/g, '');
+        const innerStrings = cleaned.match(/\((.*?)\)/g);
+        if (innerStrings) {
+          innerStrings.forEach(s => textMatches.push(s.replace(/[()]/g, '')));
+        } else {
+          textMatches.push(cleaned);
+        }
+      }
+    }
+    
+    const extractedText = textMatches.join(' ').replace(/\s+/g, ' ').trim();
+    console.log(`📝 Extração local: ${extractedText.length} caracteres`);
+    return extractedText;
+    
+  } catch (error) {
+    console.error('Erro na extração local:', error);
+    return '';
+  }
+}
+
+/**
+ * Avalia a qualidade do texto extraído
+ * Score 0-100: 0 = ruim, 100 = excelente
+ */
+function evaluateTextQuality(text: string): { score: number; reason: string } {
+  if (!text || text.length < 50) {
+    return { score: 0, reason: 'Texto muito curto' };
+  }
+  
+  let score = 0;
+  
+  // Tamanho mínimo
+  if (text.length >= 200) score += 20;
+  if (text.length >= 500) score += 10;
+  if (text.length >= 1000) score += 10;
+  
+  // Contém palavras-chave de seguros
+  const keywords = ['segurado', 'apólice', 'apolice', 'prêmio', 'premio', 'vigência', 'vigencia', 'cpf', 'cnpj', 'seguradora'];
+  const keywordCount = keywords.filter(kw => text.toLowerCase().includes(kw)).length;
+  score += keywordCount * 5;
+  
+  // Contém datas
+  if (/\d{2}[\/-]\d{2}[\/-]\d{4}/.test(text)) score += 10;
+  
+  // Contém valores monetários
+  if (/R\$\s*[\d.,]+/.test(text) || /\d{1,3}(?:\.\d{3})*,\d{2}/.test(text)) score += 10;
+  
+  // Contém CPF ou CNPJ
+  if (/\d{3}[.\s]?\d{3}[.\s]?\d{3}[\-\s]?\d{2}/.test(text)) score += 15;
+  if (/\d{2}[.\s]?\d{3}[.\s]?\d{3}[\s\/]?\d{4}[\-\s]?\d{2}/.test(text)) score += 15;
+  
+  // Contém placa de veículo
+  if (/[A-Z]{3}[\-\s]?\d[A-Z0-9]\d{2}/i.test(text)) score += 10;
+  
+  // Penaliza caracteres estranhos (PDF corrompido)
+  const strangeChars = (text.match(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g) || []).length;
+  score -= strangeChars * 2;
+  
+  return { 
+    score: Math.max(0, Math.min(100, score)), 
+    reason: score >= 30 ? 'Qualidade aceitável' : 'Qualidade baixa - necessita OCR' 
+  };
+}
+
+/**
+ * Chama OCR.space API para extração de texto
+ */
+async function callOcrSpace(base64: string, mimeType: string): Promise<string> {
+  const OCR_SPACE_API_KEY = Deno.env.get('OCR_SPACE_API_KEY') || 'K88888888888888';
+  
+  const formData = new FormData();
+  formData.append('base64Image', `data:${mimeType};base64,${base64}`);
+  formData.append('language', 'por'); // Português
+  formData.append('isOverlayRequired', 'false');
+  formData.append('OCREngine', '2'); // Engine 2 = melhor para tabelas
+  formData.append('isTable', 'true');
+  formData.append('scale', 'true');
+  
+  console.log('🔍 Chamando OCR.space Engine 2...');
+  
+  const response = await fetch(OCR_SPACE_API_URL, {
+    method: 'POST',
+    headers: {
+      'apikey': OCR_SPACE_API_KEY,
+    },
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('OCR.space error:', response.status, errorText);
+    throw new Error(`OCR.space API error: ${response.status}`);
+  }
+  
+  const result = await response.json();
+  
+  if (result.IsErroredOnProcessing) {
+    console.error('OCR.space processing error:', result.ErrorMessage);
+    throw new Error(result.ErrorMessage || 'OCR processing failed');
+  }
+  
+  const extractedText = result.ParsedResults
+    ?.map((r: any) => r.ParsedText)
+    .join('\n') || '';
+  
+  console.log(`✅ OCR.space: ${extractedText.length} caracteres extraídos`);
+  return extractedText;
 }
 
 // ============================================================
@@ -123,25 +219,13 @@ serve(async (req) => {
   }
 
   try {
-    const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY');
-    if (!GOOGLE_AI_API_KEY) {
-      console.error('GOOGLE_AI_API_KEY not configured');
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'API key not configured' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const body = await req.json();
     
     // Suporta ambos os formatos: legado (fileBase64) e novo (base64)
     const fileBase64 = body.base64 || body.fileBase64;
     const mimeType = body.mimeType || 'application/pdf';
-    const documentType = body.documentType || 'policy';
     const fileName = body.fileName || 'document.pdf';
+    const mode = body.mode || 'ocr-only'; // Novo: modo padrão é OCR puro
 
     if (!fileBase64) {
       return new Response(JSON.stringify({ 
@@ -153,229 +237,52 @@ serve(async (req) => {
       });
     }
 
-    console.log(`📄 Processando: ${fileName}, tipo: ${documentType}, mimeType: ${mimeType}`);
+    console.log(`📄 Processando: ${fileName}, mimeType: ${mimeType}, mode: ${mode}`);
     
-    // Para PDFs, cortar para 4 páginas
+    // Para PDFs, cortar para 2 páginas (limite OCR.space gratuito)
     let processedBase64 = fileBase64;
     if (mimeType === 'application/pdf') {
-      processedBase64 = await trimPdfTo4Pages(fileBase64);
+      processedBase64 = await trimPdfTo2Pages(fileBase64);
     }
 
-    // Selecionar prompt baseado no tipo de documento
-    const selectedPrompt = documentType === 'card' ? CARD_PROMPT : EXTRACTION_PROMPT;
-
-    // Schema para carteirinha
-    const cardSchema = {
-      type: 'object',
-      properties: {
-        nome_segurado: { type: 'string' },
-        numero_carteirinha: { type: 'string', nullable: true },
-        seguradora: { type: 'string' },
-        tipo_seguro: { type: 'string' },
-        vigencia_inicio: { type: 'string', nullable: true },
-        vigencia_fim: { type: 'string', nullable: true },
-        telefone_assistencia: { type: 'string', nullable: true },
-        placa: { type: 'string', nullable: true },
-        chassi: { type: 'string', nullable: true },
-        cpf_cnpj: { type: 'string', nullable: true },
-      },
-      required: ['nome_segurado', 'seguradora', 'tipo_seguro'],
-    };
-
-    // Schema para apólice (v3.0 - com campos veiculares)
-    const policySchema = {
-      type: 'object',
-      properties: {
-        cliente: {
-          type: 'object',
-          properties: {
-            nome_completo: { type: 'string' },
-            cpf_cnpj: { type: 'string', nullable: true },
-            email: { type: 'string', nullable: true },
-            telefone: { type: 'string', nullable: true },
-            endereco_completo: { type: 'string', nullable: true },
-          },
-          required: ['nome_completo'],
-        },
-        apolice: {
-          type: 'object',
-          properties: {
-            numero_apolice: { type: 'string' },
-            nome_seguradora: { type: 'string' },
-            data_inicio: { type: 'string' },
-            data_fim: { type: 'string' },
-            ramo_seguro: { type: 'string' },
-          },
-          required: ['numero_apolice', 'nome_seguradora', 'data_inicio', 'data_fim', 'ramo_seguro'],
-        },
-        objeto_segurado: {
-          type: 'object',
-          properties: {
-            descricao_bem: { type: 'string' },
-            identificacao_adicional: { type: 'string', nullable: true },
-          },
-          required: ['descricao_bem'],
-        },
-        valores: {
-          type: 'object',
-          properties: {
-            premio_liquido: { type: 'number' },
-            premio_total: { type: 'number' },
-          },
-          required: ['premio_liquido', 'premio_total'],
-        },
-      },
-      required: ['cliente', 'apolice', 'objeto_segurado', 'valores'],
-    };
-
-    const selectedSchema = documentType === 'card' ? cardSchema : policySchema;
-
-    console.log(`🤖 Enviando para Gemini 2.0 Flash...`);
+    // 1. Tenta extração local primeiro (sem API externa)
+    let rawText = extractTextFromPdfBuffer(processedBase64);
+    let source = 'LOCAL';
     
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_AI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: selectedPrompt },
-                {
-                  inline_data: {
-                    mime_type: mimeType,
-                    data: processedBase64,
-                  },
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: 'application/json',
-            responseSchema: selectedSchema,
-          },
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gemini API error:', response.status, errorText);
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: `Gemini API error: ${response.status}` 
-      }), {
-        status: response.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const result = await response.json();
-    console.log('Gemini response received');
-
-    const extractedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    const quality = evaluateTextQuality(rawText);
+    console.log(`📊 Qualidade extração local: ${quality.score}/100 - ${quality.reason}`);
     
-    if (!extractedText) {
-      console.error('No text in Gemini response');
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'No data extracted from document' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    let extractedData;
-    try {
-      // Limpa blocos de código markdown que o Gemini 2.0 pode adicionar
-      let cleanedText = extractedText.trim();
-      if (cleanedText.startsWith('```json')) {
-        cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      } else if (cleanedText.startsWith('```')) {
-        cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
-      }
-      extractedData = JSON.parse(cleanedText);
-    } catch (parseError) {
-      console.error('Failed to parse Gemini JSON:', extractedText);
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Failed to parse extracted data' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Para documentType === 'policy', converter para formato BulkOCRExtractedPolicy
-    if (documentType === 'policy') {
-      const policyData = extractedData;
-      
-      // Normalizar CPF/CNPJ (remover formatação)
-      const cpfCnpjNormalized = policyData.cliente?.cpf_cnpj?.replace(/\D/g, '') || null;
-      
-      // Construir objeto segurado formatado
-      let objetoFormatado = policyData.objeto_segurado?.descricao_bem || '';
-      if (policyData.objeto_segurado?.identificacao_adicional) {
-        objetoFormatado = objetoFormatado.includes(policyData.objeto_segurado.identificacao_adicional)
-          ? objetoFormatado
-          : `${objetoFormatado} - ${policyData.objeto_segurado.identificacao_adicional}`;
-      }
-      
-      // Gerar título sugerido
-      const nomeCliente = policyData.cliente?.nome_completo || 'Cliente';
-      const ramo = policyData.apolice?.ramo_seguro || 'Seguro';
-      const seguradora = policyData.apolice?.nome_seguradora || '';
-      const tituloSugerido = `${nomeCliente} - ${ramo} (${seguradora})`.substring(0, 100);
-      
-      const bulkFormat = {
-        nome_cliente: policyData.cliente?.nome_completo || '',
-        cpf_cnpj: cpfCnpjNormalized,
-        email: policyData.cliente?.email || null,
-        telefone: policyData.cliente?.telefone || null,
-        endereco_completo: policyData.cliente?.endereco_completo || null,
-        tipo_documento: 'APOLICE' as const,
-        numero_apolice: policyData.apolice?.numero_apolice || '',
-        numero_proposta: null,
-        tipo_operacao: null,
-        endosso_motivo: null,
-        nome_seguradora: policyData.apolice?.nome_seguradora || '',
-        ramo_seguro: policyData.apolice?.ramo_seguro || '',
-        data_inicio: policyData.apolice?.data_inicio || '',
-        data_fim: policyData.apolice?.data_fim || '',
-        descricao_bem: policyData.objeto_segurado?.descricao_bem || null,
-        objeto_segurado: objetoFormatado,
-        identificacao_adicional: policyData.objeto_segurado?.identificacao_adicional || null,
-        premio_liquido: policyData.valores?.premio_liquido || 0,
-        premio_total: policyData.valores?.premio_total || 0,
-        titulo_sugerido: tituloSugerido,
-        arquivo_origem: fileName,
-      };
-      
-      console.log(`✅ Extração concluída: ${nomeCliente} - ${ramo}`);
-      
-      return new Response(JSON.stringify({ 
-        success: true, 
-        data: bulkFormat,
-        documentType: 'policy',
-        stats: {
-          pages: 4,
-          fileName: fileName,
+    // 2. Se qualidade baixa, usa OCR.space
+    if (quality.score < 30) {
+      try {
+        rawText = await callOcrSpace(processedBase64, mimeType);
+        source = 'OCR';
+      } catch (ocrError) {
+        console.error('❌ OCR.space falhou:', ocrError);
+        // Usa o que temos da extração local
+        if (!rawText || rawText.length < 50) {
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: 'Falha na extração de texto (local e OCR)' 
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      }
     }
-
-    // Formato legado para carteirinhas
-    console.log('Successfully extracted data:', JSON.stringify(extractedData, null, 2));
+    
+    console.log(`✅ Extração concluída via ${source}: ${rawText.length} caracteres`);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      data: extractedData,
-      documentType: documentType,
+      rawText: rawText,
+      source: source,
+      fileName: fileName,
+      stats: {
+        characters: rawText.length,
+        qualityScore: quality.score,
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
