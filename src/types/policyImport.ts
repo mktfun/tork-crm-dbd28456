@@ -67,7 +67,7 @@ export interface PolicyImportItem {
   clientId?: string;
   clientName: string;      // Editável
   clientCpfCnpj: string | null;
-  matchedBy?: 'cpf_cnpj' | 'email' | 'name_fuzzy';
+  matchedBy?: 'cpf_cnpj' | 'email' | 'name_fuzzy' | 'auto_created';
   
   // Campos selecionáveis pelo usuário
   seguradoraId: string | null;

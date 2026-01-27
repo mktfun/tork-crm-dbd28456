@@ -311,41 +311,48 @@ serve(async (req) => {
     const systemPrompt = `Você é um ANALISTA SÊNIOR de seguros brasileiro.
 Analise os documentos e extraia os dados com MÁXIMA PRECISÃO.
 
-## REGRAS CRÍTICAS
+## REGRAS DE OURO (CRÍTICO!)
 1. Para cada documento separado por "=== DOCUMENTO: ... ===" extraia os dados
-2. Retorne SEMPRE um array JSON
-3. CPF: formato XXX.XXX.XXX-XX | CNPJ: formato XX.XXX.XXX/XXXX-XX
+2. Retorne SEMPRE um array JSON válido
+3. CPF/CNPJ: EXTRAIA SEMPRE da seção "Dados do Segurado" ou "Estipulante". APENAS NÚMEROS (11 ou 14 dígitos)
 4. Datas: formato YYYY-MM-DD
 5. VALORES: número puro SEM "R$", use PONTO como decimal (ex: 1234.56)
 6. Se não encontrar um campo, use null (NÃO use 0!)
 7. arquivo_origem = nome EXATO do arquivo fonte
+8. NOME: Capture o nome COMPLETO do segurado/estipulante. IGNORE nomes de corretores ou seguradoras no campo nome_cliente!
 
-## EXTRAÇÃO DO PRÊMIO LÍQUIDO (CRÍTICO!)
-- Procure "Prêmio Líquido", "Premio Comercial", "Valor Base"
+## EXTRAÇÃO DE CPF/CNPJ (PRIORIDADE ABSOLUTA!)
+- SEMPRE busque na seção "Dados do Segurado", "Segurado", "Estipulante", "Proponente"
+- Remova pontos, traços e barras: 123.456.789-00 → 12345678900
+- Se encontrar parcialmente, tente inferir pelo contexto
+- NUNCA deixe cpf_cnpj como null se houver qualquer documento visível!
+
+## EXTRAÇÃO DO PRÊMIO LÍQUIDO
+- Procure "Prêmio Líquido", "Premio Comercial", "Valor Base", "Líquido"
 - NÃO confunda com "Prêmio Total" (inclui IOF!)
 - Se só achar Total: premio_liquido = total / 1.0738
 - Se achar parcela (ex: "4x R$ 500"): premio_liquido = parcela × qtd × 0.93
 
-## EXTRAÇÃO DE VEÍCULOS E IMÓVEIS (AGRESSIVO!) - FORMATO HDI ESPECIAL
+## EXTRAÇÃO DE RAMO (PRIORIDADE ABSOLUTA!)
+- Se ler QUALQUER menção a: Veículo, Placa, Marca, Modelo, RCF, Auto, Automóvel, Carro → ramo_seguro = "AUTOMÓVEL"
+- Se ler: Residencial, Residência, Casa, Apartamento, Imóvel → ramo_seguro = "RESIDENCIAL"
+- Se ler: Vida, Morte, Invalidez, AP, Acidentes Pessoais → ramo_seguro = "VIDA"
+- Se ler: Empresarial, Empresa, Comercial, CNPJ → ramo_seguro = "EMPRESARIAL"
+- Se ler: Saúde, Médico, Hospitalar, Plano → ramo_seguro = "SAÚDE"
+
+## EXTRAÇÃO DE VEÍCULOS E IMÓVEIS
 Para ramo AUTO/AUTOMÓVEL/VEÍCULO:
-- SEMPRE procure seção "Dados do Veículo", "Veículo Segurado", "Objeto Segurado" (geralmente página 2!)
-- PLACA: formato ABC-1234 ou ABC1D23 (Mercosul) - OBRIGATÓRIO extrair!
+- SEMPRE procure seção "Dados do Veículo", "Veículo Segurado" (geralmente página 2!)
+- PLACA: formato ABC-1234 ou ABC1D23 (Mercosul)
   - HDI formato: "PLACA/UF: CNS0059 - SP" → extrair APENAS "CNS0059"
 - MARCA/MODELO: Ex: "VOLKSWAGEN GOLF GTI 2.0 TSI"
   - HDI formato: "0002866 ‑ Volkswagen Polo Highline" → REMOVER código, usar "Volkswagen Polo Highline"
-- ANO: Geralmente ao lado do modelo
-- CHASSI: 17 caracteres alfanuméricos
-- objeto_segurado = MARCA + MODELO (SEM código numérico!) ex: "Volkswagen Polo Highline"
-- identificacao_adicional = APENAS A PLACA (7 chars, ex: "CNS0059", SEM a UF!)
+- objeto_segurado = MARCA + MODELO (SEM código numérico!)
+- identificacao_adicional = APENAS A PLACA (7 chars, SEM a UF!)
 
-Para ramo RESIDENCIAL/EMPRESARIAL/CONDOMÍNIO:
-- Procure endereço do IMÓVEL segurado (pode diferir do cliente!)
+Para ramo RESIDENCIAL:
 - objeto_segurado = "Imóvel Residencial" ou endereço curto
-- identificacao_adicional = CEP do imóvel (ex: "01310-100")
-
-Para ramo VIDA/SAÚDE:
-- objeto_segurado = Nome do plano ou "Vida Individual"
-- identificacao_adicional = null
+- identificacao_adicional = CEP do imóvel
 
 ## TIPO DE DOCUMENTO
 - APOLICE: Documento emitido oficial

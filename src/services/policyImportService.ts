@@ -512,23 +512,125 @@ async function findClientByNameFuzzy(name: string, userId: string) {
   return null;
 }
 
+/**
+ * Upsert de cliente por documento (CPF/CNPJ)
+ * Cria automaticamente se não existir, retorna ID se já existe
+ */
+export async function upsertClientByDocument(
+  documento: string,
+  nome: string,
+  email: string | null,
+  telefone: string | null,
+  endereco: string | null,
+  userId: string
+): Promise<{ id: string; created: boolean } | null> {
+  const normalized = documento.replace(/\D/g, '');
+  
+  // Validação mínima: CPF (11) ou CNPJ (14)
+  if (!normalized || (normalized.length !== 11 && normalized.length !== 14)) {
+    console.warn(`⚠️ [UPSERT] Documento inválido: ${documento} (${normalized.length} dígitos)`);
+    return null;
+  }
+  
+  // 1. Busca existente pelo documento
+  const { data: existing } = await supabase
+    .from('clientes')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('cpf_cnpj', normalized)
+    .maybeSingle();
+  
+  if (existing) {
+    console.log(`✅ [UPSERT] Cliente existente encontrado: ${existing.id}`);
+    return { id: existing.id, created: false };
+  }
+  
+  // 2. Cria novo cliente
+  const cep = extractCep(endereco);
+  const { city, state } = extractCityState(endereco);
+  
+  const { data: newClient, error } = await supabase
+    .from('clientes')
+    .insert({
+      user_id: userId,
+      name: nome || 'Cliente Importado',
+      cpf_cnpj: normalized,
+      email: email || '',
+      phone: telefone || '',
+      address: endereco || '',
+      cep: cep,
+      city: city,
+      state: state,
+      status: 'Ativo',
+    })
+    .select('id')
+    .single();
+  
+  if (error) {
+    // Se for erro de duplicata (unique constraint), tenta buscar novamente
+    if (error.code === '23505') {
+      console.log('⚠️ [UPSERT] Conflito de duplicata, buscando existente...');
+      const { data: retryExisting } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('cpf_cnpj', normalized)
+        .maybeSingle();
+      
+      if (retryExisting) {
+        return { id: retryExisting.id, created: false };
+      }
+    }
+    
+    console.error('❌ [UPSERT] Erro ao criar cliente:', error);
+    return null;
+  }
+  
+  console.log(`✅ [UPSERT] Novo cliente criado: ${newClient.id} (${nome})`);
+  return { id: newClient.id, created: true };
+}
+
 export async function reconcileClient(
   extracted: ExtractedPolicyData,
   userId: string
 ): Promise<{
   status: ClientReconcileStatus;
   clientId?: string;
-  matchedBy?: 'cpf_cnpj' | 'email' | 'name_fuzzy';
+  matchedBy?: 'cpf_cnpj' | 'email' | 'name_fuzzy' | 'auto_created';
 }> {
+  const documento = extracted.cliente.cpf_cnpj;
+  
   // 1. Primeiro tenta por CPF/CNPJ (prioridade máxima)
-  if (extracted.cliente.cpf_cnpj) {
-    const clientByCpf = await findClientByCpfCnpj(extracted.cliente.cpf_cnpj, userId);
+  if (documento) {
+    const clientByCpf = await findClientByCpfCnpj(documento, userId);
     if (clientByCpf) {
       return {
         status: 'matched',
         clientId: clientByCpf.id,
         matchedBy: 'cpf_cnpj',
       };
+    }
+    
+    // 🔥 NOVO: Se não encontrou mas tem documento válido, cria automaticamente
+    const normalized = documento.replace(/\D/g, '');
+    if (normalized.length === 11 || normalized.length === 14) {
+      const upsertResult = await upsertClientByDocument(
+        documento,
+        extracted.cliente.nome_completo || 'Cliente Importado',
+        extracted.cliente.email || null,
+        extracted.cliente.telefone || null,
+        extracted.cliente.endereco_completo || null,
+        userId
+      );
+      
+      if (upsertResult) {
+        console.log(`✅ [RECONCILE] Cliente ${upsertResult.created ? 'criado' : 'encontrado'} via upsert`);
+        return {
+          status: 'matched',
+          clientId: upsertResult.id,
+          matchedBy: upsertResult.created ? 'auto_created' : 'cpf_cnpj',
+        };
+      }
     }
   }
 
@@ -544,7 +646,7 @@ export async function reconcileClient(
     }
   }
 
-  // 3. NEW: Try fuzzy name matching (90%+ threshold)
+  // 3. Fuzzy name matching (85%+ threshold)
   if (extracted.cliente.nome_completo) {
     const clientByName = await findClientByNameFuzzy(extracted.cliente.nome_completo, userId);
     if (clientByName) {
@@ -556,7 +658,7 @@ export async function reconcileClient(
     }
   }
 
-  // Não encontrou - cliente novo
+  // Não encontrou - cliente novo (sem documento válido)
   return { status: 'new' };
 }
 
