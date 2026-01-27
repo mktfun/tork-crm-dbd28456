@@ -600,8 +600,25 @@ export async function upsertClientByDocument(
     .maybeSingle();
   
   if (existing) {
+    // v5.3: Valida se nome do banco também é lixo
+    const dbNameIsValid = isValidClientName(existing.name);
+    
+    if (!dbNameIsValid) {
+      // Tenta usar nome OCR sanitizado ou fallback
+      const safeName = sanitizeClientName(nome);
+      
+      // Atualiza no banco se temos nome melhor
+      if (safeName !== existing.name) {
+        await supabase
+          .from('clientes')
+          .update({ name: safeName, updated_at: new Date().toISOString() })
+          .eq('id', existing.id);
+        console.log(`🔄 [UPSERT] Nome corrigido: "${existing.name}" → "${safeName}"`);
+        return { id: existing.id, created: false, name: safeName };
+      }
+    }
+    
     console.log(`✅ [UPSERT] Cliente existente encontrado: ${existing.id} (${existing.name})`);
-    // v5.1: Retorna nome do banco, não o nome lixo do OCR
     return { id: existing.id, created: false, name: existing.name };
   }
   
