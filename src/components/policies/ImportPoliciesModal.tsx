@@ -43,9 +43,11 @@ import {
   classifyImportError,
   createSeguradora,
   createRamo,
-  saveApoliceItens
+  saveApoliceItens,
+  upsertClientByDocument
 } from '@/services/policyImportService';
 import { useAppStore } from '@/store';
+import { parsePolicy, ParsedPolicy, inferRamoFromText } from '@/utils/universalPolicyParser';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface ImportPoliciesModalProps {
@@ -307,8 +309,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     });
   };
 
-  // ========== PROCESSAMENTO INDIVIDUAL (v2.0) ==========
-  // Cada arquivo é processado separadamente para isolar falhas
+  // ========== PROCESSAMENTO INDIVIDUAL (v3.0 - OCR + PARSER LOCAL) ==========
+  // Fluxo: PDF → OCR.space (texto bruto) → Parser Regex Local → Dados Estruturados
+  // Zero dependência de IA - 100% determinístico
   const processFilesIndividually = async () => {
     if (!user || files.length === 0) return;
     
@@ -328,7 +331,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     const results: BulkOCRExtractedPolicy[] = [];
     const errors: { fileName: string; error: string }[] = [];
     
-    // Process each file individually
+    // Process each file individually via OCR + Local Parser
     for (let idx = 0; idx < files.length; idx++) {
       const file = files[idx];
       setProcessingStatus(prev => new Map(prev).set(idx, 'processing'));
@@ -339,13 +342,13 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         
         const base64 = await fileToBase64(file);
         
-        // 🔥 Individual call to analyze-policy (4 páginas, prompt veicular)
+        // 1. Chama Edge Function para OCR (sem IA!)
         const { data, error } = await supabase.functions.invoke('analyze-policy', {
           body: { 
             base64, 
             fileName: file.name, 
             mimeType: file.type,
-            documentType: 'policy'
+            mode: 'ocr-only'
           }
         });
         
@@ -354,12 +357,61 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           throw new Error(error.message || 'Erro ao invocar função');
         }
         
-        if (!data?.success) {
-          throw new Error(data?.error || 'Extração falhou');
+        if (!data?.success || !data?.rawText) {
+          throw new Error(data?.error || 'Extração OCR falhou');
         }
         
-        console.log(`✅ [SUCCESS] ${file.name}:`, data.stats);
-        results.push(data.data);
+        console.log(`📝 [OCR] ${file.name}: ${data.rawText.length} caracteres (via ${data.source})`);
+        
+        // 2. Parser LOCAL no browser (sem rede!)
+        const parsed: ParsedPolicy = parsePolicy(data.rawText, file.name);
+        
+        console.log(`🔍 [PARSER] ${file.name}: ${parsed.matched_fields.length} campos, confiança ${parsed.confidence}%`);
+        console.log(`   CPF: ${parsed.cpf_cnpj || 'N/A'}, Apólice: ${parsed.numero_apolice || 'N/A'}, Ramo: ${parsed.ramo_seguro || 'N/A'}`);
+        
+        // 3. Se tem documento válido, faz upsert automático de cliente
+        let autoClientId: string | undefined;
+        if (parsed.cpf_cnpj) {
+          const upsertResult = await upsertClientByDocument(
+            parsed.cpf_cnpj,
+            parsed.nome_cliente || 'Cliente Importado',
+            parsed.email,
+            parsed.telefone,
+            parsed.endereco_completo,
+            user.id
+          );
+          if (upsertResult) {
+            autoClientId = upsertResult.id;
+            console.log(`✅ [UPSERT] Cliente ${upsertResult.created ? 'criado' : 'vinculado'}: ${autoClientId}`);
+          }
+        }
+        
+        // 4. Converte para formato BulkOCRExtractedPolicy
+        const bulkPolicy: BulkOCRExtractedPolicy = {
+          nome_cliente: parsed.nome_cliente || 'Cliente Não Identificado',
+          cpf_cnpj: parsed.cpf_cnpj,
+          email: parsed.email,
+          telefone: parsed.telefone,
+          endereco_completo: parsed.endereco_completo,
+          tipo_documento: 'APOLICE',
+          numero_apolice: parsed.numero_apolice || '',
+          numero_proposta: parsed.numero_proposta,
+          tipo_operacao: null,
+          endosso_motivo: null,
+          nome_seguradora: parsed.nome_seguradora || '',
+          ramo_seguro: parsed.ramo_seguro || '',
+          data_inicio: parsed.data_inicio || '',
+          data_fim: parsed.data_fim || '',
+          descricao_bem: parsed.objeto_segurado,
+          objeto_segurado: parsed.objeto_segurado,
+          identificacao_adicional: parsed.placa || parsed.chassi || null,
+          premio_liquido: parsed.premio_liquido || 0,
+          premio_total: parsed.premio_total || parsed.premio_liquido || 0,
+          titulo_sugerido: `${parsed.nome_cliente || 'Cliente'} - ${parsed.ramo_seguro || 'Seguro'} (${parsed.nome_seguradora || ''})`.substring(0, 100),
+          arquivo_origem: file.name,
+        };
+        
+        results.push(bulkPolicy);
         setProcessingStatus(prev => new Map(prev).set(idx, 'success'));
         
       } catch (err: any) {
