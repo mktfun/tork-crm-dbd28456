@@ -339,12 +339,13 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         
         const base64 = await fileToBase64(file);
         
-        // 🔥 Individual call to analyze-policy-single
-        const { data, error } = await supabase.functions.invoke('analyze-policy-single', {
+        // 🔥 Individual call to analyze-policy (4 páginas, prompt veicular)
+        const { data, error } = await supabase.functions.invoke('analyze-policy', {
           body: { 
             base64, 
             fileName: file.name, 
-            mimeType: file.type 
+            mimeType: file.type,
+            documentType: 'policy'
           }
         });
         
