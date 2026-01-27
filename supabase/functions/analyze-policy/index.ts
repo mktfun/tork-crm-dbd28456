@@ -7,82 +7,82 @@ const corsHeaders = {
 };
 
 // ============================================================
-// PURE OCR PROXY v6.0 - "CLIENT-SIDE SLICER"
+// GEMINI VISION EXTRACTOR v7.0 - "PURE AI EXTRACTION"
 // 
-// Fluxo: Frontend fatia PDF → Base64 → OCR.space → Limpeza → rawText
-// Zero IA. Zero fatiamento no servidor. Apenas OCR visual puro.
+// Fluxo: Frontend → Base64 → Gemini Vision → JSON Estruturado
+// Zero OCR.space. Zero parser local. 100% IA estruturada.
 // ============================================================
 
-const OCR_SPACE_API_URL = 'https://api.ocr.space/parse/image';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 // ============================================================
-// UTILITÁRIOS
+// SYSTEM PROMPT - EXTRAÇÃO ESTRUTURADA
 // ============================================================
 
-/**
- * THE CLEANER: Remove todos os caracteres não-imprimíveis
- * Mantém apenas ASCII printable + acentos brasileiros + quebras de linha
- */
-function cleanOcrText(rawText: string): string {
-  if (!rawText) return '';
-  
-  // Remove caracteres binários/lixo, mantém:
-  // \x20-\x7E = ASCII printable (espaço até ~)
-  // \u00C0-\u00FF = Latin Extended (acentos)
-  // \n\r\t = Whitespace útil
-  let cleaned = rawText.replace(/[^\x20-\x7E\u00C0-\u00FF\n\r\t]/g, ' ');
-  
-  // Normaliza múltiplos espaços
-  cleaned = cleaned.replace(/[ \t]{2,}/g, ' ');
-  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-  
-  return cleaned.trim();
-}
+const SYSTEM_PROMPT = `Você é um especialista em documentos de seguros brasileiros. Extraia os dados do documento anexo e retorne APENAS um JSON válido.
 
-/**
- * Chama OCR.space API - Engine 2 (visual, tabelas)
- */
-async function callOcrSpace(base64: string, mimeType: string): Promise<string> {
-  const OCR_SPACE_API_KEY = Deno.env.get('OCR_SPACE_API_KEY') || 'K88888888888888';
-  
-  const formData = new FormData();
-  formData.append('base64Image', `data:${mimeType};base64,${base64}`);
-  formData.append('language', 'por');
-  formData.append('isOverlayRequired', 'false');
-  formData.append('OCREngine', '2');           // Engine 2 = melhor para tabelas
-  formData.append('isTable', 'true');          // Modo tabela
-  formData.append('scale', 'true');            // Escala automática
-  formData.append('detectOrientation', 'true'); // Corrige rotação
-  
-  console.log('🔍 Chamando OCR.space Engine 2 (modo visual puro)...');
-  
-  const response = await fetch(OCR_SPACE_API_URL, {
-    method: 'POST',
-    headers: {
-      'apikey': OCR_SPACE_API_KEY,
-    },
-    body: formData,
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('OCR.space error:', response.status, errorText);
-    throw new Error(`OCR.space API error: ${response.status}`);
+## REGRAS CRÍTICAS:
+
+1. **CPF/CNPJ**: APENAS DÍGITOS (11 para CPF, 14 para CNPJ). Se não encontrar, retorne null.
+
+2. **NOME DO CLIENTE**: 
+   - Extraia da seção "Dados do Segurado" ou "Segurado"
+   - REMOVA prefixos de OCR: RA, RG, CP, NR, NO, SEQ, COD, REF, ID, PROP
+   - REMOVA termos de veículo: MODELO, VERSAO, FLEX, AUT, MANUAL, TURBO, TSI, SEDAN, HATCH
+   - Se o nome parecer "man ual", "modelo", "segurado" ou lixo similar, retorne null
+   - Aplique Title Case
+
+3. **NÚMERO DA APÓLICE**:
+   - NÃO confunda com "Manual" (tipo de transmissão)
+   - Se o número parecer ser "man ual", "manual", ou similar, retorne null
+   - Números válidos geralmente têm 8+ dígitos
+
+4. **VALORES (PRÊMIOS)**:
+   - Retorne como NUMBER (float), não string
+   - R$ 1.234,56 → 1234.56
+   - Se não encontrar prêmio líquido, calcule: premio_total / 1.0738
+
+5. **DATAS**: Formato YYYY-MM-DD (ex: 2024-03-15)
+
+6. **RAMO DO SEGURO**: 
+   - Identifique pelo contexto: AUTO, RESIDENCIAL, VIDA, EMPRESARIAL, etc
+   - Palavras-chave: "veículo", "placa" → AUTO; "residência" → RESIDENCIAL
+
+7. **OBJETO SEGURADO (para AUTOMÓVEL)**:
+   - Formato: "[Marca] [Modelo] [Ano] - Placa: [XXX-0000]"
+   - Ex: "VOLKSWAGEN POLO 2024 - Placa: ABC-1234"
+
+8. **SEGURADORA**: Nome completo da companhia de seguros
+
+## PROIBIÇÕES:
+- NÃO extraia termos de instrução (MANUAL, AUT, MODELO) como dados
+- NÃO invente dados - se não encontrar, retorne null
+- NÃO retorne strings como "man ual", "automatico", "modelo" em campos de identificação`;
+
+// ============================================================
+// GARBAGE PATTERNS - Filtra lixo residual
+// ============================================================
+
+const GARBAGE_PATTERNS = [
+  /^man\s*ual$/i,
+  /^aut(omatico|o)?$/i,
+  /^modelo$/i,
+  /^segurado$/i,
+  /^ramo$/i,
+  /^n[°º]?$/i,
+  /^[a-z]{1,4}\s+[a-z]{1,4}$/i, // "man ual", "au to"
+  /^\d{1,3}$/,                   // Números muito curtos
+];
+
+function cleanGarbageValue(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed.length < 3) return null;
+  if (GARBAGE_PATTERNS.some(p => p.test(trimmed))) {
+    console.log(`🧹 [GARBAGE] Removido: "${trimmed}"`);
+    return null;
   }
-  
-  const result = await response.json();
-  
-  if (result.IsErroredOnProcessing) {
-    console.error('OCR.space processing error:', result.ErrorMessage);
-    throw new Error(result.ErrorMessage || 'OCR processing failed');
-  }
-  
-  const extractedText = result.ParsedResults
-    ?.map((r: { ParsedText: string }) => r.ParsedText)
-    .join('\n') || '';
-  
-  console.log(`✅ OCR.space: ${extractedText.length} caracteres extraídos`);
-  return extractedText;
+  return trimmed;
 }
 
 // ============================================================
@@ -97,7 +97,6 @@ serve(async (req) => {
   try {
     const body = await req.json();
     
-    // Suporta ambos os formatos: legado (fileBase64) e novo (base64)
     const fileBase64 = body.base64 || body.fileBase64;
     const mimeType = body.mimeType || 'application/pdf';
     const fileName = body.fileName || 'document.pdf';
@@ -112,35 +111,152 @@ serve(async (req) => {
       });
     }
 
-    console.log(`📄 [v6.0] Processando: ${fileName} (${(fileBase64.length / 1024).toFixed(0)}KB)`);
-    
-    // 🔥 CLIENT-SIDE SLICER: PDF já vem fatiado do frontend!
-    // Não precisa mais de extractPageRange() - apenas chama OCR diretamente
-    
-    let rawText = '';
-    try {
-      rawText = await callOcrSpace(fileBase64, mimeType);
-    } catch (ocrError) {
-      console.error('❌ OCR.space falhou:', ocrError);
+    const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY');
+    if (!GOOGLE_AI_API_KEY) {
+      console.error('❌ GOOGLE_AI_API_KEY não configurada');
       return new Response(JSON.stringify({ 
         success: false, 
-        error: 'Falha na extração OCR visual',
+        error: 'GOOGLE_AI_API_KEY não configurada' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    console.log(`📄 [v7.0 GEMINI] Processando: ${fileName} (${(fileBase64.length / 1024).toFixed(0)}KB)`);
     
-    // 🧹 THE CLEANER: Remove lixo binário
-    const cleanText = cleanOcrText(rawText);
+    // ========== CHAMADA GEMINI VISION ==========
+    const startTime = Date.now();
     
-    console.log(`✅ Extração OCR: ${rawText.length} → ${cleanText.length} chars (limpo)`);
+    const response = await fetch(`${GEMINI_API_URL}?key=${GOOGLE_AI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: SYSTEM_PROMPT },
+            { 
+              inlineData: { 
+                mimeType: mimeType, 
+                data: fileBase64 
+              } 
+            },
+            { 
+              text: `Analise este documento de seguro e extraia os dados estruturados. Retorne APENAS JSON válido sem markdown.` 
+            }
+          ],
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            properties: {
+              nome_cliente: { type: 'string', nullable: true, description: 'Nome do cliente/segurado (sem lixo de OCR)' },
+              cpf_cnpj: { type: 'string', nullable: true, description: 'CPF (11 dígitos) ou CNPJ (14 dígitos) - apenas números' },
+              email: { type: 'string', nullable: true },
+              telefone: { type: 'string', nullable: true },
+              endereco_completo: { type: 'string', nullable: true },
+              numero_apolice: { type: 'string', nullable: true, description: 'Número da apólice (NÃO é "manual")' },
+              numero_proposta: { type: 'string', nullable: true },
+              nome_seguradora: { type: 'string', nullable: true },
+              ramo_seguro: { type: 'string', nullable: true, description: 'AUTO, RESIDENCIAL, VIDA, EMPRESARIAL, etc' },
+              data_inicio: { type: 'string', nullable: true, description: 'Formato YYYY-MM-DD' },
+              data_fim: { type: 'string', nullable: true, description: 'Formato YYYY-MM-DD' },
+              objeto_segurado: { type: 'string', nullable: true, description: 'Descrição do bem segurado' },
+              placa: { type: 'string', nullable: true, description: 'Placa do veículo (XXX-0000)' },
+              premio_liquido: { type: 'number', nullable: true },
+              premio_total: { type: 'number', nullable: true },
+            },
+          },
+        },
+      }),
+    });
+
+    const durationMs = Date.now() - startTime;
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Gemini API error: ${response.status}`, errorText);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: `Gemini API error: ${response.status}` 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const result = await response.json();
+    let extractedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!extractedText) {
+      console.error('❌ Gemini não retornou dados');
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Gemini não retornou dados' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Limpa blocos de código markdown
+    let cleanedText = extractedText.trim();
+    if (cleanedText.startsWith('```json')) {
+      cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (cleanedText.startsWith('```')) {
+      cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+
+    const extracted = JSON.parse(cleanedText);
+    
+    // ========== POST-PROCESSING: Remove garbage ==========
+    const cleaned = {
+      nome_cliente: cleanGarbageValue(extracted.nome_cliente),
+      cpf_cnpj: extracted.cpf_cnpj ? extracted.cpf_cnpj.replace(/\D/g, '') : null,
+      email: extracted.email || null,
+      telefone: extracted.telefone || null,
+      endereco_completo: extracted.endereco_completo || null,
+      numero_apolice: cleanGarbageValue(extracted.numero_apolice),
+      numero_proposta: cleanGarbageValue(extracted.numero_proposta),
+      nome_seguradora: extracted.nome_seguradora || null,
+      ramo_seguro: extracted.ramo_seguro || null,
+      data_inicio: extracted.data_inicio || null,
+      data_fim: extracted.data_fim || null,
+      objeto_segurado: extracted.objeto_segurado || null,
+      placa: extracted.placa || null,
+      premio_liquido: typeof extracted.premio_liquido === 'number' ? extracted.premio_liquido : null,
+      premio_total: typeof extracted.premio_total === 'number' ? extracted.premio_total : null,
+    };
+
+    // Fallback: calcula prêmio líquido se só tiver total
+    if (!cleaned.premio_liquido && cleaned.premio_total) {
+      cleaned.premio_liquido = cleaned.premio_total / 1.0738;
+      console.log(`📊 [FALLBACK] Prêmio líquido calculado: ${cleaned.premio_liquido.toFixed(2)}`);
+    }
+
+    // Valida CPF/CNPJ (deve ter 11 ou 14 dígitos)
+    if (cleaned.cpf_cnpj && cleaned.cpf_cnpj.length !== 11 && cleaned.cpf_cnpj.length !== 14) {
+      console.log(`🧹 [INVALID CPF] ${cleaned.cpf_cnpj} (${cleaned.cpf_cnpj.length} dígitos)`);
+      cleaned.cpf_cnpj = null;
+    }
+
+    console.log(`✅ [v7.0] Extração concluída em ${durationMs}ms`);
+    console.log(`   Cliente: ${cleaned.nome_cliente || 'N/A'}`);
+    console.log(`   CPF/CNPJ: ${cleaned.cpf_cnpj || 'N/A'}`);
+    console.log(`   Apólice: ${cleaned.numero_apolice || 'N/A'}`);
+    console.log(`   Prêmio: R$ ${cleaned.premio_liquido?.toFixed(2) || 'N/A'}`);
+    console.log(`   Ramo: ${cleaned.ramo_seguro || 'N/A'}`);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      rawText: cleanText,
-      source: 'OCR',
+      data: cleaned,
+      source: 'GEMINI',
       fileName: fileName,
+      durationMs: durationMs,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
