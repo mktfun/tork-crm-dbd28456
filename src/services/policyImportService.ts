@@ -620,6 +620,11 @@ function sanitizeClientName(nome: string | null): string {
  * Upsert de cliente por documento (CPF/CNPJ)
  * v5.1: Valida nome e usa existente do banco se disponível
  */
+/**
+ * v5.5: Upsert de cliente por documento + sync de dados
+ * - Cria cliente se não existe
+ * - Atualiza campos vazios do cliente existente (telefone, email, endereco)
+ */
 export async function upsertClientByDocument(
   documento: string,
   nome: string,
@@ -627,44 +632,68 @@ export async function upsertClientByDocument(
   telefone: string | null,
   endereco: string | null,
   userId: string
-): Promise<{ id: string; created: boolean; name: string } | null> {
+): Promise<{ id: string; created: boolean; name: string; phone?: string; email?: string } | null> {
   const normalized = documento.replace(/\D/g, '');
   
   // Validação mínima: CPF (11) ou CNPJ (14)
   if (!normalized || (normalized.length !== 11 && normalized.length !== 14)) {
-    console.warn(`⚠️ [UPSERT] Documento inválido: ${documento} (${normalized.length} dígitos)`);
+    console.warn(`⚠️ [UPSERT v5.5] Documento inválido: ${documento} (${normalized.length} dígitos)`);
     return null;
   }
   
-  // 1. Busca existente pelo documento
+  // 1. Busca existente pelo documento (incluindo phone e email para sync)
   const { data: existing } = await supabase
     .from('clientes')
-    .select('id, name')
+    .select('id, name, phone, email, address')
     .eq('user_id', userId)
     .eq('cpf_cnpj', normalized)
     .maybeSingle();
   
   if (existing) {
-    // v5.3: Valida se nome do banco também é lixo
-    const dbNameIsValid = isValidClientName(existing.name);
+    const updates: Record<string, any> = {};
     
+    // v5.5: Valida e corrige nome se necessário
+    const dbNameIsValid = isValidClientName(existing.name);
     if (!dbNameIsValid) {
-      // Tenta usar nome OCR sanitizado ou fallback
       const safeName = sanitizeClientName(nome);
-      
-      // Atualiza no banco se temos nome melhor
-      if (safeName !== existing.name) {
-        await supabase
-          .from('clientes')
-          .update({ name: safeName, updated_at: new Date().toISOString() })
-          .eq('id', existing.id);
-        console.log(`🔄 [UPSERT] Nome corrigido: "${existing.name}" → "${safeName}"`);
-        return { id: existing.id, created: false, name: safeName };
+      if (safeName !== existing.name && safeName !== 'Cliente Importado') {
+        updates.name = safeName;
       }
     }
     
-    console.log(`✅ [UPSERT] Cliente existente encontrado: ${existing.id} (${existing.name})`);
-    return { id: existing.id, created: false, name: existing.name };
+    // v5.5: NOVO - Preenche campos vazios com dados do PDF
+    if (telefone && !existing.phone) {
+      updates.phone = telefone;
+      console.log(`📱 [SYNC v5.5] Telefone adicionado: ${telefone}`);
+    }
+    if (email && !existing.email) {
+      updates.email = email;
+      console.log(`📧 [SYNC v5.5] Email adicionado: ${email}`);
+    }
+    if (endereco && !existing.address) {
+      updates.address = endereco;
+      console.log(`📍 [SYNC v5.5] Endereço adicionado`);
+    }
+    
+    // Aplica atualizações se houver
+    if (Object.keys(updates).length > 0) {
+      updates.updated_at = new Date().toISOString();
+      await supabase
+        .from('clientes')
+        .update(updates)
+        .eq('id', existing.id);
+      console.log(`🔄 [UPSERT v5.5] Cliente atualizado:`, Object.keys(updates));
+    }
+    
+    const finalName = updates.name || existing.name;
+    console.log(`✅ [UPSERT v5.5] Cliente existente: ${existing.id} (${finalName})`);
+    return { 
+      id: existing.id, 
+      created: false, 
+      name: finalName,
+      phone: updates.phone || existing.phone || undefined,
+      email: updates.email || existing.email || undefined,
+    };
   }
   
   // 2. Sanitiza nome antes de criar
@@ -688,31 +717,43 @@ export async function upsertClientByDocument(
       state: state,
       status: 'Ativo',
     })
-    .select('id, name')
+    .select('id, name, phone, email')
     .single();
   
   if (error) {
     // Se for erro de duplicata (unique constraint), tenta buscar novamente
     if (error.code === '23505') {
-      console.log('⚠️ [UPSERT] Conflito de duplicata, buscando existente...');
+      console.log('⚠️ [UPSERT v5.5] Conflito de duplicata, buscando existente...');
       const { data: retryExisting } = await supabase
         .from('clientes')
-        .select('id, name')
+        .select('id, name, phone, email')
         .eq('user_id', userId)
         .eq('cpf_cnpj', normalized)
         .maybeSingle();
       
       if (retryExisting) {
-        return { id: retryExisting.id, created: false, name: retryExisting.name };
+        return { 
+          id: retryExisting.id, 
+          created: false, 
+          name: retryExisting.name,
+          phone: retryExisting.phone || undefined,
+          email: retryExisting.email || undefined,
+        };
       }
     }
     
-    console.error('❌ [UPSERT] Erro ao criar cliente:', error);
+    console.error('❌ [UPSERT v5.5] Erro ao criar cliente:', error);
     return null;
   }
   
-  console.log(`✅ [UPSERT] Novo cliente criado: ${newClient.id} (${newClient.name})`);
-  return { id: newClient.id, created: true, name: newClient.name };
+  console.log(`✅ [UPSERT v5.5] Novo cliente criado: ${newClient.id} (${newClient.name})`);
+  return { 
+    id: newClient.id, 
+    created: true, 
+    name: newClient.name,
+    phone: newClient.phone || undefined,
+    email: newClient.email || undefined,
+  };
 }
 
 export async function reconcileClient(

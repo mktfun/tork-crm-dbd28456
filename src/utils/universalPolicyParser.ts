@@ -765,8 +765,34 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
     if (anoFabricacao) matchedFields.push('ano');
   }
   
-  // --- v5.1: NOME DO CLIENTE (com filtro de blacklist) ---
+  // --- v5.5: NOME DO CLIENTE (com filtro de ruído OCR + blacklist) ---
   let nomeCliente: string | null = null;
+  
+  // v5.5: Prefixos de ruído comum em OCR que devem ser removidos do início do nome
+  const NOISE_PREFIXES = [
+    'RA', 'RG', 'CP', 'NR', 'NO', 'SR', 'DR', 'SRA', 'DRA',
+    'N°', 'Nº', 'CPF', 'CNPJ', 'DOC', 'SEQ', 'COD', 'REF', 'ID'
+  ];
+  
+  /**
+   * v5.5: Remove prefixos de ruído OCR do início do nome
+   */
+  function cleanOcrNoiseFromName(rawName: string): string {
+    const words = rawName.trim().split(/\s+/);
+    
+    // Remove prefixos de ruído no início (enquanto houver mais de 2 palavras)
+    while (words.length > 2) {
+      const first = words[0].toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (NOISE_PREFIXES.includes(first) || (first.length <= 2 && /^[A-Z0-9]+$/.test(first))) {
+        console.log(`🧹 [OCR NOISE v5.5] Removendo prefixo: "${words[0]}"`);
+        words.shift();
+      } else {
+        break;
+      }
+    }
+    
+    return words.join(' ');
+  }
   
   const nomeCandidates = alphaWindowExtractMultiple(
     text, alpha, indexMap,
@@ -776,15 +802,20 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
     5
   );
   
-  // Filtra candidatos pela blacklist e pega o primeiro válido
+  // v5.5: Limpa ruído OCR e valida candidatos
   for (const candidate of nomeCandidates) {
-    if (isValidClientName(candidate)) {
-      nomeCliente = candidate.trim()
+    // v5.5: Primeiro limpa ruído OCR (prefixos tipo "RA", "RG", etc)
+    const cleanedCandidate = cleanOcrNoiseFromName(candidate);
+    
+    if (isValidClientName(cleanedCandidate)) {
+      // Formata em Title Case preservando nome completo
+      nomeCliente = cleanedCandidate.trim()
         .replace(/\s+/g, ' ')
         .split(' ')
-        .map(w => w.charAt(0) + w.slice(1).toLowerCase())
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
         .join(' ');
       matchedFields.push('nome');
+      console.log(`✅ [NAME v5.5] Nome limpo: "${candidate}" → "${nomeCliente}"`);
       break;
     }
   }
