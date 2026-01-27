@@ -1,72 +1,44 @@
 
+# Plano: Fuzzy Anchor Search - Compact Text Matching (v4.0)
 
-# Plano: Progressive Scan - Escaneamento Progressivo por Fatias de Páginas
+## Diagnóstico do Problema
 
-## Status da Arquitetura Atual
+O console mostra que o parser v3.0 está retornando **0% de confiança com 0 campos** mesmo processando 50k+ caracteres de texto:
 
-### O que já está implementado (v2.1)
-O sistema atual já possui uma arquitetura sólida com zero dependência de IA:
+```
+🔍 [PARSER v3.0] Texto normalizado: 54368 caracteres
+🔍 [PARSER v3.0] Confiança: 0% (threshold: 80%), Campos: 
+```
+
+### Causa Raiz
+
+O OCR está fragmentando palavras-chave cruciais:
+- `CPF` → `C P F` ou `C . P . F`
+- `APÓLICE` → `A P Ó L I C E`
+- `PRÊMIO` → `P R Ê M I O`
+
+A função `extractByAnchor()` usa `indexOf()` que procura a string exata "CPF", mas nunca encontra porque o texto real contém "C P F".
+
+### Solução Proposta: Compact Text Mapping
+
+Criaremos uma versão **compactada** do texto (sem espaços/tabs) para localizar a posição da âncora, e depois voltamos ao texto original para extrair o valor.
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│              EDGE FUNCTION: analyze-policy                      │
-│                                                                 │
-│  1. Recebe PDF base64                                          │
-│  2. Trim para 2 páginas (máx 512KB)                            │
-│  3. Extração LOCAL (regex em PDF streams)                      │
-│  4. Se qualidade < 30% → OCR.space Engine 2                    │
-│  5. Retorna { rawText, source, stats }                         │
-└───────────────────────────────────────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              FRONTEND: universalPolicyParser (v2.1)             │
-│                                                                 │
-│  - Anchor Search com raio de 150 caracteres                    │
-│  - Inferência de Ramo via keywords                             │
-│  - Normalização de Seguradora via aliases                      │
-│  - Cálculo de confiança baseado em campos                      │
-└───────────────────────────────────────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              SERVICE: upsertClientByDocument                    │
-│                                                                 │
-│  - Valida CPF (11) ou CNPJ (14)                                │
-│  - Busca existente → retorna ID                                │
-│  - Não existe → cria com dados extraídos                       │
-│  - Tratamento de conflito unique constraint                    │
-└───────────────────────────────────────────────────────────────┘
-```
-
-### Banco de Dados: Índices já existentes
-```sql
--- ÚNICO para upsert (já criado)
-idx_clientes_cpf_cnpj_user_unique  (user_id, cpf_cnpj) WHERE cpf_cnpj IS NOT NULL
-idx_clientes_doc_user              (user_id, cpf_cnpj) WHERE cpf_cnpj IS NOT NULL
-```
-
-## Problema Identificado
-
-O limite de **2 páginas** na função atual pode perder dados importantes em PDFs onde:
-- Dados de veículo estão na página 3 (comum na Tokio Marine)
-- Prêmio líquido aparece na página 4 (comum em propostas)
-- CPF do segurado está na página 2 mas vigência na página 3
-
-### Solução: Progressive Scan
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                FRONTEND: Progressive Scan Loop                  │
-│                                                                 │
-│  accumulatedText = ''                                          │
-│  for page = 1 to MAX_PAGES step 2:                             │
-│    1. Chama Edge Function (startPage, endPage)                 │
-│    2. accumulatedText += rawText                               │
-│    3. parsedData = universalPolicyParser(accumulatedText)      │
-│    4. SE confidenceScore >= 80 → PARA                          │
-│    5. SENÃO → continua próximas páginas                        │
-└───────────────────────────────────────────────────────────────┘
+│                    COMPACT TEXT STRATEGY                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Texto OCR Original:    "C P F : 1 2 3 . 4 5 6 . 7 8 9 - 0 0"   │
+│                                                                  │
+│  Compact Text:          "CPF:123.456.789-00"                     │
+│                                                                  │
+│  1. indexOf("CPF") em Compact → posição 0 (encontrado!)          │
+│  2. Mapeia posição 0 do Compact → índice 0 do Original           │
+│  3. Extrai 200 chars a partir do Original[índice]                │
+│  4. Aplica Regex de CPF na janela                                │
+│  5. Retorna: "12345678900" (limpo)                               │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -75,269 +47,256 @@ O limite de **2 páginas** na função atual pode perder dados importantes em PD
 
 | Arquivo | Mudanças |
 |---------|----------|
-| `supabase/functions/analyze-policy/index.ts` | Adicionar parâmetros `startPage` e `endPage` para extração seletiva |
-| `src/utils/universalPolicyParser.ts` | Adicionar Sliding Window v3.0 com correção de ruído OCR |
-| `src/components/policies/ImportPoliciesModal.tsx` | Implementar loop progressivo com threshold de confiança |
+| `src/utils/universalPolicyParser.ts` | Adicionar `createCompactText()` + `fuzzyExtractByAnchor()` |
+| `src/components/policies/ImportPoliciesModal.tsx` | Adicionar debug log com primeiros 2000 chars do texto |
 
 ---
 
 ## Seção Técnica
 
-### 1. Edge Function: Parâmetros de Paginação
+### 1. Nova Função: createCompactText()
 
-Modificar `analyze-policy` para aceitar `startPage` e `endPage`:
+Cria uma versão do texto sem espaços e retorna um mapeamento de índices:
 
 ```typescript
-// Novos parâmetros opcionais
-const startPage = body.startPage || 1;
-const endPage = body.endPage || 2;
+interface CompactTextResult {
+  compact: string;           // Texto sem espaços/tabs/newlines
+  indexMap: number[];        // indexMap[compactIdx] = originalIdx
+}
 
-// Nova função de trim com range
-async function extractPageRange(base64: string, startPage: number, endPage: number): Promise<string> {
-  const pdfBytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-  const pdfDoc = await PDFDocument.load(pdfBytes);
-  const pageCount = pdfDoc.getPageCount();
+function createCompactText(originalText: string): CompactTextResult {
+  const compact: string[] = [];
+  const indexMap: number[] = [];
   
-  // Ajusta range para não exceder total
-  const actualEnd = Math.min(endPage, pageCount);
-  const actualStart = Math.max(1, startPage);
-  
-  if (actualStart > pageCount) {
-    return ''; // Páginas solicitadas não existem
+  for (let i = 0; i < originalText.length; i++) {
+    const char = originalText[i];
+    if (!/[\s\t\n\r]/.test(char)) {
+      compact.push(char);
+      indexMap.push(i);
+    }
   }
   
-  // Cria novo PDF apenas com as páginas solicitadas
-  const newDoc = await PDFDocument.create();
-  for (let i = actualStart - 1; i < actualEnd; i++) {
-    const [page] = await newDoc.copyPages(pdfDoc, [i]);
-    newDoc.addPage(page);
-  }
-  
-  const newBytes = await newDoc.save();
-  return uint8ArrayToBase64(new Uint8Array(newBytes));
+  return {
+    compact: compact.join(''),
+    indexMap,
+  };
 }
 ```
 
-A resposta incluirá metadados:
-```typescript
-return {
-  success: true,
-  rawText: rawText,
-  source: source,
-  pageRange: { start: startPage, end: actualEnd, total: pageCount },
-  hasMorePages: actualEnd < pageCount,
-};
-```
+### 2. Nova Função: fuzzyExtractByAnchor()
 
-### 2. Parser v3.0: Sliding Window + Correção de Ruído
-
-Melhorias no `universalPolicyParser.ts`:
+Busca a âncora no texto compactado e extrai do original:
 
 ```typescript
-// NOVA função de normalização v3.0
-export function normalizeOcrText(rawText: string): string {
-  let text = rawText
-    .replace(/\r\n/g, '\n')
-    .replace(/\t+/g, ' ')
-    .toUpperCase();
-  
-  // NOVO: Remove espaços entre dígitos (OCR noise)
-  // "1 2 3 . 4 5 6 . 7 8 9 - 0 0" → "123.456.789-00"
-  text = text.replace(/(\d)\s+(?=\d)/g, '$1');
-  
-  // NOVO: Corrige O→0 e l→1 em contexto numérico (OCR noise)
-  // "CPF: 123.456.789-O0" → "CPF: 123.456.789-00"
-  text = text.replace(/(\d)[O](\d)/g, '$10$2');
-  text = text.replace(/(\d)[O]$/g, '$10');    // Final O
-  text = text.replace(/^[O](\d)/g, '0$1');    // Inicial O
-  text = text.replace(/(\d)[lI](\d)/gi, '$11$2');
-  
-  // Remove múltiplos espaços
-  text = text.replace(/[ ]{2,}/g, ' ');
-  text = text.replace(/\n{3,}/g, '\n\n');
-  
-  return text.trim();
-}
-
-// NOVA função de extração por janela deslizante
-function extractByAnchor(
-  text: string,
+function fuzzyExtractByAnchor(
+  originalText: string,
+  compactText: string,
+  indexMap: number[],
   anchors: string[],
   regex: RegExp,
-  windowSize: number = 100
+  windowSize: number = 200
 ): string | null {
-  const results: { value: string; confidence: number }[] = [];
-  
   for (const anchor of anchors) {
+    // Remove espaços da âncora também para matching
+    const compactAnchor = anchor.replace(/[\s\.\-]/g, '').toUpperCase();
+    const compactUpper = compactText.toUpperCase();
+    
     let searchIdx = 0;
     while (true) {
-      const anchorIdx = text.indexOf(anchor.toUpperCase(), searchIdx);
+      const anchorIdx = compactUpper.indexOf(compactAnchor, searchIdx);
       if (anchorIdx === -1) break;
       
-      const windowStart = anchorIdx + anchor.length;
-      const window = text.substring(windowStart, windowStart + windowSize);
+      // Mapeia posição do compact para o original
+      const originalIdx = indexMap[anchorIdx + compactAnchor.length] || 0;
+      
+      // Extrai janela do texto ORIGINAL
+      const window = originalText.substring(originalIdx, originalIdx + windowSize);
       
       const match = window.match(regex);
       if (match?.[1]) {
-        const value = match[1].trim();
-        const confidence = 100 - (match.index || 0);
-        results.push({ value, confidence });
+        return match[1].trim();
       }
       
       searchIdx = anchorIdx + 1;
     }
   }
   
-  if (results.length === 0) return null;
-  results.sort((a, b) => b.confidence - a.confidence);
-  return results[0].value;
+  return null;
 }
 ```
 
-Sistema de pesos para confiança:
-```typescript
-// Pesos para cálculo de confiança
-const CONFIDENCE_WEIGHTS = {
-  cpf_cnpj: 50,    // Crítico: identificação do cliente
-  numero_apolice: 20,
-  placa: 20,
-  datas: 10,       // data_inicio + data_fim
-  premio: 10,
-  nome: 10,
-  seguradora: 10,
-  ramo: 5,
-};
+### 3. Refatoração do parsePolicy()
 
-// Score mínimo para parar o progressive scan
-const CONFIDENCE_THRESHOLD = 80;
-```
-
-### 3. Frontend: Loop Progressivo
-
-Modificar `processFilesIndividually` em `ImportPoliciesModal.tsx`:
+O parser principal usará a nova estratégia:
 
 ```typescript
-const processFileProgressively = async (file: File): Promise<ParsedPolicy> => {
-  let accumulatedText = '';
-  let currentPage = 1;
-  const MAX_PAGES = 6; // Limite de segurança
-  let parsedData: ParsedPolicy | null = null;
-  let lastPageRange = { total: 0, hasMore: true };
+export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
+  const matchedFields: string[] = [];
+  const normalized = normalizeOcrText(rawText);
   
-  const base64 = await fileToBase64(file);
+  // NOVO v4.0: Cria versão compactada para busca de âncoras
+  const { compact, indexMap } = createCompactText(normalized);
   
-  while (currentPage <= MAX_PAGES && lastPageRange.hasMore) {
-    console.log(`📄 [PROGRESSIVE] ${file.name}: páginas ${currentPage}-${currentPage + 1}`);
-    
-    // 1. Chama Edge Function para fatia de páginas
-    const { data, error } = await supabase.functions.invoke('analyze-policy', {
-      body: { 
-        base64, 
-        fileName: file.name, 
-        mimeType: file.type,
-        startPage: currentPage,
-        endPage: currentPage + 1
-      }
-    });
-    
-    if (error || !data?.success) {
-      console.warn(`⚠️ [PROGRESSIVE] Erro nas páginas ${currentPage}-${currentPage + 1}`);
-      break;
-    }
-    
-    // 2. Acumula texto
-    accumulatedText += ' ' + data.rawText;
-    lastPageRange = {
-      total: data.pageRange?.total || 0,
-      hasMore: data.hasMorePages || false
-    };
-    
-    // 3. Parser no texto acumulado
-    parsedData = parsePolicy(accumulatedText, file.name);
-    
-    console.log(`🔍 [PROGRESSIVE] Confiança: ${parsedData.confidence}%, Campos: ${parsedData.matched_fields.length}`);
-    
-    // 4. Se confiança >= 80, para
-    if (parsedData.confidence >= 80) {
-      console.log(`✅ [PROGRESSIVE] Threshold atingido! Parando na página ${currentPage + 1}`);
-      break;
-    }
-    
-    // 5. Próximas páginas
-    currentPage += 2;
+  console.log(`🔍 [PARSER v4.0] Original: ${normalized.length} chars, Compact: ${compact.length} chars`);
+  
+  // --- CPF/CNPJ (Fuzzy Anchor Search) ---
+  let cpfCnpj: string | null = null;
+  
+  // Regex mais tolerante para CPF/CNPJ com ruído
+  const CPF_LOOSE = /(\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d)/;
+  
+  const cpfRaw = fuzzyExtractByAnchor(
+    normalized, compact, indexMap,
+    ['CPF', 'C.P.F', 'CPF/MF', 'DOCUMENTO'],
+    CPF_LOOSE,
+    200
+  );
+  
+  if (cpfRaw) {
+    cpfCnpj = cleanDocument(cpfRaw);
+    if (cpfCnpj) matchedFields.push('cpf_fuzzy');
   }
   
-  return parsedData || parsePolicy(accumulatedText, file.name);
-};
+  // ... resto da implementação
+}
+```
+
+### 4. Âncoras para Seguradoras
+
+Adiciona detecção direta de marcas de seguradoras no texto compactado:
+
+```typescript
+const INSURER_BRANDS = [
+  'TOKIOMARINE', 'PORTOSEGURO', 'HDI', 'LIBERTY', 'MAPFRE',
+  'ALLIANZ', 'BRADESCO', 'SULAMERICA', 'AZULSEGUROS', 'SOMPO',
+  'ITAUSEGUROS', 'ZURICH', 'GENERALI', 'POTTENCIAL', 'JUNTO'
+];
+
+// No parsePolicy:
+for (const brand of INSURER_BRANDS) {
+  if (compact.toUpperCase().includes(brand)) {
+    nomeSeguradora = normalizeSeguradora(brand);
+    matchedFields.push('seguradora_compact');
+    break;
+  }
+}
+```
+
+### 5. Debug Log no Modal
+
+Adiciona log com amostra do texto para diagnóstico:
+
+```typescript
+// Após acumular texto
+console.log('--- DEBUG TEXT START ---');
+console.log(accumulatedText.substring(0, 2000));
+console.log('--- DEBUG TEXT END ---');
+```
+
+### 6. Fallback para Produtor Padrão
+
+Se nenhum produtor for selecionado, força o primeiro da lista:
+
+```typescript
+// No início do save loop
+const defaultProducerId = batchProducerId || producers[0]?.id;
+
+// No item
+producerId: defaultProducerId || null,
 ```
 
 ---
 
-## Fluxo Completo: Diagrama
+## Algoritmo Completo de Matching (v4.0)
 
 ```text
-┌──────────────────────────────────────────────────────────────────────┐
-│                        PROGRESSIVE SCAN FLOW                         │
-├──────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  1. UPLOAD: PDF da Tokio Marine (8 páginas)                         │
-│                                                                      │
-│  2. LOOP PROGRESSIVO:                                                │
-│     ┌─────────────────────────────────────────────────────────────┐  │
-│     │ Iteração 1: Páginas 1-2                                     │  │
-│     │ → rawText: 15k chars                                        │  │
-│     │ → Parser: confiança 35% (só seguradora encontrada)          │  │
-│     │ → CONTINUA                                                  │  │
-│     └─────────────────────────────────────────────────────────────┘  │
-│     ┌─────────────────────────────────────────────────────────────┐  │
-│     │ Iteração 2: Páginas 3-4                                     │  │
-│     │ → rawText acumulado: 30k chars                              │  │
-│     │ → Parser: confiança 85% (CPF+Placa+Prêmio+Datas)            │  │
-│     │ → PARA! Threshold atingido                                  │  │
-│     └─────────────────────────────────────────────────────────────┘  │
-│                                                                      │
-│  3. UPSERT: Cliente criado/vinculado via CPF                        │
-│                                                                      │
-│  4. TABELA: Campos preenchidos automaticamente                      │
-│                                                                      │
-└──────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│              FUZZY ANCHOR SEARCH FLOW (v4.0)                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. NORMALIZAÇÃO                                                 │
+│     rawText → normalizeOcrText() → normalized (UPPERCASE)        │
+│                                                                  │
+│  2. COMPACTAÇÃO                                                  │
+│     normalized → createCompactText() → { compact, indexMap }     │
+│     "C P F : 1 2 3" → "CPF:123" + mapeamento de índices          │
+│                                                                  │
+│  3. BUSCA DE ÂNCORA NO COMPACT                                   │
+│     compact.indexOf("CPF") → posição no compactado               │
+│                                                                  │
+│  4. MAPEAMENTO PARA ORIGINAL                                     │
+│     indexMap[compactPos] → posição no texto original             │
+│                                                                  │
+│  5. EXTRAÇÃO COM JANELA                                          │
+│     original.substring(pos, pos + 200) → janela de busca         │
+│                                                                  │
+│  6. APLICAÇÃO DE REGEX                                           │
+│     janela.match(CPF_LOOSE) → valor extraído                     │
+│                                                                  │
+│  7. LIMPEZA E VALIDAÇÃO                                          │
+│     cleanDocument() → "12345678900" (11 ou 14 dígitos)           │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Regex Tolerantes para OCR Ruidoso
+
+```typescript
+// CPF: aceita qualquer coisa entre 11 dígitos
+const CPF_LOOSE = /(\d[\s.\-]*){11}/;
+
+// CNPJ: aceita qualquer coisa entre 14 dígitos
+const CNPJ_LOOSE = /(\d[\s.\-\/]*){14}/;
+
+// Placa: aceita espaços entre letras e números
+const PLACA_LOOSE = /([A-Z][\s]*[A-Z][\s]*[A-Z][\s]*\d[\s]*[A-Z0-9][\s]*\d[\s]*\d)/;
+
+// Data: aceita espaços entre partes
+const DATA_LOOSE = /(\d[\s]*\d[\s]*[\/\-][\s]*\d[\s]*\d[\s]*[\/\-][\s]*\d[\s]*\d[\s]*\d[\s]*\d)/;
+
+// Valor: aceita espaços em valores monetários
+const VALOR_LOOSE = /R?\$?[\s]*(\d[\s\d.,]*\d)/;
 ```
 
 ---
 
 ## Resultado Esperado
 
-### Console Logs
+### Console Logs (Após Implementação)
+
 ```
-📄 [1/1] Processando: APOLICE TOKIO MARINE.pdf
-📄 [PROGRESSIVE] páginas 1-2
-📝 [OCR] 15k caracteres (via LOCAL)
-🔍 [PROGRESSIVE] Confiança: 35%, Campos: 2
-📄 [PROGRESSIVE] páginas 3-4
-📝 [OCR] 18k caracteres (via OCR)
-🔍 [PROGRESSIVE] Confiança: 85%, Campos: 8
-✅ [PROGRESSIVE] Threshold atingido! Parando na página 4
-🔍 [PARSER] CPF: 12345678900, Apólice: 987654321, Ramo: AUTOMÓVEL
-✅ [UPSERT] Cliente criado: abc-123-def
+📄 [PROGRESSIVE] APOLICE DANIELA ROSA MATOS.pdf: páginas 1-2
+📝 [OCR] +29457 chars (via LOCAL)
+--- DEBUG TEXT START ---
+TOKIO MARINE SEGURADORA S.A.
+C P F : 1 2 3 . 4 5 6 . 7 8 9 - 0 0
+N O M E : D A N I E L A   R O S A   M A T O S
+A P Ó L I C E : 1 2 3 4 5 6 7 8 9
+--- DEBUG TEXT END ---
+🔍 [PARSER v4.0] Original: 29590 chars, Compact: 18500 chars
+🔍 [PARSER v4.0] Confiança: 85%, Campos: cpf_fuzzy, seguradora_compact, placa, apolice
+✅ [PROGRESSIVE] Threshold atingido!
 ```
 
 ### Tabela de Conferência
-- CPF preenchido e limpo (sem pontos/espaços)
-- Placa detectada automaticamente
-- Ramo = AUTOMÓVEL (inferido por keywords)
-- Cliente vinculado ou criado
+- CPF: 12345678900 (extraído corretamente)
+- Seguradora: TOKIO MARINE
+- Placa: ABC-1234
+- Ramo: AUTOMÓVEL (inferido)
+- Cliente: Vinculado/Criado automaticamente
 
 ---
 
 ## Validação e Testes
 
-| Passo | Ação | Resultado |
-|-------|------|-----------|
-| 1 | Upload PDF Tokio Marine (dados na pág 3) | Loop dispara 2 iterações |
-| 2 | Verificar console | Log mostra confiança crescente |
-| 3 | Verificar tabela | CPF limpo, placa formatada |
+| Passo | Ação | Resultado Esperado |
+|-------|------|-------------------|
+| 1 | Upload PDF problemático (DANIELA ROSA MATOS) | Parser encontra CPF no compact text |
+| 2 | Verificar console | Log mostra `cpf_fuzzy` nos campos |
+| 3 | Verificar tabela | CPF e Seguradora preenchidos |
 | 4 | Salvar apólice | Cliente criado/vinculado |
-| 5 | Upload mesmo PDF | Cliente NÃO duplicado |
 
 ---
 
@@ -345,20 +304,20 @@ const processFileProgressively = async (file: File): Promise<ParsedPolicy> => {
 
 | Tarefa | Complexidade | Linhas |
 |--------|--------------|--------|
-| Edge Function: `extractPageRange()` | Média | ~50 |
-| Parser v3.0: `normalizeOcrText()` | Baixa | ~30 |
-| Parser v3.0: `extractByAnchor()` | Média | ~40 |
-| Frontend: `processFileProgressively()` | Média | ~60 |
+| `createCompactText()` | Baixa | ~20 |
+| `fuzzyExtractByAnchor()` | Média | ~40 |
+| Refatorar `parsePolicy()` | Média | ~50 |
+| Debug log no Modal | Baixa | ~5 |
+| Produtor padrão | Baixa | ~5 |
 
-**Total**: ~180 linhas de código
+**Total**: ~120 linhas de código
 
 ---
 
 ## Vantagens da Abordagem
 
-1. **Economia de OCR**: Para PDFs onde dados estão nas primeiras 2 páginas, não processa mais
-2. **Cobertura completa**: Para PDFs complexos, processa até encontrar dados essenciais
-3. **Limite de segurança**: Máximo 6 páginas evita estouro de memória
-4. **Determinístico**: Mesmo PDF sempre produz mesmo resultado
-5. **Zero IA**: Nenhum token de modelo de linguagem consumido
-
+1. **Resiliência a OCR ruidoso**: Encontra "CPF" mesmo quando está como "C P F"
+2. **Mapeamento preciso**: Volta ao texto original para extração correta
+3. **Regex tolerantes**: Aceita espaços entre dígitos
+4. **Zero IA**: 100% determinístico
+5. **Debug facilitado**: Log mostra exatamente o que está sendo processado
