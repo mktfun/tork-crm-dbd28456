@@ -8,8 +8,9 @@ const corsHeaders = {
 };
 
 // ============================================================
-// OCR-ONLY MODE - ZERO IA DEPENDENCY
+// OCR-ONLY MODE v3.0 - PROGRESSIVE SCAN SUPPORT
 // Extração de texto puro via OCR.space Engine 2
+// Agora com suporte a extração por range de páginas
 // ============================================================
 
 const OCR_SPACE_API_URL = 'https://api.ocr.space/parse/image';
@@ -29,32 +30,66 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Corta PDF para 2 páginas (máx 512KB para OCR.space gratuito)
+ * Extrai um range específico de páginas do PDF (v3.0)
+ * @param base64 PDF em base64
+ * @param startPage Página inicial (1-indexed)
+ * @param endPage Página final (1-indexed, inclusive)
+ * @returns { sliceBase64, totalPages, actualStart, actualEnd }
  */
-async function trimPdfTo2Pages(base64: string): Promise<string> {
+async function extractPageRange(
+  base64: string, 
+  startPage: number, 
+  endPage: number
+): Promise<{ sliceBase64: string; totalPages: number; actualStart: number; actualEnd: number }> {
   try {
     const pdfBytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
     const pdfDoc = await PDFDocument.load(pdfBytes);
-    const pageCount = pdfDoc.getPageCount();
+    const totalPages = pdfDoc.getPageCount();
     
-    if (pageCount <= 2) {
-      console.log(`📄 PDF tem ${pageCount} páginas, mantendo todas`);
-      return base64;
+    // Ajusta range para não exceder total
+    const actualStart = Math.max(1, startPage);
+    const actualEnd = Math.min(endPage, totalPages);
+    
+    console.log(`📄 PDF tem ${totalPages} páginas, extraindo ${actualStart}-${actualEnd}`);
+    
+    if (actualStart > totalPages) {
+      // Páginas solicitadas não existem
+      return { 
+        sliceBase64: '', 
+        totalPages, 
+        actualStart, 
+        actualEnd: actualStart - 1 
+      };
     }
     
-    // Remove páginas excedentes (mantém apenas 1-2)
-    const pagesToRemove = pageCount - 2;
-    for (let i = 0; i < pagesToRemove; i++) {
-      pdfDoc.removePage(2); // Sempre remove a página 3 (índice 2)
+    // Cria novo PDF apenas com as páginas solicitadas
+    const newDoc = await PDFDocument.create();
+    for (let i = actualStart - 1; i < actualEnd; i++) {
+      const [page] = await newDoc.copyPages(pdfDoc, [i]);
+      newDoc.addPage(page);
     }
     
-    const trimmedBytes = await pdfDoc.save();
-    console.log(`✂️ PDF cortado: ${pageCount} → 2 páginas`);
-    return uint8ArrayToBase64(new Uint8Array(trimmedBytes));
+    const newBytes = await newDoc.save();
+    const sliceBase64 = uint8ArrayToBase64(new Uint8Array(newBytes));
+    
+    console.log(`✂️ Slice criado: páginas ${actualStart}-${actualEnd} de ${totalPages}`);
+    
+    return { sliceBase64, totalPages, actualStart, actualEnd };
+    
   } catch (error) {
-    console.error('Erro ao cortar PDF:', error);
-    return base64;
+    console.error('Erro ao extrair range de páginas:', error);
+    // Fallback: retorna o PDF original
+    return { sliceBase64: base64, totalPages: 1, actualStart: 1, actualEnd: 1 };
   }
+}
+
+/**
+ * Corta PDF para máximo de páginas (limite OCR.space gratuito)
+ * @deprecated Use extractPageRange para controle preciso
+ */
+async function trimPdfToMaxPages(base64: string, maxPages: number = 2): Promise<string> {
+  const result = await extractPageRange(base64, 1, maxPages);
+  return result.sliceBase64;
 }
 
 /**
@@ -225,7 +260,11 @@ serve(async (req) => {
     const fileBase64 = body.base64 || body.fileBase64;
     const mimeType = body.mimeType || 'application/pdf';
     const fileName = body.fileName || 'document.pdf';
-    const mode = body.mode || 'ocr-only'; // Novo: modo padrão é OCR puro
+    const mode = body.mode || 'ocr-only';
+    
+    // NOVO: Parâmetros de paginação para Progressive Scan
+    const startPage = body.startPage || 1;
+    const endPage = body.endPage || 2;
 
     if (!fileBase64) {
       return new Response(JSON.stringify({ 
@@ -237,12 +276,35 @@ serve(async (req) => {
       });
     }
 
-    console.log(`📄 Processando: ${fileName}, mimeType: ${mimeType}, mode: ${mode}`);
+    console.log(`📄 Processando: ${fileName}, mimeType: ${mimeType}, mode: ${mode}, páginas: ${startPage}-${endPage}`);
     
-    // Para PDFs, cortar para 2 páginas (limite OCR.space gratuito)
+    // Para PDFs, extrai o range de páginas solicitado
     let processedBase64 = fileBase64;
+    let pageInfo = { totalPages: 1, actualStart: 1, actualEnd: 1 };
+    
     if (mimeType === 'application/pdf') {
-      processedBase64 = await trimPdfTo2Pages(fileBase64);
+      const result = await extractPageRange(fileBase64, startPage, endPage);
+      processedBase64 = result.sliceBase64;
+      pageInfo = {
+        totalPages: result.totalPages,
+        actualStart: result.actualStart,
+        actualEnd: result.actualEnd,
+      };
+      
+      // Se o slice está vazio (páginas não existem), retorna vazio
+      if (!processedBase64) {
+        return new Response(JSON.stringify({ 
+          success: true, 
+          rawText: '',
+          source: 'EMPTY',
+          fileName,
+          pageRange: pageInfo,
+          hasMorePages: false,
+          stats: { characters: 0, qualityScore: 0 }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // 1. Tenta extração local primeiro (sem API externa)
@@ -263,7 +325,9 @@ serve(async (req) => {
         if (!rawText || rawText.length < 50) {
           return new Response(JSON.stringify({ 
             success: false, 
-            error: 'Falha na extração de texto (local e OCR)' 
+            error: 'Falha na extração de texto (local e OCR)',
+            pageRange: pageInfo,
+            hasMorePages: pageInfo.actualEnd < pageInfo.totalPages,
           }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -272,13 +336,19 @@ serve(async (req) => {
       }
     }
     
-    console.log(`✅ Extração concluída via ${source}: ${rawText.length} caracteres`);
+    console.log(`✅ Extração concluída via ${source}: ${rawText.length} caracteres (páginas ${pageInfo.actualStart}-${pageInfo.actualEnd} de ${pageInfo.totalPages})`);
 
     return new Response(JSON.stringify({ 
       success: true, 
       rawText: rawText,
       source: source,
       fileName: fileName,
+      pageRange: {
+        start: pageInfo.actualStart,
+        end: pageInfo.actualEnd,
+        total: pageInfo.totalPages,
+      },
+      hasMorePages: pageInfo.actualEnd < pageInfo.totalPages,
       stats: {
         characters: rawText.length,
         qualityScore: quality.score,

@@ -1,15 +1,13 @@
 /**
- * Parser Universal para Extração de Dados de Apólices (v2.1)
- * Arquitetura: OCR → Normalização → Anchor Search → Dados Estruturados
+ * Parser Universal para Extração de Dados de Apólices (v3.0)
+ * Arquitetura: OCR → Normalização → Sliding Window → Anchor Search → Dados Estruturados
  * Zero dependência de IA - 100% determinístico
  * 
- * ESTRATÉGIA: Busca por âncoras com proximidade (150 char radius)
- * Ignora estrutura visual e foca em padrões de dados universais
- * 
- * NOVA FUNÇÃO `findNear(anchor, regex, radius)`:
- * - Localiza a palavra âncora no texto normalizado
- * - Busca o regex apenas nos próximos N caracteres após a âncora
- * - Elimina falsos positivos de dados distantes
+ * NOVIDADES v3.0:
+ * - Sliding Window com multi-pass para maior cobertura
+ * - Correção de ruído OCR (espaços entre dígitos, O→0, l→1)
+ * - Sistema de confiança com pesos para Progressive Scan
+ * - extractByAnchor com busca em TODAS as ocorrências
  */
 
 // ============================================================
@@ -56,36 +54,129 @@ export interface ParsedPolicy {
 }
 
 // ============================================================
-// NORMALIZAÇÃO DE TEXTO (v2.0)
+// PESOS PARA CÁLCULO DE CONFIANÇA (v3.0)
+// ============================================================
+
+const CONFIDENCE_WEIGHTS: Record<string, number> = {
+  cpf_cnpj: 50,       // Crítico: identificação do cliente
+  numero_apolice: 20, // Importante: identificação do documento
+  placa: 20,          // Importante para auto
+  data_inicio: 10,
+  data_fim: 10,
+  premio_liquido: 10,
+  nome_segurado: 10,
+  seguradora: 10,
+  ramo: 5,
+  chassi: 5,
+  marca: 3,
+  modelo: 3,
+  ano: 3,
+  email: 2,
+  telefone: 2,
+  cep: 2,
+};
+
+// Score mínimo para o Progressive Scan parar de buscar mais páginas
+export const CONFIDENCE_THRESHOLD = 80;
+
+// ============================================================
+// NORMALIZAÇÃO DE TEXTO (v3.0 - CORREÇÃO DE RUÍDO OCR)
 // ============================================================
 
 /**
- * Normaliza texto OCR para busca uniforme
- * - Remove espaços múltiplos, tabs, quebras excessivas
+ * Normaliza texto OCR para busca uniforme (v3.0)
+ * - Remove espaços entre dígitos (ruído OCR)
+ * - Corrige O→0 e l/I→1 em contexto numérico
  * - Converte para UPPERCASE para matching case-insensitive
- * - Mantém estrutura mínima para proximidade
  */
 export function normalizeOcrText(rawText: string): string {
-  return rawText
+  let text = rawText
     .replace(/\r\n/g, '\n')           // Normaliza quebras
     .replace(/\t+/g, ' ')             // Tabs → espaço
-    .replace(/[ ]{2,}/g, ' ')         // Múltiplos espaços → um
-    .replace(/\n{3,}/g, '\n\n')       // Múltiplas quebras → duas
-    .toUpperCase()                     // Case-insensitive matching
-    .trim();
+    .toUpperCase();                   // Case-insensitive matching
+  
+  // NOVO v3.0: Remove espaços entre dígitos (OCR noise)
+  // "1 2 3 . 4 5 6 . 7 8 9 - 0 0" → "123.456.789-00"
+  text = text.replace(/(\d)\s+(?=\d)/g, '$1');
+  
+  // NOVO v3.0: Corrige O→0 em contexto numérico (OCR noise)
+  // "CPF: 123.456.789-O0" → "CPF: 123.456.789-00"
+  text = text.replace(/(\d)[O](\d)/g, '$10$2');
+  text = text.replace(/(\d)[O]$/g, '$10');     // Final O após dígito
+  text = text.replace(/^[O](\d)/g, '0$1');     // Inicial O antes de dígito
+  text = text.replace(/([.\-\/])[O](\d)/g, '$10$2'); // O após separador
+  text = text.replace(/(\d)[O]([.\-\/])/g, '$10$2'); // O antes de separador
+  
+  // NOVO v3.0: Corrige l/I→1 em contexto numérico
+  text = text.replace(/(\d)[lI](\d)/g, '$11$2');
+  text = text.replace(/(\d)[lI]$/g, '$11');
+  text = text.replace(/^[lI](\d)/g, '1$1');
+  text = text.replace(/([.\-\/])[lI](\d)/g, '$11$2');
+  text = text.replace(/(\d)[lI]([.\-\/])/g, '$11$2');
+  
+  // Remove múltiplos espaços
+  text = text.replace(/[ ]{2,}/g, ' ');
+  text = text.replace(/\n{3,}/g, '\n\n');
+  
+  return text.trim();
 }
 
 // ============================================================
-// ANCHOR SEARCH - BUSCA POR PROXIMIDADE (v2.0)
+// SLIDING WINDOW EXTRACTION (v3.0 - NOVO)
 // ============================================================
 
 /**
- * Busca um padrão após uma âncora com raio de proximidade (v2.1)
+ * Busca padrão em TODAS as ocorrências de âncoras (v3.0 - Sliding Window)
+ * Retorna o melhor match baseado na proximidade com a âncora
+ * 
  * @param text Texto normalizado (UPPERCASE)
  * @param anchors Lista de palavras-âncora para buscar
- * @param pattern Regex do valor a capturar (deve ter grupo de captura)
- * @param radius Raio em caracteres após a âncora (default: 150)
- * @returns Valor capturado ou null
+ * @param regex Regex do valor a capturar (deve ter grupo de captura)
+ * @param windowSize Raio em caracteres após a âncora
+ * @returns Valor capturado mais confiável ou null
+ */
+function extractByAnchor(
+  text: string,
+  anchors: string[],
+  regex: RegExp,
+  windowSize: number = 100
+): string | null {
+  const results: { value: string; confidence: number }[] = [];
+  
+  for (const anchor of anchors) {
+    const anchorUpper = anchor.toUpperCase();
+    let searchIdx = 0;
+    
+    // Busca TODAS as ocorrências da âncora
+    while (true) {
+      const anchorIdx = text.indexOf(anchorUpper, searchIdx);
+      if (anchorIdx === -1) break;
+      
+      // Extrai janela após a âncora
+      const windowStart = anchorIdx + anchor.length;
+      const window = text.substring(windowStart, windowStart + windowSize);
+      
+      const match = window.match(regex);
+      if (match?.[1]) {
+        const value = match[1].trim();
+        // Score baseado na proximidade (quanto mais perto da âncora, melhor)
+        const confidence = 100 - (match.index || 0);
+        results.push({ value, confidence });
+      }
+      
+      searchIdx = anchorIdx + 1;
+    }
+  }
+  
+  if (results.length === 0) return null;
+  
+  // Retorna o match mais confiável (mais próximo da âncora)
+  results.sort((a, b) => b.confidence - a.confidence);
+  return results[0].value;
+}
+
+/**
+ * Alias para anchorSearch - compatibilidade com versões anteriores
  */
 function anchorSearch(
   text: string, 
@@ -93,24 +184,11 @@ function anchorSearch(
   pattern: RegExp, 
   radius: number = 150
 ): string | null {
-  for (const anchor of anchors) {
-    const anchorIdx = text.indexOf(anchor.toUpperCase());
-    if (anchorIdx === -1) continue;
-    
-    // Extrai região após a âncora
-    const regionStart = anchorIdx + anchor.length;
-    const region = text.substring(regionStart, regionStart + radius);
-    
-    const match = region.match(pattern);
-    if (match?.[1]) {
-      return match[1].trim();
-    }
-  }
-  return null;
+  return extractByAnchor(text, anchors, pattern, radius);
 }
 
 /**
- * Alias para anchorSearch - compatibilidade com documentação
+ * Alias para extractByAnchor - compatibilidade com documentação
  * Localiza a palavra âncora e busca regex nos próximos N caracteres
  */
 export function findNear(
@@ -119,7 +197,7 @@ export function findNear(
   regex: RegExp,
   radius: number = 150
 ): string | null {
-  return anchorSearch(text, [anchor], regex, radius);
+  return extractByAnchor(text, [anchor], regex, radius);
 }
 
 /**
@@ -345,7 +423,7 @@ const SEGURADORA_MARCAS = [
   'ESSOR', 'SANCOR', 'AMERICAN', 'METLIFE', 'MONGERAL', 'PRUDENTIAL'
 ];
 
-// Aliases para normalizar nomes de seguradoras (v2.1 - NOVO)
+// Aliases para normalizar nomes de seguradoras (v2.1)
 export const SEGURADORA_ALIASES: Record<string, string> = {
   'tokio marine kiln': 'TOKIO MARINE',
   'tokio marine': 'TOKIO MARINE',
@@ -537,20 +615,72 @@ function normalizePlaca(placa: string | null): string | null {
 }
 
 // ============================================================
-// PARSER PRINCIPAL (v2.0 - Anchor-Based)
+// CÁLCULO DE CONFIANÇA (v3.0 - NOVO)
+// ============================================================
+
+/**
+ * Calcula score de confiança baseado em pesos (v3.0)
+ * @param matchedFields Lista de campos encontrados
+ * @returns Score de 0-100
+ */
+function calculateConfidence(matchedFields: string[]): number {
+  let score = 0;
+  
+  for (const field of matchedFields) {
+    // Mapeia campo para categoria de peso
+    if (field.includes('cpf') || field.includes('cnpj')) {
+      score += CONFIDENCE_WEIGHTS.cpf_cnpj;
+    } else if (field.includes('apolice')) {
+      score += CONFIDENCE_WEIGHTS.numero_apolice;
+    } else if (field === 'placa') {
+      score += CONFIDENCE_WEIGHTS.placa;
+    } else if (field.includes('data_inicio')) {
+      score += CONFIDENCE_WEIGHTS.data_inicio;
+    } else if (field.includes('data_fim')) {
+      score += CONFIDENCE_WEIGHTS.data_fim;
+    } else if (field.includes('premio')) {
+      score += CONFIDENCE_WEIGHTS.premio_liquido;
+    } else if (field.includes('nome_segurado')) {
+      score += CONFIDENCE_WEIGHTS.nome_segurado;
+    } else if (field.includes('seguradora')) {
+      score += CONFIDENCE_WEIGHTS.seguradora;
+    } else if (field.includes('ramo')) {
+      score += CONFIDENCE_WEIGHTS.ramo;
+    } else if (field === 'chassi') {
+      score += CONFIDENCE_WEIGHTS.chassi;
+    } else if (field === 'marca') {
+      score += CONFIDENCE_WEIGHTS.marca;
+    } else if (field === 'modelo') {
+      score += CONFIDENCE_WEIGHTS.modelo;
+    } else if (field === 'ano') {
+      score += CONFIDENCE_WEIGHTS.ano;
+    } else if (field === 'email') {
+      score += CONFIDENCE_WEIGHTS.email;
+    } else if (field === 'telefone') {
+      score += CONFIDENCE_WEIGHTS.telefone;
+    } else if (field === 'cep') {
+      score += CONFIDENCE_WEIGHTS.cep;
+    }
+  }
+  
+  return Math.min(100, score);
+}
+
+// ============================================================
+// PARSER PRINCIPAL (v3.0 - Sliding Window + Confidence Weights)
 // ============================================================
 
 export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   const matchedFields: string[] = [];
   const normalized = normalizeOcrText(rawText);
   
-  console.log(`🔍 [PARSER] Texto normalizado: ${normalized.length} caracteres`);
+  console.log(`🔍 [PARSER v3.0] Texto normalizado: ${normalized.length} caracteres`);
   
-  // --- CPF/CNPJ (Anchor Search com 150 char radius) ---
+  // --- CPF/CNPJ (Sliding Window com 150 char radius) ---
   let cpfCnpj: string | null = null;
   
   // Tenta CPF primeiro
-  const cpfRaw = anchorSearch(normalized, ANCHORS.cpf, CPF_PATTERN, 150);
+  const cpfRaw = extractByAnchor(normalized, ANCHORS.cpf, CPF_PATTERN, 150);
   if (cpfRaw) {
     cpfCnpj = cleanDocument(cpfRaw);
     if (cpfCnpj) matchedFields.push('cpf_anchor');
@@ -558,7 +688,7 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   
   // Tenta CNPJ se não achou CPF
   if (!cpfCnpj) {
-    const cnpjRaw = anchorSearch(normalized, ANCHORS.cnpj, CNPJ_PATTERN, 150);
+    const cnpjRaw = extractByAnchor(normalized, ANCHORS.cnpj, CNPJ_PATTERN, 150);
     if (cnpjRaw) {
       cpfCnpj = cleanDocument(cnpjRaw);
       if (cpfCnpj) matchedFields.push('cnpj_anchor');
@@ -575,7 +705,7 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   }
   
   // --- Nome do Segurado ---
-  let nomeCliente = anchorSearch(normalized, ANCHORS.segurado, NOME_PATTERN, 100);
+  let nomeCliente = extractByAnchor(normalized, ANCHORS.segurado, NOME_PATTERN, 100);
   nomeCliente = cleanNome(nomeCliente);
   if (nomeCliente && nomeCliente.length >= 5) {
     matchedFields.push('nome_segurado');
@@ -600,14 +730,14 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   }
   
   // --- Número da Apólice ---
-  let numeroApolice = anchorSearch(normalized, ANCHORS.apolice, APOLICE_PATTERN, 80);
+  let numeroApolice = extractByAnchor(normalized, ANCHORS.apolice, APOLICE_PATTERN, 80);
   if (numeroApolice) matchedFields.push('numero_apolice');
   
   // --- Número da Proposta ---
-  let numeroProposta = anchorSearch(normalized, ANCHORS.proposta, APOLICE_PATTERN, 80);
+  let numeroProposta = extractByAnchor(normalized, ANCHORS.proposta, APOLICE_PATTERN, 80);
   if (numeroProposta) matchedFields.push('numero_proposta');
   
-  // --- Seguradora (detecção de marca conhecida + normalização v2.1) ---
+  // --- Seguradora (detecção de marca conhecida + normalização) ---
   let nomeSeguradora: string | null = null;
   for (const marca of SEGURADORA_MARCAS) {
     if (normalized.includes(marca)) {
@@ -618,7 +748,7 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   }
   // Fallback: anchor search
   if (!nomeSeguradora) {
-    const seguradoraRaw = anchorSearch(normalized, ANCHORS.seguradora, /([A-Z\s]{5,40})/i, 60);
+    const seguradoraRaw = extractByAnchor(normalized, ANCHORS.seguradora, /([A-Z\s]{5,40})/i, 60);
     if (seguradoraRaw) {
       nomeSeguradora = normalizeSeguradora(seguradoraRaw.substring(0, 40).trim());
       matchedFields.push('seguradora_anchor');
@@ -626,11 +756,11 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   }
   
   // --- Datas de Vigência ---
-  let dataInicio = anchorSearch(normalized, ANCHORS.vigencia_inicio, DATA_PATTERN, 50);
+  let dataInicio = extractByAnchor(normalized, ANCHORS.vigencia_inicio, DATA_PATTERN, 50);
   dataInicio = parseDate(dataInicio);
   if (dataInicio) matchedFields.push('data_inicio');
   
-  let dataFim = anchorSearch(normalized, ANCHORS.vigencia_fim, DATA_PATTERN, 50);
+  let dataFim = extractByAnchor(normalized, ANCHORS.vigencia_fim, DATA_PATTERN, 50);
   dataFim = parseDate(dataFim);
   if (dataFim) matchedFields.push('data_fim');
   
@@ -651,14 +781,14 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   
   // --- Valores ---
   let premioLiquido: number | null = null;
-  const liquidoRaw = anchorSearch(normalized, ANCHORS.premio_liquido, VALOR_PATTERN, 80);
+  const liquidoRaw = extractByAnchor(normalized, ANCHORS.premio_liquido, VALOR_PATTERN, 80);
   if (liquidoRaw) {
     premioLiquido = parseMonetaryValue(liquidoRaw);
     if (premioLiquido) matchedFields.push('premio_liquido');
   }
   
   let premioTotal: number | null = null;
-  const totalRaw = anchorSearch(normalized, ANCHORS.premio_total, VALOR_PATTERN, 80);
+  const totalRaw = extractByAnchor(normalized, ANCHORS.premio_total, VALOR_PATTERN, 80);
   if (totalRaw) {
     premioTotal = parseMonetaryValue(totalRaw);
     if (premioTotal) matchedFields.push('premio_total');
@@ -688,7 +818,7 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   if (placa) matchedFields.push('placa');
   
   // --- Chassi ---
-  let chassi = anchorSearch(normalized, ANCHORS.chassi, CHASSI_PATTERN, 50);
+  let chassi = extractByAnchor(normalized, ANCHORS.chassi, CHASSI_PATTERN, 50);
   if (!chassi) {
     chassi = globalSearch(normalized, CHASSI_PATTERN);
   }
@@ -699,12 +829,12 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   }
   
   // --- Marca/Modelo/Ano ---
-  const marca = anchorSearch(normalized, ANCHORS.marca, /([A-Z]{3,20})/i, 40);
-  const modelo = anchorSearch(normalized, ANCHORS.modelo, /([A-Z0-9\s\-\.]{3,30})/i, 50);
+  const marca = extractByAnchor(normalized, ANCHORS.marca, /([A-Z]{3,20})/i, 40);
+  const modelo = extractByAnchor(normalized, ANCHORS.modelo, /([A-Z0-9\s\-\.]{3,30})/i, 50);
   let anoFabricacao: number | null = null;
   let anoModelo: number | null = null;
   
-  const anoRaw = anchorSearch(normalized, ANCHORS.ano, /(\d{4})[\/\s]*(\d{4})?/, 30);
+  const anoRaw = extractByAnchor(normalized, ANCHORS.ano, /(\d{4})[\/\s]*(\d{4})?/, 30);
   if (anoRaw) {
     const anoMatch = anoRaw.match(/(\d{4})[\/\s]*(\d{4})?/);
     if (anoMatch) {
@@ -749,13 +879,10 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
     matchedFields.push('cep');
   }
   
-  // --- Cálculo de Confiança ---
-  // Campos essenciais: documento, apólice, nome
-  const essentialFields = ['cpf_anchor', 'cnpj_anchor', 'cpf_global', 'numero_apolice', 'nome_segurado'];
-  const essentialMatched = matchedFields.filter(f => essentialFields.some(e => f.includes(e))).length;
-  const confidence = Math.min(100, (matchedFields.length * 7) + (essentialMatched * 20));
+  // --- Cálculo de Confiança (v3.0 - Sistema de Pesos) ---
+  const confidence = calculateConfidence(matchedFields);
   
-  console.log(`🔍 [PARSER] Confiança: ${confidence}%, Campos: ${matchedFields.join(', ')}`);
+  console.log(`🔍 [PARSER v3.0] Confiança: ${confidence}% (threshold: ${CONFIDENCE_THRESHOLD}%), Campos: ${matchedFields.join(', ')}`);
   
   return {
     nome_cliente: nomeCliente,
