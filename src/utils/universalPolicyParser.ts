@@ -1,10 +1,15 @@
 /**
- * Parser Universal para Extração de Dados de Apólices (v2.0)
+ * Parser Universal para Extração de Dados de Apólices (v2.1)
  * Arquitetura: OCR → Normalização → Anchor Search → Dados Estruturados
  * Zero dependência de IA - 100% determinístico
  * 
  * ESTRATÉGIA: Busca por âncoras com proximidade (150 char radius)
  * Ignora estrutura visual e foca em padrões de dados universais
+ * 
+ * NOVA FUNÇÃO `findNear(anchor, regex, radius)`:
+ * - Localiza a palavra âncora no texto normalizado
+ * - Busca o regex apenas nos próximos N caracteres após a âncora
+ * - Elimina falsos positivos de dados distantes
  */
 
 // ============================================================
@@ -75,7 +80,7 @@ export function normalizeOcrText(rawText: string): string {
 // ============================================================
 
 /**
- * Busca um padrão após uma âncora com raio de proximidade
+ * Busca um padrão após uma âncora com raio de proximidade (v2.1)
  * @param text Texto normalizado (UPPERCASE)
  * @param anchors Lista de palavras-âncora para buscar
  * @param pattern Regex do valor a capturar (deve ter grupo de captura)
@@ -102,6 +107,19 @@ function anchorSearch(
     }
   }
   return null;
+}
+
+/**
+ * Alias para anchorSearch - compatibilidade com documentação
+ * Localiza a palavra âncora e busca regex nos próximos N caracteres
+ */
+export function findNear(
+  text: string,
+  anchor: string,
+  regex: RegExp,
+  radius: number = 150
+): string | null {
+  return anchorSearch(text, [anchor], regex, radius);
 }
 
 /**
@@ -151,25 +169,47 @@ const TELEFONE_PATTERN = /(\(?\d{2}\)?\s*9?\d{4}[\-\s]?\d{4})/;
 const NOME_PATTERN = /([A-Z\u00C0-\u017F][A-Z\u00C0-\u017F\s]{3,60})/;
 
 // ============================================================
-// ÂNCORAS POR CAMPO
+// ÂNCORAS POR CAMPO (v2.1 - Expandido para múltiplas seguradoras)
 // ============================================================
 
 const ANCHORS = {
-  cpf: ['CPF', 'C.P.F', 'CPF/MF', 'DOCUMENTO', 'CPF:'],
-  cnpj: ['CNPJ', 'C.N.P.J', 'INSCRICAO', 'CNPJ:'],
-  segurado: ['SEGURADO', 'TITULAR', 'ESTIPULANTE', 'PROPONENTE', 'CLIENTE', 'NOME:'],
-  apolice: ['APOLICE', 'APÓLICE', 'N° APOLICE', 'NUMERO APOLICE', 'Nº APOLICE', 'APOLICE N'],
-  proposta: ['PROPOSTA', 'N° PROPOSTA', 'NUMERO PROPOSTA', 'PROPOSTA N'],
-  seguradora: ['SEGURADORA', 'COMPANHIA', 'CIA', 'CIA.'],
-  premio_liquido: ['PREMIO LIQUIDO', 'PRÊMIO LÍQUIDO', 'PRÊMIO LIQ', 'PREMIO LIQ', 'LIQUIDO'],
-  premio_total: ['PREMIO TOTAL', 'PRÊMIO TOTAL', 'TOTAL A PAGAR', 'VALOR TOTAL', 'TOTAL:'],
-  vigencia_inicio: ['INICIO VIGENCIA', 'INÍCIO VIGÊNCIA', 'VIGENCIA DE', 'VIGÊNCIA DE', 'INICIO:', 'DE:'],
-  vigencia_fim: ['TERMINO VIGENCIA', 'TÉRMINO VIGÊNCIA', 'VIGENCIA ATE', 'VIGÊNCIA ATÉ', 'ATE:', 'ATÉ:', 'TERMINO:'],
-  marca: ['MARCA', 'FABRICANTE', 'MARCA:'],
-  modelo: ['MODELO', 'VEICULO', 'MODELO:'],
-  placa: ['PLACA', 'PLACA:'],
-  chassi: ['CHASSI', 'CHASSIS', 'CHASSI:'],
-  ano: ['ANO', 'ANO/MODELO', 'ANO FAB', 'ANO MODELO', 'ANO:'],
+  // Documentos - ordem de prioridade
+  cpf: ['CPF', 'C.P.F', 'CPF/MF', 'DOCUMENTO', 'CPF:', 'IDENTIFICAÇÃO', 'IDENTIFICACAO'],
+  cnpj: ['CNPJ', 'C.N.P.J', 'INSCRICAO', 'CNPJ:', 'INSCRICÃO', 'REGISTRO'],
+  
+  // Nome do segurado - múltiplas variações
+  segurado: ['SEGURADO', 'TITULAR', 'ESTIPULANTE', 'PROPONENTE', 'CLIENTE', 'NOME:', 
+             'SEGURADO PRINCIPAL', 'RESPONSAVEL', 'RESPONSÁVEL', 'CONTRATANTE'],
+  
+  // Número do documento (apólice/proposta)
+  apolice: ['APOLICE', 'APÓLICE', 'N° APOLICE', 'NUMERO APOLICE', 'Nº APOLICE', 
+            'APOLICE N', 'N° DA APÓLICE', 'APÓLICE Nº', 'NUMERO DA APOLICE'],
+  proposta: ['PROPOSTA', 'N° PROPOSTA', 'NUMERO PROPOSTA', 'PROPOSTA N', 
+             'N° DA PROPOSTA', 'PROPOSTA Nº', 'NUMERO DA PROPOSTA'],
+  
+  // Seguradora
+  seguradora: ['SEGURADORA', 'COMPANHIA', 'CIA', 'CIA.', 'SEGUROS', 'SEGURADORA:'],
+  
+  // Valores monetários
+  premio_liquido: ['PREMIO LIQUIDO', 'PRÊMIO LÍQUIDO', 'PRÊMIO LIQ', 'PREMIO LIQ', 
+                   'LIQUIDO', 'VALOR LIQUIDO', 'VALOR LÍQUIDO', 'LIQ.'],
+  premio_total: ['PREMIO TOTAL', 'PRÊMIO TOTAL', 'TOTAL A PAGAR', 'VALOR TOTAL', 
+                 'TOTAL:', 'TOTAL GERAL', 'VALOR A PAGAR'],
+  
+  // Vigência
+  vigencia_inicio: ['INICIO VIGENCIA', 'INÍCIO VIGÊNCIA', 'VIGENCIA DE', 'VIGÊNCIA DE', 
+                    'INICIO:', 'DE:', 'INÍCIO DA VIGÊNCIA', 'DATA INICIO', 'DATA INÍCIO'],
+  vigencia_fim: ['TERMINO VIGENCIA', 'TÉRMINO VIGÊNCIA', 'VIGENCIA ATE', 'VIGÊNCIA ATÉ', 
+                 'ATE:', 'ATÉ:', 'TERMINO:', 'TÉRMINO:', 'FIM DA VIGÊNCIA', 'DATA FIM', 
+                 'DATA TÉRMINO', 'VENCIMENTO'],
+  
+  // Veículo (âncoras expandidas)
+  marca: ['MARCA', 'FABRICANTE', 'MARCA:', 'MARCA/MODELO', 'MARCA DO VEICULO'],
+  modelo: ['MODELO', 'VEICULO', 'MODELO:', 'MODELO DO VEICULO', 'VEÍCULO'],
+  placa: ['PLACA', 'PLACA:', 'PLACA DO VEICULO', 'IDENTIFICAÇÃO', 'IDENTIFICACAO'],
+  chassi: ['CHASSI', 'CHASSIS', 'CHASSI:', 'NUMERO DO CHASSI', 'Nº CHASSI'],
+  ano: ['ANO', 'ANO/MODELO', 'ANO FAB', 'ANO MODELO', 'ANO:', 'ANO FABRICAÇÃO', 
+        'ANO FABRICACAO', 'ANO/MOD'],
 };
 
 // ============================================================
@@ -295,13 +335,57 @@ export const RAMO_KEYWORDS: Record<string, string[]> = {
   'RESPONSABILIDADE CIVIL': ['RESPONSABILIDADE', 'RC', 'D&O', 'E&O', 'PROFISSIONAL', 'DIRECTORS', 'OFFICERS'],
 };
 
-// Marcas conhecidas de seguradoras
+// Marcas conhecidas de seguradoras (v2.1 - expandido)
 const SEGURADORA_MARCAS = [
   'PORTO SEGURO', 'PORTO', 'HDI', 'TOKIO MARINE', 'TOKIO', 'ALLIANZ', 
   'BRADESCO', 'SULAMERICA', 'SULAMÉRICA', 'LIBERTY', 'MAPFRE', 'ZURICH',
   'AZUL SEGUROS', 'AZUL', 'SOMPO', 'ITAU', 'ITAÚ', 'CAIXA', 'BB SEGUROS',
-  'ICATU', 'MITSUI', 'ALFA', 'YASUDA', 'MARITIMA', 'MARÍTIMA'
+  'ICATU', 'MITSUI', 'ALFA', 'YASUDA', 'MARITIMA', 'MARÍTIMA', 'SURA',
+  'EXCELSIOR', 'JUNTO', 'GENERALI', 'AXA', 'FAIRFAX', 'POTTENCIAL',
+  'ESSOR', 'SANCOR', 'AMERICAN', 'METLIFE', 'MONGERAL', 'PRUDENTIAL'
 ];
+
+// Aliases para normalizar nomes de seguradoras (v2.1 - NOVO)
+export const SEGURADORA_ALIASES: Record<string, string> = {
+  'tokio marine kiln': 'TOKIO MARINE',
+  'tokio marine': 'TOKIO MARINE',
+  'tokio': 'TOKIO MARINE',
+  'porto seguro cia': 'PORTO SEGURO',
+  'porto seguro companhia': 'PORTO SEGURO',
+  'porto': 'PORTO SEGURO',
+  'hdi seguros': 'HDI',
+  'hdi': 'HDI',
+  'allianz seguros': 'ALLIANZ',
+  'sulamerica seguros': 'SULAMÉRICA',
+  'sulamerica': 'SULAMÉRICA',
+  'liberty seguros': 'LIBERTY',
+  'mapfre seguros': 'MAPFRE',
+  'zurich seguros': 'ZURICH',
+  'azul seguros': 'AZUL SEGUROS',
+  'azul companhia': 'AZUL SEGUROS',
+  'sompo seguros': 'SOMPO',
+  'itau seguros': 'ITAÚ SEGUROS',
+  'itaú seguros': 'ITAÚ SEGUROS',
+  'bradesco seguros': 'BRADESCO',
+  'bradesco auto': 'BRADESCO',
+  'caixa seguradora': 'CAIXA',
+  'bb seguros': 'BB SEGUROS',
+  'banco do brasil seguros': 'BB SEGUROS',
+  'icatu seguros': 'ICATU',
+  'sura seguros': 'SURA',
+  'junto seguros': 'JUNTO',
+  'generali seguros': 'GENERALI',
+  'pottencial seguros': 'POTTENCIAL',
+};
+
+/**
+ * Normaliza nome de seguradora usando aliases
+ */
+export function normalizeSeguradora(nome: string | null): string | null {
+  if (!nome) return null;
+  const key = nome.toLowerCase().trim();
+  return SEGURADORA_ALIASES[key] || nome.toUpperCase();
+}
 
 // ============================================================
 // FUNÇÕES AUXILIARES
@@ -523,20 +607,20 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   let numeroProposta = anchorSearch(normalized, ANCHORS.proposta, APOLICE_PATTERN, 80);
   if (numeroProposta) matchedFields.push('numero_proposta');
   
-  // --- Seguradora (detecção de marca conhecida) ---
+  // --- Seguradora (detecção de marca conhecida + normalização v2.1) ---
   let nomeSeguradora: string | null = null;
   for (const marca of SEGURADORA_MARCAS) {
     if (normalized.includes(marca)) {
-      nomeSeguradora = marca;
+      nomeSeguradora = normalizeSeguradora(marca);
       matchedFields.push('seguradora_marca');
       break;
     }
   }
   // Fallback: anchor search
   if (!nomeSeguradora) {
-    nomeSeguradora = anchorSearch(normalized, ANCHORS.seguradora, /([A-Z\s]{5,40})/i, 60);
-    if (nomeSeguradora) {
-      nomeSeguradora = nomeSeguradora.substring(0, 40).trim();
+    const seguradoraRaw = anchorSearch(normalized, ANCHORS.seguradora, /([A-Z\s]{5,40})/i, 60);
+    if (seguradoraRaw) {
+      nomeSeguradora = normalizeSeguradora(seguradoraRaw.substring(0, 40).trim());
       matchedFields.push('seguradora_anchor');
     }
   }
