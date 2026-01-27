@@ -1,189 +1,193 @@
 
-# Plano: Correção Definitiva do Nome "Ra Jj" + Popover de Vinculação
+# Plano: Correção Definitiva de Nome do Cliente + Melhorias na Vinculação
 
-## Diagnóstico Confirmado
+## Diagnóstico
 
-Descobri que **4 clientes no banco estão com nome "Ra Jj"**:
+O nome "Agora Você Pode Realizar O Programa De Benefícios..." está passando pela validação porque:
 
-| CPF | ID |
-|-----|-----|
-| 35939607888 | 9acee241-9ad4-48f0-96c1-bcc37feb7dd5 |
-| 22699965855 | c54a2c41-e017-4b4b-9ce3-3c0256524aeb |
-| 21617669881 | e54110c8-aa69-41ab-8e16-d7015db8eaee |
-| 31897639848 | 952c4b17-6c38-42d3-8067-e0147d5f6b65 |
+| Critério Atual | Valor | Resultado |
+|----------------|-------|-----------|
+| 8+ caracteres | ~40 chars | PASSA |
+| 2+ palavras | 10 palavras | PASSA |
+| Palavra 3+ chars | "Agora", "Você", etc. | PASSA |
+| Blacklist | Não contém termos | PASSA |
 
-O problema não é o código novo - é que **o lixo já foi persistido no banco** quando o código antigo rodou. O fluxo atual:
-
-```text
-Import PDF → OCR → Parser v5.2 (filtra "Ra Jj") → Busca CPF no banco → 
-ENCONTRA cliente "Ra Jj" → Retorna nome do banco (lixo persistido)
-```
+Mas claramente é um texto institucional/marketing, NÃO um nome de pessoa.
 
 ---
 
-## Correção em 2 Frentes
+## Solução em 3 Frentes
 
-### Frente 1: Limpar Dados do Banco (Imediato)
+### Frente 1: Expandir Blacklist com Frases Institucionais
 
-Executar SQL para atualizar os 4 clientes com nome "Ra Jj" para "Cliente Importado":
+**Arquivo**: `src/services/policyImportService.ts` e `src/utils/universalPolicyParser.ts`
 
-```sql
-UPDATE clientes 
-SET name = 'Cliente Importado', updated_at = NOW() 
-WHERE name = 'Ra Jj';
-```
-
-Isso resolve o problema para os registros existentes.
-
-### Frente 2: Validar Nome do Banco (Código)
-
-**Arquivo**: `src/services/policyImportService.ts`
-
-Modificar `upsertClientByDocument` para validar se o nome do cliente EXISTENTE no banco também é lixo:
+Adicionar termos que indicam texto institucional/marketing:
 
 ```typescript
-if (existing) {
-  // v5.3: Se o nome do banco também é lixo, considera como "a atualizar"
-  const dbNameIsValid = isValidClientName(existing.name);
-  const finalName = dbNameIsValid ? existing.name : sanitizeClientName(nome);
+const INSTITUTIONAL_BLACKLIST = [
+  // Existentes...
   
-  // Se nome do banco era lixo, atualiza com nome melhor do OCR ou default
-  if (!dbNameIsValid && finalName !== existing.name) {
-    await supabase
-      .from('clientes')
-      .update({ name: finalName })
-      .eq('id', existing.id);
-    console.log(`🔄 [UPSERT] Nome atualizado: "${existing.name}" → "${finalName}"`);
+  // v5.4: Frases de marketing/institucional
+  'AGORA', 'VOCE', 'PODE', 'REALIZAR', 'PROGRAMA', 'BENEFICIOS',
+  'APROVEITE', 'DESCONTO', 'PROMOCAO', 'OFERTA', 'EXCLUSIVO',
+  'CLIQUE', 'ACESSE', 'SAIBA', 'MAIS', 'INFORMACOES',
+  'ATENDIMENTO', 'SERVICO', 'PORTAL', 'ONLINE', 'DIGITAL',
+  'TERMOS', 'CONDICOES', 'REGULAMENTO', 'PARTICIPAR',
+  'PAGINA', 'SITE', 'WWW', 'HTTP', 'HTTPS',
+];
+```
+
+### Frente 2: Detectar Padrão de Frase (Muitas Palavras)
+
+Adicionar heurística: nomes reais raramente têm mais de 5 palavras.
+
+```typescript
+function isValidClientName(name: string): boolean {
+  // ... critérios existentes ...
+  
+  // v5.4: Nome com mais de 5 palavras provavelmente é frase institucional
+  if (words.length > 5) {
+    console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (${words.length} palavras - provavelmente frase)`);
+    return false;
   }
   
-  return { id: existing.id, created: false, name: finalName };
+  // v5.4: Verificar se parece com frase (verbos, artigos em excesso)
+  const verbsAndArticles = ['VOCE', 'PODE', 'PARA', 'COM', 'QUE', 'COMO', 'FAZER', 'TER', 'SER'];
+  const wordSet = new Set(words.map(w => w.toUpperCase()));
+  const matchCount = verbsAndArticles.filter(v => wordSet.has(v)).length;
+  
+  if (matchCount >= 2) {
+    console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (parece frase: ${matchCount} verbos/artigos)`);
+    return false;
+  }
+  
+  return true;
 }
 ```
 
-Isso garante que:
-1. Se o nome no banco é válido → usa nome do banco
-2. Se o nome no banco é lixo → atualiza com nome melhor ou "Cliente Importado"
+### Frente 3: Forçar Edição Manual Quando Nome Inválido
+
+No `ImportPoliciesModal.tsx`, quando o nome é inválido:
+1. Exibir campo com borda vermelha + placeholder "Digite o nome do cliente"
+2. Bloquear botão "Importar" até que o nome seja editado
+3. Exibir alerta visual na linha
+
+```typescript
+// Validação visual na UI
+const isNameInvalid = !item.clientName?.trim() || 
+  item.clientName === 'Cliente Não Identificado' ||
+  item.clientName.length > 60 ||  // v5.4: Nomes muito longos são suspeitos
+  item.clientName.split(' ').length > 5; // v5.4: Muitas palavras = frase
+
+// Input com destaque vermelho se inválido
+<Input
+  value={item.clientName}
+  className={cn(
+    "h-8 bg-transparent border-zinc-700/50",
+    isNameInvalid && "border-red-500/50 bg-red-900/10 animate-pulse"
+  )}
+  placeholder="⚠️ Digite o nome do cliente"
+/>
+```
 
 ---
 
-## Frente 3: Popover de Vinculação (Verificação)
-
-O código do Popover ESTÁ implementado corretamente (linhas 1021-1063 do ImportPoliciesModal.tsx). Se não está funcionando, pode ser:
-
-1. **Z-index**: O popover pode estar atrás de outros elementos
-2. **Evento propagation**: O click pode estar sendo consumido pela TableRow
-
-Correção sugerida:
-
-```typescript
-// Adicionar stopPropagation para evitar que TableRow consuma o click
-<PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
-```
-
-E garantir z-index alto no PopoverContent:
-
-```typescript
-<PopoverContent className="w-64 bg-zinc-900 border-zinc-700 p-3 z-[100]" side="top">
-```
-
----
-
-## Resumo das Alterações
+## Alterações por Arquivo
 
 | Arquivo | Alteração |
 |---------|-----------|
-| *Banco de dados* | Limpar registros "Ra Jj" existentes |
-| `src/services/policyImportService.ts` | Validar nome do banco e atualizar se for lixo |
-| `src/components/policies/ImportPoliciesModal.tsx` | Adicionar `stopPropagation` e z-index no Popover |
+| `src/services/policyImportService.ts` | Expandir `INSTITUTIONAL_BLACKLIST`, adicionar heurística de frase em `isValidClientName()` |
+| `src/utils/universalPolicyParser.ts` | Sincronizar mesma lógica de validação (ou importar função compartilhada) |
+| `src/components/policies/ImportPoliciesModal.tsx` | Validação visual + bloquear importação de nomes inválidos |
 
 ---
 
 ## Resultado Esperado
 
-1. **Clientes existentes com lixo**: Serão atualizados automaticamente na próxima importação
-2. **Popover de auditoria**: Abrirá ao clicar no badge "Vinculado"
-3. **Proteção futura**: Nomes lixo nunca mais serão persistidos (validação dupla)
+Antes:
+- "Agora Você Pode Realizar O Pro..." é exibido como nome → Usuário precisa perceber e editar
+
+Depois:
+- Campo aparece VAZIO com placeholder vermelho "⚠️ Digite o nome do cliente"
+- Botão "Importar" desabilitado até edição
+- Nome institucional rejeitado automaticamente
 
 ---
 
 ## Detalhes Técnicos
 
-### isValidClientName (já implementado)
-
-A função rejeita nomes com:
-- Menos de 8 caracteres
-- Menos de 2 palavras válidas (2+ chars cada)
-- Sem palavra substancial (3+ chars)
-- Contendo termos da blacklist institucional
-
-### upsertClientByDocument v5.3
+### Nova Função `isValidClientName` (v5.4)
 
 ```typescript
-export async function upsertClientByDocument(
-  documento: string,
-  nome: string,
-  email: string | null,
-  telefone: string | null,
-  endereco: string | null,
-  userId: string
-): Promise<{ id: string; created: boolean; name: string } | null> {
-  const normalized = documento.replace(/\D/g, '');
+function isValidClientName(name: string): boolean {
+  if (!name) return false;
   
-  if (!normalized || (normalized.length !== 11 && normalized.length !== 14)) {
-    return null;
+  const cleanName = name.trim().replace(/\s+/g, ' ');
+  
+  // Mínimo de 8 caracteres
+  if (cleanName.length < 8) return false;
+  
+  const words = cleanName.split(' ');
+  
+  // v5.4: NOVO - Máximo de 5 palavras (nomes reais)
+  if (words.length > 5) return false;
+  
+  // Mínimo de 2 palavras válidas
+  const validWords = words.filter(w => w.length >= 2);
+  if (validWords.length < 2) return false;
+  
+  // Pelo menos uma palavra substancial (3+ chars)
+  if (!words.some(w => w.length >= 3)) return false;
+  
+  const alphaName = name.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  
+  // Blacklist expandida
+  const BLACKLIST = [
+    // Seguradoras
+    'SEGURADORA', 'SEGUROS', 'CORRETORA', 'TOKIO', 'PORTO', 'HDI',
+    // Termos jurídicos
+    'LTDA', 'SA', 'EIRELI', 'CNPJ', 'CPF',
+    // v5.4: Termos de marketing/frases
+    'AGORA', 'VOCE', 'PODE', 'REALIZAR', 'PROGRAMA', 'BENEFICIOS',
+    'APROVEITE', 'PROMOCAO', 'OFERTA', 'CLIQUE', 'ACESSE',
+    'TERMOS', 'CONDICOES', 'REGULAMENTO', 'PARTICIPAR',
+  ];
+  
+  for (const forbidden of BLACKLIST) {
+    if (alphaName.includes(forbidden)) return false;
   }
   
-  const { data: existing } = await supabase
-    .from('clientes')
-    .select('id, name')
-    .eq('user_id', userId)
-    .eq('cpf_cnpj', normalized)
-    .maybeSingle();
+  // v5.4: Detectar padrão de frase
+  const verbsAndArticles = ['VOCE', 'PODE', 'PARA', 'COM', 'QUE', 'COMO'];
+  const wordSet = new Set(words.map(w => w.toUpperCase()));
+  const matchCount = verbsAndArticles.filter(v => wordSet.has(v)).length;
   
-  if (existing) {
-    // v5.3: Valida se nome do banco é aceitável
-    const dbNameIsValid = isValidClientName(existing.name);
-    
-    if (!dbNameIsValid) {
-      // Tenta usar nome OCR ou fallback
-      const safeName = sanitizeClientName(nome);
-      
-      // Atualiza no banco se temos nome melhor
-      if (safeName !== existing.name) {
-        await supabase
-          .from('clientes')
-          .update({ name: safeName, updated_at: new Date().toISOString() })
-          .eq('id', existing.id);
-        console.log(`🔄 [UPSERT] Nome corrigido: "${existing.name}" → "${safeName}"`);
-        return { id: existing.id, created: false, name: safeName };
-      }
-    }
-    
-    return { id: existing.id, created: false, name: existing.name };
-  }
+  if (matchCount >= 2) return false;
   
-  // Código para criar novo cliente...
+  return true;
 }
 ```
 
-### PopoverTrigger com stopPropagation
+### Validação na UI (ImportPoliciesModal)
 
 ```typescript
-<Popover>
-  <PopoverTrigger 
-    asChild 
-    onClick={(e) => e.stopPropagation()}
-  >
-    <Badge className="cursor-pointer hover:bg-zinc-600/40">
-      <UserCheck className="w-3 h-3 mr-1" />
-      Vinculado
-    </Badge>
-  </PopoverTrigger>
-  <PopoverContent 
-    className="w-64 bg-zinc-900 border-zinc-700 p-3 z-[100]" 
-    side="top"
-  >
-    {/* conteúdo... */}
-  </PopoverContent>
-</Popover>
+const isNameSuspicious = (name: string | null): boolean => {
+  if (!name?.trim()) return true;
+  if (name === 'Cliente Não Identificado') return true;
+  if (name.length > 60) return true;
+  if (name.split(' ').length > 5) return true;
+  
+  const upper = name.toUpperCase();
+  const suspiciousTerms = ['AGORA', 'VOCE', 'PODE', 'PROGRAMA', 'BENEFICIO'];
+  return suspiciousTerms.some(t => upper.includes(t));
+};
+
+// Na validação antes de importar
+const hasInvalidNames = validItems.some(item => isNameSuspicious(item.clientName));
+
+if (hasInvalidNames) {
+  toast.error('Existem clientes com nome inválido. Edite antes de importar.');
+  return;
+}
 ```
