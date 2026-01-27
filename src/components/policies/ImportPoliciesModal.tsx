@@ -50,7 +50,7 @@ import {
   upsertClientByDocument
 } from '@/services/policyImportService';
 import { useAppStore } from '@/store';
-import { parsePolicy, ParsedPolicy, inferRamoFromText, CONFIDENCE_THRESHOLD } from '@/utils/universalPolicyParser';
+// v7.0: Parser local deprecated - extração via Gemini Vision
 import { useQueryClient } from '@tanstack/react-query';
 import { ClientSearchCombobox } from '@/components/crm/ClientSearchCombobox';
 
@@ -446,9 +446,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     };
   };
 
-  // ========== PROCESSAMENTO INDIVIDUAL (v6.0 - CLIENT-SIDE SLICER) ==========
-  // Fluxo: PDF → Fatiamento no Cliente → OCR.space → Parser Local → Threshold de confiança
-  // Zero dependência de IA - 100% determinístico
+  // ========== PROCESSAMENTO INDIVIDUAL (v7.0 - GEMINI VISION DIRECT) ==========
+  // Fluxo: PDF → Fatiamento no Cliente → Gemini Vision → JSON Estruturado
+  // Zero OCR.space. Zero parser local. 100% IA estruturada.
   const processFilesIndividually = async () => {
     if (!user || files.length === 0) return;
     
@@ -468,159 +468,103 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     const results: BulkOCRExtractedPolicy[] = [];
     const errors: { fileName: string; error: string }[] = [];
     
-    const MAX_PAGES = 6; // Limite de segurança (3 iterações de 2 páginas)
-    
-    // Process each file individually via Client-Side Slicer + Progressive Scan
+    // Process each file via Gemini Vision (direct AI extraction)
     for (let idx = 0; idx < files.length; idx++) {
       const file = files[idx];
       setProcessingStatus(prev => new Map(prev).set(idx, 'processing'));
       setOcrProgress(idx);
       
       try {
-        console.log(`📄 [${idx + 1}/${files.length}] Processando: ${file.name}`);
-        
-        // ========== PROGRESSIVE SCAN LOOP com CLIENT-SIDE SLICER ==========
-        let accumulatedText = '';
-        let currentPage = 1;
-        let parsed: ParsedPolicy | null = null;
-        let hasMore = true;
-        let totalPages = 0;
+        console.log(`📄 [${idx + 1}/${files.length}] Processando via Gemini: ${file.name}`);
         
         // Imagens: envia diretamente (sem fatiamento)
         const isImage = file.type.startsWith('image/');
         
-        while (currentPage <= MAX_PAGES && hasMore) {
-          console.log(`📄 [SLICER] ${file.name}: páginas ${currentPage}-${currentPage + 1}`);
+        let sliceBase64: string;
+        
+        if (isImage) {
+          // Imagens: converte para base64 diretamente
+          sliceBase64 = await fileToBase64(file);
+        } else {
+          // PDFs: Fatia apenas primeiras 4 páginas (suficiente para Gemini)
+          const slice = await slicePdfPages(file, 1, 4);
+          sliceBase64 = slice.sliceBase64;
           
-          let sliceBase64: string;
-          
-          if (isImage) {
-            // Imagens: converte para base64 diretamente
-            sliceBase64 = await fileToBase64(file);
-            hasMore = false;
-            totalPages = 1;
-          } else {
-            // PDFs: FATIA NO CLIENTE (não envia PDF completo!)
-            const slice = await slicePdfPages(file, currentPage, currentPage + 1);
-            sliceBase64 = slice.sliceBase64;
-            hasMore = slice.hasMore;
-            totalPages = slice.totalPages;
-            
-            if (!sliceBase64) {
-              console.log(`📄 [SLICER] Sem mais páginas para processar`);
-              break;
-            }
+          if (!sliceBase64) {
+            throw new Error('PDF vazio ou não legível');
           }
-          
-          // 2. Envia APENAS o slice para Edge Function
-          const { data, error } = await supabase.functions.invoke('analyze-policy', {
-            body: { 
-              base64: sliceBase64,
-              fileName: file.name,
-              mimeType: file.type,
-            }
-          });
-          
-          if (error) {
-            console.error(`❌ [INVOKE ERROR] ${file.name} (páginas ${currentPage}-${currentPage + 1}):`, error);
-            throw new Error(error.message || 'Erro ao invocar função');
-          }
-          
-          if (!data?.success) {
-            throw new Error(data?.error || 'Extração OCR falhou');
-          }
-          
-          // 3. Acumula texto
-          const newText = data.rawText || '';
-          accumulatedText += ' ' + newText;
-          
-          console.log(`📝 [OCR v6.0] ${file.name}: +${newText.length} chars (via ${data.source}), total acumulado: ${accumulatedText.length}`);
-          
-          // DEBUG v6.0: Log dos primeiros 2000 chars do TEXTO LIMPO para diagnóstico
-          if (currentPage === 1) {
-            console.log('--- TEXTO LIMPO START ---');
-            console.log(accumulatedText.substring(0, 2000));
-            console.log('--- TEXTO LIMPO END ---');
-          }
-          
-          // 4. Parser LOCAL no texto acumulado
-          parsed = parsePolicy(accumulatedText, file.name);
-          
-          console.log(`🔍 [PROGRESSIVE] Confiança: ${parsed.confidence}% (threshold: ${CONFIDENCE_THRESHOLD}%), Campos: ${parsed.matched_fields.length}`);
-          
-          // 5. v5.1: Continue scanning até página 4 se prêmio não encontrado
-          const MIN_PAGES_FOR_PREMIO = 4;
-          const hasPremiun = parsed.premio_liquido !== null && parsed.premio_liquido > 0;
-          
-          const shouldStop = 
-            parsed.confidence >= CONFIDENCE_THRESHOLD && 
-            (hasPremiun || currentPage >= MIN_PAGES_FOR_PREMIO);
-          
-          if (shouldStop) {
-            console.log(`✅ [PROGRESSIVE] Threshold atingido! Parando na página ${Math.min(currentPage + 1, totalPages)}`);
-            break;
-          }
-          
-          // Se não tem prêmio e ainda está antes da página 4, continua mesmo com alta confiança
-          if (!hasPremiun && currentPage < MIN_PAGES_FOR_PREMIO) {
-            console.log(`🔄 [PROGRESSIVE] Continuando busca por prêmio (página ${currentPage + 2})`);
-          }
-          
-          // 6. Próximas páginas
-          currentPage += 2;
         }
         
-        // Se não conseguiu parsear nada, usa resultado final
-        if (!parsed) {
-          parsed = parsePolicy(accumulatedText, file.name);
+        // ========== CHAMADA GEMINI VISION DIRETA ==========
+        const { data, error } = await supabase.functions.invoke('analyze-policy', {
+          body: { 
+            base64: sliceBase64,
+            fileName: file.name,
+            mimeType: file.type,
+          }
+        });
+        
+        if (error) {
+          console.error(`❌ [INVOKE ERROR] ${file.name}:`, error);
+          throw new Error(error.message || 'Erro ao invocar função');
         }
         
-        console.log(`🔍 [PARSER FINAL] ${file.name}: ${parsed.matched_fields.length} campos, confiança ${parsed.confidence}%`);
-        console.log(`   CPF: ${parsed.cpf_cnpj || 'N/A'}, Apólice: ${parsed.numero_apolice || 'N/A'}, Ramo: ${parsed.ramo_seguro || 'N/A'}`);
+        if (!data?.success) {
+          throw new Error(data?.error || 'Extração Gemini falhou');
+        }
         
-        // 6. Se tem documento válido, faz upsert automático de cliente
+        // v7.0: Dados estruturados diretamente do Gemini
+        const extracted = data.data;
+        
+        console.log(`✅ [GEMINI v7.0] ${file.name} em ${data.durationMs}ms`);
+        console.log(`   Cliente: ${extracted.nome_cliente || 'N/A'}`);
+        console.log(`   CPF/CNPJ: ${extracted.cpf_cnpj || 'N/A'}`);
+        console.log(`   Apólice: ${extracted.numero_apolice || 'N/A'}`);
+        console.log(`   Prêmio: R$ ${extracted.premio_liquido?.toFixed(2) || 'N/A'}`);
+        console.log(`   Ramo: ${extracted.ramo_seguro || 'N/A'}`);
+        
+        // Se tem documento válido, faz upsert automático de cliente
         let autoClientId: string | undefined;
-        let autoClientName: string | undefined;  // Captura nome do banco para evitar lixo OCR
+        let autoClientName: string | undefined;
         
-        if (parsed.cpf_cnpj) {
+        if (extracted.cpf_cnpj) {
           const upsertResult = await upsertClientByDocument(
-            parsed.cpf_cnpj,
-            parsed.nome_cliente || 'Cliente Importado',
-            parsed.email,
-            parsed.telefone,
-            parsed.endereco_completo,
+            extracted.cpf_cnpj,
+            extracted.nome_cliente || 'Cliente Importado',
+            extracted.email,
+            extracted.telefone,
+            extracted.endereco_completo,
             user.id
           );
           if (upsertResult) {
             autoClientId = upsertResult.id;
-            autoClientName = upsertResult.name;  // Guarda nome correto do banco
+            autoClientName = upsertResult.name;
             console.log(`✅ [UPSERT] Cliente: ${autoClientName} (${upsertResult.created ? 'criado' : 'existente'})`);
           }
         }
         
-        // 7. Converte para formato BulkOCRExtractedPolicy
-        // IMPORTANTE: Prioriza nome do banco (autoClientName) sobre nome OCR que pode vir com lixo
+        // Converte para formato BulkOCRExtractedPolicy
         const bulkPolicy: BulkOCRExtractedPolicy = {
-          nome_cliente: autoClientName || parsed.nome_cliente || 'Cliente Não Identificado',
-          cpf_cnpj: parsed.cpf_cnpj,
-          email: parsed.email,
-          telefone: parsed.telefone,
-          endereco_completo: parsed.endereco_completo,
+          nome_cliente: autoClientName || extracted.nome_cliente || 'Cliente Não Identificado',
+          cpf_cnpj: extracted.cpf_cnpj,
+          email: extracted.email,
+          telefone: extracted.telefone,
+          endereco_completo: extracted.endereco_completo,
           tipo_documento: 'APOLICE',
-          numero_apolice: parsed.numero_apolice || '',
-          numero_proposta: parsed.numero_proposta,
+          numero_apolice: extracted.numero_apolice || '',
+          numero_proposta: extracted.numero_proposta,
           tipo_operacao: null,
           endosso_motivo: null,
-          nome_seguradora: parsed.nome_seguradora || '',
-          ramo_seguro: parsed.ramo_seguro || '',
-          data_inicio: parsed.data_inicio || '',
-          data_fim: parsed.data_fim || '',
-          descricao_bem: parsed.objeto_segurado,
-          objeto_segurado: parsed.objeto_segurado,
-          identificacao_adicional: parsed.placa || parsed.chassi || null,
-          premio_liquido: parsed.premio_liquido || 0,
-          premio_total: parsed.premio_total || parsed.premio_liquido || 0,
-          titulo_sugerido: `${parsed.nome_cliente || 'Cliente'} - ${parsed.ramo_seguro || 'Seguro'} (${parsed.nome_seguradora || ''})`.substring(0, 100),
+          nome_seguradora: extracted.nome_seguradora || '',
+          ramo_seguro: extracted.ramo_seguro || '',
+          data_inicio: extracted.data_inicio || '',
+          data_fim: extracted.data_fim || '',
+          descricao_bem: extracted.objeto_segurado,
+          objeto_segurado: extracted.objeto_segurado,
+          identificacao_adicional: extracted.placa || null,
+          premio_liquido: extracted.premio_liquido || 0,
+          premio_total: extracted.premio_total || extracted.premio_liquido || 0,
+          titulo_sugerido: `${extracted.nome_cliente || 'Cliente'} - ${extracted.ramo_seguro || 'Seguro'} (${extracted.nome_seguradora || ''})`.substring(0, 100),
           arquivo_origem: file.name,
         };
         
