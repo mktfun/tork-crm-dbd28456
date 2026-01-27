@@ -50,7 +50,7 @@ import {
   upsertClientByDocument
 } from '@/services/policyImportService';
 import { useAppStore } from '@/store';
-// v7.0: Parser local deprecated - extração via Gemini Vision
+// v11.0: Mistral Intelligence - OCR + LLM Pipeline
 import { useQueryClient } from '@tanstack/react-query';
 import { ClientSearchCombobox } from '@/components/crm/ClientSearchCombobox';
 
@@ -61,7 +61,7 @@ interface ImportPoliciesModalProps {
 
 type Step = 'upload' | 'processing' | 'review' | 'complete';
 type FileProcessingStatus = 'pending' | 'processing' | 'success' | 'error';
-type BulkProcessingPhase = 'ocr' | 'ai' | 'reconciling';
+type BulkProcessingPhase = 'ocr' | 'ai' | 'reconciling' | 'storage';
 
 interface ProcessingMetrics {
   totalDurationSec: string;
@@ -128,13 +128,14 @@ interface StepperProps {
 
 const PremiumStepper = ({ phase }: StepperProps) => {
   const steps = [
-    { id: 'ocr', label: 'OCR' },
-    { id: 'ai', label: 'IA' },
+    { id: 'ocr', label: 'OCR Mistral' },
+    { id: 'ai', label: 'IA Extração' },
     { id: 'reconciling', label: 'Vincular' },
+    { id: 'storage', label: 'Salvar PDF' },
   ];
 
   const getStepStatus = (stepId: string) => {
-    const order = ['ocr', 'ai', 'reconciling'];
+    const order = ['ocr', 'ai', 'reconciling', 'storage'];
     const currentIdx = order.indexOf(phase);
     const stepIdx = order.indexOf(stepId);
     if (stepIdx < currentIdx) return 'complete';
@@ -307,6 +308,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     setMobilePreviewOpen(false);
     setEditedFields(new Map());
     setShowClientSearchFor(null);
+    setProcessingLabel('');
   }, []);
 
   const handleClose = () => {
@@ -481,11 +483,15 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     };
   };
 
-  // ========== v8.0: PROCESSAMENTO COM CHUNKING 2 EM 2 PÁGINAS ==========
-  // Fluxo: PDF → Fatiamento 2 em 2 → Gemini Vision → Merge → JSON Final
-  // Garante 98%+ de precisão mesmo em apólices longas (6+ páginas)
+  // ========== v11.0: MISTRAL INTELLIGENCE PIPELINE ==========
+  // Fluxo: PDF → Mistral OCR → Markdown → Mistral LLM → JSON
+  // Frontend ainda fatia 2 em 2 páginas para evitar timeouts
   
   const PAGES_PER_CHUNK = 2;
+  const MAX_CHUNKS = 3; // Limite de 6 páginas (3 chunks * 2 páginas)
+  
+  // Estado de descrição da etapa atual
+  const [processingLabel, setProcessingLabel] = useState<string>('');
   
   /**
    * Merge de resultados parciais de múltiplos chunks
@@ -524,7 +530,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     return merged;
   };
   
-  const processFilesIndividually = async () => {
+  const processFilesWithMistral = async () => {
     if (!user || files.length === 0) return;
     
     setStep('processing');
@@ -543,7 +549,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     const results: BulkOCRExtractedPolicy[] = [];
     const errors: { fileName: string; error: string }[] = [];
     
-    // Process each file via Gemini Vision with 2-page chunking
+    // v11.0: Process each file via MISTRAL OCR + LLM pipeline
     for (let idx = 0; idx < files.length; idx++) {
       const file = files[idx];
       setProcessingStatus(prev => new Map(prev).set(idx, 'processing'));
@@ -551,15 +557,19 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       
       try {
         console.log(`📄 [${idx + 1}/${files.length}] Processando: ${file.name}`);
+        setProcessingLabel(`Lendo ${file.name}...`);
         
         const isImage = file.type.startsWith('image/');
         let finalExtracted: any;
         
         if (isImage) {
-          // Imagens: envio direto (sem chunking)
+          // Imagens: envio direto para Mistral
+          setBulkPhase('ocr');
+          setProcessingLabel('Processando imagem com OCR Mistral...');
+          
           const sliceBase64 = await fileToBase64(file);
           
-          const { data, error } = await supabase.functions.invoke('analyze-policy', {
+          const { data, error } = await supabase.functions.invoke('analyze-policy-mistral', {
             body: { 
               base64: sliceBase64,
               fileName: file.name,
@@ -572,19 +582,23 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           }
           
           finalExtracted = data.data;
-          console.log(`✅ [GEMINI] Imagem processada em ${data.durationMs}ms`);
+          console.log(`✅ [MISTRAL] Imagem processada em ${data.durationMs}ms`);
           
         } else {
-          // PDFs: Chunking de 2 em 2 páginas com EARLY-STOPPING v9.0
+          // PDFs: Chunking de 2 em 2 páginas com limite de 3 tentativas
           const chunkResults: any[] = [];
           let currentPage = 1;
           let hasMore = true;
           let totalPages = 0;
           let earlyStopTriggered = false;
           let pagesProcessed = 0;
+          let chunkCount = 0;
           
-          while (hasMore) {
+          while (hasMore && chunkCount < MAX_CHUNKS) {
             const endPage = currentPage + PAGES_PER_CHUNK - 1;
+            
+            setBulkPhase('ocr');
+            setProcessingLabel(`Lendo páginas ${currentPage}-${endPage}...`);
             
             const slice = await slicePdfPages(file, currentPage, endPage);
             totalPages = slice.totalPages;
@@ -596,9 +610,12 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
               continue;
             }
             
-            console.log(`🔄 [CHUNK v9.0] Páginas ${slice.actualStart}-${slice.actualEnd} de ${totalPages}`);
+            setBulkPhase('ai');
+            setProcessingLabel(`Extraindo dados págs ${slice.actualStart}-${slice.actualEnd}...`);
             
-            const { data, error } = await supabase.functions.invoke('analyze-policy', {
+            console.log(`🔄 [MISTRAL v11] Páginas ${slice.actualStart}-${slice.actualEnd} de ${totalPages}`);
+            
+            const { data, error } = await supabase.functions.invoke('analyze-policy-mistral', {
               body: { 
                 base64: slice.sliceBase64,
                 fileName: `${file.name}_p${currentPage}-${endPage}`,
@@ -611,22 +628,27 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
             } else if (data?.success && data.data) {
               chunkResults.push(data.data);
               pagesProcessed = slice.actualEnd;
-              console.log(`✅ [CHUNK] Págs ${currentPage}-${endPage} extraídas em ${data.durationMs}ms`);
+              chunkCount++;
               
-              // v9.0: EARLY-STOP CHECK - Verifica se dados estão completos
+              const ocrMs = data.metrics?.ocrMs || 0;
+              const llmMs = data.metrics?.llmMs || 0;
+              console.log(`✅ [MISTRAL] Págs ${currentPage}-${endPage}: OCR ${ocrMs}ms + LLM ${llmMs}ms = ${data.durationMs}ms`);
+              
+              // v11.0: EARLY-STOP CHECK - Se status = COMPLETO ou dados críticos estão ok
               const currentMerged = mergeChunkResults(chunkResults);
-              const completeness = isDataComplete(currentMerged);
+              const isComplete = data.data.status === 'COMPLETO' || isDataComplete(currentMerged).complete;
               
-              if (completeness.complete) {
+              if (isComplete) {
                 const pagesSkipped = totalPages - slice.actualEnd;
                 earlyStopTriggered = true;
-                console.log(`✅ [EARLY-STOP v9.0] Dados completos após ${chunkResults.length} chunk(s)!`);
+                console.log(`✅ [EARLY-STOP v11] Dados completos após ${chunkResults.length} chunk(s)!`);
                 if (pagesSkipped > 0) {
-                  console.log(`💰 [ECONOMIA v9.0] Pulando ${pagesSkipped} páginas restantes (economia de ${Math.round(pagesSkipped / totalPages * 100)}%)`);
+                  console.log(`💰 [ECONOMIA v11] Pulando ${pagesSkipped} páginas restantes`);
                 }
-                break; // Sai do loop, economizando chamadas à API
+                break;
               } else {
-                console.log(`⏳ [CONTINUE v9.0] Faltando: ${completeness.missing.join(', ')}`);
+                const completeness = isDataComplete(currentMerged);
+                console.log(`⏳ [CONTINUE v11] Faltando: ${completeness.missing.join(', ')}`);
               }
             }
             
@@ -640,10 +662,14 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           // Merge dos resultados de todos os chunks
           finalExtracted = mergeChunkResults(chunkResults);
           
-          // Log final com métricas v9.0
+          // Log final
           const statusLabel = earlyStopTriggered ? '⚡ EARLY-STOP' : '📄 COMPLETO';
-          console.log(`✅ [PDF v9.0] ${file.name}: ${pagesProcessed}/${totalPages} págs em ${chunkResults.length} chunk(s) [${statusLabel}]`);
+          console.log(`✅ [MISTRAL v11] ${file.name}: ${pagesProcessed}/${totalPages} págs em ${chunkResults.length} chunk(s) [${statusLabel}]`);
         }
+        
+        // v11.0: Fase de reconciliação/enrichment
+        setBulkPhase('reconciling');
+        setProcessingLabel('Enriquecendo dados do cliente...');
         
         // Se tem documento válido, faz upsert automático de cliente
         let autoClientId: string | undefined;
@@ -823,8 +849,8 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     setStep('review');
   };
   
-  // Keep legacy function name for compatibility
-  const processBulkOCR = processFilesIndividually;
+  // v11.0: Mistral Intelligence Pipeline
+  const processBulkOCR = processFilesWithMistral;
 
   const updateItem = (id: string, updates: Partial<PolicyImportItem>) => {
     setItems(prev => prev.map(item => {
@@ -1053,12 +1079,18 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
 
   const getPhaseLabel = () => {
     if (bulkPhase === 'ocr') {
-      return `Extraindo textos (${Math.min(ocrProgress + 1, files.length)} de ${files.length})...`;
+      return `OCR Mistral (${Math.min(ocrProgress + 1, files.length)} de ${files.length})...`;
     }
     if (bulkPhase === 'ai') {
-      return 'IA mapeando apólices...';
+      return 'Mistral LLM extraindo dados...';
     }
-    return 'Vinculando clientes...';
+    if (bulkPhase === 'reconciling') {
+      return 'Enriquecendo cliente...';
+    }
+    if (bulkPhase === 'storage') {
+      return 'Salvando PDF original...';
+    }
+    return 'Processando...';
   };
 
   // =====================================================
@@ -1647,9 +1679,14 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
               <div className="text-center">
                 <p className="text-white font-medium text-lg">{getPhaseLabel()}</p>
                 <p className="text-zinc-500 text-sm mt-1">
-                  {bulkPhase === 'ocr' && 'Extraindo texto dos PDFs...'}
-                  {bulkPhase === 'ai' && 'Analisando documentos com IA...'}
-                  {bulkPhase === 'reconciling' && 'Vinculando clientes existentes...'}
+                  {processingLabel || (
+                    <>
+                      {bulkPhase === 'ocr' && 'Extraindo texto com Mistral OCR...'}
+                      {bulkPhase === 'ai' && 'Analisando documentos com Mistral LLM...'}
+                      {bulkPhase === 'reconciling' && 'Enriquecendo cadastro do cliente...'}
+                      {bulkPhase === 'storage' && 'Salvando PDF original no Storage...'}
+                    </>
+                  )}
                 </p>
               </div>
               

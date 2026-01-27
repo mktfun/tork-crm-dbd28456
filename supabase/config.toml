@@ -36,3 +36,6 @@ verify_jwt = false
 
 [functions.ocr-bulk-analyze]
 verify_jwt = false
+
+[functions.analyze-policy-mistral]
+verify_jwt = false
