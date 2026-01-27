@@ -526,13 +526,30 @@ const INSTITUTIONAL_BLACKLIST = [
 ];
 
 /**
- * v5.1: Valida se um nome é válido para cliente (não é institucional/lixo)
+ * v5.2: Valida se um nome é válido para cliente (não é institucional/lixo)
+ * Mais rigoroso: exige 8+ chars, palavras substanciais
  */
 function isValidClientName(name: string): boolean {
-  if (!name || name.length < 5) return false;
+  if (!name) return false;
   
-  const words = name.trim().split(/\s+/);
+  // Remove espaços extras
+  const cleanName = name.trim().replace(/\s+/g, ' ');
+  
+  // v5.2: Mínimo de 8 caracteres (evita ruído OCR como "Ra Jj")
+  if (cleanName.length < 8) return false;
+  
+  const words = cleanName.split(' ');
+  
+  // Mínimo de 2 palavras
   if (words.length < 2) return false;
+  
+  // v5.2: Cada palavra deve ter pelo menos 2 chars
+  const validWords = words.filter(w => w.length >= 2);
+  if (validWords.length < 2) return false;
+  
+  // v5.2: Pelo menos uma palavra com 3+ caracteres
+  const hasSubstantialWord = words.some(w => w.length >= 3);
+  if (!hasSubstantialWord) return false;
   
   const alphaName = name.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   
@@ -642,6 +659,7 @@ export async function reconcileClient(
 ): Promise<{
   status: ClientReconcileStatus;
   clientId?: string;
+  clientName?: string; // v5.2: Retorna nome do banco quando disponível
   matchedBy?: 'cpf_cnpj' | 'email' | 'name_fuzzy' | 'auto_created';
 }> {
   const documento = extracted.cliente.cpf_cnpj;
@@ -653,6 +671,7 @@ export async function reconcileClient(
       return {
         status: 'matched',
         clientId: clientByCpf.id,
+        clientName: clientByCpf.name, // v5.2: Retorna nome do banco
         matchedBy: 'cpf_cnpj',
       };
     }
@@ -674,6 +693,7 @@ export async function reconcileClient(
         return {
           status: 'matched',
           clientId: upsertResult.id,
+          clientName: upsertResult.name, // v5.2: Retorna nome do banco/criado
           matchedBy: upsertResult.created ? 'auto_created' : 'cpf_cnpj',
         };
       }
@@ -699,6 +719,7 @@ export async function reconcileClient(
       return {
         status: 'matched',
         clientId: clientByName.id,
+        clientName: clientByName.name, // v5.2: Retorna nome do banco
         matchedBy: 'name_fuzzy',
       };
     }

@@ -642,6 +642,13 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         // Avoid duplicating plate info since parser already includes it
         const objetoCompleto = policy.objeto_segurado || policy.descricao_bem || '';
         
+        // v5.2: Prioriza nome do banco quando cliente já existe
+        const clientNameToUse = clientResult.clientName || policy.nome_cliente || 'Cliente Não Identificado';
+        
+        // v5.2: Fallback de prêmio líquido se vier zerado
+        const premioLiquidoFinal = sanitizePremio(policy.premio_liquido) || sanitizePremio(policy.premio_total) || 0;
+        const premioTotalFinal = sanitizePremio(policy.premio_total) || premioLiquidoFinal;
+        
         const item: PolicyImportItem = {
           id: crypto.randomUUID(),
           file,
@@ -650,7 +657,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           extracted,
           clientStatus: clientResult.status,
           clientId: clientResult.clientId,
-          clientName: policy.nome_cliente,
+          clientName: clientNameToUse,
           clientCpfCnpj: policy.cpf_cnpj,
           matchedBy: clientResult.matchedBy,
           seguradoraId: seguradoraMatch?.id || null,
@@ -663,14 +670,14 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           dataInicio: policy.data_inicio,
           dataFim: policy.data_fim,
           objetoSegurado: objetoCompleto,
-          premioLiquido: sanitizePremio(policy.premio_liquido),
-          premioTotal: sanitizePremio(policy.premio_total),
+          premioLiquido: premioLiquidoFinal,
+          premioTotal: premioTotalFinal,
           tipoDocumento: policy.tipo_documento || null,
           tipoOperacao: policy.tipo_operacao || null,
           endossoMotivo: policy.endosso_motivo || null,
           tituloSugerido: policy.titulo_sugerido || '',
           identificacaoAdicional: policy.identificacao_adicional || null,
-          estimatedCommission: sanitizePremio(policy.premio_liquido) * 0.15,
+          estimatedCommission: premioLiquidoFinal * 0.15,
           isValid: false,
           validationErrors: [],
           isProcessing: false,
