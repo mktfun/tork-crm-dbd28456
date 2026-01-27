@@ -1,274 +1,223 @@
 
-# Plano: Refinamento do Motor Mistral V11 - Prompt Tuning, UI e Sync
 
-## Resumo Executivo
+# Plano: Correção do Early-Stop Prematuro - Motor Mistral V12.2
 
-O plano aborda três áreas principais:
-1. **Prompt Tuning** na Edge Function para capturar sinônimos de "Prêmio Líquido" e garantir extração de datas
-2. **UI Enhancement** com colunas de Vigência (Início/Fim) e CPF/CNPJ na tabela de revisão
-3. **Sync Logic** aprimorada para garantir gravação do CPF extraído no cliente
+## Diagnóstico do Problema
 
----
-
-## 1. Edge Function (`analyze-policy-mistral/index.ts`)
-
-### Alterações no `EXTRACTION_PROMPT`
-
-**Localização:** Linhas 23-86
-
-**Refinamentos:**
-
-Expandir a seção de **VALORES (PRÊMIOS)** para incluir sinônimos:
+### Evidências dos Logs
 
 ```
-4. **VALORES (PRÊMIOS)**:
-   - Retorne como NUMBER (float), não string
-   - R$ 1.234,56 → 1234.56
-   - SINÔNIMOS PARA PRÊMIO LÍQUIDO: 
-     * "Prêmio Líquido", "Importe Líquido", "Prêmio Individual"
-     * "Valor Líquido", "Premio Liquido", "Líquido do Seguro"
-     * "Prêmio Comercial", "Prêmio Puro"
-   - SINÔNIMOS PARA PRÊMIO TOTAL:
-     * "Prêmio Total", "Valor Total", "Total a Pagar"
-     * "Custo Total", "Premio com IOF"
-   - Se não encontrar prêmio líquido, calcule: premio_total / 1.0738
-   - Se AMBOS estiverem faltando, busque por "Parcela" e multiplique por número de parcelas
+Ana Claudia Vieira Duarte.pdf:
+  Status: COMPLETO ❌ (incorreto)
+  Policy: N/A ❌
+  CPF/CNPJ: N/A ❌
+  Premium: R$ N/A ❌
+
+PEDRASUL PEDRAS E REVESTIMENTOS.pdf:
+  Status: COMPLETO ❌ (incorreto)
+  Policy: N/A ❌
+  CPF/CNPJ: N/A ❌
+  Premium: R$ N/A ❌
 ```
 
-Expandir a seção de **DATAS** para ser mais agressiva:
+### Raiz do Problema (Duas Falhas)
 
+**1. Prompt do LLM incompleto (linha 110):**
 ```
-5. **DATAS (VIGÊNCIA)**:
-   - Formato OBRIGATÓRIO: YYYY-MM-DD (ex: 2024-03-15)
-   - BUSQUE EXAUSTIVAMENTE por:
-     * "Vigência", "Início da Vigência", "Data Inicial"
-     * "Término", "Fim da Vigência", "Data Final"
-     * "Válido de", "Válido até", "Período de"
-     * Padrões: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
-   - NUNCA retorne null se houver qualquer indício de data no documento
-   - Se encontrar apenas UMA data, assuma vigência de 1 ano
+Se campos CRÍTICOS (nome, cpf_cnpj, numero da apolice) estiverem faltando...
 ```
+- NÃO inclui `premio_liquido`, `premio_total`, `data_inicio`, `data_fim`
+- O LLM retorna `status: 'COMPLETO'` quando encontra apenas o nome
 
-**Arquivos afetados:**
-- `supabase/functions/analyze-policy-mistral/index.ts` (linhas 23-86)
-
----
-
-## 2. Frontend (`ImportPoliciesModal.tsx`)
-
-### 2.1 Adicionar Colunas de Vigência na Tabela de Revisão
-
-**Localização:** Componente `ReviewTableRow` (linhas 1139-1545)
-
-**Nova coluna após "Apólice + Prêmio" (linha ~1367):**
-
-```tsx
-{/* Vigência */}
-<TableCell className="py-3">
-  {!item.processError && (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-1">
-        <span className="text-zinc-600 text-xs">Início:</span>
-        <Input
-          type="date"
-          value={item.dataInicio || ''}
-          onChange={(e) => {
-            markFieldEdited(item.id, 'dataInicio');
-            updateItem(item.id, { dataInicio: e.target.value });
-          }}
-          className={cn(
-            "h-6 text-xs bg-transparent border-zinc-700/50 px-1 w-32",
-            !item.dataInicio && "border-red-500/50 bg-red-900/10",
-            isFieldEdited(item.id, 'dataInicio') && "text-zinc-300 border-zinc-500/50"
-          )}
-        />
-      </div>
-      <div className="flex items-center gap-1">
-        <span className="text-zinc-600 text-xs">Fim:</span>
-        <Input
-          type="date"
-          value={item.dataFim || ''}
-          onChange={(e) => {
-            markFieldEdited(item.id, 'dataFim');
-            updateItem(item.id, { dataFim: e.target.value });
-          }}
-          className={cn(
-            "h-6 text-xs bg-transparent border-zinc-700/50 px-1 w-32",
-            !item.dataFim && "border-red-500/50 bg-red-900/10",
-            isFieldEdited(item.id, 'dataFim') && "text-zinc-300 border-zinc-500/50"
-          )}
-        />
-      </div>
-    </div>
-  )}
-</TableCell>
-```
-
-### 2.2 Mover CPF/CNPJ para Coluna Separada
-
-**Atualmente:** CPF/CNPJ está agrupado com Nome do Cliente
-
-**Proposta:** Criar coluna dedicada para melhor visibilidade
-
-### 2.3 Atualizar TableHeader
-
-**Localização:** Onde o `<TableHeader>` é definido (aproximadamente linha 1750-1800)
-
-Adicionar header para nova coluna:
-```tsx
-<TableHead className="text-zinc-500 font-medium">Vigência</TableHead>
-```
-
-**Arquivos afetados:**
-- `src/components/policies/ImportPoliciesModal.tsx`
-
----
-
-## 3. Sync Logic (`policyImportService.ts`)
-
-### 3.1 Aprimorar `upsertClientByDocument`
-
-**Localização:** Linhas 662-796
-
-**Alterações:**
-
-1. Garantir que CPF seja SEMPRE gravado quando não existir:
-
+**2. Early-Stop confia no status do LLM (linha 639):**
 ```typescript
-// Dentro do bloco de updates (linha ~699-710)
-// v5.6: NOVO - Gravar CPF extraído se campo estiver vazio
-if (normalized && !existing.cpf_cnpj) {
-  updates.cpf_cnpj = normalized;
-  console.log(`📋 [SYNC v5.6] CPF/CNPJ adicionado: ${normalized}`);
+const isComplete = data.data.status === 'COMPLETO' || isDataComplete(currentMerged).complete;
+```
+- Se o LLM retorna `COMPLETO`, para imediatamente
+- Mesmo que prêmios e datas estejam faltando
+
+**3. Limite de chunks muito baixo (linha 491):**
+```typescript
+const MAX_CHUNKS = 3; // Limite de 6 páginas
+```
+- Mesmo sem early-stop, processa no máximo 6 páginas
+- PDFs de seguros podem ter 10-20 páginas
+
+---
+
+## Solução Proposta
+
+### 1. Edge Function: Expandir Campos Críticos no Prompt
+
+**Arquivo:** `supabase/functions/analyze-policy-mistral/index.ts`
+
+**Alteração na linha 110:**
+
+De:
+```
+Se campos CRÍTICOS (nome, cpf_cnpj, numero da apolice) estiverem faltando, retorne status: "INCOMPLETO".
+```
+
+Para:
+```
+## REGRA DE STATUS:
+- Retorne status: "COMPLETO" APENAS se TODOS os seguintes campos forem extraídos:
+  * nome do cliente
+  * cpf_cnpj (11 ou 14 dígitos)
+  * numero da apólice
+  * premio_liquido OU premio_total (valor > 0)
+  * data_inicio E data_fim
+- Se QUALQUER um desses campos estiver faltando ou nulo, retorne status: "INCOMPLETO"
+```
+
+### 2. Frontend: Não Confiar no Status do LLM
+
+**Arquivo:** `src/components/policies/ImportPoliciesModal.tsx`
+
+**Alteração na linha 639:**
+
+De:
+```typescript
+const isComplete = data.data.status === 'COMPLETO' || isDataComplete(currentMerged).complete;
+```
+
+Para:
+```typescript
+// v12.2: NUNCA confiar apenas no status do LLM - sempre validar dados reais
+const completeness = isDataComplete(currentMerged);
+const isComplete = completeness.complete;
+
+// Log para debug
+if (data.data.status === 'COMPLETO' && !completeness.complete) {
+  console.warn(`⚠️ [TRUST ISSUE] LLM disse COMPLETO mas faltam: ${completeness.missing.join(', ')}`);
 }
 ```
 
-2. Adicionar log de auditoria para rastreamento:
+### 3. Frontend: Aumentar Limite de Chunks
+
+**Arquivo:** `src/components/policies/ImportPoliciesModal.tsx`
+
+**Alteração na linha 491:**
+
+De:
+```typescript
+const MAX_CHUNKS = 3; // Limite de 6 páginas
+```
+
+Para:
+```typescript
+const MAX_CHUNKS = 5; // Limite de 10 páginas (suficiente para maioria das apólices)
+```
+
+### 4. Frontend: Melhorar função isDataComplete
+
+**Arquivo:** `src/components/policies/ImportPoliciesModal.tsx`
+
+**Alteração nas linhas 99-120:**
 
 ```typescript
-// Após aplicar updates (linha ~719)
-if (Object.keys(updates).length > 0) {
-  console.table([{
-    cliente_id: existing.id,
-    nome: existing.name,
-    campos_atualizados: Object.keys(updates).join(', '),
-    origem: 'PDF Import'
-  }]);
-}
+const isDataComplete = (data: any): DataCompletenessResult => {
+  // v12.2: Campos absolutamente obrigatórios
+  const REQUIRED_FIELDS = [
+    'nome_cliente',     // Nome do segurado
+    'numero_apolice',   // Número da apólice
+    'nome_seguradora',  // Seguradora
+    'data_inicio',      // Início da vigência
+    'data_fim'          // Fim da vigência
+  ];
+  
+  const missing: string[] = [];
+  
+  for (const field of REQUIRED_FIELDS) {
+    const value = data?.[field];
+    if (value === null || value === undefined || value === '' || value === 'N/A') {
+      missing.push(field);
+    }
+  }
+  
+  // CPF/CNPJ: deve ter 11 ou 14 dígitos se presente
+  const cpf = data?.cpf_cnpj;
+  if (!cpf || (cpf.length !== 11 && cpf.length !== 14)) {
+    missing.push('cpf_cnpj');
+  }
+  
+  // Prêmio: pelo menos um dos dois deve ter valor > 0
+  const hasValidPremium = (data?.premio_liquido > 0) || (data?.premio_total > 0);
+  if (!hasValidPremium) {
+    missing.push('premio');
+  }
+  
+  // v12.2: Log de diagnóstico
+  if (missing.length > 0) {
+    console.log(`📊 [COMPLETENESS] Faltando ${missing.length}: ${missing.join(', ')}`);
+  }
+  
+  return { 
+    complete: missing.length === 0, 
+    missing 
+  };
+};
 ```
-
-**Arquivos afetados:**
-- `src/services/policyImportService.ts`
 
 ---
 
-## 4. Migração SQL (Opcional)
+## Resumo das Alterações
 
-O índice único já existe (`idx_clientes_cpf_cnpj_unique`), mas podemos garantir:
-
-```sql
--- Garante que o campo de CPF seja tratado de forma única por usuário
-CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_cpf_cnpj_per_user 
-ON clientes (cpf_cnpj, user_id) 
-WHERE cpf_cnpj IS NOT NULL;
-```
-
-Esta migração é opcional pois o índice já foi criado na sessão anterior.
+| Arquivo | Alteração | Impacto |
+|---------|-----------|---------|
+| `analyze-policy-mistral/index.ts` | Expandir campos críticos no prompt | LLM retorna status correto |
+| `ImportPoliciesModal.tsx` linha 639 | Ignorar status LLM, validar dados reais | Early-stop só quando dados estão OK |
+| `ImportPoliciesModal.tsx` linha 491 | MAX_CHUNKS de 3 para 5 | Processa até 10 páginas |
+| `ImportPoliciesModal.tsx` linhas 99-120 | Validar CPF com 11/14 dígitos | Detecta CPFs inválidos |
 
 ---
 
-## 5. Detalhes Técnicos de Implementação
+## Fluxo Corrigido
 
-### Edge Function - Prompt Expandido
-
-**Antes (linha 45-48):**
+```text
+PDF Upload
+    │
+    ▼
+Chunk 1 (págs 1-2)
+    │
+    ├─ LLM retorna dados parciais
+    ├─ isDataComplete() verifica campos REAIS
+    ├─ Faltando: premio, data_fim? → CONTINUE
+    │
+    ▼
+Chunk 2 (págs 3-4)
+    │
+    ├─ Merge com chunk anterior
+    ├─ isDataComplete() verifica novamente
+    ├─ Ainda falta premio? → CONTINUE
+    │
+    ▼
+Chunk 3 (págs 5-6)
+    │
+    ├─ Merge acumulativo
+    ├─ isDataComplete() → COMPLETO!
+    ├─ ✅ EARLY-STOP (economia de págs 7-20)
+    │
+    ▼
+Continua para próximo arquivo
 ```
-4. **VALORES (PRÊMIOS)**:
-   - Retorne como NUMBER (float), não string
-   - R$ 1.234,56 → 1234.56
-   - Se não encontrar prêmio líquido, calcule: premio_total / 1.0738
-```
-
-**Depois:**
-```
-4. **VALORES (PRÊMIOS)** - BUSCA EXAUSTIVA:
-   - Retorne como NUMBER (float), não string
-   - R$ 1.234,56 → 1234.56
-   - SINÔNIMOS ACEITOS PARA PRÊMIO LÍQUIDO:
-     * "Prêmio Líquido", "Premio Liquido" (sem acento)
-     * "Importe Líquido", "Valor Líquido"
-     * "Prêmio Individual", "Prêmio Comercial"
-     * "Prêmio Puro", "Líquido do Seguro"
-   - SINÔNIMOS ACEITOS PARA PRÊMIO TOTAL:
-     * "Prêmio Total", "Premio Total"
-     * "Valor Total", "Total a Pagar"
-     * "Custo Total", "Premio com IOF"
-   - FALLBACK: Se não encontrar líquido, calcule: premio_total / 1.0738
-   - FALLBACK 2: Se encontrar parcelas, multiplique valor_parcela × num_parcelas
-```
-
-### Frontend - Estrutura da Tabela de Revisão
-
-**Ordem das colunas atual:**
-1. Cliente (nome + CPF inline)
-2. Apólice + Prêmio
-3. Objeto Segurado
-4. Seguradora
-5. Ramo
-6. Produtor
-7. Comissão
-8. Status
-
-**Nova ordem proposta:**
-1. Cliente (nome)
-2. CPF/CNPJ (separado)
-3. Apólice + Prêmio
-4. Vigência (Início/Fim)
-5. Objeto Segurado
-6. Seguradora
-7. Ramo
-8. Produtor
-9. Comissão
-10. Status
 
 ---
 
-## 6. Testes de Validação
+## Testes de Validação
 
-### Teste 1: Sinônimos de Prêmio
-1. Upload de PDF com "Importe Líquido" em vez de "Prêmio Líquido"
-2. Verificar se o valor é extraído corretamente
-3. Verificar log: `premio_liquido: X.XX`
+1. **Upload de PDF com prêmio na página 5:**
+   - Verificar que processa até encontrar o prêmio
+   - Log: `⏳ [CONTINUE v11] Faltando: premio`
 
-### Teste 2: Datas de Vigência
-1. Upload de PDF com datas em formato DD/MM/YYYY
-2. Verificar se as colunas "Início" e "Fim" estão preenchidas
-3. Verificar se datas estão no formato YYYY-MM-DD na tabela
+2. **Upload de PDF com todos os dados na página 2:**
+   - Verificar early-stop funciona
+   - Log: `✅ [EARLY-STOP v11] Dados completos após 1 chunk(s)!`
 
-### Teste 3: Sync de CPF
-1. Subir apólice de cliente existente SEM CPF cadastrado
-2. Verificar se após importação o CPF aparece no cadastro do cliente
-3. Verificar log: `📋 [SYNC v5.6] CPF/CNPJ adicionado`
+3. **Upload de PDF sem prêmio (documento incompleto):**
+   - Verificar que processa até MAX_CHUNKS (5)
+   - UI mostra campos faltantes em vermelho
 
-### Teste 4: Edição na UI
-1. Clicar em campo de data e alterar
-2. Verificar se borda muda para indicar edição manual
-3. Verificar se validação remove erro quando data é preenchida
+4. **Verificar que LLM não engana mais:**
+   - Log: `⚠️ [TRUST ISSUE] LLM disse COMPLETO mas faltam: premio, data_fim`
 
----
-
-## 7. Resumo de Arquivos a Modificar
-
-| Arquivo | Tipo de Alteração |
-|---------|-------------------|
-| `supabase/functions/analyze-policy-mistral/index.ts` | Expandir EXTRACTION_PROMPT |
-| `src/components/policies/ImportPoliciesModal.tsx` | Adicionar colunas Vigência e CPF |
-| `src/services/policyImportService.ts` | Melhorar sync de CPF |
-
----
-
-## 8. Próximos Passos (Pós-Implementação)
-
-1. **Detecção de Apólice Duplicada**: Verificar se número da apólice já existe antes de criar
-2. **Log de Auditoria Visual**: Mostrar diff entre "IA extraiu" vs "Salvo no banco"
-3. **Retry Inteligente**: Se Mistral falhar, tentar Gemini como fallback
