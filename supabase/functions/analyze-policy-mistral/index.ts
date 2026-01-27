@@ -19,7 +19,7 @@ const corsHeaders = {
 
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1';
 
-// System prompt para extração estruturada - v12.1 with synonyms
+// System prompt para extração estruturada - v12.3 with premium differentiation
 const EXTRACTION_PROMPT = `Você é um perito especialista em extração de dados de documentos de seguros brasileiros.
 
 ## INSTRUÇÕES CRÍTICAS:
@@ -42,21 +42,26 @@ Analise o Markdown fornecido e extraia os dados estruturados. Retorne APENAS JSO
    - Números válidos geralmente têm 6+ dígitos
    - NÃO confunda com "Manual" (transmissão de veículo)
 
-4. **VALORES (PRÊMIOS)** - BUSCA EXAUSTIVA:
+4. **VALORES (PRÊMIOS)** - BUSCA EXAUSTIVA E DIFERENCIAÇÃO CRÍTICA:
    - Retorne como NUMBER (float), não string
    - R$ 1.234,56 → 1234.56
-   - SINÔNIMOS ACEITOS PARA PRÊMIO LÍQUIDO:
-     * "Prêmio Líquido", "Premio Liquido" (sem acento)
-     * "Importe Líquido", "Valor Líquido"
-     * "Prêmio Individual", "Prêmio Comercial"
-     * "Prêmio Puro", "Líquido do Seguro"
-     * "Prêmio Tarifário", "Valor do Seguro"
-   - SINÔNIMOS ACEITOS PARA PRÊMIO TOTAL:
-     * "Prêmio Total", "Premio Total"
-     * "Valor Total", "Total a Pagar"
-     * "Custo Total", "Prêmio com IOF"
-     * "Total do Seguro", "Valor Final"
-   - FALLBACK 1: Se não encontrar líquido, calcule: premio_total / 1.0738
+   
+   ⚠️ ATENÇÃO: O "PRÊMIO LÍQUIDO" NÃO É o mesmo que "Prêmio de Coberturas"!
+   
+   - **PRÊMIO LÍQUIDO** (o que queremos): É o valor BASE do seguro ANTES de encargos, IOF e custos administrativos.
+     * Sinônimos: "Prêmio Líquido", "Premio Liquido", "Importe Líquido", "Valor Líquido"
+     * "Prêmio Comercial", "Prêmio Tarifário", "Prêmio Individual", "Prêmio Puro"
+     * Geralmente aparece em seção de resumo financeiro ou demonstrativo de prêmio
+   
+   - **PRÊMIO DE COBERTURAS** (NÃO confundir): É a soma dos valores de cada cobertura individual.
+     * Geralmente aparece em tabela de coberturas (ex: "Colisão: R$ X", "Terceiros: R$ Y")
+     * NÃO use este valor como premio_liquido
+   
+   - **PRÊMIO TOTAL**: É o valor FINAL com IOF e encargos incluídos.
+     * Sinônimos: "Prêmio Total", "Premio Total", "Valor Total", "Total a Pagar"
+     * "Custo Total", "Prêmio com IOF", "Total do Seguro", "Valor Final"
+   
+   - FALLBACK 1: Se não encontrar líquido, calcule: premio_total / 1.0738 (remove IOF)
    - FALLBACK 2: Se encontrar parcelas, multiplique valor_parcela × num_parcelas
 
 5. **DATAS (VIGÊNCIA)** - BUSCA EXAUSTIVA:
@@ -81,6 +86,10 @@ Analise o Markdown fornecido e extraia os dados estruturados. Retorne APENAS JSO
    - Para AUTO: "[Marca] [Modelo] [Ano] - Placa: [XXX-0000]"
    - Para RESIDENCIAL: Endereço do imóvel
    - Para VIDA: Nome do beneficiário ou "Vida Individual/Grupo"
+
+8. **PLACA/CHASSI** (para AUTO):
+   - Extraia separadamente para o campo "placa"
+   - Formato: ABC-1D23 ou ABC1D23
 
 ## FORMATO DE SAÍDA (JSON):
 

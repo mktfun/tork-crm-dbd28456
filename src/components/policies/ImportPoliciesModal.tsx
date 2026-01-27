@@ -127,9 +127,9 @@ const isDataComplete = (data: any): DataCompletenessResult => {
     missing.push('premio');
   }
   
-  // v12.2: Log de diagnóstico
+  // v12.3: Log de diagnóstico com número de página
   if (missing.length > 0) {
-    console.log(`📊 [COMPLETENESS v12.2] Faltando ${missing.length}: ${missing.join(', ')}`);
+    console.log(`📊 [COMPLETENESS v12.3] Faltando ${missing.length}: ${missing.join(', ')}`);
   }
   
   return { 
@@ -502,12 +502,13 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     };
   };
 
-  // ========== v11.0: MISTRAL INTELLIGENCE PIPELINE ==========
+// ========== v12.3: MISTRAL INTELLIGENCE PIPELINE ==========
   // Fluxo: PDF → Mistral OCR → Markdown → Mistral LLM → JSON
-  // Frontend ainda fatia 2 em 2 páginas para evitar timeouts
+  // Frontend fatia 2 em 2 páginas para evitar timeouts
+  // v12.3: REMOVIDO limite de chunks - processa até encontrar dados ou fim do PDF
   
   const PAGES_PER_CHUNK = 2;
-  const MAX_CHUNKS = 5; // v12.2: Limite de 10 páginas (5 chunks * 2 páginas) para garantir extração completa
+  const MAX_CHUNKS = 999; // v12.3: Sem limite artificial - processa o PDF inteiro se necessário
   
   // Estado de descrição da etapa atual
   const [processingLabel, setProcessingLabel] = useState<string>('');
@@ -653,26 +654,26 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
               const llmMs = data.metrics?.llmMs || 0;
               console.log(`✅ [MISTRAL] Págs ${currentPage}-${endPage}: OCR ${ocrMs}ms + LLM ${llmMs}ms = ${data.durationMs}ms`);
               
-              // v12.2: EARLY-STOP CHECK - NUNCA confiar apenas no status do LLM
+              // v12.3: EARLY-STOP CHECK - NUNCA confiar apenas no status do LLM
               const currentMerged = mergeChunkResults(chunkResults);
               const completeness = isDataComplete(currentMerged);
               const isComplete = completeness.complete; // Ignora data.data.status
               
               // Log de trust issue se LLM mentir
               if (data.data.status === 'COMPLETO' && !completeness.complete) {
-                console.warn(`⚠️ [TRUST ISSUE v12.2] LLM disse COMPLETO mas faltam: ${completeness.missing.join(', ')}`);
+                console.warn(`⚠️ [TRUST ISSUE v12.3] LLM disse COMPLETO mas faltam: ${completeness.missing.join(', ')}`);
               }
               
               if (isComplete) {
                 const pagesSkipped = totalPages - slice.actualEnd;
                 earlyStopTriggered = true;
-                console.log(`✅ [EARLY-STOP v12.2] Dados completos após ${chunkResults.length} chunk(s)!`);
+                console.log(`✅ [EARLY-STOP v12.3] Dados completos após ${chunkResults.length} chunk(s)!`);
                 if (pagesSkipped > 0) {
-                  console.log(`💰 [ECONOMIA v12.2] Pulando ${pagesSkipped} páginas restantes`);
+                  console.log(`💰 [ECONOMIA v12.3] Pulando ${pagesSkipped} páginas restantes`);
                 }
                 break;
               } else {
-                console.log(`⏳ [CONTINUE v12.2] Faltando: ${completeness.missing.join(', ')}`);
+                console.log(`⏳ [CONTINUE v12.3] Pág ${slice.actualEnd}/${totalPages} - Faltando: ${completeness.missing.join(', ')}`);
               }
             }
             
@@ -688,7 +689,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           
           // Log final
           const statusLabel = earlyStopTriggered ? '⚡ EARLY-STOP' : '📄 COMPLETO';
-          console.log(`✅ [MISTRAL v11] ${file.name}: ${pagesProcessed}/${totalPages} págs em ${chunkResults.length} chunk(s) [${statusLabel}]`);
+          console.log(`✅ [MISTRAL v12.3] ${file.name}: ${pagesProcessed}/${totalPages} págs em ${chunkResults.length} chunk(s) [${statusLabel}]`);
         }
         
         // v11.0: Fase de reconciliação/enrichment
@@ -1203,22 +1204,33 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
               );
             })()}
             <div className="flex items-center gap-2">
-              <Input
-                value={item.clientCpfCnpj || ''}
-                onChange={(e) => {
-                  markFieldEdited(item.id, 'clientCpfCnpj');
-                  updateItem(item.id, { 
-                    clientCpfCnpj: e.target.value,
-                    clientStatus: 'new'
-                  });
-                }}
-                className={cn(
-                  "h-6 text-xs bg-transparent border-zinc-700/50 px-2 w-36 transition-all",
-                  "focus:bg-zinc-900/50 focus:border-zinc-400",
-                  isFieldEdited(item.id, 'clientCpfCnpj') && "text-zinc-300 border-zinc-500/50"
-                )}
-                placeholder="CPF/CNPJ"
-              />
+              {/* v12.3: CPF/CNPJ com validação visual melhorada */}
+              {(() => {
+                const cpf = item.clientCpfCnpj;
+                const isValid = cpf && (cpf.length === 11 || cpf.length === 14);
+                const isEmpty = !cpf || cpf.length === 0;
+                return (
+                  <Input
+                    value={cpf || ''}
+                    onChange={(e) => {
+                      const onlyDigits = e.target.value.replace(/\D/g, '');
+                      markFieldEdited(item.id, 'clientCpfCnpj');
+                      updateItem(item.id, { 
+                        clientCpfCnpj: onlyDigits,
+                        clientStatus: 'new'
+                      });
+                    }}
+                    className={cn(
+                      "h-6 text-xs bg-transparent border-zinc-700/50 px-2 w-36 transition-all font-mono",
+                      "focus:bg-zinc-900/50 focus:border-zinc-400",
+                      (isEmpty || !isValid) && "border-red-500/50 bg-red-900/10",
+                      isFieldEdited(item.id, 'clientCpfCnpj') && "text-zinc-300 border-zinc-500/50"
+                    )}
+                    placeholder="CPF/CNPJ obrigatório"
+                    maxLength={14}
+                  />
+                );
+              })()}
               {item.clientStatus === 'matched' ? (
                 <Popover open={showClientSearchFor === item.id} onOpenChange={(open) => setShowClientSearchFor(open ? item.id : null)}>
                   <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
