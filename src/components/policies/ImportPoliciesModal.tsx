@@ -495,10 +495,22 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           
           console.log(`🔍 [PROGRESSIVE] Confiança: ${parsed.confidence}% (threshold: ${CONFIDENCE_THRESHOLD}%), Campos: ${parsed.matched_fields.length}`);
           
-          // 5. Se confiança >= threshold, para o loop
-          if (parsed.confidence >= CONFIDENCE_THRESHOLD) {
+          // 5. v5.1: Continue scanning até página 4 se prêmio não encontrado
+          const MIN_PAGES_FOR_PREMIO = 4;
+          const hasPremiun = parsed.premio_liquido !== null && parsed.premio_liquido > 0;
+          
+          const shouldStop = 
+            parsed.confidence >= CONFIDENCE_THRESHOLD && 
+            (hasPremiun || currentPage >= MIN_PAGES_FOR_PREMIO);
+          
+          if (shouldStop) {
             console.log(`✅ [PROGRESSIVE] Threshold atingido! Parando na página ${Math.min(currentPage + 1, totalPages)}`);
             break;
+          }
+          
+          // Se não tem prêmio e ainda está antes da página 4, continua mesmo com alta confiança
+          if (!hasPremiun && currentPage < MIN_PAGES_FOR_PREMIO) {
+            console.log(`🔄 [PROGRESSIVE] Continuando busca por prêmio (página ${currentPage + 2})`);
           }
           
           // 6. Próximas páginas
@@ -626,11 +638,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         const seguradoraMatch = await matchSeguradora(policy.nome_seguradora, user.id);
         const ramoMatch = await matchRamo(policy.ramo_seguro, user.id);
         
-        const objetoCompleto = policy.objeto_segurado 
-          ? (policy.identificacao_adicional 
-              ? `${policy.objeto_segurado} - ${policy.identificacao_adicional}` 
-              : policy.objeto_segurado)
-          : policy.descricao_bem || '';
+        // v5.1: Use directly the objeto_segurado formatted by the parser
+        // Avoid duplicating plate info since parser already includes it
+        const objetoCompleto = policy.objeto_segurado || policy.descricao_bem || '';
         
         const item: PolicyImportItem = {
           id: crypto.randomUUID(),

@@ -512,9 +512,51 @@ async function findClientByNameFuzzy(name: string, userId: string) {
   return null;
 }
 
+// ============================================================
+// v5.1: INSTITUTIONAL BLACKLIST FOR NAME VALIDATION
+// ============================================================
+
+const INSTITUTIONAL_BLACKLIST = [
+  'SEGURADORA', 'SEGUROS', 'CORRETORA', 'CORRETAGEM', 'ESTIPULANTE',
+  'TOKIO', 'MARINE', 'PORTO', 'HDI', 'LIBERTY', 'ALLIANZ', 'MAPFRE',
+  'SULAMERICA', 'AZUL', 'ZURICH', 'SOMPO', 'BRADESCO', 'ITAU', 'CAIXA',
+  'MITSUI', 'GENERALI', 'POTTENCIAL', 'JUNTO', 'ALFA', 'BBSEGUROS',
+  'LTDA', 'SA', 'EIRELI', 'ME', 'EPP', 'CIA', 'COMPANHIA',
+  'CNPJ', 'INSCRICAO', 'RAZAOSOCIAL', 'FANTASIA', 'SUSEP',
+];
+
+/**
+ * v5.1: Valida se um nome é válido para cliente (não é institucional/lixo)
+ */
+function isValidClientName(name: string): boolean {
+  if (!name || name.length < 5) return false;
+  
+  const words = name.trim().split(/\s+/);
+  if (words.length < 2) return false;
+  
+  const alphaName = name.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  
+  for (const forbidden of INSTITUTIONAL_BLACKLIST) {
+    if (alphaName.includes(forbidden)) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
+ * v5.1: Sanitiza nome para uso - substitui lixo por default
+ */
+function sanitizeClientName(nome: string | null): string {
+  if (!nome) return 'Cliente Importado';
+  if (!isValidClientName(nome)) return 'Cliente Importado';
+  return nome;
+}
+
 /**
  * Upsert de cliente por documento (CPF/CNPJ)
- * Cria automaticamente se não existir, retorna ID se já existe
+ * v5.1: Valida nome e usa existente do banco se disponível
  */
 export async function upsertClientByDocument(
   documento: string,
@@ -523,7 +565,7 @@ export async function upsertClientByDocument(
   telefone: string | null,
   endereco: string | null,
   userId: string
-): Promise<{ id: string; created: boolean } | null> {
+): Promise<{ id: string; created: boolean; name: string } | null> {
   const normalized = documento.replace(/\D/g, '');
   
   // Validação mínima: CPF (11) ou CNPJ (14)
@@ -535,17 +577,21 @@ export async function upsertClientByDocument(
   // 1. Busca existente pelo documento
   const { data: existing } = await supabase
     .from('clientes')
-    .select('id')
+    .select('id, name')
     .eq('user_id', userId)
     .eq('cpf_cnpj', normalized)
     .maybeSingle();
   
   if (existing) {
-    console.log(`✅ [UPSERT] Cliente existente encontrado: ${existing.id}`);
-    return { id: existing.id, created: false };
+    console.log(`✅ [UPSERT] Cliente existente encontrado: ${existing.id} (${existing.name})`);
+    // v5.1: Retorna nome do banco, não o nome lixo do OCR
+    return { id: existing.id, created: false, name: existing.name };
   }
   
-  // 2. Cria novo cliente
+  // 2. Sanitiza nome antes de criar
+  const safeName = sanitizeClientName(nome);
+  
+  // 3. Cria novo cliente
   const cep = extractCep(endereco);
   const { city, state } = extractCityState(endereco);
   
@@ -553,7 +599,7 @@ export async function upsertClientByDocument(
     .from('clientes')
     .insert({
       user_id: userId,
-      name: nome || 'Cliente Importado',
+      name: safeName,
       cpf_cnpj: normalized,
       email: email || '',
       phone: telefone || '',
@@ -563,7 +609,7 @@ export async function upsertClientByDocument(
       state: state,
       status: 'Ativo',
     })
-    .select('id')
+    .select('id, name')
     .single();
   
   if (error) {
@@ -572,13 +618,13 @@ export async function upsertClientByDocument(
       console.log('⚠️ [UPSERT] Conflito de duplicata, buscando existente...');
       const { data: retryExisting } = await supabase
         .from('clientes')
-        .select('id')
+        .select('id, name')
         .eq('user_id', userId)
         .eq('cpf_cnpj', normalized)
         .maybeSingle();
       
       if (retryExisting) {
-        return { id: retryExisting.id, created: false };
+        return { id: retryExisting.id, created: false, name: retryExisting.name };
       }
     }
     
@@ -586,8 +632,8 @@ export async function upsertClientByDocument(
     return null;
   }
   
-  console.log(`✅ [UPSERT] Novo cliente criado: ${newClient.id} (${nome})`);
-  return { id: newClient.id, created: true };
+  console.log(`✅ [UPSERT] Novo cliente criado: ${newClient.id} (${newClient.name})`);
+  return { id: newClient.id, created: true, name: newClient.name };
 }
 
 export async function reconcileClient(
