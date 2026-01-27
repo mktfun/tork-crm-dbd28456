@@ -1,209 +1,279 @@
 
-# Plano: Aprimoramento do OCR e Lógica de Vínculo Cliente-Apólice
+
+# Plano: Migração para Processamento Individual de Arquivos
 
 ## Diagnóstico do Sistema Atual
 
-### OCR Bulk Analyze (`supabase/functions/ocr-bulk-analyze/index.ts`)
-- **Já usa Engine 2 e isTable=true** (linhas 253-256) - está configurado corretamente
-- Processa apenas **páginas 1-2** do PDF (trimming inteligente) para economia de tokens
-- Usa **OCR.space** como fallback quando extração local tem qualidade baixa
-- Limite de 512KB por arquivo para o OCR.space
+### Arquitetura Atual (Batch Processing)
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                     FRONTEND                                     │
+│  ImportPoliciesModal.tsx                                        │
+│  ─────────────────────────────────────────────────────────────  │
+│  processBulkOCR():                                              │
+│    1. Converte TODOS os arquivos para Base64                   │
+│    2. Envia array único para ocr-bulk-analyze                  │
+│    3. Aguarda resposta única com TODAS as apólices             │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │ 1 requisição com N arquivos
+                      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              EDGE FUNCTION: ocr-bulk-analyze                    │
+│  ─────────────────────────────────────────────────────────────  │
+│  1. Recebe array de arquivos (files[])                         │
+│  2. Loop: PDF trimming + OCR.space (Engine 2 + isTable)        │
+│  3. Envia texto agregado para IA (Lovable Gateway)             │
+│  4. Retorna array de apólices extraídas                        │
+│                                                                 │
+│  🔴 PROBLEMA: Se 1 arquivo falhar ou usar muita RAM,           │
+│     toda a requisição falha (WORKER_LIMIT)                     │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-### Policy Import Service (`src/services/policyImportService.ts`)
-- **Problema crítico**: Quando o cliente não é encontrado por CPF/CNPJ, email ou nome fuzzy (85%), o sistema retorna `status: 'new'` mas **não cria o cliente automaticamente** durante a reconciliação
-- A criação só acontece na hora de salvar (`createClientFromEdited`), e se o CPF/CNPJ estiver nulo ou inválido, a apólice fica órfã
-- Tabela `clientes` tem duplicatas: CPF `248.630.238-71` aparece 7 vezes, `569.896.598-66` aparece 3 vezes
-
-### Ramo Inference (`src/utils/ramoInference.ts`)
-- Atualmente **concorre** com a IA - o código roda independente do resultado da IA
-- Deveria ser **fallback** apenas quando a IA retornar nulo
+### Problema Identificado
+- A edge function `ocr-bulk-analyze` processa todos os arquivos em uma única execução
+- Um PDF grande ou corrompido pode causar falha total
+- Uso de memória acumulativo: 4 PDFs × 5MB = 20MB+ na mesma instância
 
 ---
 
-## Mudanças Propostas
-
-### 1. Edge Function: Otimizar Prompt da IA
-**Arquivo**: `supabase/functions/ocr-bulk-analyze/index.ts`
-
-O prompt atual já é bom (linhas 311-354), mas vamos reforçar as seguintes instruções:
+## Arquitetura Proposta (Individual Processing)
 
 ```text
-## REGRAS CRÍTICAS ADICIONAIS
-- CPF: SEMPRE extrair, mesmo parcialmente visível. Formato: apenas números (11 ou 14 dígitos)
-- Se encontrar menção a Veículo, Placa, Marca/Modelo, RCF, Automóvel → ramo_seguro = "AUTOMÓVEL"
-- NUNCA retorne "NÃO IDENTIFICADO" para nome_cliente se houver qualquer nome no documento
+┌─────────────────────────────────────────────────────────────────┐
+│                     FRONTEND (Orquestrador)                     │
+│  ImportPoliciesModal.tsx                                        │
+│  ─────────────────────────────────────────────────────────────  │
+│  processFilesIndividually():                                    │
+│    for (file of selectedFiles) {                               │
+│      try {                                                      │
+│        const result = await supabase.functions.invoke(...)     │
+│        results.push(result)     // ✅ Sucesso isolado          │
+│      } catch (err) {                                           │
+│        errors.push(file.name)   // ❌ Falha isolada            │
+│      }                                                          │
+│    }                                                            │
+│    // Continua com os que deram certo                          │
+│    await reconcileAll(results)                                  │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │ N requisições (1 por arquivo)
+                      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              EDGE FUNCTION: analyze-policy-single               │
+│  ─────────────────────────────────────────────────────────────  │
+│  1. Recebe UM arquivo (base64, fileName, mimeType)             │
+│  2. PDF trimming (páginas 1-2 apenas)                          │
+│  3. OCR.space com Engine 2 + isTable                           │
+│  4. IA via Lovable Gateway (mesmo prompt da bulk)              │
+│  5. Retorna dados de 1 apólice                                 │
+│                                                                 │
+│  ✅ Isolamento total: falha de 1 não afeta outros              │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Mudanças específicas:**
-- Adicionar validação mais agressiva para extração de CPF (regex reforçado)
-- Instruir a IA a priorizar seção "Dados do Segurado" para nome/CPF
+---
 
-### 2. Policy Import Service: Implementar Upsert de Cliente
-**Arquivo**: `src/services/policyImportService.ts`
+## Mudanças Detalhadas
 
-**Nova função `upsertClientByDocument`**:
+### 1. Nova Edge Function: `analyze-policy-single`
+**Arquivo**: `supabase/functions/analyze-policy-single/index.ts`
+
+Por que criar nova função em vez de modificar `analyze-policy`:
+- A função `analyze-policy` existente usa **Gemini direto** com schema diferente
+- A `ocr-bulk-analyze` tem pipeline mais robusto (OCR.space + Lovable Gateway)
+- Melhor isolar a nova lógica para não quebrar funcionalidades existentes
+
+**Estrutura**:
 ```typescript
-async function upsertClientByDocument(
-  documento: string,
-  nome: string,
-  email: string | null,
-  telefone: string | null,
-  endereco: string | null,
-  userId: string
-): Promise<{ id: string; created: boolean }> {
-  const normalized = documento.replace(/\D/g, '');
+serve(async (req) => {
+  const { base64, fileName, mimeType } = await req.json();
   
-  // 1. Busca existente pelo documento
-  const { data: existing } = await supabase
-    .from('clientes')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('cpf_cnpj', normalized)
-    .maybeSingle();
+  // 1. PDF Trimming (páginas 1-2) - código reutilizado de ocr-bulk-analyze
+  const miniPdfBytes = await trimPdf(base64);
   
-  if (existing) {
-    return { id: existing.id, created: false };
+  // 2. OCR.space (Engine 2, isTable=true)
+  const extractedText = await callOcrSpace(miniPdfBytes);
+  
+  // 3. IA via Lovable Gateway (mesmo prompt robusto)
+  const policy = await extractWithAI(extractedText, fileName);
+  
+  // 4. Retorna dados da apólice única
+  return Response.json({
+    success: true,
+    data: policy,
+    fileName: fileName
+  });
+});
+```
+
+### 2. Refatoração do Frontend
+**Arquivo**: `src/components/policies/ImportPoliciesModal.tsx`
+
+**Substituir `processBulkOCR` por `processFilesIndividually`**:
+
+```typescript
+const processFilesIndividually = async () => {
+  if (!user || files.length === 0) return;
+  
+  setStep('processing');
+  const results: BulkOCRExtractedPolicy[] = [];
+  const errors: { fileName: string; error: string }[] = [];
+  
+  // Processa cada arquivo individualmente
+  for (let idx = 0; idx < files.length; idx++) {
+    const file = files[idx];
+    setProcessingStatus(prev => new Map(prev).set(idx, 'processing'));
+    setOcrProgress(idx);
+    
+    try {
+      const base64 = await fileToBase64(file);
+      
+      // 🔥 Chamada individual para cada arquivo
+      const { data, error } = await supabase.functions.invoke('analyze-policy-single', {
+        body: { 
+          base64, 
+          fileName: file.name, 
+          mimeType: file.type 
+        }
+      });
+      
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.error || 'Extração falhou');
+      
+      results.push(data.data);
+      setProcessingStatus(prev => new Map(prev).set(idx, 'success'));
+      
+    } catch (err: any) {
+      console.error(`❌ Falha em ${file.name}:`, err.message);
+      errors.push({ fileName: file.name, error: err.message });
+      setProcessingStatus(prev => new Map(prev).set(idx, 'error'));
+      // ✅ Continua com os próximos arquivos (não quebra o loop)
+    }
   }
   
-  // 2. Cria novo cliente
-  const { data: newClient, error } = await supabase
-    .from('clientes')
-    .insert({
-      user_id: userId,
-      name: nome,
-      cpf_cnpj: normalized,
-      email: email || '',
-      phone: telefone || '',
-      address: endereco || '',
-      status: 'Ativo'
-    })
-    .select('id')
-    .single();
+  setOcrProgress(files.length);
   
-  if (error) throw error;
-  return { id: newClient.id, created: true };
-}
+  if (results.length === 0) {
+    toast.error('Nenhum arquivo processado com sucesso');
+    setStep('upload');
+    return;
+  }
+  
+  // Mostra toast com estatísticas
+  if (errors.length > 0) {
+    toast.warning(`${results.length} processados, ${errors.length} com erro`);
+  }
+  
+  // Continua com reconciliação dos que deram certo
+  await reconcileResults(results);
+};
 ```
 
-**Modificar `reconcileClient`** para usar upsert quando documento disponível:
-- Se documento existe → tenta match
-- Se não achou match mas tem documento válido → cria automaticamente
-- Retorna `clientId` sempre preenchido quando possível
+### 3. Ajustes na Edge Function Existente
+**Arquivo**: `supabase/functions/analyze-policy/index.ts`
 
-### 3. Ramo Inference: Priorizar IA
-**Arquivo**: `src/utils/ramoInference.ts` e `ImportPoliciesModal.tsx`
+Esta função **permanece inalterada** pois é usada para outros fluxos (carteirinhas, etc).
 
-**Lógica atual** (problemática):
-```javascript
-// Sempre roda o inferRamoFromDescription
-const ramoInferido = inferRamoFromDescription(item.objetoSegurado, ramos);
+### 4. Atualizar Config.toml
+**Arquivo**: `supabase/config.toml`
+
+```toml
+[functions.analyze-policy-single]
+verify_jwt = false
 ```
-
-**Nova lógica**:
-```javascript
-// Prioridade: IA > Inference > null
-let ramoId = null;
-
-// 1. Tentar match pelo ramo_seguro retornado pela IA
-if (extracted.ramo_seguro) {
-  const aiRamo = await matchRamo(extracted.ramo_seguro, userId);
-  if (aiRamo) ramoId = aiRamo.id;
-}
-
-// 2. Fallback: inferência local apenas se IA falhou
-if (!ramoId && extracted.objeto_segurado) {
-  ramoId = inferRamoFromDescription(extracted.objeto_segurado, ramosDisponiveis);
-}
-```
-
-### 4. Índice Único para Evitar Duplicatas
-**Database Migration**:
-```sql
--- Índice condicional para evitar duplicatas de CPF/CNPJ por user
-CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_cpf_cnpj_user_unique 
-ON public.clientes (user_id, cpf_cnpj) 
-WHERE cpf_cnpj IS NOT NULL AND cpf_cnpj != '';
-```
-
-**Nota**: O banco atual tem duplicatas que precisarão ser tratadas antes de criar o índice único.
 
 ---
 
-## Arquivos a Modificar
+## Reutilização de Código
 
-| Arquivo | Mudança |
-|---------|---------|
-| `supabase/functions/ocr-bulk-analyze/index.ts` | Reforçar prompt de extração de CPF e ramo |
-| `src/services/policyImportService.ts` | Adicionar `upsertClientByDocument`, modificar `reconcileClient` |
-| `src/components/policies/ImportPoliciesModal.tsx` | Usar ramo_seguro da IA como prioridade |
-| `src/utils/ramoInference.ts` | Manter como está (usado apenas como fallback) |
+Para evitar duplicação, a nova função `analyze-policy-single` irá:
+
+1. **Reutilizar** a lógica de PDF trimming do `ocr-bulk-analyze`
+2. **Reutilizar** o prompt do sistema já otimizado
+3. **Simplificar** a resposta para retornar apenas 1 apólice
+
+**Código compartilhado a ser extraído**:
+- `uint8ArrayToBase64()` - conversão segura
+- `trimPdf()` - corte de páginas 1-2
+- `callOcrSpace()` - chamada OCR Engine 2
+- `extractPolicyWithAI()` - chamada Lovable Gateway
+- `generateSmartTitle()` - geração de título
 
 ---
 
-## Fluxo de Importação Atualizado
+## Fluxo de Processamento Comparativo
 
-```text
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
-│   PDF Upload    │────▶│  OCR Bulk        │────▶│  IA Extração        │
-│   (páginas 1-2) │     │  (Engine 2 +     │     │  (nome, CPF, ramo,  │
-│                 │     │   isTable=true)  │     │   prêmio, datas)    │
-└─────────────────┘     └──────────────────┘     └──────────┬──────────┘
-                                                            │
-                        ┌───────────────────────────────────┘
-                        ▼
-          ┌─────────────────────────────────┐
-          │  reconcileClient (UPSERT)       │
-          │  ────────────────────────────── │
-          │  1. Busca por CPF/CNPJ          │
-          │  2. Se não achou + CPF válido:  │
-          │     → CRIA cliente automatico   │
-          │  3. Retorna clientId SEMPRE     │
-          └─────────────────┬───────────────┘
-                            │
-                            ▼
-          ┌─────────────────────────────────┐
-          │  matchRamo (PRIORIDADE IA)      │
-          │  ────────────────────────────── │
-          │  1. Usa ramo_seguro da IA       │
-          │  2. Fallback: inferência local  │
-          └─────────────────┬───────────────┘
-                            │
-                            ▼
-          ┌─────────────────────────────────┐
-          │  Salvar Apólice + Itens         │
-          │  (apolices + apolice_itens)     │
-          └─────────────────────────────────┘
-```
+| Aspecto | Batch (Atual) | Individual (Novo) |
+|---------|---------------|-------------------|
+| Requisições | 1 (N arquivos) | N (1 por arquivo) |
+| Isolamento de falhas | ❌ Total failure | ✅ Parcial |
+| Uso de RAM | ❌ Acumulativo | ✅ Reset por req |
+| Feedback visual | ⚠️ Tudo ou nada | ✅ Por arquivo |
+| Network tab | 1 requisição | N requisições |
+| Rate limit | ⚠️ 1 hit IA | ⚠️ N hits IA |
 
 ---
 
 ## Validação e Testes
 
-1. **Upload de PDF**: Subir `APOLICE EVELINE SUCHOJ.pdf`
-2. **Verificar Logs**: Console deve mostrar `📊 [IA]` com JSON contendo CPF extraído
-3. **Verificar Cliente**: Novo cliente "EVELINE SUCHOJ" deve existir na tabela `clientes`
-4. **Verificar Ramo**: Apólice deve ter `ramo_seguro = 'AUTOMÓVEL'` (inferido pelo ramo_seguro da IA)
-5. **Verificar Vínculo**: Apólice deve estar vinculada ao cliente correto
+1. **Teste de Isolamento**:
+   - Subir 4 arquivos: 3 válidos + 1 corrompido
+   - Esperado: 3 processados com sucesso, 1 erro isolado
+
+2. **Teste de Network**:
+   - Abrir DevTools > Network
+   - Subir 3 arquivos
+   - Esperado: 3 requisições separadas para `analyze-policy-single`
+
+3. **Teste de Memória**:
+   - Subir 5 PDFs de 4MB cada
+   - Esperado: Sem erro WORKER_LIMIT (cada req < 50MB)
 
 ---
 
-## Riscos e Mitigações
+## Arquivos a Criar/Modificar
 
-| Risco | Mitigação |
-|-------|-----------|
-| Duplicatas existentes no banco | Executar query de deduplicação antes do índice único |
-| CPF parcialmente extraído | Validação de 11/14 dígitos antes de usar |
-| IA retorna ramo genérico | Fallback para inferência local mantido |
+| Arquivo | Ação | Descrição |
+|---------|------|-----------|
+| `supabase/functions/analyze-policy-single/index.ts` | **Criar** | Nova edge function para processamento individual |
+| `supabase/config.toml` | **Modificar** | Adicionar config da nova função |
+| `src/components/policies/ImportPoliciesModal.tsx` | **Modificar** | Substituir `processBulkOCR` por `processFilesIndividually` |
+
+**Arquivos mantidos inalterados**:
+- `supabase/functions/ocr-bulk-analyze/index.ts` - mantido para compatibilidade
+- `supabase/functions/analyze-policy/index.ts` - usado para carteirinhas
+- `src/services/policyImportService.ts` - já tem upsert implementado
+
+---
+
+## Considerações de Performance
+
+### Latência
+- **Batch**: 1 requisição de ~10s (todos os arquivos)
+- **Individual**: N requisições de ~3-5s cada (paralelo possível no futuro)
+
+### Rate Limiting
+- **Lovable AI Gateway**: Verificar limites de requests/min
+- **OCR.space**: 500 requests/dia no plano free
+
+### Otimização Futura
+Para reduzir latência total, podemos implementar **processamento paralelo controlado**:
+```typescript
+// Versão otimizada (fase 2)
+const concurrency = 2; // 2 arquivos por vez
+const results = await processInBatches(files, concurrency, processFile);
+```
 
 ---
 
 ## Estimativa de Complexidade
 
-| Tarefa | Complexidade |
-|--------|--------------|
-| Modificar prompt da IA | Baixa |
-| Implementar upsert de cliente | Média |
-| Ajustar prioridade de ramo | Baixa |
-| Migration de índice único | Média (requer deduplicação prévia) |
+| Tarefa | Complexidade | Linhas de Código |
+|--------|--------------|------------------|
+| Nova edge function | Alta | ~200 linhas |
+| Refatorar frontend | Média | ~80 linhas modificadas |
+| Config.toml | Baixa | 3 linhas |
+| Testes | Baixa | Manual |
 
-**Total: 4-5 arquivos modificados, 1 migration SQL**
+**Total: 1 novo arquivo, 2 modificações**
+
