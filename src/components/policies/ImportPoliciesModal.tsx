@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
@@ -1014,10 +1015,48 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                 placeholder="CPF/CNPJ"
               />
               {item.clientStatus === 'matched' ? (
-                <Badge className="bg-zinc-700/30 text-zinc-200 border border-zinc-500/40 text-[10px] h-5">
-                  <UserCheck className="w-3 h-3 mr-1" />
-                  Vinculado
-                </Badge>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Badge className="bg-zinc-700/30 text-zinc-200 border border-zinc-500/40 text-[10px] h-5 cursor-pointer hover:bg-zinc-600/40 transition-colors">
+                      <UserCheck className="w-3 h-3 mr-1" />
+                      Vinculado
+                    </Badge>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 bg-zinc-900 border-zinc-700 p-3" side="top">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-zinc-200 font-medium text-sm">
+                        <UserCheck className="w-4 h-4 text-green-400" />
+                        Cliente Vinculado
+                      </div>
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex items-start gap-2">
+                          <span className="text-zinc-500 shrink-0">Nome:</span>
+                          <span className="text-zinc-200 font-medium">{item.clientName}</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="text-zinc-500 shrink-0">CPF/CNPJ:</span>
+                          <span className="text-zinc-300 font-mono">
+                            {item.clientCpfCnpj 
+                              ? item.clientCpfCnpj.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '***.$2.***-**')
+                              : 'Não informado'}
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="text-zinc-500 shrink-0">Match:</span>
+                          <Badge variant="outline" className="text-[10px] h-4 px-1 text-zinc-400 border-zinc-600">
+                            {item.matchedBy === 'cpf_cnpj' && 'CPF/CNPJ'}
+                            {item.matchedBy === 'email' && 'E-mail'}
+                            {item.matchedBy === 'name_fuzzy' && 'Nome (85%+)'}
+                            {item.matchedBy === 'auto_created' && '✨ Auto-criado'}
+                          </Badge>
+                        </div>
+                      </div>
+                      <p className="text-zinc-500 text-[10px] pt-1 border-t border-zinc-700/50">
+                        Clique no campo Nome para editar se necessário.
+                      </p>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               ) : (
                 <Badge className="bg-transparent text-zinc-400 border border-zinc-600/50 text-[10px] h-5">
                   <UserPlus className="w-3 h-3 mr-1" />
