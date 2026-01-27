@@ -73,14 +73,24 @@ export const CONFIDENCE_THRESHOLD = 80;
 // Termos que NÃO devem aparecer em nomes de segurados
 // ============================================================
 
+// v5.4: Expanded institutional blacklist + marketing phrases
 const INSTITUTIONAL_BLACKLIST = [
+  // Seguradoras
   'SEGURADORA', 'SEGUROS', 'CORRETORA', 'CORRETAGEM', 'ESTIPULANTE',
   'TOKIO', 'MARINE', 'PORTO', 'HDI', 'LIBERTY', 'ALLIANZ', 'MAPFRE',
   'SULAMERICA', 'AZUL', 'ZURICH', 'SOMPO', 'BRADESCO', 'ITAU', 'CAIXA',
   'MITSUI', 'GENERALI', 'POTTENCIAL', 'JUNTO', 'ALFA', 'BBSEGUROS',
+  // Termos jurídicos
   'LTDA', 'SA', 'EIRELI', 'ME', 'EPP', 'CIA', 'COMPANHIA',
   'CNPJ', 'INSCRICAO', 'RAZAOSOCIAL', 'FANTASIA', 'SUSEP',
   'REPRESENTANTE', 'PROCURADOR', 'BENEFICIARIO', 'PRODUTOR',
+  // v5.4: Termos de marketing/frases institucionais
+  'AGORA', 'VOCE', 'PODE', 'REALIZAR', 'PROGRAMA', 'BENEFICIOS', 'BENEFICIO',
+  'APROVEITE', 'DESCONTO', 'PROMOCAO', 'OFERTA', 'EXCLUSIVO',
+  'CLIQUE', 'ACESSE', 'SAIBA', 'MAIS', 'INFORMACOES',
+  'ATENDIMENTO', 'SERVICO', 'PORTAL', 'ONLINE', 'DIGITAL',
+  'TERMOS', 'CONDICOES', 'REGULAMENTO', 'PARTICIPAR',
+  'PAGINA', 'SITE', 'WWW', 'HTTP', 'HTTPS',
 ];
 
 // ============================================================
@@ -231,7 +241,13 @@ function alphaWindowExtractMultiple(
 // ============================================================
 
 /**
- * Valida se um nome é válido para cliente (não é institucional)
+ * v5.4: Valida se um nome é válido para cliente (não é institucional/lixo/frase)
+ * Critérios rigorosos:
+ * - 8+ caracteres totais
+ * - 2-5 palavras (nomes reais raramente têm > 5 palavras)
+ * - Palavras substanciais (3+ chars)
+ * - Não contém termos da blacklist
+ * - Não parece frase (poucos verbos/artigos)
  */
 function isValidClientName(name: string): boolean {
   if (!name) return false;
@@ -239,31 +255,37 @@ function isValidClientName(name: string): boolean {
   // Remove espaços extras e normaliza
   const cleanName = name.trim().replace(/\s+/g, ' ');
   
-  // v5.2: Mínimo de 8 caracteres (mais realista para nomes reais)
+  // Mínimo de 8 caracteres
   if (cleanName.length < 8) {
-    console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (muito curto: ${cleanName.length} chars)`);
+    console.log(`🚫 [NAME v5.4] Rejeitado: "${name}" (muito curto: ${cleanName.length} chars)`);
     return false;
   }
   
   const words = cleanName.split(' ');
   
+  // v5.4: NOVO - Máximo de 5 palavras (nomes reais)
+  if (words.length > 5) {
+    console.log(`🚫 [NAME v5.4] Rejeitado: "${name}" (${words.length} palavras - provavelmente frase)`);
+    return false;
+  }
+  
   // Mínimo de 2 palavras
   if (words.length < 2) {
-    console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (apenas ${words.length} palavra)`);
+    console.log(`🚫 [NAME v5.4] Rejeitado: "${name}" (apenas ${words.length} palavra)`);
     return false;
   }
   
-  // v5.2: CADA palavra deve ter pelo menos 2 caracteres
+  // Cada palavra deve ter pelo menos 2 caracteres
   const validWords = words.filter(w => w.length >= 2);
   if (validWords.length < 2) {
-    console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (palavras muito curtas)`);
+    console.log(`🚫 [NAME v5.4] Rejeitado: "${name}" (palavras muito curtas)`);
     return false;
   }
   
-  // v5.2: Pelo menos UMA palavra deve ter 3+ caracteres (evita "Ra Jj")
+  // Pelo menos UMA palavra deve ter 3+ caracteres
   const hasSubstantialWord = words.some(w => w.length >= 3);
   if (!hasSubstantialWord) {
-    console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (sem palavra substancial)`);
+    console.log(`🚫 [NAME v5.4] Rejeitado: "${name}" (sem palavra substancial)`);
     return false;
   }
   
@@ -272,9 +294,19 @@ function isValidClientName(name: string): boolean {
   
   for (const forbidden of INSTITUTIONAL_BLACKLIST) {
     if (alphaName.includes(forbidden)) {
-      console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (contém "${forbidden}")`);
+      console.log(`🚫 [NAME v5.4] Rejeitado: "${name}" (contém "${forbidden}")`);
       return false;
     }
+  }
+  
+  // v5.4: NOVO - Detectar padrão de frase (verbos/artigos em excesso)
+  const verbsAndArticles = ['VOCE', 'PODE', 'PARA', 'COM', 'QUE', 'COMO', 'FAZER', 'TER', 'SER', 'ESTA'];
+  const wordSet = new Set(words.map(w => w.toUpperCase()));
+  const matchCount = verbsAndArticles.filter(v => wordSet.has(v)).length;
+  
+  if (matchCount >= 2) {
+    console.log(`🚫 [NAME v5.4] Rejeitado: "${name}" (parece frase: ${matchCount} verbos/artigos)`);
+    return false;
   }
   
   return true;

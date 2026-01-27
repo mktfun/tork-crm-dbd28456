@@ -764,16 +764,29 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       return;
     }
 
-    const invalidClients = validItems.filter(item => 
-      !item.clientName?.trim() ||
-      item.clientName === 'Não Identificado' || 
-      item.clientName.toUpperCase().includes('NÃO IDENTIFICADO') ||
-      item.clientName.toUpperCase().includes('NAO IDENTIFICADO')
-    );
+    // v5.4: Função de validação rigorosa de nome
+    const isNameSuspicious = (name: string | null): boolean => {
+      if (!name?.trim()) return true;
+      if (name === 'Cliente Não Identificado') return true;
+      if (name === 'Não Identificado') return true;
+      if (name.toUpperCase().includes('NÃO IDENTIFICADO')) return true;
+      if (name.toUpperCase().includes('NAO IDENTIFICADO')) return true;
+      if (name.length > 60) return true; // Nomes muito longos são suspeitos
+      if (name.split(' ').length > 5) return true; // Muitas palavras = frase
+      
+      // Termos de marketing/institucional
+      const upper = name.toUpperCase();
+      const suspiciousTerms = ['AGORA', 'VOCE', 'PODE', 'PROGRAMA', 'BENEFICIO', 'REALIZAR', 'TERMOS', 'CONDICOES'];
+      if (suspiciousTerms.some(t => upper.includes(t))) return true;
+      
+      return false;
+    };
+    
+    const invalidClients = validItems.filter(item => isNameSuspicious(item.clientName));
 
     if (invalidClients.length > 0) {
       toast.error(`${invalidClients.length} item(s) com nome de cliente inválido. Edite o nome antes de salvar!`, {
-        description: 'Clique no campo "Cliente" e digite o nome correto.',
+        description: 'Campos com borda vermelha precisam ser corrigidos manualmente.',
         duration: 6000,
       });
       return;
@@ -987,20 +1000,34 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       <TableCell className="py-3">
         {!item.processError && (
           <div className="space-y-1.5">
-            <Input
-              value={item.clientName}
-              onChange={(e) => {
-                markFieldEdited(item.id, 'clientName');
-                updateItem(item.id, { clientName: e.target.value });
-              }}
-              className={cn(
-                "h-8 bg-transparent border-zinc-700/50 text-sm font-medium transition-all",
-                "focus:bg-zinc-900/50 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400/20",
-                !item.clientName && "border-red-500/50 bg-red-900/10",
-                isFieldEdited(item.id, 'clientName') && "text-zinc-300 border-zinc-500/50"
-              )}
-              placeholder="Nome do Cliente"
-            />
+            {(() => {
+              // v5.4: Validação visual rigorosa de nome
+              const isNameInvalid = !item.clientName?.trim() || 
+                item.clientName === 'Cliente Não Identificado' ||
+                item.clientName === 'Não Identificado' ||
+                item.clientName.length > 60 ||
+                item.clientName.split(' ').length > 5 ||
+                ['AGORA', 'VOCE', 'PODE', 'PROGRAMA', 'BENEFICIO', 'REALIZAR'].some(t => 
+                  item.clientName?.toUpperCase().includes(t)
+                );
+              
+              return (
+                <Input
+                  value={isNameInvalid && !isFieldEdited(item.id, 'clientName') ? '' : item.clientName}
+                  onChange={(e) => {
+                    markFieldEdited(item.id, 'clientName');
+                    updateItem(item.id, { clientName: e.target.value });
+                  }}
+                  className={cn(
+                    "h-8 bg-transparent border-zinc-700/50 text-sm font-medium transition-all",
+                    "focus:bg-zinc-900/50 focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400/20",
+                    isNameInvalid && "border-red-500/50 bg-red-900/10 animate-pulse",
+                    isFieldEdited(item.id, 'clientName') && "text-zinc-300 border-zinc-500/50"
+                  )}
+                  placeholder={isNameInvalid ? "⚠️ Digite o nome do cliente" : "Nome do Cliente"}
+                />
+              );
+            })()}
             <div className="flex items-center gap-2">
               <Input
                 value={item.clientCpfCnpj || ''}
