@@ -1,6 +1,5 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,10 +7,10 @@ const corsHeaders = {
 };
 
 // ============================================================
-// PURE OCR PROXY v5.0 - "THE CLEANER"
+// PURE OCR PROXY v6.0 - "CLIENT-SIDE SLICER"
 // 
-// Fluxo: Base64 → Trim páginas → OCR.space → Limpeza → rawText
-// Zero IA. Zero extração local. Apenas OCR visual puro.
+// Fluxo: Frontend fatia PDF → Base64 → OCR.space → Limpeza → rawText
+// Zero IA. Zero fatiamento no servidor. Apenas OCR visual puro.
 // ============================================================
 
 const OCR_SPACE_API_URL = 'https://api.ocr.space/parse/image';
@@ -19,62 +18,6 @@ const OCR_SPACE_API_URL = 'https://api.ocr.space/parse/image';
 // ============================================================
 // UTILITÁRIOS
 // ============================================================
-
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  const chunkSize = 32768;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-    binary += String.fromCharCode.apply(null, [...chunk]);
-  }
-  return btoa(binary);
-}
-
-/**
- * Extrai um range específico de páginas do PDF
- */
-async function extractPageRange(
-  base64: string, 
-  startPage: number, 
-  endPage: number
-): Promise<{ sliceBase64: string; totalPages: number; actualStart: number; actualEnd: number }> {
-  try {
-    const pdfBytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-    const pdfDoc = await PDFDocument.load(pdfBytes);
-    const totalPages = pdfDoc.getPageCount();
-    
-    const actualStart = Math.max(1, startPage);
-    const actualEnd = Math.min(endPage, totalPages);
-    
-    console.log(`📄 PDF tem ${totalPages} páginas, extraindo ${actualStart}-${actualEnd}`);
-    
-    if (actualStart > totalPages) {
-      return { 
-        sliceBase64: '', 
-        totalPages, 
-        actualStart, 
-        actualEnd: actualStart - 1 
-      };
-    }
-    
-    const newDoc = await PDFDocument.create();
-    for (let i = actualStart - 1; i < actualEnd; i++) {
-      const [page] = await newDoc.copyPages(pdfDoc, [i]);
-      newDoc.addPage(page);
-    }
-    
-    const newBytes = await newDoc.save();
-    const sliceBase64 = uint8ArrayToBase64(new Uint8Array(newBytes));
-    
-    console.log(`✂️ Slice criado: páginas ${actualStart}-${actualEnd} de ${totalPages}`);
-    
-    return { sliceBase64, totalPages, actualStart, actualEnd };
-    
-  } catch (error) {
-    console.error('Erro ao extrair range de páginas:', error);
-    return { sliceBase64: base64, totalPages: 1, actualStart: 1, actualEnd: 1 };
-  }
-}
 
 /**
  * THE CLEANER: Remove todos os caracteres não-imprimíveis
@@ -158,10 +101,6 @@ serve(async (req) => {
     const fileBase64 = body.base64 || body.fileBase64;
     const mimeType = body.mimeType || 'application/pdf';
     const fileName = body.fileName || 'document.pdf';
-    
-    // Parâmetros de paginação
-    const startPage = body.startPage || 1;
-    const endPage = body.endPage || 2;
 
     if (!fileBase64) {
       return new Response(JSON.stringify({ 
@@ -173,46 +112,19 @@ serve(async (req) => {
       });
     }
 
-    console.log(`📄 Processando: ${fileName}, páginas: ${startPage}-${endPage}`);
+    console.log(`📄 [v6.0] Processando: ${fileName} (${(fileBase64.length / 1024).toFixed(0)}KB)`);
     
-    // Para PDFs, extrai o range de páginas
-    let processedBase64 = fileBase64;
-    let pageInfo = { totalPages: 1, actualStart: 1, actualEnd: 1 };
+    // 🔥 CLIENT-SIDE SLICER: PDF já vem fatiado do frontend!
+    // Não precisa mais de extractPageRange() - apenas chama OCR diretamente
     
-    if (mimeType === 'application/pdf') {
-      const result = await extractPageRange(fileBase64, startPage, endPage);
-      processedBase64 = result.sliceBase64;
-      pageInfo = {
-        totalPages: result.totalPages,
-        actualStart: result.actualStart,
-        actualEnd: result.actualEnd,
-      };
-      
-      if (!processedBase64) {
-        return new Response(JSON.stringify({ 
-          success: true, 
-          rawText: '',
-          source: 'EMPTY',
-          fileName,
-          pageRange: pageInfo,
-          hasMorePages: false,
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-    }
-
-    // 🔥 SEMPRE usa OCR.space (morte total ao extrator local)
     let rawText = '';
     try {
-      rawText = await callOcrSpace(processedBase64, mimeType);
+      rawText = await callOcrSpace(fileBase64, mimeType);
     } catch (ocrError) {
       console.error('❌ OCR.space falhou:', ocrError);
       return new Response(JSON.stringify({ 
         success: false, 
         error: 'Falha na extração OCR visual',
-        pageRange: pageInfo,
-        hasMorePages: pageInfo.actualEnd < pageInfo.totalPages,
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -223,19 +135,12 @@ serve(async (req) => {
     const cleanText = cleanOcrText(rawText);
     
     console.log(`✅ Extração OCR: ${rawText.length} → ${cleanText.length} chars (limpo)`);
-    console.log(`📄 Páginas ${pageInfo.actualStart}-${pageInfo.actualEnd} de ${pageInfo.totalPages}`);
 
     return new Response(JSON.stringify({ 
       success: true, 
       rawText: cleanText,
       source: 'OCR',
       fileName: fileName,
-      pageRange: {
-        start: pageInfo.actualStart,
-        end: pageInfo.actualEnd,
-        total: pageInfo.totalPages,
-      },
-      hasMorePages: pageInfo.actualEnd < pageInfo.totalPages,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

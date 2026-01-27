@@ -24,6 +24,7 @@ import { useSupabaseBrokerages } from '@/hooks/useSupabaseBrokerages';
 import { usePolicies } from '@/hooks/useAppData';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { PDFDocument } from 'pdf-lib';
 import { 
   ExtractedPolicyData, 
   PolicyImportItem, 
@@ -309,8 +310,69 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     });
   };
 
-  // ========== PROCESSAMENTO INDIVIDUAL (v3.0 - PROGRESSIVE SCAN) ==========
-  // Fluxo: PDF → OCR por fatias de 2 páginas → Parser Local → Threshold de confiança
+  // ========== CLIENT-SIDE PDF SLICER (v6.0) ==========
+  /**
+   * Extrai um range de páginas do PDF no cliente
+   * Retorna: { sliceBase64, totalPages, hasMore }
+   */
+  const slicePdfPages = async (
+    file: File, 
+    startPage: number, 
+    endPage: number
+  ): Promise<{ 
+    sliceBase64: string; 
+    totalPages: number; 
+    hasMore: boolean;
+    actualStart: number;
+    actualEnd: number;
+  }> => {
+    // 1. Lê arquivo como ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer();
+    
+    // 2. Carrega PDF
+    const pdfDoc = await PDFDocument.load(arrayBuffer);
+    const totalPages = pdfDoc.getPageCount();
+    
+    // 3. Ajusta range
+    const actualStart = Math.max(1, startPage);
+    const actualEnd = Math.min(endPage, totalPages);
+    
+    if (actualStart > totalPages) {
+      return { 
+        sliceBase64: '', 
+        totalPages, 
+        hasMore: false,
+        actualStart,
+        actualEnd: 0
+      };
+    }
+    
+    // 4. Cria novo PDF com apenas as páginas solicitadas
+    const newDoc = await PDFDocument.create();
+    for (let i = actualStart - 1; i < actualEnd; i++) {
+      const [page] = await newDoc.copyPages(pdfDoc, [i]);
+      newDoc.addPage(page);
+    }
+    
+    // 5. Converte para Base64
+    const pdfBytes = await newDoc.save();
+    const sliceBase64 = btoa(
+      String.fromCharCode(...new Uint8Array(pdfBytes))
+    );
+    
+    console.log(`✂️ [SLICER] Páginas ${actualStart}-${actualEnd} de ${totalPages} (${(sliceBase64.length / 1024).toFixed(0)}KB)`);
+    
+    return {
+      sliceBase64,
+      totalPages,
+      hasMore: actualEnd < totalPages,
+      actualStart,
+      actualEnd
+    };
+  };
+
+  // ========== PROCESSAMENTO INDIVIDUAL (v6.0 - CLIENT-SIDE SLICER) ==========
+  // Fluxo: PDF → Fatiamento no Cliente → OCR.space → Parser Local → Threshold de confiança
   // Zero dependência de IA - 100% determinístico
   const processFilesIndividually = async () => {
     if (!user || files.length === 0) return;
@@ -333,7 +395,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     
     const MAX_PAGES = 6; // Limite de segurança (3 iterações de 2 páginas)
     
-    // Process each file individually via Progressive Scan
+    // Process each file individually via Client-Side Slicer + Progressive Scan
     for (let idx = 0; idx < files.length; idx++) {
       const file = files[idx];
       setProcessingStatus(prev => new Map(prev).set(idx, 'processing'));
@@ -342,27 +404,45 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       try {
         console.log(`📄 [${idx + 1}/${files.length}] Processando: ${file.name}`);
         
-        const base64 = await fileToBase64(file);
-        
-        // ========== PROGRESSIVE SCAN LOOP ==========
+        // ========== PROGRESSIVE SCAN LOOP com CLIENT-SIDE SLICER ==========
         let accumulatedText = '';
         let currentPage = 1;
         let parsed: ParsedPolicy | null = null;
-        let hasMorePages = true;
+        let hasMore = true;
         let totalPages = 0;
         
-        while (currentPage <= MAX_PAGES && hasMorePages) {
-          console.log(`📄 [PROGRESSIVE] ${file.name}: páginas ${currentPage}-${currentPage + 1}`);
+        // Imagens: envia diretamente (sem fatiamento)
+        const isImage = file.type.startsWith('image/');
+        
+        while (currentPage <= MAX_PAGES && hasMore) {
+          console.log(`📄 [SLICER] ${file.name}: páginas ${currentPage}-${currentPage + 1}`);
           
-          // 1. Chama Edge Function para fatia de páginas
+          let sliceBase64: string;
+          
+          if (isImage) {
+            // Imagens: converte para base64 diretamente
+            sliceBase64 = await fileToBase64(file);
+            hasMore = false;
+            totalPages = 1;
+          } else {
+            // PDFs: FATIA NO CLIENTE (não envia PDF completo!)
+            const slice = await slicePdfPages(file, currentPage, currentPage + 1);
+            sliceBase64 = slice.sliceBase64;
+            hasMore = slice.hasMore;
+            totalPages = slice.totalPages;
+            
+            if (!sliceBase64) {
+              console.log(`📄 [SLICER] Sem mais páginas para processar`);
+              break;
+            }
+          }
+          
+          // 2. Envia APENAS o slice para Edge Function
           const { data, error } = await supabase.functions.invoke('analyze-policy', {
             body: { 
-              base64, 
-              fileName: file.name, 
+              base64: sliceBase64,
+              fileName: file.name,
               mimeType: file.type,
-              mode: 'ocr-only',
-              startPage: currentPage,
-              endPage: currentPage + 1
             }
           });
           
@@ -372,41 +452,34 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           }
           
           if (!data?.success) {
-            // Se não há mais páginas, apenas para o loop
-            if (!data?.rawText && data?.pageRange?.end < data?.pageRange?.start) {
-              console.log(`📄 [PROGRESSIVE] Sem mais páginas para processar`);
-              break;
-            }
             throw new Error(data?.error || 'Extração OCR falhou');
           }
           
-        // 2. Acumula texto
-        const newText = data.rawText || '';
-        accumulatedText += ' ' + newText;
-        hasMorePages = data.hasMorePages || false;
-        totalPages = data.pageRange?.total || 0;
-        
-        console.log(`📝 [OCR v5.0] ${file.name}: +${newText.length} chars (via ${data.source}), total acumulado: ${accumulatedText.length}`);
-        
-        // DEBUG v5.0: Log dos primeiros 2000 chars do TEXTO LIMPO para diagnóstico
-        if (currentPage === 1) {
-          console.log('--- TEXTO LIMPO START ---');
-          console.log(accumulatedText.substring(0, 2000));
-          console.log('--- TEXTO LIMPO END ---');
-        }
+          // 3. Acumula texto
+          const newText = data.rawText || '';
+          accumulatedText += ' ' + newText;
           
-          // 3. Parser LOCAL no texto acumulado
+          console.log(`📝 [OCR v6.0] ${file.name}: +${newText.length} chars (via ${data.source}), total acumulado: ${accumulatedText.length}`);
+          
+          // DEBUG v6.0: Log dos primeiros 2000 chars do TEXTO LIMPO para diagnóstico
+          if (currentPage === 1) {
+            console.log('--- TEXTO LIMPO START ---');
+            console.log(accumulatedText.substring(0, 2000));
+            console.log('--- TEXTO LIMPO END ---');
+          }
+          
+          // 4. Parser LOCAL no texto acumulado
           parsed = parsePolicy(accumulatedText, file.name);
           
           console.log(`🔍 [PROGRESSIVE] Confiança: ${parsed.confidence}% (threshold: ${CONFIDENCE_THRESHOLD}%), Campos: ${parsed.matched_fields.length}`);
           
-          // 4. Se confiança >= threshold, para o loop
+          // 5. Se confiança >= threshold, para o loop
           if (parsed.confidence >= CONFIDENCE_THRESHOLD) {
             console.log(`✅ [PROGRESSIVE] Threshold atingido! Parando na página ${Math.min(currentPage + 1, totalPages)}`);
             break;
           }
           
-          // 5. Próximas páginas
+          // 6. Próximas páginas
           currentPage += 2;
         }
         
