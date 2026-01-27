@@ -85,6 +85,41 @@ const sanitizePremio = (value: unknown): number => {
 };
 
 // =====================================================
+// v9.0: SMART EARLY-STOPPING - Verifica completude dos dados
+// =====================================================
+interface DataCompletenessResult {
+  complete: boolean;
+  missing: string[];
+}
+
+/**
+ * v9.0: Verifica se os dados extraídos estão completos para early-stopping
+ * Retorna true se todos os campos críticos foram preenchidos
+ */
+const isDataComplete = (data: any): DataCompletenessResult => {
+  const REQUIRED_FIELDS = ['cpf_cnpj', 'nome_cliente', 'numero_apolice', 'nome_seguradora', 'data_inicio', 'data_fim'];
+  
+  const missing: string[] = [];
+  
+  for (const field of REQUIRED_FIELDS) {
+    const value = data?.[field];
+    if (value === null || value === undefined || value === '') {
+      missing.push(field);
+    }
+  }
+  
+  // Prêmio: pelo menos um dos dois deve ter valor > 0
+  if (!(data?.premio_liquido > 0 || data?.premio_total > 0)) {
+    missing.push('premio');
+  }
+  
+  return { 
+    complete: missing.length === 0, 
+    missing 
+  };
+};
+
+// =====================================================
 // PREMIUM STEPPER COMPONENT - BLACK & SILVER
 // =====================================================
 interface StepperProps {
@@ -540,11 +575,13 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           console.log(`✅ [GEMINI] Imagem processada em ${data.durationMs}ms`);
           
         } else {
-          // PDFs: Chunking de 2 em 2 páginas
+          // PDFs: Chunking de 2 em 2 páginas com EARLY-STOPPING v9.0
           const chunkResults: any[] = [];
           let currentPage = 1;
           let hasMore = true;
           let totalPages = 0;
+          let earlyStopTriggered = false;
+          let pagesProcessed = 0;
           
           while (hasMore) {
             const endPage = currentPage + PAGES_PER_CHUNK - 1;
@@ -559,7 +596,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
               continue;
             }
             
-            console.log(`🔄 [CHUNK] Páginas ${slice.actualStart}-${slice.actualEnd} de ${totalPages}`);
+            console.log(`🔄 [CHUNK v9.0] Páginas ${slice.actualStart}-${slice.actualEnd} de ${totalPages}`);
             
             const { data, error } = await supabase.functions.invoke('analyze-policy', {
               body: { 
@@ -573,7 +610,24 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
               console.warn(`⚠️ [CHUNK] Erro págs ${currentPage}-${endPage}:`, error.message);
             } else if (data?.success && data.data) {
               chunkResults.push(data.data);
+              pagesProcessed = slice.actualEnd;
               console.log(`✅ [CHUNK] Págs ${currentPage}-${endPage} extraídas em ${data.durationMs}ms`);
+              
+              // v9.0: EARLY-STOP CHECK - Verifica se dados estão completos
+              const currentMerged = mergeChunkResults(chunkResults);
+              const completeness = isDataComplete(currentMerged);
+              
+              if (completeness.complete) {
+                const pagesSkipped = totalPages - slice.actualEnd;
+                earlyStopTriggered = true;
+                console.log(`✅ [EARLY-STOP v9.0] Dados completos após ${chunkResults.length} chunk(s)!`);
+                if (pagesSkipped > 0) {
+                  console.log(`💰 [ECONOMIA v9.0] Pulando ${pagesSkipped} páginas restantes (economia de ${Math.round(pagesSkipped / totalPages * 100)}%)`);
+                }
+                break; // Sai do loop, economizando chamadas à API
+              } else {
+                console.log(`⏳ [CONTINUE v9.0] Faltando: ${completeness.missing.join(', ')}`);
+              }
             }
             
             currentPage = endPage + 1;
@@ -585,7 +639,10 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           
           // Merge dos resultados de todos os chunks
           finalExtracted = mergeChunkResults(chunkResults);
-          console.log(`✅ [PDF] ${file.name}: ${totalPages} páginas em ${chunkResults.length} chunks`);
+          
+          // Log final com métricas v9.0
+          const statusLabel = earlyStopTriggered ? '⚡ EARLY-STOP' : '📄 COMPLETO';
+          console.log(`✅ [PDF v9.0] ${file.name}: ${pagesProcessed}/${totalPages} págs em ${chunkResults.length} chunk(s) [${statusLabel}]`);
         }
         
         // Se tem documento válido, faz upsert automático de cliente
