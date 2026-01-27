@@ -1,7 +1,10 @@
 /**
- * Parser Universal para Extração de Dados de Apólices
- * Arquitetura: OCR → Regex Ancorado → Dados Estruturados
+ * Parser Universal para Extração de Dados de Apólices (v2.0)
+ * Arquitetura: OCR → Normalização → Anchor Search → Dados Estruturados
  * Zero dependência de IA - 100% determinístico
+ * 
+ * ESTRATÉGIA: Busca por âncoras com proximidade (150 char radius)
+ * Ignora estrutura visual e foca em padrões de dados universais
  */
 
 // ============================================================
@@ -48,153 +51,289 @@ export interface ParsedPolicy {
 }
 
 // ============================================================
-// PADRÕES REGEX ANCORADOS - SEGURADORAS BRASILEIRAS
+// NORMALIZAÇÃO DE TEXTO (v2.0)
 // ============================================================
 
-const PATTERNS = {
-  // CPF: aceita 000.000.000-00 ou 00000000000
-  cpf: /(?:CPF|C\.P\.F|CPF\/MF)[\s:]*(\d{3}[.\s]?\d{3}[.\s]?\d{3}[\-\s]?\d{2})/i,
-  cpf_standalone: /\b(\d{3}[.\s]?\d{3}[.\s]?\d{3}[\-\s]?\d{2})\b/,
-  
-  // CNPJ: aceita 00.000.000/0000-00 ou 00000000000000
-  cnpj: /(?:CNPJ|C\.N\.P\.J)[\s:]*(\d{2}[.\s]?\d{3}[.\s]?\d{3}[\s\/]?\d{4}[\-\s]?\d{2})/i,
-  cnpj_standalone: /\b(\d{2}[.\s]?\d{3}[.\s]?\d{3}[\s\/]?\d{4}[\-\s]?\d{2})\b/,
-  
-  // Placa Mercosul ou antiga
-  placa: /(?:PLACA|Placa)[\s:]*([A-Z]{3}[\-\s]?\d[A-Z0-9]\d{2})/i,
-  placa_standalone: /\b([A-Z]{3}[\-\s]?\d[A-Z0-9]\d{2})\b/i,
-  
-  // Chassi
-  chassi: /(?:CHASSI|Chassi|CHASSIS)[\s:]*([A-HJ-NPR-Z0-9]{17})/i,
-  
-  // Número da Apólice (5-15 dígitos)
-  apolice: /(?:N[º°]?\s*(?:da\s+)?Ap[óo]lice|APÓLICE|APOLICE|Apólice\s*(?:Nº|N\.)?)[\s:]*(\d{5,20})/i,
-  apolice_fallback: /(?:Ap[óo]lice)[\s:\/]*(\d{5,15})/i,
-  
-  // Número da Proposta
-  proposta: /(?:N[º°]?\s*(?:da\s+)?Proposta|PROPOSTA|Proposta\s*(?:Nº|N\.)?)[\s:]*(\d{5,20})/i,
-  
-  // Prêmio Líquido (R$ 1.234,56 ou 1234.56)
-  premio_liquido: /(?:Prêmio|Premio|PRÊMIO|PREMIO)\s*(?:Líquido|LÍQUIDO|Liquido|LIQUIDO)[\s:R$]*([\d.,]+)/i,
-  
-  // Prêmio Total
-  premio_total: /(?:Prêmio|Premio|PRÊMIO|PREMIO)\s*(?:Total|TOTAL)[\s:R$]*([\d.,]+)/i,
-  
-  // Valores monetários genéricos (fallback)
-  valor_monetario: /R\$\s*([\d.,]+)/g,
-  
-  // Data início (múltiplos formatos)
-  data_inicio: /(?:Início\s*(?:de\s*)?Vigência|Vigência\s*(?:de|início|a\s*partir)|Data\s*Início|Início)[\s:]*(\d{2}[\/-]\d{2}[\/-]\d{4})/i,
-  
-  // Data fim
-  data_fim: /(?:Término|Fim\s*(?:de\s*)?Vigência|Vigência\s*até|Até|Vencimento|Final\s*Vigência)[\s:]*(\d{2}[\/-]\d{2}[\/-]\d{4})/i,
-  
-  // Datas genéricas (captura par de datas)
-  datas_vigencia: /(\d{2}[\/-]\d{2}[\/-]\d{4})\s*(?:a|à|até|[\-–])\s*(\d{2}[\/-]\d{2}[\/-]\d{4})/i,
-  
-  // Nome do Segurado (captura até quebra de linha)
-  nome_segurado: /(?:Segurado|Titular|Estipulante|Proponente|SEGURADO|PROPONENTE)[\s:]+([A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ][A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇa-záàâãéèêíìîóòôõúùûç\s]{4,60})/i,
-  
-  // Seguradora
-  seguradora: /(?:Seguradora|Companhia|Cia|SEGURADORA|CIA)[\s:]+([A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ][A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇa-záàâãéèêíìîóòôõúùûç\s]+(?:S\.?A\.?|SEGUROS|Seguros)?)/i,
-  
-  // Marcas conhecidas de seguradoras
-  seguradora_marca: /\b(Porto\s*Seguro|HDI|Tokio\s*Marine|Allianz|Bradesco|SulAmérica|Sulamerica|Liberty|Mapfre|Zurich|Azul\s*Seguros|Sompo|Itaú|Caixa|BB\s*Seguros|Icatu|Mitsui|Alfa)\b/i,
-  
-  // Email
-  email: /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i,
-  
-  // Telefone (formato brasileiro)
-  telefone: /(?:\(?\d{2}\)?\s*)?(?:9\s?)?\d{4}[\-\s]?\d{4}/,
-  telefone_celular: /\(?\d{2}\)?\s*9\d{4}[\-\s]?\d{4}/,
-  
-  // CEP
-  cep: /(?:CEP|Cep)[\s:]*(\d{5}[\-\s]?\d{3})/i,
-  
-  // Marca do veículo
-  marca_veiculo: /(?:Marca|MARCA)[\s:]*([A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ][A-Za-z\s]{2,20})/i,
-  
-  // Modelo do veículo
-  modelo_veiculo: /(?:Modelo|MODELO)[\s:]*([A-Za-z0-9\s\-\.]{2,30})/i,
-  
-  // Ano do veículo
-  ano_veiculo: /(?:Ano|ANO)[\s:\/]*(\d{4})[\s\/]*(\d{4})?/i,
+/**
+ * Normaliza texto OCR para busca uniforme
+ * - Remove espaços múltiplos, tabs, quebras excessivas
+ * - Converte para UPPERCASE para matching case-insensitive
+ * - Mantém estrutura mínima para proximidade
+ */
+export function normalizeOcrText(rawText: string): string {
+  return rawText
+    .replace(/\r\n/g, '\n')           // Normaliza quebras
+    .replace(/\t+/g, ' ')             // Tabs → espaço
+    .replace(/[ ]{2,}/g, ' ')         // Múltiplos espaços → um
+    .replace(/\n{3,}/g, '\n\n')       // Múltiplas quebras → duas
+    .toUpperCase()                     // Case-insensitive matching
+    .trim();
+}
+
+// ============================================================
+// ANCHOR SEARCH - BUSCA POR PROXIMIDADE (v2.0)
+// ============================================================
+
+/**
+ * Busca um padrão após uma âncora com raio de proximidade
+ * @param text Texto normalizado (UPPERCASE)
+ * @param anchors Lista de palavras-âncora para buscar
+ * @param pattern Regex do valor a capturar (deve ter grupo de captura)
+ * @param radius Raio em caracteres após a âncora (default: 150)
+ * @returns Valor capturado ou null
+ */
+function anchorSearch(
+  text: string, 
+  anchors: string[], 
+  pattern: RegExp, 
+  radius: number = 150
+): string | null {
+  for (const anchor of anchors) {
+    const anchorIdx = text.indexOf(anchor.toUpperCase());
+    if (anchorIdx === -1) continue;
+    
+    // Extrai região após a âncora
+    const regionStart = anchorIdx + anchor.length;
+    const region = text.substring(regionStart, regionStart + radius);
+    
+    const match = region.match(pattern);
+    if (match?.[1]) {
+      return match[1].trim();
+    }
+  }
+  return null;
+}
+
+/**
+ * Busca um padrão em TODO o texto (sem âncora)
+ * Usado para dados que aparecem isolados (ex: placa)
+ */
+function globalSearch(text: string, pattern: RegExp): string | null {
+  const match = text.match(pattern);
+  return match?.[1]?.trim() || match?.[0]?.trim() || null;
+}
+
+// ============================================================
+// PADRÕES REGEX - OTIMIZADOS PARA OCR RUIDOSO
+// ============================================================
+
+// CPF: 000.000.000-00 ou 00000000000 (com ruído de OCR)
+const CPF_PATTERN = /(\d{3}[.\s]?\d{3}[.\s]?\d{3}[\-\s]?\d{2})/;
+
+// CNPJ: 00.000.000/0000-00 ou 00000000000000
+const CNPJ_PATTERN = /(\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[\-\s]?\d{2})/;
+
+// Placa Mercosul: ABC1D23 ou ABC-1D23
+const PLACA_MERCOSUL = /([A-Z]{3}[\-\s]?\d[A-Z]\d{2})/;
+
+// Placa Antiga: ABC1234 ou ABC-1234
+const PLACA_ANTIGA = /([A-Z]{3}[\-\s]?\d{4})/;
+
+// Número da Apólice: 5-20 dígitos
+const APOLICE_PATTERN = /(\d{5,20})/;
+
+// Valores monetários brasileiros (captura grupos de dígitos com vírgula/ponto)
+const VALOR_PATTERN = /R?\$?\s*([\d.,]+)/;
+
+// Data brasileira DD/MM/YYYY ou DD-MM-YYYY
+const DATA_PATTERN = /(\d{2}[\/-]\d{2}[\/-]\d{4})/;
+
+// Chassi: 17 caracteres alfanuméricos (sem I, O, Q)
+const CHASSI_PATTERN = /([A-HJ-NPR-Z0-9]{17})/;
+
+// Email (case-insensitive)
+const EMAIL_PATTERN = /([A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})/i;
+
+// Telefone brasileiro
+const TELEFONE_PATTERN = /(\(?\d{2}\)?\s*9?\d{4}[\-\s]?\d{4})/;
+
+// Nome segurado (captura palavras após âncora, até 60 chars)
+const NOME_PATTERN = /([A-Z\u00C0-\u017F][A-Z\u00C0-\u017F\s]{3,60})/;
+
+// ============================================================
+// ÂNCORAS POR CAMPO
+// ============================================================
+
+const ANCHORS = {
+  cpf: ['CPF', 'C.P.F', 'CPF/MF', 'DOCUMENTO', 'CPF:'],
+  cnpj: ['CNPJ', 'C.N.P.J', 'INSCRICAO', 'CNPJ:'],
+  segurado: ['SEGURADO', 'TITULAR', 'ESTIPULANTE', 'PROPONENTE', 'CLIENTE', 'NOME:'],
+  apolice: ['APOLICE', 'APÓLICE', 'N° APOLICE', 'NUMERO APOLICE', 'Nº APOLICE', 'APOLICE N'],
+  proposta: ['PROPOSTA', 'N° PROPOSTA', 'NUMERO PROPOSTA', 'PROPOSTA N'],
+  seguradora: ['SEGURADORA', 'COMPANHIA', 'CIA', 'CIA.'],
+  premio_liquido: ['PREMIO LIQUIDO', 'PRÊMIO LÍQUIDO', 'PRÊMIO LIQ', 'PREMIO LIQ', 'LIQUIDO'],
+  premio_total: ['PREMIO TOTAL', 'PRÊMIO TOTAL', 'TOTAL A PAGAR', 'VALOR TOTAL', 'TOTAL:'],
+  vigencia_inicio: ['INICIO VIGENCIA', 'INÍCIO VIGÊNCIA', 'VIGENCIA DE', 'VIGÊNCIA DE', 'INICIO:', 'DE:'],
+  vigencia_fim: ['TERMINO VIGENCIA', 'TÉRMINO VIGÊNCIA', 'VIGENCIA ATE', 'VIGÊNCIA ATÉ', 'ATE:', 'ATÉ:', 'TERMINO:'],
+  marca: ['MARCA', 'FABRICANTE', 'MARCA:'],
+  modelo: ['MODELO', 'VEICULO', 'MODELO:'],
+  placa: ['PLACA', 'PLACA:'],
+  chassi: ['CHASSI', 'CHASSIS', 'CHASSI:'],
+  ano: ['ANO', 'ANO/MODELO', 'ANO FAB', 'ANO MODELO', 'ANO:'],
 };
 
 // ============================================================
-// ALIASES E INFERÊNCIA DE RAMO
+// ALIASES E INFERÊNCIA DE RAMO (v2.0 - Expandido)
 // ============================================================
 
-const RAMO_ALIASES: Record<string, string> = {
+export const RAMO_ALIASES: Record<string, string> = {
+  // Automóvel
   'rcf-v': 'AUTOMÓVEL',
   'rcf': 'AUTOMÓVEL',
   'rcfv': 'AUTOMÓVEL',
   'auto pf': 'AUTOMÓVEL',
   'auto pj': 'AUTOMÓVEL',
   'automovel': 'AUTOMÓVEL',
+  'automóvel': 'AUTOMÓVEL',
   'pessoa física auto': 'AUTOMÓVEL',
   'veiculo': 'AUTOMÓVEL',
+  'veículo': 'AUTOMÓVEL',
   'carro': 'AUTOMÓVEL',
   'moto': 'AUTOMÓVEL',
+  'motocicleta': 'AUTOMÓVEL',
+  'caminhão': 'AUTOMÓVEL',
+  'caminhao': 'AUTOMÓVEL',
+  'frota': 'AUTOMÓVEL',
+  
+  // Residencial
   'residencia habitual': 'RESIDENCIAL',
   'multi residencial': 'RESIDENCIAL',
   'incendio residencial': 'RESIDENCIAL',
   'residencia': 'RESIDENCIAL',
+  'residência': 'RESIDENCIAL',
   'casa': 'RESIDENCIAL',
   'apartamento': 'RESIDENCIAL',
+  'condominio': 'RESIDENCIAL',
+  'condomínio': 'RESIDENCIAL',
+  'lar': 'RESIDENCIAL',
+  'moradia': 'RESIDENCIAL',
+  
+  // Vida
   'vida em grupo': 'VIDA',
+  'vida individual': 'VIDA',
   'ap': 'VIDA',
   'acidentes pessoais': 'VIDA',
   'prestamista': 'VIDA',
   'invalidez': 'VIDA',
+  'morte': 'VIDA',
+  'funeral': 'VIDA',
+  
+  // Empresarial
   'empresarial compreensivo': 'EMPRESARIAL',
   'riscos nomeados': 'EMPRESARIAL',
   'comercial': 'EMPRESARIAL',
+  'incendio comercial': 'EMPRESARIAL',
+  'riscos operacionais': 'EMPRESARIAL',
+  
+  // Saúde
   'saude': 'SAÚDE',
+  'saúde': 'SAÚDE',
   'odonto': 'SAÚDE',
   'dental': 'SAÚDE',
   'hospitalar': 'SAÚDE',
+  'plano de saude': 'SAÚDE',
+  
+  // Viagem
   'viagem': 'VIAGEM',
   'travel': 'VIAGEM',
+  'internacional': 'VIAGEM',
+  'exterior': 'VIAGEM',
+  
+  // Garantia
   'fianca': 'GARANTIA',
+  'fiança': 'GARANTIA',
   'locaticia': 'GARANTIA',
+  'locatícia': 'GARANTIA',
+  'fianca locaticia': 'GARANTIA',
+  
+  // Rural
   'rural': 'RURAL',
   'agricola': 'RURAL',
+  'agrícola': 'RURAL',
+  'safra': 'RURAL',
+  'pecuario': 'RURAL',
+  'pecuário': 'RURAL',
+  'agro': 'RURAL',
+  
+  // Transporte
   'transporte': 'TRANSPORTE',
   'carga': 'TRANSPORTE',
   'rctr': 'TRANSPORTE',
+  'rctr-c': 'TRANSPORTE',
+  'embarcador': 'TRANSPORTE',
+  'mercadoria': 'TRANSPORTE',
+  
+  // Responsabilidade Civil
+  'responsabilidade civil': 'RESPONSABILIDADE CIVIL',
+  'rc profissional': 'RESPONSABILIDADE CIVIL',
+  'rc geral': 'RESPONSABILIDADE CIVIL',
+  'd&o': 'RESPONSABILIDADE CIVIL',
+  'e&o': 'RESPONSABILIDADE CIVIL',
+  
+  // Equipamentos
+  'equipamentos': 'EQUIPAMENTOS',
+  'eletronicos': 'EQUIPAMENTOS',
+  'eletrônicos': 'EQUIPAMENTOS',
+  'portateis': 'EQUIPAMENTOS',
+  'portáteis': 'EQUIPAMENTOS',
+  
+  // Consórcio
+  'consorcio': 'CONSÓRCIO',
+  'consórcio': 'CONSÓRCIO',
 };
 
-const RAMO_KEYWORDS: Record<string, string[]> = {
-  'AUTOMÓVEL': ['placa', 'veículo', 'veiculo', 'marca', 'modelo', 'chassi', 'rcf', 'auto', 'carro', 'moto', 'caminhão', 'frota', 'renavam', 'bonus'],
-  'RESIDENCIAL': ['residencial', 'residência', 'residencia', 'casa', 'apartamento', 'imóvel', 'imovel', 'incêndio', 'incendio', 'moradia', 'condomínio'],
-  'VIDA': ['vida', 'invalidez', 'morte', 'funeral', 'prestamista', 'acidentes pessoais', 'beneficiário', 'beneficiario', 'capital segurado'],
-  'EMPRESARIAL': ['empresarial', 'empresa', 'comercial', 'cnpj', 'estabelecimento', 'riscos nomeados', 'lucros cessantes', 'rc geral'],
-  'SAÚDE': ['saúde', 'saude', 'médico', 'medico', 'hospitalar', 'odonto', 'plano', 'dental', 'ans'],
-  'VIAGEM': ['viagem', 'travel', 'internacional', 'exterior', 'bagagem', 'cancelamento'],
-  'GARANTIA': ['garantia', 'fiança', 'fianca', 'locatícia', 'locaticia', 'performance', 'judicial'],
-  'TRANSPORTE': ['transporte', 'carga', 'frete', 'mercadoria', 'embarcador', 'rctr'],
-  'RURAL': ['rural', 'agrícola', 'agricola', 'safra', 'pecuário', 'pecuario', 'agro'],
+export const RAMO_KEYWORDS: Record<string, string[]> = {
+  'AUTOMÓVEL': ['PLACA', 'VEICULO', 'VEÍCULO', 'MARCA', 'MODELO', 'CHASSI', 'RCF', 'AUTO', 'CARRO', 'MOTO', 'CAMINHAO', 'FROTA', 'RENAVAM', 'BONUS', 'FIPE', 'COLISAO', 'ROUBO'],
+  'RESIDENCIAL': ['RESIDENCIAL', 'RESIDENCIA', 'RESIDÊNCIA', 'CASA', 'APARTAMENTO', 'IMOVEL', 'IMÓVEL', 'INCENDIO', 'INCÊNDIO', 'MORADIA', 'CONDOMINIO', 'CONDOMÍNIO'],
+  'VIDA': ['VIDA', 'INVALIDEZ', 'MORTE', 'FUNERAL', 'PRESTAMISTA', 'ACIDENTES PESSOAIS', 'BENEFICIARIO', 'CAPITAL SEGURADO', 'IPA', 'PECÚLIO'],
+  'EMPRESARIAL': ['EMPRESARIAL', 'EMPRESA', 'COMERCIAL', 'CNPJ', 'ESTABELECIMENTO', 'RISCOS NOMEADOS', 'LUCROS CESSANTES', 'RC GERAL'],
+  'SAÚDE': ['SAUDE', 'SAÚDE', 'MEDICO', 'MÉDICO', 'HOSPITALAR', 'ODONTO', 'PLANO', 'DENTAL', 'ANS'],
+  'VIAGEM': ['VIAGEM', 'TRAVEL', 'INTERNACIONAL', 'EXTERIOR', 'BAGAGEM', 'CANCELAMENTO'],
+  'GARANTIA': ['GARANTIA', 'FIANCA', 'FIANÇA', 'LOCATICIA', 'LOCATÍCIA', 'PERFORMANCE', 'JUDICIAL'],
+  'TRANSPORTE': ['TRANSPORTE', 'CARGA', 'FRETE', 'MERCADORIA', 'EMBARCADOR', 'RCTR'],
+  'RURAL': ['RURAL', 'AGRICOLA', 'AGRÍCOLA', 'SAFRA', 'PECUARIO', 'PECUÁRIO', 'AGRO'],
+  'RESPONSABILIDADE CIVIL': ['RESPONSABILIDADE', 'RC', 'D&O', 'E&O', 'PROFISSIONAL', 'DIRECTORS', 'OFFICERS'],
 };
+
+// Marcas conhecidas de seguradoras
+const SEGURADORA_MARCAS = [
+  'PORTO SEGURO', 'PORTO', 'HDI', 'TOKIO MARINE', 'TOKIO', 'ALLIANZ', 
+  'BRADESCO', 'SULAMERICA', 'SULAMÉRICA', 'LIBERTY', 'MAPFRE', 'ZURICH',
+  'AZUL SEGUROS', 'AZUL', 'SOMPO', 'ITAU', 'ITAÚ', 'CAIXA', 'BB SEGUROS',
+  'ICATU', 'MITSUI', 'ALFA', 'YASUDA', 'MARITIMA', 'MARÍTIMA'
+];
 
 // ============================================================
 // FUNÇÕES AUXILIARES
 // ============================================================
 
 /**
- * Limpa CPF/CNPJ para apenas dígitos
+ * Limpa CPF/CNPJ para apenas dígitos (v2.0)
+ * Trata ruído de OCR: espaços, pontos extras, etc.
  */
-function cleanDocument(doc: string | null): string | null {
+export function cleanDocument(doc: string | null): string | null {
   if (!doc) return null;
   const digits = doc.replace(/\D/g, '');
-  return (digits.length === 11 || digits.length === 14) ? digits : null;
+  
+  // Valida tamanho: CPF = 11, CNPJ = 14
+  if (digits.length === 11 || digits.length === 14) {
+    return digits;
+  }
+  // Tenta corrigir se tiver dígitos a mais/menos (ruído de OCR)
+  if (digits.length === 10) {
+    return '0' + digits; // CPF sem primeiro zero
+  }
+  if (digits.length === 13) {
+    return '0' + digits; // CNPJ sem primeiro zero
+  }
+  return null;
 }
 
 /**
  * Converte valor monetário brasileiro para número
  * "1.234,56" → 1234.56
  */
-function parseMonetaryValue(value: string | null): number | null {
+export function parseMonetaryValue(value: string | null): number | null {
   if (!value) return null;
   
   // Remove R$ e espaços
@@ -213,13 +352,13 @@ function parseMonetaryValue(value: string | null): number | null {
   }
   
   const num = parseFloat(clean);
-  return isNaN(num) ? null : num;
+  return isNaN(num) || num <= 0 ? null : num;
 }
 
 /**
  * Converte data brasileira (DD/MM/YYYY) para ISO (YYYY-MM-DD)
  */
-function parseDate(dateStr: string | null): string | null {
+export function parseDate(dateStr: string | null): string | null {
   if (!dateStr) return null;
   
   // Já está em formato ISO?
@@ -229,17 +368,22 @@ function parseDate(dateStr: string | null): string | null {
   const match = dateStr.match(/(\d{2})[\/-](\d{2})[\/-](\d{4})/);
   if (match) {
     const [, day, month, year] = match;
-    return `${year}-${month}-${day}`;
+    // Validação básica
+    const d = parseInt(day), m = parseInt(month), y = parseInt(year);
+    if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2100) {
+      return `${year}-${month}-${day}`;
+    }
   }
   
   return null;
 }
 
 /**
- * Infere o ramo baseado em keywords no texto
+ * Infere o ramo baseado em keywords no texto (v2.0)
+ * Usa texto normalizado (UPPERCASE) para matching preciso
  */
-function inferRamoFromText(text: string): string | null {
-  const lowerText = text.toLowerCase();
+export function inferRamoFromText(text: string): string | null {
+  const normalizedText = text.toUpperCase();
   
   // Pontuação para cada ramo
   const scores: Record<string, number> = {};
@@ -247,7 +391,7 @@ function inferRamoFromText(text: string): string | null {
   for (const [ramo, keywords] of Object.entries(RAMO_KEYWORDS)) {
     scores[ramo] = 0;
     for (const keyword of keywords) {
-      if (lowerText.includes(keyword.toLowerCase())) {
+      if (normalizedText.includes(keyword)) {
         scores[ramo] += 1;
       }
     }
@@ -259,8 +403,8 @@ function inferRamoFromText(text: string): string | null {
     return sorted[0][0];
   }
   
-  // Fallback: se tem placa, é AUTOMÓVEL
-  if (PATTERNS.placa_standalone.test(text)) {
+  // Fallback: Detecção direta de placa = AUTOMÓVEL
+  if (PLACA_MERCOSUL.test(normalizedText) || PLACA_ANTIGA.test(normalizedText)) {
     return 'AUTOMÓVEL';
   }
   
@@ -270,241 +414,264 @@ function inferRamoFromText(text: string): string | null {
 /**
  * Normaliza nome do ramo usando aliases
  */
-function normalizeRamo(ramoExtraido: string | null): string | null {
+export function normalizeRamo(ramoExtraido: string | null): string | null {
   if (!ramoExtraido) return null;
   const key = ramoExtraido.toLowerCase().trim();
   return RAMO_ALIASES[key] || ramoExtraido.toUpperCase();
 }
 
 /**
- * Limpa nome de segurado (remove ruídos)
+ * Limpa nome de segurado (remove ruídos de OCR)
  */
 function cleanNome(nome: string | null): string | null {
   if (!nome) return null;
   return nome
-    .replace(/\s+/g, ' ')
-    .replace(/[^\wÀ-ÿ\s\-]/g, '')
+    .replace(/[^A-Z\u00C0-\u017F\s\-]/gi, '') // Remove caracteres inválidos
+    .replace(/\s+/g, ' ')                       // Múltiplos espaços → um
     .trim()
     .substring(0, 100);
 }
 
+/**
+ * Normaliza placa para formato padrão
+ */
+function normalizePlaca(placa: string | null): string | null {
+  if (!placa) return null;
+  const clean = placa.replace(/[\s\-]/g, '').toUpperCase();
+  
+  // Mercosul: ABC1D23 (7 chars, posição 4 é letra)
+  if (clean.length === 7 && /^[A-Z]{3}\d[A-Z]\d{2}$/.test(clean)) {
+    return clean.substring(0, 3) + '-' + clean.substring(3);
+  }
+  
+  // Antiga: ABC1234 (7 chars, posições 4-7 são dígitos)
+  if (clean.length === 7 && /^[A-Z]{3}\d{4}$/.test(clean)) {
+    return clean.substring(0, 3) + '-' + clean.substring(3);
+  }
+  
+  return null;
+}
+
 // ============================================================
-// PARSER PRINCIPAL
+// PARSER PRINCIPAL (v2.0 - Anchor-Based)
 // ============================================================
 
 export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   const matchedFields: string[] = [];
+  const normalized = normalizeOcrText(rawText);
   
-  // --- CPF/CNPJ ---
+  console.log(`🔍 [PARSER] Texto normalizado: ${normalized.length} caracteres`);
+  
+  // --- CPF/CNPJ (Anchor Search com 150 char radius) ---
   let cpfCnpj: string | null = null;
-  let cpfMatch = rawText.match(PATTERNS.cpf);
-  if (cpfMatch) {
-    cpfCnpj = cleanDocument(cpfMatch[1]);
-    if (cpfCnpj) matchedFields.push('cpf');
+  
+  // Tenta CPF primeiro
+  const cpfRaw = anchorSearch(normalized, ANCHORS.cpf, CPF_PATTERN, 150);
+  if (cpfRaw) {
+    cpfCnpj = cleanDocument(cpfRaw);
+    if (cpfCnpj) matchedFields.push('cpf_anchor');
   }
   
+  // Tenta CNPJ se não achou CPF
   if (!cpfCnpj) {
-    const cnpjMatch = rawText.match(PATTERNS.cnpj);
-    if (cnpjMatch) {
-      cpfCnpj = cleanDocument(cnpjMatch[1]);
-      if (cpfCnpj) matchedFields.push('cnpj');
+    const cnpjRaw = anchorSearch(normalized, ANCHORS.cnpj, CNPJ_PATTERN, 150);
+    if (cnpjRaw) {
+      cpfCnpj = cleanDocument(cnpjRaw);
+      if (cpfCnpj) matchedFields.push('cnpj_anchor');
     }
   }
   
-  // Fallback: busca standalone se não encontrou ancorado
+  // Fallback: busca global por padrão de CPF/CNPJ
   if (!cpfCnpj) {
-    const standaloneMatch = rawText.match(PATTERNS.cpf_standalone);
-    if (standaloneMatch) {
-      cpfCnpj = cleanDocument(standaloneMatch[1]);
-      if (cpfCnpj) matchedFields.push('cpf_standalone');
+    const globalCpf = globalSearch(normalized, CPF_PATTERN);
+    if (globalCpf) {
+      cpfCnpj = cleanDocument(globalCpf);
+      if (cpfCnpj) matchedFields.push('cpf_global');
     }
   }
   
   // --- Nome do Segurado ---
-  let nomeCliente: string | null = null;
-  const nomeMatch = rawText.match(PATTERNS.nome_segurado);
-  if (nomeMatch) {
-    nomeCliente = cleanNome(nomeMatch[1]);
-    if (nomeCliente) matchedFields.push('nome_segurado');
+  let nomeCliente = anchorSearch(normalized, ANCHORS.segurado, NOME_PATTERN, 100);
+  nomeCliente = cleanNome(nomeCliente);
+  if (nomeCliente && nomeCliente.length >= 5) {
+    matchedFields.push('nome_segurado');
   }
   
-  // --- Email ---
-  let email: string | null = null;
-  const emailMatch = rawText.match(PATTERNS.email);
-  if (emailMatch) {
-    email = emailMatch[1].toLowerCase();
+  // --- Email (busca global) ---
+  let email = globalSearch(rawText, EMAIL_PATTERN); // Usa texto original para case-sensitivity
+  if (email) {
+    email = email.toLowerCase();
     matchedFields.push('email');
   }
   
   // --- Telefone ---
-  let telefone: string | null = null;
-  const telMatch = rawText.match(PATTERNS.telefone_celular) || rawText.match(PATTERNS.telefone);
-  if (telMatch) {
-    telefone = telMatch[0].replace(/\D/g, '');
-    if (telefone.length >= 10) matchedFields.push('telefone');
-    else telefone = null;
+  let telefone = globalSearch(normalized, TELEFONE_PATTERN);
+  if (telefone) {
+    telefone = telefone.replace(/\D/g, '');
+    if (telefone.length >= 10 && telefone.length <= 11) {
+      matchedFields.push('telefone');
+    } else {
+      telefone = null;
+    }
   }
   
   // --- Número da Apólice ---
-  let numeroApolice: string | null = null;
-  const apoliceMatch = rawText.match(PATTERNS.apolice) || rawText.match(PATTERNS.apolice_fallback);
-  if (apoliceMatch) {
-    numeroApolice = apoliceMatch[1];
-    matchedFields.push('numero_apolice');
-  }
+  let numeroApolice = anchorSearch(normalized, ANCHORS.apolice, APOLICE_PATTERN, 80);
+  if (numeroApolice) matchedFields.push('numero_apolice');
   
   // --- Número da Proposta ---
-  let numeroProposta: string | null = null;
-  const propostaMatch = rawText.match(PATTERNS.proposta);
-  if (propostaMatch) {
-    numeroProposta = propostaMatch[1];
-    matchedFields.push('numero_proposta');
-  }
+  let numeroProposta = anchorSearch(normalized, ANCHORS.proposta, APOLICE_PATTERN, 80);
+  if (numeroProposta) matchedFields.push('numero_proposta');
   
-  // --- Seguradora ---
+  // --- Seguradora (detecção de marca conhecida) ---
   let nomeSeguradora: string | null = null;
-  const segMatch = rawText.match(PATTERNS.seguradora_marca);
-  if (segMatch) {
-    nomeSeguradora = segMatch[1].trim();
-    matchedFields.push('seguradora_marca');
-  } else {
-    const segGeneric = rawText.match(PATTERNS.seguradora);
-    if (segGeneric) {
-      nomeSeguradora = segGeneric[1].trim().substring(0, 50);
-      matchedFields.push('seguradora');
+  for (const marca of SEGURADORA_MARCAS) {
+    if (normalized.includes(marca)) {
+      nomeSeguradora = marca;
+      matchedFields.push('seguradora_marca');
+      break;
+    }
+  }
+  // Fallback: anchor search
+  if (!nomeSeguradora) {
+    nomeSeguradora = anchorSearch(normalized, ANCHORS.seguradora, /([A-Z\s]{5,40})/i, 60);
+    if (nomeSeguradora) {
+      nomeSeguradora = nomeSeguradora.substring(0, 40).trim();
+      matchedFields.push('seguradora_anchor');
     }
   }
   
   // --- Datas de Vigência ---
-  let dataInicio: string | null = null;
-  let dataFim: string | null = null;
+  let dataInicio = anchorSearch(normalized, ANCHORS.vigencia_inicio, DATA_PATTERN, 50);
+  dataInicio = parseDate(dataInicio);
+  if (dataInicio) matchedFields.push('data_inicio');
   
-  // Tenta par de datas primeiro
-  const datasParMatch = rawText.match(PATTERNS.datas_vigencia);
-  if (datasParMatch) {
-    dataInicio = parseDate(datasParMatch[1]);
-    dataFim = parseDate(datasParMatch[2]);
-    if (dataInicio && dataFim) matchedFields.push('vigencia_par');
-  }
+  let dataFim = anchorSearch(normalized, ANCHORS.vigencia_fim, DATA_PATTERN, 50);
+  dataFim = parseDate(dataFim);
+  if (dataFim) matchedFields.push('data_fim');
   
-  // Fallback para datas individuais
-  if (!dataInicio) {
-    const inicioMatch = rawText.match(PATTERNS.data_inicio);
-    if (inicioMatch) {
-      dataInicio = parseDate(inicioMatch[1]);
-      if (dataInicio) matchedFields.push('data_inicio');
-    }
-  }
-  
-  if (!dataFim) {
-    const fimMatch = rawText.match(PATTERNS.data_fim);
-    if (fimMatch) {
-      dataFim = parseDate(fimMatch[1]);
-      if (dataFim) matchedFields.push('data_fim');
+  // Fallback: busca par de datas DD/MM/YYYY a DD/MM/YYYY
+  if (!dataInicio || !dataFim) {
+    const parDatas = normalized.match(/(\d{2}[\/-]\d{2}[\/-]\d{4})\s*(?:A|À|ATE|ATÉ|[\-–])\s*(\d{2}[\/-]\d{2}[\/-]\d{4})/);
+    if (parDatas) {
+      if (!dataInicio) {
+        dataInicio = parseDate(parDatas[1]);
+        if (dataInicio) matchedFields.push('data_inicio_par');
+      }
+      if (!dataFim) {
+        dataFim = parseDate(parDatas[2]);
+        if (dataFim) matchedFields.push('data_fim_par');
+      }
     }
   }
   
   // --- Valores ---
   let premioLiquido: number | null = null;
-  let premioTotal: number | null = null;
-  
-  const liquidoMatch = rawText.match(PATTERNS.premio_liquido);
-  if (liquidoMatch) {
-    premioLiquido = parseMonetaryValue(liquidoMatch[1]);
+  const liquidoRaw = anchorSearch(normalized, ANCHORS.premio_liquido, VALOR_PATTERN, 80);
+  if (liquidoRaw) {
+    premioLiquido = parseMonetaryValue(liquidoRaw);
     if (premioLiquido) matchedFields.push('premio_liquido');
   }
   
-  const totalMatch = rawText.match(PATTERNS.premio_total);
-  if (totalMatch) {
-    premioTotal = parseMonetaryValue(totalMatch[1]);
+  let premioTotal: number | null = null;
+  const totalRaw = anchorSearch(normalized, ANCHORS.premio_total, VALOR_PATTERN, 80);
+  if (totalRaw) {
+    premioTotal = parseMonetaryValue(totalRaw);
     if (premioTotal) matchedFields.push('premio_total');
   }
   
-  // Fallback: busca valores monetários genéricos
+  // Fallback: busca valores monetários globais
   if (!premioLiquido && !premioTotal) {
-    const valoresMatch = rawText.matchAll(PATTERNS.valor_monetario);
-    const valores = [...valoresMatch].map(m => parseMonetaryValue(m[1])).filter(v => v && v > 100) as number[];
+    const valoresGlobais = [...normalized.matchAll(/R?\$\s*([\d.,]+)/g)];
+    const valores = valoresGlobais
+      .map(m => parseMonetaryValue(m[1]))
+      .filter((v): v is number => v !== null && v > 50)
+      .sort((a, b) => b - a);
+    
     if (valores.length >= 1) {
-      // Maior valor = total, menor = líquido (heurística)
-      valores.sort((a, b) => b - a);
-      premioTotal = valores[0] || null;
-      premioLiquido = valores[1] || valores[0] || null;
-      if (premioLiquido) matchedFields.push('valores_fallback');
+      premioTotal = valores[0];
+      premioLiquido = valores[1] || valores[0];
+      matchedFields.push('valores_global');
     }
   }
   
-  // --- Placa ---
+  // --- Placa (busca global - placas aparecem em qualquer lugar) ---
   let placa: string | null = null;
-  const placaMatch = rawText.match(PATTERNS.placa) || rawText.match(PATTERNS.placa_standalone);
-  if (placaMatch) {
-    placa = placaMatch[1].toUpperCase().replace(/[\s\-]/g, '-');
-    // Normaliza para formato XXX-0X00
-    if (placa.length === 7 && !placa.includes('-')) {
-      placa = placa.substring(0, 3) + '-' + placa.substring(3);
-    }
-    matchedFields.push('placa');
-  }
+  const placaMercosul = globalSearch(normalized, PLACA_MERCOSUL);
+  const placaAntiga = globalSearch(normalized, PLACA_ANTIGA);
+  
+  placa = normalizePlaca(placaMercosul) || normalizePlaca(placaAntiga);
+  if (placa) matchedFields.push('placa');
   
   // --- Chassi ---
-  let chassi: string | null = null;
-  const chassiMatch = rawText.match(PATTERNS.chassi);
-  if (chassiMatch) {
-    chassi = chassiMatch[1].toUpperCase();
+  let chassi = anchorSearch(normalized, ANCHORS.chassi, CHASSI_PATTERN, 50);
+  if (!chassi) {
+    chassi = globalSearch(normalized, CHASSI_PATTERN);
+  }
+  if (chassi && chassi.length === 17) {
     matchedFields.push('chassi');
+  } else {
+    chassi = null;
   }
   
   // --- Marca/Modelo/Ano ---
-  let marca: string | null = null;
-  let modelo: string | null = null;
+  const marca = anchorSearch(normalized, ANCHORS.marca, /([A-Z]{3,20})/i, 40);
+  const modelo = anchorSearch(normalized, ANCHORS.modelo, /([A-Z0-9\s\-\.]{3,30})/i, 50);
   let anoFabricacao: number | null = null;
   let anoModelo: number | null = null;
   
-  const marcaMatch = rawText.match(PATTERNS.marca_veiculo);
-  if (marcaMatch) {
-    marca = marcaMatch[1].trim();
-    matchedFields.push('marca');
+  const anoRaw = anchorSearch(normalized, ANCHORS.ano, /(\d{4})[\/\s]*(\d{4})?/, 30);
+  if (anoRaw) {
+    const anoMatch = anoRaw.match(/(\d{4})[\/\s]*(\d{4})?/);
+    if (anoMatch) {
+      anoFabricacao = parseInt(anoMatch[1]);
+      anoModelo = anoMatch[2] ? parseInt(anoMatch[2]) : anoFabricacao;
+      if (anoFabricacao >= 1980 && anoFabricacao <= 2030) {
+        matchedFields.push('ano');
+      } else {
+        anoFabricacao = null;
+        anoModelo = null;
+      }
+    }
   }
   
-  const modeloMatch = rawText.match(PATTERNS.modelo_veiculo);
-  if (modeloMatch) {
-    modelo = modeloMatch[1].trim();
-    matchedFields.push('modelo');
-  }
+  if (marca) matchedFields.push('marca');
+  if (modelo) matchedFields.push('modelo');
   
-  const anoMatch = rawText.match(PATTERNS.ano_veiculo);
-  if (anoMatch) {
-    anoFabricacao = parseInt(anoMatch[1]);
-    anoModelo = anoMatch[2] ? parseInt(anoMatch[2]) : anoFabricacao;
-    matchedFields.push('ano');
-  }
-  
-  // --- Ramo ---
-  let ramoSeguro = inferRamoFromText(rawText);
+  // --- Inferência de Ramo ---
+  let ramoSeguro = inferRamoFromText(normalized);
   if (ramoSeguro) matchedFields.push('ramo_inferido');
+  
+  // Auto-detect AUTOMÓVEL se tem placa ou chassi
+  if (!ramoSeguro && (placa || chassi)) {
+    ramoSeguro = 'AUTOMÓVEL';
+    matchedFields.push('ramo_auto_placa');
+  }
   
   // --- Objeto Segurado ---
   let objetoSegurado: string | null = null;
   if (placa || marca || modelo) {
-    // Veículo
     const partes = [marca, modelo, anoModelo ? String(anoModelo) : null].filter(Boolean);
     objetoSegurado = partes.length > 0 
       ? `${partes.join(' ')}${placa ? ` - Placa: ${placa}` : ''}`
       : (placa ? `Veículo - Placa: ${placa}` : null);
-    if (!ramoSeguro) ramoSeguro = 'AUTOMÓVEL';
   }
   
-  // --- CEP (para endereço) ---
+  // --- Endereço/CEP ---
   let endereco: string | null = null;
-  const cepMatch = rawText.match(PATTERNS.cep);
+  const cepMatch = normalized.match(/CEP[\s:]*(\d{5}[\-\s]?\d{3})/);
   if (cepMatch) {
-    endereco = `CEP: ${cepMatch[1]}`;
+    endereco = `CEP: ${cepMatch[1].replace(/[\s\-]/g, '-')}`;
     matchedFields.push('cep');
   }
   
   // --- Cálculo de Confiança ---
-  const essentialFields = ['cpf', 'cnpj', 'cpf_standalone', 'numero_apolice', 'nome_segurado'];
+  // Campos essenciais: documento, apólice, nome
+  const essentialFields = ['cpf_anchor', 'cnpj_anchor', 'cpf_global', 'numero_apolice', 'nome_segurado'];
   const essentialMatched = matchedFields.filter(f => essentialFields.some(e => f.includes(e))).length;
-  const confidence = Math.min(100, (matchedFields.length * 8) + (essentialMatched * 15));
+  const confidence = Math.min(100, (matchedFields.length * 7) + (essentialMatched * 20));
+  
+  console.log(`🔍 [PARSER] Confiança: ${confidence}%, Campos: ${matchedFields.join(', ')}`);
   
   return {
     nome_cliente: nomeCliente,
@@ -521,8 +688,8 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
     objeto_segurado: objetoSegurado,
     placa,
     chassi,
-    marca,
-    modelo,
+    marca: marca || null,
+    modelo: modelo || null,
     ano_fabricacao: anoFabricacao,
     ano_modelo: anoModelo,
     premio_liquido: premioLiquido,
@@ -539,17 +706,3 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
 export function parsePolicyFromText(rawText: string, fileName?: string): ParsedPolicy {
   return parsePolicy(rawText, fileName);
 }
-
-// ============================================================
-// EXPORTAÇÕES AUXILIARES
-// ============================================================
-
-export { 
-  inferRamoFromText, 
-  normalizeRamo, 
-  cleanDocument, 
-  parseMonetaryValue, 
-  parseDate,
-  RAMO_ALIASES,
-  RAMO_KEYWORDS 
-};
