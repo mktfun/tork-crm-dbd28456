@@ -136,7 +136,7 @@ function generateSmartTitle(policy: any): string {
 }
 
 // =============================================================================
-// v6.0 SYSTEM PROMPT: Chain of Thought + Name Sanitization + Enhanced Extraction
+// v6.1 SYSTEM PROMPT: Chain of Thought + Negative Constraints + Enhanced Extraction
 // =============================================================================
 const systemPrompt = `Você é um ANALISTA SÊNIOR de seguros brasileiro.
 SIGA O PROCESSO ABAIXO RIGOROSAMENTE (Chain of Thought):
@@ -199,13 +199,139 @@ Para RESIDENCIAL:
 - objeto_segurado = "Imóvel Residencial"
 - identificacao_adicional = CEP
 
+## ⚠️ NEGATIVE CONSTRAINTS (PROIBIÇÕES ABSOLUTAS) ⚠️
+NÃO EXTRAIA como dados os seguintes termos de instrução do documento:
+- "MANUAL", "MAN UAL", "AUT", "AUTOMÁTICO" → São tipos de câmbio, NÃO são números de apólice
+- "MODELO", "VERSAO", "VERSÃO" → São labels, NÃO são nomes de cliente
+- "SEGURADO", "TITULAR", "ESTIPULANTE" → São headers, NÃO são nomes
+- "RAMO", "PROPOSTA", "APOLICE" → São labels, NÃO são valores
+- Qualquer string < 4 caracteres (ex: "RA", "NR", "SP") → Provavelmente lixo de OCR
+- Qualquer string que contenha espaço no meio de palavra (ex: "man ual") → Lixo de OCR
+
+Se encontrar esses termos onde deveria haver um dado, retorne NULL para o campo.
+
 ## REGRAS DE OURO (NÃO VIOLAR!)
 1. CPF/CNPJ: APENAS dígitos (11 ou 14). Nunca null se visível no documento!
 2. Datas: formato YYYY-MM-DD
 3. Valores: números puros (ex: 1234.56)
 4. Nome: SANITIZADO, sem lixo de OCR, sem partes de veículo, sem títulos
-5. Se não encontrar um campo, use null (nunca invente dados)
-6. NUNCA inclua nomes de corretoras ou seguradoras no campo nome_cliente`;
+5. Se não encontrar um campo real, use null (nunca invente dados)
+6. NUNCA inclua nomes de corretoras ou seguradoras no campo nome_cliente
+7. numero_apolice deve ser um código numérico/alfanumérico, NUNCA "manual" ou similar
+8. objeto_segurado deve ser um veículo/imóvel real, NUNCA termos de instrução`;
+
+// =============================================================================
+// v6.1 POST-PROCESSING CLEAN: Remove garbage values after AI extraction
+// =============================================================================
+const GARBAGE_PATTERNS = [
+  /^man\s*ual$/i,
+  /^aut(omatico|o)?$/i,
+  /^modelo$/i,
+  /^versao$/i,
+  /^versão$/i,
+  /^segurado$/i,
+  /^titular$/i,
+  /^estipulante$/i,
+  /^proponente$/i,
+  /^ramo$/i,
+  /^proposta$/i,
+  /^apolice$/i,
+  /^apólice$/i,
+  /^item$/i,
+  /^veiculo$/i,
+  /^veículo$/i,
+  /^condutor$/i,
+  /^principal$/i,
+  /^cliente$/i,
+  /^nome$/i,
+  /^cpf$/i,
+  /^cnpj$/i,
+  /^n[°º]?$/i,
+  /^nr$/i,
+  /^ra$/i,
+  /^sp$/i,
+  /^rj$/i,
+  /^mg$/i,
+  /^\d{1,3}$/,  // Numbers with 1-3 digits only
+];
+
+function cleanGarbageValue(value: string | null | undefined): string | null {
+  if (!value) return null;
+  
+  const trimmed = value.toString().trim();
+  
+  // Too short = garbage
+  if (trimmed.length < 3) {
+    console.log(`🧹 [POST-CLEAN] Removendo valor muito curto: "${trimmed}"`);
+    return null;
+  }
+  
+  // Contains suspicious space in middle of word (like "man ual")
+  if (/^[a-z]{1,4}\s+[a-z]{1,4}$/i.test(trimmed) && trimmed.length < 12) {
+    console.log(`🧹 [POST-CLEAN] Removendo OCR com espaço suspeito: "${trimmed}"`);
+    return null;
+  }
+  
+  // Match against garbage patterns
+  for (const pattern of GARBAGE_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      console.log(`🧹 [POST-CLEAN] Removendo garbage match: "${trimmed}"`);
+      return null;
+    }
+  }
+  
+  return trimmed;
+}
+
+function postProcessExtractedPolicy(policy: any): any {
+  console.log('🧹 [POST-CLEAN v6.1] Iniciando limpeza de garbage...');
+  
+  // Fields that should never have garbage values
+  const fieldsToClean = [
+    'numero_apolice',
+    'numero_proposta',
+    'objeto_segurado',
+    'identificacao_adicional',
+  ];
+  
+  for (const field of fieldsToClean) {
+    if (policy[field]) {
+      const original = policy[field];
+      const cleaned = cleanGarbageValue(original);
+      if (cleaned !== original) {
+        console.log(`🧹 [POST-CLEAN] ${field}: "${original}" → ${cleaned === null ? 'null' : `"${cleaned}"`}`);
+        policy[field] = cleaned;
+      }
+    }
+  }
+  
+  // Special handling for nome_cliente - more aggressive cleaning
+  if (policy.nome_cliente) {
+    let nome = policy.nome_cliente.toString().trim();
+    
+    // Remove garbage suffixes/prefixes
+    nome = nome
+      .replace(/\s+(manual|aut|auto|automatico|automático|modelo|versao|versão|flex|turbo|tsi|gti|sedan|hatch|suv)\s*$/gi, '')
+      .replace(/^(ra|rg|nr|cp|seq|cod|ref|id|prop|num)\s+/gi, '')
+      .replace(/^\d+\s+/, '')
+      .replace(/\s+\d+$/, '')
+      .trim();
+    
+    // Validate minimum name requirements
+    const words = nome.split(/\s+/).filter((w: string) => w.length >= 2);
+    if (words.length < 2 || nome.length < 5) {
+      console.log(`🧹 [POST-CLEAN] Nome inválido após limpeza: "${nome}" → null`);
+      policy.nome_cliente = null;
+    } else {
+      policy.nome_cliente = words.map((w: string) =>
+        w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+      ).join(' ');
+      console.log(`✅ [POST-CLEAN] Nome sanitizado: "${policy.nome_cliente}"`);
+    }
+  }
+  
+  return policy;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -423,14 +549,17 @@ serve(async (req) => {
     // Ensure arquivo_origem is set correctly
     extractedPolicy.arquivo_origem = fileName;
 
+    // v6.1: POST-PROCESSING CLEAN - Remove garbage values
+    extractedPolicy = postProcessExtractedPolicy(extractedPolicy);
+
     // Generate smart title
     extractedPolicy.titulo_sugerido = generateSmartTitle(extractedPolicy);
 
-    // v6.0: Log extracted data for debugging
-    console.log(`📋 [EXTRACTED v6.0] Cliente: "${extractedPolicy.nome_cliente}", CPF: ${extractedPolicy.cpf_cnpj || 'N/A'}, Ramo: ${extractedPolicy.ramo_seguro}`);
+    // v6.1: Log extracted data for debugging
+    console.log(`📋 [EXTRACTED v6.1] Cliente: "${extractedPolicy.nome_cliente}", CPF: ${extractedPolicy.cpf_cnpj || 'N/A'}, Apólice: ${extractedPolicy.numero_apolice || 'N/A'}, Ramo: ${extractedPolicy.ramo_seguro}`);
 
     const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
-    console.log(`✅ [SINGLE-OCR v6.0] Concluído em ${totalDuration}s`);
+    console.log(`✅ [SINGLE-OCR v6.1] Concluído em ${totalDuration}s`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -442,7 +571,8 @@ serve(async (req) => {
         text_length: filteredText.length,
         ai_time: `${aiDuration}s`,
         total_time: `${totalDuration}s`,
-        model: 'gemini-3-flash-preview'
+        model: 'gemini-3-flash-preview',
+        version: 'v6.1-post-clean'
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
