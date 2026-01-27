@@ -8,9 +8,10 @@ const corsHeaders = {
 };
 
 // ============================================================
-// OCR-ONLY MODE v3.0 - PROGRESSIVE SCAN SUPPORT
-// Extração de texto puro via OCR.space Engine 2
-// Agora com suporte a extração por range de páginas
+// PURE OCR PROXY v5.0 - "THE CLEANER"
+// 
+// Fluxo: Base64 → Trim páginas → OCR.space → Limpeza → rawText
+// Zero IA. Zero extração local. Apenas OCR visual puro.
 // ============================================================
 
 const OCR_SPACE_API_URL = 'https://api.ocr.space/parse/image';
@@ -30,11 +31,7 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Extrai um range específico de páginas do PDF (v3.0)
- * @param base64 PDF em base64
- * @param startPage Página inicial (1-indexed)
- * @param endPage Página final (1-indexed, inclusive)
- * @returns { sliceBase64, totalPages, actualStart, actualEnd }
+ * Extrai um range específico de páginas do PDF
  */
 async function extractPageRange(
   base64: string, 
@@ -46,14 +43,12 @@ async function extractPageRange(
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const totalPages = pdfDoc.getPageCount();
     
-    // Ajusta range para não exceder total
     const actualStart = Math.max(1, startPage);
     const actualEnd = Math.min(endPage, totalPages);
     
     console.log(`📄 PDF tem ${totalPages} páginas, extraindo ${actualStart}-${actualEnd}`);
     
     if (actualStart > totalPages) {
-      // Páginas solicitadas não existem
       return { 
         sliceBase64: '', 
         totalPages, 
@@ -62,7 +57,6 @@ async function extractPageRange(
       };
     }
     
-    // Cria novo PDF apenas com as páginas solicitadas
     const newDoc = await PDFDocument.create();
     for (let i = actualStart - 1; i < actualEnd; i++) {
       const [page] = await newDoc.copyPages(pdfDoc, [i]);
@@ -78,141 +72,46 @@ async function extractPageRange(
     
   } catch (error) {
     console.error('Erro ao extrair range de páginas:', error);
-    // Fallback: retorna o PDF original
     return { sliceBase64: base64, totalPages: 1, actualStart: 1, actualEnd: 1 };
   }
 }
 
 /**
- * Corta PDF para máximo de páginas (limite OCR.space gratuito)
- * @deprecated Use extractPageRange para controle preciso
+ * THE CLEANER: Remove todos os caracteres não-imprimíveis
+ * Mantém apenas ASCII printable + acentos brasileiros + quebras de linha
  */
-async function trimPdfToMaxPages(base64: string, maxPages: number = 2): Promise<string> {
-  const result = await extractPageRange(base64, 1, maxPages);
-  return result.sliceBase64;
+function cleanOcrText(rawText: string): string {
+  if (!rawText) return '';
+  
+  // Remove caracteres binários/lixo, mantém:
+  // \x20-\x7E = ASCII printable (espaço até ~)
+  // \u00C0-\u00FF = Latin Extended (acentos)
+  // \n\r\t = Whitespace útil
+  let cleaned = rawText.replace(/[^\x20-\x7E\u00C0-\u00FF\n\r\t]/g, ' ');
+  
+  // Normaliza múltiplos espaços
+  cleaned = cleaned.replace(/[ \t]{2,}/g, ' ');
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  
+  return cleaned.trim();
 }
 
 /**
- * Extrai texto de streams do PDF (sem OCR)
- * Funciona para PDFs com texto selecionável
- */
-function extractTextFromPdfBuffer(base64: string): string {
-  try {
-    const decoded = atob(base64);
-    
-    // Regex para capturar streams de texto em PDFs
-    const textMatches: string[] = [];
-    
-    // Busca por objetos de texto (BT...ET blocks)
-    const btEtRegex = /BT\s*([\s\S]*?)\s*ET/g;
-    let match;
-    while ((match = btEtRegex.exec(decoded)) !== null) {
-      // Extrai strings entre parênteses ou <hex>
-      const textBlock = match[1];
-      const stringRegex = /\((.*?)\)|<([0-9A-Fa-f]+)>/g;
-      let strMatch;
-      while ((strMatch = stringRegex.exec(textBlock)) !== null) {
-        if (strMatch[1]) {
-          textMatches.push(strMatch[1]);
-        } else if (strMatch[2]) {
-          // Hex string - tenta decodificar
-          try {
-            const hex = strMatch[2];
-            let str = '';
-            for (let i = 0; i < hex.length; i += 2) {
-              str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
-            }
-            textMatches.push(str);
-          } catch { /* ignore */ }
-        }
-      }
-    }
-    
-    // Também busca por Tj/TJ operators
-    const tjRegex = /\[(.*?)\]\s*TJ|\((.*?)\)\s*Tj/g;
-    while ((match = tjRegex.exec(decoded)) !== null) {
-      const content = match[1] || match[2];
-      if (content) {
-        // Limpa operadores e extrai texto
-        const cleaned = content.replace(/\(\d+\)/g, ' ').replace(/[\[\]]/g, '');
-        const innerStrings = cleaned.match(/\((.*?)\)/g);
-        if (innerStrings) {
-          innerStrings.forEach(s => textMatches.push(s.replace(/[()]/g, '')));
-        } else {
-          textMatches.push(cleaned);
-        }
-      }
-    }
-    
-    const extractedText = textMatches.join(' ').replace(/\s+/g, ' ').trim();
-    console.log(`📝 Extração local: ${extractedText.length} caracteres`);
-    return extractedText;
-    
-  } catch (error) {
-    console.error('Erro na extração local:', error);
-    return '';
-  }
-}
-
-/**
- * Avalia a qualidade do texto extraído
- * Score 0-100: 0 = ruim, 100 = excelente
- */
-function evaluateTextQuality(text: string): { score: number; reason: string } {
-  if (!text || text.length < 50) {
-    return { score: 0, reason: 'Texto muito curto' };
-  }
-  
-  let score = 0;
-  
-  // Tamanho mínimo
-  if (text.length >= 200) score += 20;
-  if (text.length >= 500) score += 10;
-  if (text.length >= 1000) score += 10;
-  
-  // Contém palavras-chave de seguros
-  const keywords = ['segurado', 'apólice', 'apolice', 'prêmio', 'premio', 'vigência', 'vigencia', 'cpf', 'cnpj', 'seguradora'];
-  const keywordCount = keywords.filter(kw => text.toLowerCase().includes(kw)).length;
-  score += keywordCount * 5;
-  
-  // Contém datas
-  if (/\d{2}[\/-]\d{2}[\/-]\d{4}/.test(text)) score += 10;
-  
-  // Contém valores monetários
-  if (/R\$\s*[\d.,]+/.test(text) || /\d{1,3}(?:\.\d{3})*,\d{2}/.test(text)) score += 10;
-  
-  // Contém CPF ou CNPJ
-  if (/\d{3}[.\s]?\d{3}[.\s]?\d{3}[\-\s]?\d{2}/.test(text)) score += 15;
-  if (/\d{2}[.\s]?\d{3}[.\s]?\d{3}[\s\/]?\d{4}[\-\s]?\d{2}/.test(text)) score += 15;
-  
-  // Contém placa de veículo
-  if (/[A-Z]{3}[\-\s]?\d[A-Z0-9]\d{2}/i.test(text)) score += 10;
-  
-  // Penaliza caracteres estranhos (PDF corrompido)
-  const strangeChars = (text.match(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g) || []).length;
-  score -= strangeChars * 2;
-  
-  return { 
-    score: Math.max(0, Math.min(100, score)), 
-    reason: score >= 30 ? 'Qualidade aceitável' : 'Qualidade baixa - necessita OCR' 
-  };
-}
-
-/**
- * Chama OCR.space API para extração de texto
+ * Chama OCR.space API - Engine 2 (visual, tabelas)
  */
 async function callOcrSpace(base64: string, mimeType: string): Promise<string> {
   const OCR_SPACE_API_KEY = Deno.env.get('OCR_SPACE_API_KEY') || 'K88888888888888';
   
   const formData = new FormData();
   formData.append('base64Image', `data:${mimeType};base64,${base64}`);
-  formData.append('language', 'por'); // Português
+  formData.append('language', 'por');
   formData.append('isOverlayRequired', 'false');
-  formData.append('OCREngine', '2'); // Engine 2 = melhor para tabelas
-  formData.append('isTable', 'true');
-  formData.append('scale', 'true');
+  formData.append('OCREngine', '2');           // Engine 2 = melhor para tabelas
+  formData.append('isTable', 'true');          // Modo tabela
+  formData.append('scale', 'true');            // Escala automática
+  formData.append('detectOrientation', 'true'); // Corrige rotação
   
-  console.log('🔍 Chamando OCR.space Engine 2...');
+  console.log('🔍 Chamando OCR.space Engine 2 (modo visual puro)...');
   
   const response = await fetch(OCR_SPACE_API_URL, {
     method: 'POST',
@@ -236,7 +135,7 @@ async function callOcrSpace(base64: string, mimeType: string): Promise<string> {
   }
   
   const extractedText = result.ParsedResults
-    ?.map((r: any) => r.ParsedText)
+    ?.map((r: { ParsedText: string }) => r.ParsedText)
     .join('\n') || '';
   
   console.log(`✅ OCR.space: ${extractedText.length} caracteres extraídos`);
@@ -248,7 +147,6 @@ async function callOcrSpace(base64: string, mimeType: string): Promise<string> {
 // ============================================================
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -260,9 +158,8 @@ serve(async (req) => {
     const fileBase64 = body.base64 || body.fileBase64;
     const mimeType = body.mimeType || 'application/pdf';
     const fileName = body.fileName || 'document.pdf';
-    const mode = body.mode || 'ocr-only';
     
-    // NOVO: Parâmetros de paginação para Progressive Scan
+    // Parâmetros de paginação
     const startPage = body.startPage || 1;
     const endPage = body.endPage || 2;
 
@@ -276,9 +173,9 @@ serve(async (req) => {
       });
     }
 
-    console.log(`📄 Processando: ${fileName}, mimeType: ${mimeType}, mode: ${mode}, páginas: ${startPage}-${endPage}`);
+    console.log(`📄 Processando: ${fileName}, páginas: ${startPage}-${endPage}`);
     
-    // Para PDFs, extrai o range de páginas solicitado
+    // Para PDFs, extrai o range de páginas
     let processedBase64 = fileBase64;
     let pageInfo = { totalPages: 1, actualStart: 1, actualEnd: 1 };
     
@@ -291,7 +188,6 @@ serve(async (req) => {
         actualEnd: result.actualEnd,
       };
       
-      // Se o slice está vazio (páginas não existem), retorna vazio
       if (!processedBase64) {
         return new Response(JSON.stringify({ 
           success: true, 
@@ -300,48 +196,39 @@ serve(async (req) => {
           fileName,
           pageRange: pageInfo,
           hasMorePages: false,
-          stats: { characters: 0, qualityScore: 0 }
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
     }
 
-    // 1. Tenta extração local primeiro (sem API externa)
-    let rawText = extractTextFromPdfBuffer(processedBase64);
-    let source = 'LOCAL';
-    
-    const quality = evaluateTextQuality(rawText);
-    console.log(`📊 Qualidade extração local: ${quality.score}/100 - ${quality.reason}`);
-    
-    // 2. Se qualidade baixa, usa OCR.space
-    if (quality.score < 30) {
-      try {
-        rawText = await callOcrSpace(processedBase64, mimeType);
-        source = 'OCR';
-      } catch (ocrError) {
-        console.error('❌ OCR.space falhou:', ocrError);
-        // Usa o que temos da extração local
-        if (!rawText || rawText.length < 50) {
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: 'Falha na extração de texto (local e OCR)',
-            pageRange: pageInfo,
-            hasMorePages: pageInfo.actualEnd < pageInfo.totalPages,
-          }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-      }
+    // 🔥 SEMPRE usa OCR.space (morte total ao extrator local)
+    let rawText = '';
+    try {
+      rawText = await callOcrSpace(processedBase64, mimeType);
+    } catch (ocrError) {
+      console.error('❌ OCR.space falhou:', ocrError);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Falha na extração OCR visual',
+        pageRange: pageInfo,
+        hasMorePages: pageInfo.actualEnd < pageInfo.totalPages,
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
     
-    console.log(`✅ Extração concluída via ${source}: ${rawText.length} caracteres (páginas ${pageInfo.actualStart}-${pageInfo.actualEnd} de ${pageInfo.totalPages})`);
+    // 🧹 THE CLEANER: Remove lixo binário
+    const cleanText = cleanOcrText(rawText);
+    
+    console.log(`✅ Extração OCR: ${rawText.length} → ${cleanText.length} chars (limpo)`);
+    console.log(`📄 Páginas ${pageInfo.actualStart}-${pageInfo.actualEnd} de ${pageInfo.totalPages}`);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      rawText: rawText,
-      source: source,
+      rawText: cleanText,
+      source: 'OCR',
       fileName: fileName,
       pageRange: {
         start: pageInfo.actualStart,
@@ -349,10 +236,6 @@ serve(async (req) => {
         total: pageInfo.totalPages,
       },
       hasMorePages: pageInfo.actualEnd < pageInfo.totalPages,
-      stats: {
-        characters: rawText.length,
-        qualityScore: quality.score,
-      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

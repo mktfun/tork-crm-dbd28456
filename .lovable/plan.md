@@ -1,58 +1,85 @@
-# Plano: Fuzzy Anchor Search - Compact Text Matching (v4.0) ✅ IMPLEMENTADO
+# Plano: Pure OCR Proxy v5.0 - "THE CLEANER" ✅ IMPLEMENTADO
 
 ## Status: CONCLUÍDO
 
-A implementação v4.0 está completa e corrige o problema de OCR fragmentando palavras-chave.
+A implementação v5.0 está completa e resolve os problemas de lixo binário no OCR.
 
 ---
 
 ## O Que Foi Implementado
 
-### 1. universalPolicyParser.ts (v4.0)
+### 1. Edge Function "THE CLEANER" (supabase/functions/analyze-policy/index.ts)
 
-- **`createCompactText()`**: Cria versão do texto sem espaços com mapeamento de índices
-- **`fuzzyExtractByAnchor()`**: Busca âncoras no compact e extrai do original
-- **Regex tolerantes**: CPF_LOOSE, CNPJ_LOOSE, PLACA_LOOSE, DATA_LOOSE, VALOR_LOOSE
-- **Detecção de seguradoras**: INSURER_BRANDS_COMPACT para marcas no texto compactado
-- **Inferência dupla de ramo**: Testa no texto normal E no compact text
+- **Proxy OCR Puro**: Removida toda tentativa de extração local de texto
+- **Sempre OCR.space**: Engine 2 com `isTable=true`, `scale=true`, `detectOrientation=true`
+- **Limpeza de Caracteres**: Função `cleanOcrText()` remove lixo binário mantendo apenas ASCII printable + acentos brasileiros
 
-### 2. ImportPoliciesModal.tsx
+```typescript
+const cleanText = rawText.replace(/[^\x20-\x7E\u00C0-\u00FF\n\r\t]/g, ' ');
+```
 
-- **Debug log**: Primeiros 2000 chars do texto para diagnóstico
+### 2. Parser v5.0 "Alpha Window Strategy" (src/utils/universalPolicyParser.ts)
+
+- **`createAlphaText()`**: Versão só com A-Z e 0-9 + mapeamento de índices
+- **`alphaWindowExtract()`**: Busca âncora no texto alfa e extrai do original
+- **Regex tolerantes**: Aceitam espaços/pontos entre dígitos
+- **Detecção de seguradoras**: Busca direta de marcas no texto alfa
+- **Inferência de ramo**: Se encontrar "PLACA", ramo = Automóvel
+
+### 3. Frontend Debug Logs (ImportPoliciesModal.tsx)
+
+- **Log de texto limpo**: `console.log('--- TEXTO LIMPO START ---', text)`
 - **Produtor padrão**: Fallback para primeiro produtor se nenhum selecionado
 
 ---
 
-## Como Funciona
+## Fluxo Completo
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│              FUZZY ANCHOR SEARCH FLOW (v4.0)                     │
+│                    PURE OCR PROXY FLOW v5.0                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  1. NORMALIZAÇÃO                                                 │
-│     rawText → normalizeOcrText() → normalized (UPPERCASE)        │
+│  1. FRONTEND: Upload PDF                                         │
+│     └─> Base64 → supabase.functions.invoke('analyze-policy')     │
 │                                                                  │
-│  2. COMPACTAÇÃO                                                  │
-│     normalized → createCompactText() → { compact, indexMap }     │
-│     "C P F : 1 2 3" → "CPF:123" + mapeamento de índices          │
+│  2. EDGE FUNCTION: "THE CLEANER"                                 │
+│     └─> extractPageRange() → OCR.space → cleanOcrText()          │
+│     └─> Return { rawText, pageRange, hasMorePages }              │
 │                                                                  │
-│  3. BUSCA DE ÂNCORA NO COMPACT                                   │
-│     compact.indexOf("CPF") → posição no compactado               │
+│  3. FRONTEND: Parser Local                                       │
+│     └─> createAlphaText() → alphaWindowExtract()                 │
+│     └─> Se confiança >= 80%, para o loop                         │
 │                                                                  │
-│  4. MAPEAMENTO PARA ORIGINAL                                     │
-│     indexMap[compactPos] → posição no texto original             │
+│  4. FRONTEND: Upsert Cliente                                     │
+│     └─> CPF extraído → upsertClientByDocument()                  │
 │                                                                  │
-│  5. EXTRAÇÃO COM JANELA                                          │
-│     original.substring(pos, pos + 200) → janela de busca         │
-│                                                                  │
-│  6. APLICAÇÃO DE REGEX TOLERANTE                                 │
-│     janela.match(CPF_LOOSE) → valor com espaços aceitos          │
-│                                                                  │
-│  7. LIMPEZA E VALIDAÇÃO                                          │
-│     cleanDocument() → "12345678900" (11 ou 14 dígitos)           │
+│  5. FRONTEND: Tabela de Conferência                              │
+│     └─> CPF, Seguradora, Ramo preenchidos                        │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Console Logs Esperados
+
+```
+📄 [1/1] Processando: APOLICE MARINA.pdf
+📄 [PROGRESSIVE] páginas 1-2
+🔍 Chamando OCR.space Engine 2 (modo visual puro)...
+✅ OCR.space: 45000 caracteres extraídos
+✅ Extração OCR: 45000 → 42000 chars (limpo)
+--- TEXTO LIMPO START ---
+TOKIO MARINE SEGURADORA S A
+SEGURADO MARINA DA SILVA SANTOS
+CPF 123 456 789 00
+PLACA ABC1D23
+--- TEXTO LIMPO END ---
+🔍 [PARSER v5.0] Original: 42000 chars, Alpha: 28000 chars
+🔍 [PARSER v5.0] Confiança: 85%, Campos: cpf, placa, seguradora, ramo
+✅ [PROGRESSIVE] Threshold atingido!
+✅ [UPSERT] Cliente vinculado: abc-123-def
 ```
 
 ---
@@ -61,28 +88,11 @@ A implementação v4.0 está completa e corrige o problema de OCR fragmentando p
 
 | Passo | Ação | Resultado Esperado |
 |-------|------|-------------------|
-| 1 | Upload PDF problemático | Parser encontra CPF no compact text |
-| 2 | Verificar console | Log mostra `cpf_fuzzy` nos campos |
-| 3 | Verificar debug log | Primeiros 2000 chars mostram texto OCR |
-| 4 | Verificar tabela | CPF e Seguradora preenchidos |
-| 5 | Salvar apólice | Cliente criado/vinculado, produtor padrão aplicado |
-
----
-
-## Console Logs Esperados
-
-```
-📄 [PROGRESSIVE] arquivo.pdf: páginas 1-2
-📝 [OCR] +29457 chars (via LOCAL)
---- DEBUG TEXT START ---
-T O K I O   M A R I N E   S E G U R A D O R A
-C P F : 1 2 3 . 4 5 6 . 7 8 9 - 0 0
---- DEBUG TEXT END ---
-🔍 [PARSER v4.0] Original: 29590 chars, Compact: 18500 chars
-🔍 [PARSER v4.0] Confiança: 85%, Campos: cpf_fuzzy, seguradora_compact, placa, ramo_inferido
-✅ [PROGRESSIVE] Threshold atingido!
-🔧 [IMPORT] Produtor padrão: abc-123-def
-```
+| 1 | Upload PDF que tinha lixo binário | Texto limpo no console |
+| 2 | Verificar `--- TEXTO LIMPO START ---` | Sem caracteres estranhos |
+| 3 | Verificar tabela | CPF e Seguradora preenchidos |
+| 4 | Ramo automático | Se tem PLACA, Ramo = Automóvel |
+| 5 | Salvar apólice | Cliente vinculado, produtor padrão aplicado |
 
 ---
 
@@ -90,5 +100,16 @@ C P F : 1 2 3 . 4 5 6 . 7 8 9 - 0 0
 
 | Arquivo | Mudanças |
 |---------|----------|
-| `src/utils/universalPolicyParser.ts` | Reescrito com Compact Text Mapping v4.0 |
-| `src/components/policies/ImportPoliciesModal.tsx` | Debug log + produtor padrão |
+| `supabase/functions/analyze-policy/index.ts` | Proxy OCR puro com limpeza de caracteres |
+| `src/utils/universalPolicyParser.ts` | Alpha Window Strategy v5.0 |
+| `src/components/policies/ImportPoliciesModal.tsx` | Debug logs + produtor padrão |
+
+---
+
+## Vantagens
+
+1. **Zero lixo binário**: Limpeza de caracteres não-printáveis
+2. **OCR visual puro**: Sem dependência de extração local falha
+3. **Determinístico**: Mesmo PDF sempre produz mesmo resultado
+4. **Zero IA**: Nenhum token de modelo consumido
+5. **Debug facilitado**: Log mostra texto limpo para diagnóstico

@@ -386,13 +386,13 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         hasMorePages = data.hasMorePages || false;
         totalPages = data.pageRange?.total || 0;
         
-        console.log(`📝 [OCR] ${file.name}: +${newText.length} chars (via ${data.source}), total acumulado: ${accumulatedText.length}`);
+        console.log(`📝 [OCR v5.0] ${file.name}: +${newText.length} chars (via ${data.source}), total acumulado: ${accumulatedText.length}`);
         
-        // DEBUG v4.0: Log dos primeiros 2000 chars para diagnóstico
+        // DEBUG v5.0: Log dos primeiros 2000 chars do TEXTO LIMPO para diagnóstico
         if (currentPage === 1) {
-          console.log('--- DEBUG TEXT START ---');
+          console.log('--- TEXTO LIMPO START ---');
           console.log(accumulatedText.substring(0, 2000));
-          console.log('--- DEBUG TEXT END ---');
+          console.log('--- TEXTO LIMPO END ---');
         }
           
           // 3. Parser LOCAL no texto acumulado
