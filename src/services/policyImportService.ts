@@ -256,6 +256,39 @@ async function findClientByEmail(email: string, userId: string) {
 }
 
 // ============================================================
+// v5.7: NEW - Exact Name Match (Case Insensitive)
+// ============================================================
+
+/**
+ * v5.7: Busca cliente por nome EXATO (case insensitive + trim)
+ * Executada ANTES do fuzzy matching para evitar duplicatas
+ */
+async function findClientByNameExact(name: string, userId: string) {
+  if (!name || name.length < 3) return null;
+  
+  const cleanName = name.trim().replace(/\s+/g, ' ');
+  
+  const { data, error } = await supabase
+    .from('clientes')
+    .select('id, name, cpf_cnpj, email, phone')
+    .eq('user_id', userId)
+    .ilike('name', cleanName)  // Case insensitive exact match
+    .limit(1);
+  
+  if (error) {
+    console.error('Error finding client by exact name:', error);
+    return null;
+  }
+  
+  if (data?.[0]) {
+    console.log(`✅ [NAME EXACT v5.7] Match: "${name}" → "${data[0].name}"`);
+    return data[0];
+  }
+  
+  return null;
+}
+
+// ============================================================
 // Fuzzy Matching for Seguradora (Insurance Company) with Aliases
 // ============================================================
 
@@ -696,9 +729,14 @@ export async function upsertClientByDocument(
     };
   }
   
-  // 2. Sanitiza nome antes de criar
+  // v5.7: NÃO criar se nome é inválido - força vinculação manual
   const safeName = sanitizeClientName(nome);
+  if (safeName === 'Cliente Importado' || safeName === 'Cliente Não Identificado') {
+    console.warn(`🚫 [UPSERT v5.7] Bloqueando criação - nome inválido: "${nome}"`);
+    return null;  // Força vinculação manual no modal
+  }
   
+  // 2. Cria novo cliente (safeName já foi calculado acima)
   // 3. Cria novo cliente
   const cep = extractCep(endereco);
   const { city, state } = extractCityState(endereco);
@@ -810,7 +848,21 @@ export async function reconcileClient(
       return {
         status: 'matched',
         clientId: clientByEmail.id,
+        clientName: clientByEmail.name,
         matchedBy: 'email',
+      };
+    }
+  }
+  
+  // 3. NOVO v5.7: Busca por nome EXATO (case insensitive) antes do fuzzy
+  if (extracted.cliente.nome_completo) {
+    const clientByNameExact = await findClientByNameExact(extracted.cliente.nome_completo, userId);
+    if (clientByNameExact) {
+      return {
+        status: 'matched',
+        clientId: clientByNameExact.id,
+        clientName: clientByNameExact.name,
+        matchedBy: 'name_fuzzy', // Usa mesmo matchedBy para compatibilidade de tipos
       };
     }
   }

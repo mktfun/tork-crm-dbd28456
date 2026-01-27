@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * UNIVERSAL POLICY PARSER v5.6 - "FULL NAME EXTRACTION"
+ * UNIVERSAL POLICY PARSER v5.7 - "AGGRESSIVE NOISE CLEANUP"
  * 
  * Estratégia: 
  * 1. Cria versão AlphaNum do texto (só A-Z e 0-9)
@@ -8,10 +8,10 @@
  * 3. Mapeia posição para texto original
  * 4. Extrai janela do original e aplica Regex tolerante
  * 
- * v5.6 Improvements:
- * - NOME_REGEX agora captura maiúsculas + minúsculas (nome completo)
- * - cleanOcrNoiseFromName mais agressivo (remove prefixos numéricos)
- * - Lista expandida de NOISE_PREFIXES (PROP, NUM, NRO, NUMERO)
+ * v5.7 Improvements:
+ * - cleanOcrNoiseFromName agora remove prefixos MESMO com apenas 2 palavras
+ * - Se sobrar apenas 1 palavra após limpeza, retorna vazio (força fallback)
+ * - Corrige nomes como "Ra Marina" → "Marina" → fallback
  * 
  * Zero dependência de IA - 100% determinístico
  * ============================================================
@@ -609,7 +609,7 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   // Cria versão alfa para busca de âncoras
   const { alpha, indexMap } = createAlphaText(text);
   
-  console.log(`🔍 [PARSER v5.6] Original: ${text.length} chars, Alpha: ${alpha.length} chars`);
+  console.log(`🔍 [PARSER v5.7] Original: ${text.length} chars, Alpha: ${alpha.length} chars`);
   
   // --- CPF/CNPJ ---
   let cpfCnpj: string | null = null;
@@ -776,15 +776,15 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   ];
   
   /**
-   * v5.6: Remove prefixos de ruído OCR AGRESSIVAMENTE do início do nome
-   * Preserva o nome completo após limpar lixo
+   * v5.7: Remove prefixos de ruído OCR AGRESSIVAMENTE do início do nome
+   * CORREÇÃO: Agora remove prefixos MESMO com apenas 2 palavras
    */
   function cleanOcrNoiseFromName(rawName: string): string {
     const words = rawName.trim().split(/\s+/);
     
-    // v5.6: Remove prefixos de ruído AGRESSIVAMENTE
-    // Enquanto houver palavras suficientes, remove lixo do início
-    while (words.length > 2) {
+    // v5.7: CORREÇÃO - Remove prefixos de ruído MESMO com 2 palavras
+    // Só precisa de ao menos 2 palavras (1 prefixo + 1 nome real)
+    while (words.length >= 2) {  // Mudou de > 2 para >= 2
       const first = words[0].toUpperCase().replace(/[^A-Z0-9]/g, '');
       
       // Remove se:
@@ -796,11 +796,18 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
         (first.length <= 2 && /^[A-Z0-9]+$/.test(first)) ||
         /^\d+$/.test(first)
       ) {
-        console.log(`🧹 [OCR v5.6] Removendo prefixo: "${words[0]}"`);
+        console.log(`🧹 [OCR v5.7] Removendo prefixo: "${words[0]}"`);
         words.shift();
       } else {
         break;
       }
+    }
+    
+    // v5.7: Se sobrou apenas 1 palavra após limpeza, retorna vazio
+    // (forçar fallback para "Cliente Não Identificado")
+    if (words.length < 2) {
+      console.log(`🚫 [OCR v5.7] Nome insuficiente após limpeza: "${words.join(' ')}"`);
+      return '';
     }
     
     return words.join(' ');
@@ -827,7 +834,7 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
         .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
         .join(' ');
       matchedFields.push('nome');
-      console.log(`✅ [NAME v5.6] Nome extraído: "${candidate}" → "${nomeCliente}"`);
+      console.log(`✅ [NAME v5.7] Nome extraído: "${candidate}" → "${nomeCliente}"`);
       break;
     }
   }
