@@ -97,20 +97,39 @@ interface DataCompletenessResult {
  * Retorna true se todos os campos críticos foram preenchidos
  */
 const isDataComplete = (data: any): DataCompletenessResult => {
-  const REQUIRED_FIELDS = ['cpf_cnpj', 'nome_cliente', 'numero_apolice', 'nome_seguradora', 'data_inicio', 'data_fim'];
+  // v12.2: Campos absolutamente obrigatórios
+  const REQUIRED_FIELDS = [
+    'nome_cliente',     // Nome do segurado
+    'numero_apolice',   // Número da apólice
+    'nome_seguradora',  // Seguradora
+    'data_inicio',      // Início da vigência
+    'data_fim'          // Fim da vigência
+  ];
   
   const missing: string[] = [];
   
   for (const field of REQUIRED_FIELDS) {
     const value = data?.[field];
-    if (value === null || value === undefined || value === '') {
+    if (value === null || value === undefined || value === '' || value === 'N/A') {
       missing.push(field);
     }
   }
   
+  // CPF/CNPJ: deve ter 11 ou 14 dígitos se presente
+  const cpf = data?.cpf_cnpj;
+  if (!cpf || (cpf.length !== 11 && cpf.length !== 14)) {
+    missing.push('cpf_cnpj');
+  }
+  
   // Prêmio: pelo menos um dos dois deve ter valor > 0
-  if (!(data?.premio_liquido > 0 || data?.premio_total > 0)) {
+  const hasValidPremium = (data?.premio_liquido > 0) || (data?.premio_total > 0);
+  if (!hasValidPremium) {
     missing.push('premio');
+  }
+  
+  // v12.2: Log de diagnóstico
+  if (missing.length > 0) {
+    console.log(`📊 [COMPLETENESS v12.2] Faltando ${missing.length}: ${missing.join(', ')}`);
   }
   
   return { 
@@ -488,7 +507,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
   // Frontend ainda fatia 2 em 2 páginas para evitar timeouts
   
   const PAGES_PER_CHUNK = 2;
-  const MAX_CHUNKS = 3; // Limite de 6 páginas (3 chunks * 2 páginas)
+  const MAX_CHUNKS = 5; // v12.2: Limite de 10 páginas (5 chunks * 2 páginas) para garantir extração completa
   
   // Estado de descrição da etapa atual
   const [processingLabel, setProcessingLabel] = useState<string>('');
@@ -634,21 +653,26 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
               const llmMs = data.metrics?.llmMs || 0;
               console.log(`✅ [MISTRAL] Págs ${currentPage}-${endPage}: OCR ${ocrMs}ms + LLM ${llmMs}ms = ${data.durationMs}ms`);
               
-              // v11.0: EARLY-STOP CHECK - Se status = COMPLETO ou dados críticos estão ok
+              // v12.2: EARLY-STOP CHECK - NUNCA confiar apenas no status do LLM
               const currentMerged = mergeChunkResults(chunkResults);
-              const isComplete = data.data.status === 'COMPLETO' || isDataComplete(currentMerged).complete;
+              const completeness = isDataComplete(currentMerged);
+              const isComplete = completeness.complete; // Ignora data.data.status
+              
+              // Log de trust issue se LLM mentir
+              if (data.data.status === 'COMPLETO' && !completeness.complete) {
+                console.warn(`⚠️ [TRUST ISSUE v12.2] LLM disse COMPLETO mas faltam: ${completeness.missing.join(', ')}`);
+              }
               
               if (isComplete) {
                 const pagesSkipped = totalPages - slice.actualEnd;
                 earlyStopTriggered = true;
-                console.log(`✅ [EARLY-STOP v11] Dados completos após ${chunkResults.length} chunk(s)!`);
+                console.log(`✅ [EARLY-STOP v12.2] Dados completos após ${chunkResults.length} chunk(s)!`);
                 if (pagesSkipped > 0) {
-                  console.log(`💰 [ECONOMIA v11] Pulando ${pagesSkipped} páginas restantes`);
+                  console.log(`💰 [ECONOMIA v12.2] Pulando ${pagesSkipped} páginas restantes`);
                 }
                 break;
               } else {
-                const completeness = isDataComplete(currentMerged);
-                console.log(`⏳ [CONTINUE v11] Faltando: ${completeness.missing.join(', ')}`);
+                console.log(`⏳ [CONTINUE v12.2] Faltando: ${completeness.missing.join(', ')}`);
               }
             }
             
