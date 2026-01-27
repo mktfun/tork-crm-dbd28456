@@ -310,7 +310,31 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     });
   };
 
-  // ========== CLIENT-SIDE PDF SLICER (v6.0) ==========
+  // ========== CLIENT-SIDE PDF SLICER (v6.1) ==========
+  /**
+   * Converte Uint8Array para Base64 de forma segura (sem stack overflow)
+   * Usa Blob + FileReader em vez de String.fromCharCode.apply
+   */
+  const bytesToBase64Safe = (bytes: Uint8Array): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // Cria um novo ArrayBuffer a partir dos bytes para evitar SharedArrayBuffer
+      const newBuffer = new ArrayBuffer(bytes.length);
+      const newView = new Uint8Array(newBuffer);
+      newView.set(bytes);
+      
+      const blob = new Blob([newBuffer], { type: 'application/pdf' });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        // Remove o prefixo "data:application/pdf;base64,"
+        const base64 = dataUrl.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
   /**
    * Extrai um range de páginas do PDF no cliente
    * Retorna: { sliceBase64, totalPages, hasMore }
@@ -354,13 +378,11 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       newDoc.addPage(page);
     }
     
-    // 5. Converte para Base64
+    // 5. Converte para Base64 de forma SEGURA (sem stack overflow!)
     const pdfBytes = await newDoc.save();
-    const sliceBase64 = btoa(
-      String.fromCharCode(...new Uint8Array(pdfBytes))
-    );
+    const sliceBase64 = await bytesToBase64Safe(pdfBytes);
     
-    console.log(`✂️ [SLICER] Páginas ${actualStart}-${actualEnd} de ${totalPages} (${(sliceBase64.length / 1024).toFixed(0)}KB)`);
+    console.log(`✂️ [SLICER v6.1] Páginas ${actualStart}-${actualEnd} de ${totalPages} (${(sliceBase64.length / 1024).toFixed(0)}KB)`);
     
     return {
       sliceBase64,
