@@ -1366,6 +1366,48 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         )}
       </TableCell>
 
+      {/* Vigência - NOVA COLUNA v12.1 */}
+      <TableCell className="py-3">
+        {!item.processError && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1">
+              <span className="text-zinc-600 text-[10px] w-7">De:</span>
+              <Input
+                type="date"
+                value={item.dataInicio || ''}
+                onChange={(e) => {
+                  markFieldEdited(item.id, 'dataInicio');
+                  updateItem(item.id, { dataInicio: e.target.value });
+                }}
+                className={cn(
+                  "h-6 text-xs bg-transparent border-zinc-700/50 px-1.5 w-[110px] transition-all",
+                  "focus:bg-zinc-900/50 focus:border-zinc-400",
+                  !item.dataInicio && "border-red-500/50 bg-red-900/10",
+                  isFieldEdited(item.id, 'dataInicio') && "text-zinc-300 border-zinc-500/50"
+                )}
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-zinc-600 text-[10px] w-7">Até:</span>
+              <Input
+                type="date"
+                value={item.dataFim || ''}
+                onChange={(e) => {
+                  markFieldEdited(item.id, 'dataFim');
+                  updateItem(item.id, { dataFim: e.target.value });
+                }}
+                className={cn(
+                  "h-6 text-xs bg-transparent border-zinc-700/50 px-1.5 w-[110px] transition-all",
+                  "focus:bg-zinc-900/50 focus:border-zinc-400",
+                  !item.dataFim && "border-red-500/50 bg-red-900/10",
+                  isFieldEdited(item.id, 'dataFim') && "text-zinc-300 border-zinc-500/50"
+                )}
+              />
+            </div>
+          </div>
+        )}
+      </TableCell>
+
       {/* Objeto Segurado */}
       <TableCell className="py-3">
         {!item.processError && (
@@ -1809,9 +1851,10 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                     <TooltipProvider>
                       <Table>
                         <TableHeader className="sticky top-0 z-10 bg-zinc-900/95 backdrop-blur-sm">
-                          <TableRow className="border-b border-white/5 hover:bg-transparent">
+                        <TableRow className="border-b border-white/5 hover:bg-transparent">
                             <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Cliente</TableHead>
                             <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Apólice</TableHead>
+                            <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Vigência</TableHead>
                             <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Objeto</TableHead>
                             <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Cia</TableHead>
                             <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Ramo</TableHead>
@@ -1869,6 +1912,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                             <TableRow className="border-b border-white/5 hover:bg-transparent">
                               <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Cliente</TableHead>
                               <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Apólice</TableHead>
+                              <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Vigência</TableHead>
                               <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Objeto</TableHead>
                               <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Cia</TableHead>
                               <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Ramo</TableHead>

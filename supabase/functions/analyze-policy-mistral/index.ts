@@ -19,8 +19,8 @@ const corsHeaders = {
 
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1';
 
-// System prompt para extração estruturada
-const EXTRACTION_PROMPT = `Você é um especialista em extração de dados de documentos de seguros brasileiros.
+// System prompt para extração estruturada - v12.1 with synonyms
+const EXTRACTION_PROMPT = `Você é um perito especialista em extração de dados de documentos de seguros brasileiros.
 
 ## INSTRUÇÕES CRÍTICAS:
 
@@ -42,12 +42,36 @@ Analise o Markdown fornecido e extraia os dados estruturados. Retorne APENAS JSO
    - Números válidos geralmente têm 6+ dígitos
    - NÃO confunda com "Manual" (transmissão de veículo)
 
-4. **VALORES (PRÊMIOS)**:
+4. **VALORES (PRÊMIOS)** - BUSCA EXAUSTIVA:
    - Retorne como NUMBER (float), não string
    - R$ 1.234,56 → 1234.56
-   - Se não encontrar prêmio líquido, calcule: premio_total / 1.0738
+   - SINÔNIMOS ACEITOS PARA PRÊMIO LÍQUIDO:
+     * "Prêmio Líquido", "Premio Liquido" (sem acento)
+     * "Importe Líquido", "Valor Líquido"
+     * "Prêmio Individual", "Prêmio Comercial"
+     * "Prêmio Puro", "Líquido do Seguro"
+     * "Prêmio Tarifário", "Valor do Seguro"
+   - SINÔNIMOS ACEITOS PARA PRÊMIO TOTAL:
+     * "Prêmio Total", "Premio Total"
+     * "Valor Total", "Total a Pagar"
+     * "Custo Total", "Prêmio com IOF"
+     * "Total do Seguro", "Valor Final"
+   - FALLBACK 1: Se não encontrar líquido, calcule: premio_total / 1.0738
+   - FALLBACK 2: Se encontrar parcelas, multiplique valor_parcela × num_parcelas
 
-5. **DATAS**: Formato YYYY-MM-DD (ex: 2024-03-15)
+5. **DATAS (VIGÊNCIA)** - BUSCA EXAUSTIVA:
+   - Formato OBRIGATÓRIO: YYYY-MM-DD (ex: 2024-03-15)
+   - SINÔNIMOS ACEITOS PARA DATA INÍCIO:
+     * "Vigência", "Início da Vigência", "Data Inicial"
+     * "Início", "Válido de", "A partir de"
+     * "Data de Início", "Vigência Início"
+   - SINÔNIMOS ACEITOS PARA DATA FIM:
+     * "Término", "Fim da Vigência", "Data Final"
+     * "Válido até", "Até", "Vencimento"
+     * "Data de Término", "Vigência Fim"
+   - PADRÕES DE DATA ACEITOS: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+   - NUNCA retorne null se houver qualquer indício de data no documento
+   - Se encontrar apenas UMA data, assuma vigência de 1 ano (some 365 dias)
 
 6. **RAMO DO SEGURO**: 
    - AUTO, RESIDENCIAL, VIDA, EMPRESARIAL, SAUDE, etc
