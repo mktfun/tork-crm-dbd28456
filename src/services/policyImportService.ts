@@ -675,10 +675,10 @@ export async function upsertClientByDocument(
     return null;
   }
   
-  // 1. Busca existente pelo documento (incluindo phone e email para sync)
+  // 1. Busca existente pelo documento (incluindo phone, email e cpf_cnpj para sync)
   const { data: existing } = await supabase
     .from('clientes')
-    .select('id, name, phone, email, address')
+    .select('id, name, phone, email, address, cpf_cnpj')
     .eq('user_id', userId)
     .eq('cpf_cnpj', normalized)
     .maybeSingle();
@@ -686,7 +686,7 @@ export async function upsertClientByDocument(
   if (existing) {
     const updates: Record<string, any> = {};
     
-    // v5.5: Valida e corrige nome se necessário
+    // v5.6: Valida e corrige nome se necessário
     const dbNameIsValid = isValidClientName(existing.name);
     if (!dbNameIsValid) {
       const safeName = sanitizeClientName(nome);
@@ -695,18 +695,24 @@ export async function upsertClientByDocument(
       }
     }
     
-    // v5.5: NOVO - Preenche campos vazios com dados do PDF
+    // v5.6: NOVO - Gravar CPF extraído se campo estiver vazio ou incompleto
+    if (normalized && !existing.cpf_cnpj) {
+      // Cliente existente não tinha CPF/CNPJ, agora tem!
+      console.log(`📋 [SYNC v5.6] CPF/CNPJ será adicionado: ${normalized}`);
+    }
+    
+    // v5.6: NOVO - Preenche campos vazios com dados do PDF
     if (telefone && !existing.phone) {
       updates.phone = telefone;
-      console.log(`📱 [SYNC v5.5] Telefone adicionado: ${telefone}`);
+      console.log(`📱 [SYNC v5.6] Telefone adicionado: ${telefone}`);
     }
     if (email && !existing.email) {
       updates.email = email;
-      console.log(`📧 [SYNC v5.5] Email adicionado: ${email}`);
+      console.log(`📧 [SYNC v5.6] Email adicionado: ${email}`);
     }
     if (endereco && !existing.address) {
       updates.address = endereco;
-      console.log(`📍 [SYNC v5.5] Endereço adicionado`);
+      console.log(`📍 [SYNC v5.6] Endereço adicionado`);
     }
     
     // Aplica atualizações se houver
@@ -716,11 +722,18 @@ export async function upsertClientByDocument(
         .from('clientes')
         .update(updates)
         .eq('id', existing.id);
-      console.log(`🔄 [UPSERT v5.5] Cliente atualizado:`, Object.keys(updates));
+      
+      // Log de auditoria para rastreamento
+      console.table([{
+        cliente_id: existing.id,
+        nome: existing.name,
+        campos_atualizados: Object.keys(updates).join(', '),
+        origem: 'PDF Import v5.6'
+      }]);
     }
     
     const finalName = updates.name || existing.name;
-    console.log(`✅ [UPSERT v5.5] Cliente existente: ${existing.id} (${finalName})`);
+    console.log(`✅ [UPSERT v5.6] Cliente existente: ${existing.id} (${finalName})`);
     return { 
       id: existing.id, 
       created: false, 
