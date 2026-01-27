@@ -9,8 +9,6 @@ verify_jwt = false
 [functions.analyze-policy]
 verify_jwt = false
 
-[functions.analyze-policy-single]
-verify_jwt = false
 
 [functions.analyze-receipt]
 verify_jwt = false
