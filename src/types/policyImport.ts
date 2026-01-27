@@ -34,7 +34,23 @@ export interface AnalyzePolicyResult {
 export type ClientReconcileStatus = 'matched' | 'new';
 
 // Tipo de documento detectado pela IA
-export type DocumentType = 'APOLICE' | 'PROPOSTA' | 'ORCAMENTO' | 'ENDOSSO';
+export type DocumentType = 'APOLICE' | 'PROPOSTA' | 'ORCAMENTO' | 'ENDOSSO' | 'CARTEIRINHA';
+
+// Dados específicos de carteirinha de saúde
+export interface CarteirinhaData {
+  numero_carteirinha: string | null;
+  operadora: string | null;
+  titular_cpf: string | null;
+  validade_cartao: string | null;
+}
+
+// Apólice de saúde encontrada para vínculo de carteirinha
+export interface HealthPolicyOption {
+  id: string;
+  policy_number: string | null;
+  insured_asset: string | null;
+  company_name: string | null;
+}
 
 // ============================================================
 // PHASE 3: Import Error Interface
@@ -103,6 +119,12 @@ export interface PolicyImportItem {
   isProcessing?: boolean;
   isProcessed?: boolean;
   processError?: string;
+  
+  // NOVOS CAMPOS - Carteirinha
+  isCarteirinha?: boolean;
+  carteirinhaData?: CarteirinhaData;
+  targetPolicyId?: string; // ID da apólice para vincular carteirinha
+  healthPolicies?: HealthPolicyOption[]; // Opções de apólices de saúde para vincular
 }
 
 // Resultado da importação
@@ -151,6 +173,11 @@ export interface BulkOCRExtractedPolicy {
   // Metadados
   titulo_sugerido: string;                  // NOME - RAMO (OBJETO) - ID - CIA
   arquivo_origem: string;
+  
+  // NOVOS CAMPOS - Carteirinha
+  numero_carteirinha: string | null;
+  operadora: string | null;
+  validade_cartao: string | null;
 }
 
 // Resposta da Edge Function ocr-bulk-analyze

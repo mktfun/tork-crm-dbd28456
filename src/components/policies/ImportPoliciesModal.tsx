@@ -717,21 +717,24 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         }
         
         // Converte para formato BulkOCRExtractedPolicy
+        // v9.0: Detecta tipo de documento (APOLICE ou CARTEIRINHA)
+        const tipoDocumento = finalExtracted.tipo_documento || 'APOLICE';
+        
         const bulkPolicy: BulkOCRExtractedPolicy = {
           nome_cliente: autoClientName || finalExtracted.nome_cliente || 'Cliente Não Identificado',
           cpf_cnpj: finalExtracted.cpf_cnpj,
           email: finalExtracted.email,
           telefone: finalExtracted.telefone,
           endereco_completo: finalExtracted.endereco_completo,
-          tipo_documento: 'APOLICE',
+          tipo_documento: tipoDocumento as DocumentType,
           numero_apolice: finalExtracted.numero_apolice || '',
           numero_proposta: finalExtracted.numero_proposta,
           tipo_operacao: null,
           endosso_motivo: null,
-          nome_seguradora: finalExtracted.nome_seguradora || '',
-          ramo_seguro: finalExtracted.ramo_seguro || '',
+          nome_seguradora: finalExtracted.nome_seguradora || finalExtracted.operadora || '',
+          ramo_seguro: finalExtracted.ramo_seguro || (tipoDocumento === 'CARTEIRINHA' ? 'SAUDE' : ''),
           data_inicio: finalExtracted.data_inicio || '',
-          data_fim: finalExtracted.data_fim || '',
+          data_fim: finalExtracted.data_fim || finalExtracted.validade_cartao || '',
           descricao_bem: finalExtracted.objeto_segurado,
           objeto_segurado: finalExtracted.objeto_segurado,
           identificacao_adicional: finalExtracted.placa || null,
@@ -739,6 +742,10 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           premio_total: finalExtracted.premio_total || finalExtracted.premio_liquido || 0,
           titulo_sugerido: `${finalExtracted.nome_cliente || 'Cliente'} - ${finalExtracted.ramo_seguro || 'Seguro'} (${finalExtracted.nome_seguradora || ''})`.substring(0, 100),
           arquivo_origem: file.name,
+          // NOVOS CAMPOS - Carteirinha
+          numero_carteirinha: finalExtracted.numero_carteirinha || null,
+          operadora: finalExtracted.operadora || null,
+          validade_cartao: finalExtracted.validade_cartao || null,
         };
         
         results.push(bulkPolicy);
