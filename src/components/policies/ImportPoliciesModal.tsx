@@ -1020,13 +1020,13 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
               />
               {item.clientStatus === 'matched' ? (
                 <Popover>
-                  <PopoverTrigger asChild>
+                  <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
                     <Badge className="bg-zinc-700/30 text-zinc-200 border border-zinc-500/40 text-[10px] h-5 cursor-pointer hover:bg-zinc-600/40 transition-colors">
                       <UserCheck className="w-3 h-3 mr-1" />
                       Vinculado
                     </Badge>
                   </PopoverTrigger>
-                  <PopoverContent className="w-64 bg-zinc-900 border-zinc-700 p-3" side="top">
+                  <PopoverContent className="w-64 bg-zinc-900 border-zinc-700 p-3 z-[100]" side="top" sideOffset={8}>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-zinc-200 font-medium text-sm">
                         <UserCheck className="w-4 h-4 text-green-400" />
