@@ -107,7 +107,15 @@ Analise o Markdown fornecido e extraia os dados estruturados. Retorne APENAS JSO
   }
 }
 
-Se campos CRÍTICOS (nome, cpf_cnpj, numero da apolice) estiverem faltando, retorne status: "INCOMPLETO".`;
+## REGRA DE STATUS (OBRIGATÓRIO):
+- Retorne status: "COMPLETO" APENAS se TODOS os seguintes campos forem extraídos com valores válidos:
+  * nome do cliente (não vazio)
+  * cpf_cnpj (exatamente 11 ou 14 dígitos)
+  * numero da apólice (não vazio)
+  * premio_liquido OU premio_total (valor numérico > 0)
+  * data_inicio E data_fim (formato YYYY-MM-DD)
+- Se QUALQUER um desses campos estiver faltando, vazio ou nulo, OBRIGATORIAMENTE retorne status: "INCOMPLETO"
+- NUNCA retorne status: "COMPLETO" se prêmio for 0 ou nulo!`;
 
 // Patterns de lixo para filtrar
 const GARBAGE_PATTERNS = [
