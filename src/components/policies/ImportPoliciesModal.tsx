@@ -380,13 +380,20 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
             throw new Error(data?.error || 'Extração OCR falhou');
           }
           
-          // 2. Acumula texto
-          const newText = data.rawText || '';
-          accumulatedText += ' ' + newText;
-          hasMorePages = data.hasMorePages || false;
-          totalPages = data.pageRange?.total || 0;
-          
-          console.log(`📝 [OCR] ${file.name}: +${newText.length} chars (via ${data.source}), total acumulado: ${accumulatedText.length}`);
+        // 2. Acumula texto
+        const newText = data.rawText || '';
+        accumulatedText += ' ' + newText;
+        hasMorePages = data.hasMorePages || false;
+        totalPages = data.pageRange?.total || 0;
+        
+        console.log(`📝 [OCR] ${file.name}: +${newText.length} chars (via ${data.source}), total acumulado: ${accumulatedText.length}`);
+        
+        // DEBUG v4.0: Log dos primeiros 2000 chars para diagnóstico
+        if (currentPage === 1) {
+          console.log('--- DEBUG TEXT START ---');
+          console.log(accumulatedText.substring(0, 2000));
+          console.log('--- DEBUG TEXT END ---');
+        }
           
           // 3. Parser LOCAL no texto acumulado
           parsed = parsePolicy(accumulatedText, file.name);
@@ -664,6 +671,10 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     setProcessingIndex(0);
     setImportErrors([]);
     
+    // v4.0: Fallback para produtor padrão (primeiro da lista)
+    const defaultProducerId = batchProducerId || producers[0]?.id || null;
+    console.log(`🔧 [IMPORT] Produtor padrão: ${defaultProducerId || 'N/A'}`);
+    
     let success = 0;
     let errors = 0;
     const collectedErrors: ImportError[] = [];
@@ -730,7 +741,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           commissionRate: item.commissionRate,
           startDate: item.dataInicio,
           expirationDate: item.dataFim,
-          producerId: item.producerId!,
+          producerId: item.producerId || defaultProducerId || undefined,
           status: finalStatus,
           automaticRenewal: !isOrcamento,
           isBudget: isOrcamento,
