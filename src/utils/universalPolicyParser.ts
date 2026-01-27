@@ -1,12 +1,18 @@
 /**
  * ============================================================
- * UNIVERSAL POLICY PARSER v5.0 - "ALPHA WINDOW STRATEGY"
+ * UNIVERSAL POLICY PARSER v5.1 - "ANTI-NOISE + VEHICLE EXTRACTION"
  * 
  * Estratégia: 
  * 1. Cria versão AlphaNum do texto (só A-Z e 0-9)
  * 2. Localiza âncora no AlphaNum
  * 3. Mapeia posição para texto original
  * 4. Extrai janela do original e aplica Regex tolerante
+ * 
+ * v5.1 Improvements:
+ * - Institutional blacklist for client name filtering
+ * - Expanded premium anchors
+ * - Vehicle brand/model/year extraction
+ * - Smart objeto_segurado construction
  * 
  * Zero dependência de IA - 100% determinístico
  * ============================================================
@@ -61,6 +67,50 @@ export interface ParsedPolicy {
 
 // Score mínimo para o Progressive Scan parar de buscar mais páginas
 export const CONFIDENCE_THRESHOLD = 80;
+
+// ============================================================
+// v5.1: INSTITUTIONAL BLACKLIST
+// Termos que NÃO devem aparecer em nomes de segurados
+// ============================================================
+
+const INSTITUTIONAL_BLACKLIST = [
+  'SEGURADORA', 'SEGUROS', 'CORRETORA', 'CORRETAGEM', 'ESTIPULANTE',
+  'TOKIO', 'MARINE', 'PORTO', 'HDI', 'LIBERTY', 'ALLIANZ', 'MAPFRE',
+  'SULAMERICA', 'AZUL', 'ZURICH', 'SOMPO', 'BRADESCO', 'ITAU', 'CAIXA',
+  'MITSUI', 'GENERALI', 'POTTENCIAL', 'JUNTO', 'ALFA', 'BBSEGUROS',
+  'LTDA', 'SA', 'EIRELI', 'ME', 'EPP', 'CIA', 'COMPANHIA',
+  'CNPJ', 'INSCRICAO', 'RAZAOSOCIAL', 'FANTASIA', 'SUSEP',
+  'REPRESENTANTE', 'PROCURADOR', 'BENEFICIARIO', 'PRODUTOR',
+];
+
+// ============================================================
+// v5.1: CAR BRANDS DICTIONARY
+// ============================================================
+
+const CAR_BRANDS = [
+  'VW', 'VOLKSWAGEN', 'FIAT', 'CHEVROLET', 'GM', 'FORD', 'TOYOTA',
+  'HONDA', 'HYUNDAI', 'RENAULT', 'NISSAN', 'JEEP', 'PEUGEOT', 'CITROEN',
+  'KIA', 'MITSUBISHI', 'BMW', 'MERCEDES', 'AUDI', 'VOLVO', 'PORSCHE',
+  'LANDROVER', 'JAGUAR', 'SUZUKI', 'CHERY', 'JAC', 'CAOA', 'BYD',
+  'FIAT', 'YAMAHA', 'HARLEY', 'KAWASAKI', 'DUCATI', 'TRIUMPH',
+  'SCANIA', 'VOLVO', 'IVECO', 'MAN', 'DAF',
+];
+
+// ============================================================
+// v5.1: EXPANDED PREMIUM ANCHORS
+// ============================================================
+
+const PREMIO_LIQUIDO_ANCHORS = [
+  'PREMIOLIQUIDO', 'LIQUIDO', 'PREMIONET', 'PREMIOSEMLOF',
+  'VALORLIQUIDO', 'LIQTOTAL', 'PREMIOANUAL', 'PREMIOMENSAL',
+  'PREMIOCOMERCIAL', 'PREMIOLIQ', 'VLRLIQUIDO', 'VALORNET',
+  'PREMIOBASE', 'VALORSEGURO', 'PREMIOSEMLOF', 'PREMIODOSEGURO',
+];
+
+const PREMIO_TOTAL_ANCHORS = [
+  'PREMIOTOTAL', 'TOTAL', 'PREMIOFINAL', 'VALORAPAGAR', 'TOTALGERAL',
+  'TOTALAPAGAR', 'VALORFINALDOSEGURO', 'PREMIOCOMERCIAL',
+];
 
 // ============================================================
 // ALPHA TEXT STRATEGY (v5.0)
@@ -135,6 +185,137 @@ function alphaWindowExtract(
   return null;
 }
 
+/**
+ * v5.1: Extrai múltiplos candidatos de nome e retorna o primeiro válido
+ */
+function alphaWindowExtractMultiple(
+  originalText: string,
+  alphaText: string,
+  indexMap: number[],
+  anchors: string[],
+  regex: RegExp,
+  windowSize: number = 150,
+  maxCandidates: number = 5
+): string[] {
+  const candidates: string[] = [];
+  
+  for (const anchor of anchors) {
+    const alphaAnchor = anchor.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    
+    let searchIdx = 0;
+    while (candidates.length < maxCandidates) {
+      const anchorIdx = alphaText.indexOf(alphaAnchor, searchIdx);
+      if (anchorIdx === -1) break;
+      
+      const afterAnchorAlphaIdx = anchorIdx + alphaAnchor.length;
+      const originalIdx = indexMap[afterAnchorAlphaIdx] || indexMap[indexMap.length - 1] || 0;
+      const window = originalText.substring(originalIdx, originalIdx + windowSize);
+      
+      const match = window.match(regex);
+      if (match?.[1] || match?.[0]) {
+        const value = (match[1] || match[0]).trim();
+        if (value.length >= 5) {
+          candidates.push(value);
+        }
+      }
+      
+      searchIdx = anchorIdx + 1;
+    }
+  }
+  
+  return candidates;
+}
+
+// ============================================================
+// v5.1: NAME VALIDATION FUNCTION
+// ============================================================
+
+/**
+ * Valida se um nome é válido para cliente (não é institucional)
+ */
+function isValidClientName(name: string): boolean {
+  if (!name || name.length < 5) return false;
+  
+  const words = name.trim().split(/\s+/);
+  if (words.length < 2) return false;
+  
+  // Cria versão alpha do nome para checar blacklist
+  const alphaName = name.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  
+  for (const forbidden of INSTITUTIONAL_BLACKLIST) {
+    if (alphaName.includes(forbidden)) {
+      console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (contém "${forbidden}")`);
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+// ============================================================
+// v5.1: VEHICLE EXTRACTION FUNCTION
+// ============================================================
+
+interface VehicleInfo {
+  marca: string | null;
+  modelo: string | null;
+  ano: number | null;
+}
+
+/**
+ * Extrai informações do veículo (marca, modelo, ano)
+ */
+function extractVehicleInfo(
+  originalText: string,
+  alphaText: string,
+  indexMap: number[]
+): VehicleInfo {
+  const vehicleAnchors = ['VEICULO', 'MODELO', 'MARCA', 'FABRICANTE', 'AUTOMOVEL', 'SEGURADO'];
+  
+  for (const anchor of vehicleAnchors) {
+    let searchIdx = 0;
+    while (true) {
+      const idx = alphaText.indexOf(anchor, searchIdx);
+      if (idx === -1) break;
+      
+      const originalIdx = indexMap[idx + anchor.length] || 0;
+      const window = originalText.substring(originalIdx, originalIdx + 200).toUpperCase();
+      
+      // Procura marca conhecida na janela
+      for (const brand of CAR_BRANDS) {
+        const brandIdx = window.indexOf(brand);
+        if (brandIdx !== -1) {
+          // Captura texto após a marca (modelo)
+          const afterBrand = window.substring(brandIdx + brand.length, brandIdx + brand.length + 50);
+          const modelMatch = afterBrand.match(/^\s*([A-Z0-9\-\s]{2,25})/);
+          let modelo = modelMatch?.[1]?.trim() || null;
+          
+          // Limpa o modelo de caracteres indesejados
+          if (modelo) {
+            modelo = modelo.replace(/\s+/g, ' ').trim();
+            // Remove se modelo for muito curto ou parecer lixo
+            if (modelo.length < 2 || /^[\d\-]+$/.test(modelo)) {
+              modelo = null;
+            }
+          }
+          
+          // Busca ano (4 dígitos começando com 19 ou 20)
+          const anoMatch = window.match(/\b(19|20)\d{2}\b/);
+          const ano = anoMatch ? parseInt(anoMatch[0]) : null;
+          
+          console.log(`🚗 [VEHICLE] Marca: ${brand}, Modelo: ${modelo}, Ano: ${ano}`);
+          
+          return { marca: brand, modelo, ano };
+        }
+      }
+      
+      searchIdx = idx + 1;
+    }
+  }
+  
+  return { marca: null, modelo: null, ano: null };
+}
+
 // ============================================================
 // DOCUMENT CLEANING & VALIDATION
 // ============================================================
@@ -184,7 +365,7 @@ function formatDate(raw: string | null): string | null {
 }
 
 /**
- * Extrai valor monetário
+ * v5.1: Extrai valor monetário com regex mais robusto
  */
 function parseMoneyValue(raw: string | null): number | null {
   if (!raw) return null;
@@ -198,7 +379,7 @@ function parseMoneyValue(raw: string | null): number | null {
   }
   
   const value = parseFloat(cleaned);
-  return isNaN(value) ? null : value;
+  return isNaN(value) || value <= 0 ? null : value;
 }
 
 // ============================================================
@@ -346,7 +527,7 @@ export function normalizeSeguradora(nome: string | null): string | null {
 }
 
 // ============================================================
-// MAIN PARSER (v5.0)
+// MAIN PARSER (v5.1)
 // ============================================================
 
 // Regex tolerantes para OCR ruidoso
@@ -354,7 +535,8 @@ const CPF_REGEX = /(\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*
 const CNPJ_REGEX = /(\d[\s.\-\/]*\d[\s.\-\/]*\d[\s.\-\/]*\d[\s.\-\/]*\d[\s.\-\/]*\d[\s.\-\/]*\d[\s.\-\/]*\d[\s.\-\/]*\d[\s.\-\/]*\d[\s.\-\/]*\d[\s.\-\/]*\d[\s.\-\/]*\d[\s.\-\/]*\d)/;
 const PLACA_REGEX = /([A-Z][\s]*[A-Z][\s]*[A-Z][\s]*[\-\s]*\d[\s]*[A-Z0-9][\s]*\d[\s]*\d)/i;
 const DATA_REGEX = /(\d{1,2}[\s]*[\/\-][\s]*\d{1,2}[\s]*[\/\-][\s]*\d{4})/;
-const VALOR_REGEX = /R?\$?\s*([\d.,\s]+)/;
+// v5.1: Regex monetário mais robusto
+const VALOR_REGEX = /(?:R\$|BRL)?\s*([\d]{1,3}(?:[.\s]?\d{3})*[,]\d{2})/;
 const APOLICE_REGEX = /(\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d+)/;
 const NOME_REGEX = /([A-ZÀ-Ú\s]{5,60})/;
 
@@ -367,7 +549,7 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   // Cria versão alfa para busca de âncoras
   const { alpha, indexMap } = createAlphaText(text);
   
-  console.log(`🔍 [PARSER v5.0] Original: ${text.length} chars, Alpha: ${alpha.length} chars`);
+  console.log(`🔍 [PARSER v5.1] Original: ${text.length} chars, Alpha: ${alpha.length} chars`);
   
   // --- CPF/CNPJ ---
   let cpfCnpj: string | null = null;
@@ -464,15 +646,15 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
     if (dataFim) matchedFields.push('data_fim');
   }
   
-  // --- VALORES ---
+  // --- VALORES (v5.1: Âncoras expandidas) ---
   let premioLiquido: number | null = null;
   let premioTotal: number | null = null;
   
   const premioRaw = alphaWindowExtract(
     text, alpha, indexMap,
-    ['PREMIOLIQUIDO', 'LIQUIDO', 'PREMIONET'],
+    PREMIO_LIQUIDO_ANCHORS,
     VALOR_REGEX,
-    80
+    100
   );
   if (premioRaw) {
     premioLiquido = parseMoneyValue(premioRaw);
@@ -481,9 +663,9 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   
   const totalRaw = alphaWindowExtract(
     text, alpha, indexMap,
-    ['PREMIOTOTAL', 'TOTAL', 'PREMIOFINAL', 'VALORAPAGAR', 'TOTALGERAL'],
+    PREMIO_TOTAL_ANCHORS,
     VALOR_REGEX,
-    80
+    100
   );
   if (totalRaw) {
     premioTotal = parseMoneyValue(totalRaw);
@@ -505,23 +687,68 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
     matchedFields.push('ramo');
   }
   
-  // --- NOME DO CLIENTE ---
+  // --- v5.1: EXTRAÇÃO DE VEÍCULO ---
+  let marca: string | null = null;
+  let modelo: string | null = null;
+  let anoFabricacao: number | null = null;
+  let anoModelo: number | null = null;
+  
+  if (ramoSeguro === 'Automóvel' || placa) {
+    const vehicleInfo = extractVehicleInfo(text, alpha, indexMap);
+    marca = vehicleInfo.marca;
+    modelo = vehicleInfo.modelo;
+    anoFabricacao = vehicleInfo.ano;
+    anoModelo = vehicleInfo.ano;
+    
+    if (marca) matchedFields.push('marca');
+    if (modelo) matchedFields.push('modelo');
+    if (anoFabricacao) matchedFields.push('ano');
+  }
+  
+  // --- v5.1: NOME DO CLIENTE (com filtro de blacklist) ---
   let nomeCliente: string | null = null;
   
-  const nomeRaw = alphaWindowExtract(
+  const nomeCandidates = alphaWindowExtractMultiple(
     text, alpha, indexMap,
-    ['SEGURADO', 'NOME', 'PROPONENTE', 'TITULAR', 'CLIENTE', 'ESTIPULANTE'],
+    ['SEGURADO', 'NOME', 'PROPONENTE', 'TITULAR', 'CLIENTE'],
     NOME_REGEX,
-    100
+    100,
+    5
   );
-  if (nomeRaw && nomeRaw.length >= 5) {
-    nomeCliente = nomeRaw.trim()
-      .replace(/\s+/g, ' ')
-      .split(' ')
-      .map(w => w.charAt(0) + w.slice(1).toLowerCase())
-      .join(' ');
-    matchedFields.push('nome');
+  
+  // Filtra candidatos pela blacklist e pega o primeiro válido
+  for (const candidate of nomeCandidates) {
+    if (isValidClientName(candidate)) {
+      nomeCliente = candidate.trim()
+        .replace(/\s+/g, ' ')
+        .split(' ')
+        .map(w => w.charAt(0) + w.slice(1).toLowerCase())
+        .join(' ');
+      matchedFields.push('nome');
+      break;
+    }
   }
+  
+  // --- v5.1: MONTAGEM INTELIGENTE DO OBJETO SEGURADO ---
+  let objetoSegurado: string | null = null;
+  
+  if (ramoSeguro === 'Automóvel' || placa) {
+    // Automóvel: combina marca, modelo, ano e placa
+    const parts: string[] = [];
+    
+    if (marca) parts.push(marca);
+    if (modelo) parts.push(modelo);
+    if (anoFabricacao) parts.push(String(anoFabricacao));
+    
+    if (parts.length > 0 && placa) {
+      objetoSegurado = `${parts.join(' ')} - Placa: ${placa}`;
+    } else if (placa) {
+      objetoSegurado = `Veículo - Placa: ${placa}`;
+    } else if (parts.length > 0) {
+      objetoSegurado = parts.join(' ');
+    }
+  }
+  // Para outros ramos, objeto_segurado fica null (preenchimento manual)
   
   // --- CÁLCULO DE CONFIANÇA ---
   const WEIGHTS: Record<string, number> = {
@@ -537,6 +764,9 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
     ramo: 5,
     ramo_inferred: 5,
     nome: 5,
+    marca: 3,
+    modelo: 3,
+    ano: 2,
   };
   
   let confidence = 0;
@@ -545,7 +775,7 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   }
   confidence = Math.min(100, confidence);
   
-  console.log(`🔍 [PARSER v5.0] Confiança: ${confidence}%, Campos: ${matchedFields.join(', ')}`);
+  console.log(`🔍 [PARSER v5.1] Confiança: ${confidence}%, Campos: ${matchedFields.join(', ')}`);
   
   return {
     nome_cliente: nomeCliente,
@@ -562,14 +792,14 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
     data_inicio: dataInicio,
     data_fim: dataFim,
     
-    objeto_segurado: placa ? `Veículo - Placa ${placa}` : null,
+    objeto_segurado: objetoSegurado,
     placa: placa,
     chassi: null,
     
-    marca: null,
-    modelo: null,
-    ano_fabricacao: null,
-    ano_modelo: null,
+    marca: marca,
+    modelo: modelo,
+    ano_fabricacao: anoFabricacao,
+    ano_modelo: anoModelo,
     
     premio_liquido: premioLiquido,
     premio_total: premioTotal,
