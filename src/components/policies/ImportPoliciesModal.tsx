@@ -47,7 +47,7 @@ import {
   upsertClientByDocument
 } from '@/services/policyImportService';
 import { useAppStore } from '@/store';
-import { parsePolicy, ParsedPolicy, inferRamoFromText } from '@/utils/universalPolicyParser';
+import { parsePolicy, ParsedPolicy, inferRamoFromText, CONFIDENCE_THRESHOLD } from '@/utils/universalPolicyParser';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface ImportPoliciesModalProps {
@@ -309,8 +309,8 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     });
   };
 
-  // ========== PROCESSAMENTO INDIVIDUAL (v3.0 - OCR + PARSER LOCAL) ==========
-  // Fluxo: PDF → OCR.space (texto bruto) → Parser Regex Local → Dados Estruturados
+  // ========== PROCESSAMENTO INDIVIDUAL (v3.0 - PROGRESSIVE SCAN) ==========
+  // Fluxo: PDF → OCR por fatias de 2 páginas → Parser Local → Threshold de confiança
   // Zero dependência de IA - 100% determinístico
   const processFilesIndividually = async () => {
     if (!user || files.length === 0) return;
@@ -331,7 +331,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     const results: BulkOCRExtractedPolicy[] = [];
     const errors: { fileName: string; error: string }[] = [];
     
-    // Process each file individually via OCR + Local Parser
+    const MAX_PAGES = 6; // Limite de segurança (3 iterações de 2 páginas)
+    
+    // Process each file individually via Progressive Scan
     for (let idx = 0; idx < files.length; idx++) {
       const file = files[idx];
       setProcessingStatus(prev => new Map(prev).set(idx, 'processing'));
@@ -342,34 +344,74 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         
         const base64 = await fileToBase64(file);
         
-        // 1. Chama Edge Function para OCR (sem IA!)
-        const { data, error } = await supabase.functions.invoke('analyze-policy', {
-          body: { 
-            base64, 
-            fileName: file.name, 
-            mimeType: file.type,
-            mode: 'ocr-only'
+        // ========== PROGRESSIVE SCAN LOOP ==========
+        let accumulatedText = '';
+        let currentPage = 1;
+        let parsed: ParsedPolicy | null = null;
+        let hasMorePages = true;
+        let totalPages = 0;
+        
+        while (currentPage <= MAX_PAGES && hasMorePages) {
+          console.log(`📄 [PROGRESSIVE] ${file.name}: páginas ${currentPage}-${currentPage + 1}`);
+          
+          // 1. Chama Edge Function para fatia de páginas
+          const { data, error } = await supabase.functions.invoke('analyze-policy', {
+            body: { 
+              base64, 
+              fileName: file.name, 
+              mimeType: file.type,
+              mode: 'ocr-only',
+              startPage: currentPage,
+              endPage: currentPage + 1
+            }
+          });
+          
+          if (error) {
+            console.error(`❌ [INVOKE ERROR] ${file.name} (páginas ${currentPage}-${currentPage + 1}):`, error);
+            throw new Error(error.message || 'Erro ao invocar função');
           }
-        });
-        
-        if (error) {
-          console.error(`❌ [INVOKE ERROR] ${file.name}:`, error);
-          throw new Error(error.message || 'Erro ao invocar função');
+          
+          if (!data?.success) {
+            // Se não há mais páginas, apenas para o loop
+            if (!data?.rawText && data?.pageRange?.end < data?.pageRange?.start) {
+              console.log(`📄 [PROGRESSIVE] Sem mais páginas para processar`);
+              break;
+            }
+            throw new Error(data?.error || 'Extração OCR falhou');
+          }
+          
+          // 2. Acumula texto
+          const newText = data.rawText || '';
+          accumulatedText += ' ' + newText;
+          hasMorePages = data.hasMorePages || false;
+          totalPages = data.pageRange?.total || 0;
+          
+          console.log(`📝 [OCR] ${file.name}: +${newText.length} chars (via ${data.source}), total acumulado: ${accumulatedText.length}`);
+          
+          // 3. Parser LOCAL no texto acumulado
+          parsed = parsePolicy(accumulatedText, file.name);
+          
+          console.log(`🔍 [PROGRESSIVE] Confiança: ${parsed.confidence}% (threshold: ${CONFIDENCE_THRESHOLD}%), Campos: ${parsed.matched_fields.length}`);
+          
+          // 4. Se confiança >= threshold, para o loop
+          if (parsed.confidence >= CONFIDENCE_THRESHOLD) {
+            console.log(`✅ [PROGRESSIVE] Threshold atingido! Parando na página ${Math.min(currentPage + 1, totalPages)}`);
+            break;
+          }
+          
+          // 5. Próximas páginas
+          currentPage += 2;
         }
         
-        if (!data?.success || !data?.rawText) {
-          throw new Error(data?.error || 'Extração OCR falhou');
+        // Se não conseguiu parsear nada, usa resultado final
+        if (!parsed) {
+          parsed = parsePolicy(accumulatedText, file.name);
         }
         
-        console.log(`📝 [OCR] ${file.name}: ${data.rawText.length} caracteres (via ${data.source})`);
-        
-        // 2. Parser LOCAL no browser (sem rede!)
-        const parsed: ParsedPolicy = parsePolicy(data.rawText, file.name);
-        
-        console.log(`🔍 [PARSER] ${file.name}: ${parsed.matched_fields.length} campos, confiança ${parsed.confidence}%`);
+        console.log(`🔍 [PARSER FINAL] ${file.name}: ${parsed.matched_fields.length} campos, confiança ${parsed.confidence}%`);
         console.log(`   CPF: ${parsed.cpf_cnpj || 'N/A'}, Apólice: ${parsed.numero_apolice || 'N/A'}, Ramo: ${parsed.ramo_seguro || 'N/A'}`);
         
-        // 3. Se tem documento válido, faz upsert automático de cliente
+        // 6. Se tem documento válido, faz upsert automático de cliente
         let autoClientId: string | undefined;
         if (parsed.cpf_cnpj) {
           const upsertResult = await upsertClientByDocument(
@@ -386,7 +428,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           }
         }
         
-        // 4. Converte para formato BulkOCRExtractedPolicy
+        // 7. Converte para formato BulkOCRExtractedPolicy
         const bulkPolicy: BulkOCRExtractedPolicy = {
           nome_cliente: parsed.nome_cliente || 'Cliente Não Identificado',
           cpf_cnpj: parsed.cpf_cnpj,
