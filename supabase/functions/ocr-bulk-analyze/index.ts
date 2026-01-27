@@ -308,57 +308,73 @@ serve(async (req) => {
       .map(t => `\n\n=== DOCUMENTO: ${t.fileName} ===\n${t.text}\n`)
       .join('');
 
+    // v6.0: System Prompt com Chain of Thought e sanitização agressiva de nomes
     const systemPrompt = `Você é um ANALISTA SÊNIOR de seguros brasileiro.
-Analise os documentos e extraia os dados com MÁXIMA PRECISÃO.
+SIGA O PROCESSO ABAIXO RIGOROSAMENTE (Chain of Thought):
 
-## REGRAS DE OURO (CRÍTICO!)
-1. Para cada documento separado por "=== DOCUMENTO: ... ===" extraia os dados
-2. Retorne SEMPRE um array JSON válido
-3. CPF/CNPJ: EXTRAIA SEMPRE da seção "Dados do Segurado" ou "Estipulante". APENAS NÚMEROS (11 ou 14 dígitos)
-4. Datas: formato YYYY-MM-DD
-5. VALORES: número puro SEM "R$", use PONTO como decimal (ex: 1234.56)
-6. Se não encontrar um campo, use null (NÃO use 0!)
-7. arquivo_origem = nome EXATO do arquivo fonte
-8. NOME: Capture o nome COMPLETO do segurado/estipulante. IGNORE nomes de corretores ou seguradoras no campo nome_cliente!
+## PASSO 1: IDENTIFICAR TIPO DE DOCUMENTO
+Para cada documento separado por "=== DOCUMENTO: ... ===":
+- APOLICE: Documento emitido com número final
+- PROPOSTA: Antes da emissão (número de proposta)
+- ORCAMENTO: Apenas cotação (sem número definitivo)
+- ENDOSSO: Alteração em apólice existente
 
-## EXTRAÇÃO DE CPF/CNPJ (PRIORIDADE ABSOLUTA!)
-- SEMPRE busque na seção "Dados do Segurado", "Segurado", "Estipulante", "Proponente"
-- Remova pontos, traços e barras: 123.456.789-00 → 12345678900
-- Se encontrar parcialmente, tente inferir pelo contexto
-- NUNCA deixe cpf_cnpj como null se houver qualquer documento visível!
+## PASSO 2: LOCALIZAR SEÇÃO "DADOS DO SEGURADO"
+Procure por termos: "Segurado", "Titular", "Estipulante", "Proponente"
+EXTRAIA:
+- Nome COMPLETO (ignorar corretores, seguradoras, modelos de veículo)
+- CPF ou CNPJ (apenas dígitos, 11 ou 14 chars)
+- Email (se disponível)
+- Telefone (se disponível)
 
-## EXTRAÇÃO DO PRÊMIO LÍQUIDO
-- Procure "Prêmio Líquido", "Premio Comercial", "Valor Base", "Líquido"
-- NÃO confunda com "Prêmio Total" (inclui IOF!)
-- Se só achar Total: premio_liquido = total / 1.0738
-- Se achar parcela (ex: "4x R$ 500"): premio_liquido = parcela × qtd × 0.93
+## PASSO 3: SANITIZAR NOME DO CLIENTE (CRÍTICO!)
+O nome extraído DEVE passar por limpeza:
+- REMOVER palavras que são parte de veículos: modelo, versão, flex, aut, manual, turbo, tsi, tfsi, gti, sedan, hatch, suv
+- REMOVER prefixos de OCR: RA, RG, CP, NR, NO, SEQ, COD, REF, ID, PROP, NUM
+- REMOVER números puros no início ou fim
+- REMOVER títulos: Dr, Dra, Sr, Sra
+- RESULTADO: Apenas o nome da pessoa/empresa
 
-## EXTRAÇÃO DE RAMO (PRIORIDADE ABSOLUTA!)
-- Se ler QUALQUER menção a: Veículo, Placa, Marca, Modelo, RCF, Auto, Automóvel, Carro → ramo_seguro = "AUTOMÓVEL"
-- Se ler: Residencial, Residência, Casa, Apartamento, Imóvel → ramo_seguro = "RESIDENCIAL"
-- Se ler: Vida, Morte, Invalidez, AP, Acidentes Pessoais → ramo_seguro = "VIDA"
-- Se ler: Empresarial, Empresa, Comercial, CNPJ → ramo_seguro = "EMPRESARIAL"
-- Se ler: Saúde, Médico, Hospitalar, Plano → ramo_seguro = "SAÚDE"
+Exemplos de sanitização:
+- "RA TATIANE DELLA BARDA MODELO" → "Tatiane Della Barda"
+- "ALEXANDRE PELLAGIO MODELO 350" → "Alexandre Pellagio"
+- "123456 MARINA DA SILVA" → "Marina Da Silva"
+- "MARIA SILVA FLEX 1.6" → "Maria Silva"
 
-## EXTRAÇÃO DE VEÍCULOS E IMÓVEIS
-Para ramo AUTO/AUTOMÓVEL/VEÍCULO:
-- SEMPRE procure seção "Dados do Veículo", "Veículo Segurado" (geralmente página 2!)
-- PLACA: formato ABC-1234 ou ABC1D23 (Mercosul)
-  - HDI formato: "PLACA/UF: CNS0059 - SP" → extrair APENAS "CNS0059"
-- MARCA/MODELO: Ex: "VOLKSWAGEN GOLF GTI 2.0 TSI"
-  - HDI formato: "0002866 ‑ Volkswagen Polo Highline" → REMOVER código, usar "Volkswagen Polo Highline"
-- objeto_segurado = MARCA + MODELO (SEM código numérico!)
-- identificacao_adicional = APENAS A PLACA (7 chars, SEM a UF!)
+## PASSO 4: EXTRAIR VALORES FINANCEIROS
+Procure na ordem de prioridade:
+1. "Prêmio Líquido", "Premio Comercial", "Valor Base", "Líquido"
+2. Se não achar líquido mas achar total: premio_liquido = premio_total / 1.0738
+3. Se achar parcela (ex: "4x R$ 500"): premio_liquido = parcela × qtd × 0.93
 
-Para ramo RESIDENCIAL:
-- objeto_segurado = "Imóvel Residencial" ou endereço curto
-- identificacao_adicional = CEP do imóvel
+SEMPRE retorne números SEM "R$", usando PONTO como decimal.
 
-## TIPO DE DOCUMENTO
-- APOLICE: Documento emitido oficial
-- PROPOSTA: Antes da emissão
-- ORCAMENTO: Apenas cotação
-- ENDOSSO: Alteração em apólice existente`;
+## PASSO 5: IDENTIFICAR RAMO DO SEGURO
+Palavras-chave por ramo:
+- AUTOMÓVEL: placa, veículo, marca, modelo, chassi, rcf, condutor, colisão, roubo
+- RESIDENCIAL: casa, apartamento, imóvel, residência, incêndio residencial
+- VIDA: morte, invalidez, funeral, ap, acidentes pessoais, prestamista
+- EMPRESARIAL: empresa, comercial, cnpj, lucros cessantes, estabelecimento
+- SAÚDE: médico, hospitalar, plano, odonto, ANS
+
+## PASSO 6: EXTRAIR OBJETO SEGURADO
+Para AUTO:
+- objeto_segurado = MARCA + MODELO (ex: "VW Golf GTI 2.0 TSI")
+- identificacao_adicional = PLACA (7 chars, sem UF)
+- HDI formato: "0002866 ‑ Volkswagen Polo" → usar "Volkswagen Polo"
+- HDI formato: "CNS0059 - SP" → extrair "CNS0059"
+
+Para RESIDENCIAL:
+- objeto_segurado = "Imóvel Residencial"
+- identificacao_adicional = CEP
+
+## REGRAS DE OURO (NÃO VIOLAR!)
+1. CPF/CNPJ: APENAS dígitos (11 ou 14). Nunca null se visível!
+2. Datas: formato YYYY-MM-DD
+3. Valores: números puros (ex: 1234.56)
+4. Nome: SANITIZADO, sem lixo de OCR, sem partes de veículo
+5. arquivo_origem = nome EXATO do arquivo fonte
+6. NUNCA inclua nomes de corretoras ou seguradoras no campo nome_cliente`;
 
     const toolSchema = {
       type: "function",
@@ -402,6 +418,7 @@ Para ramo RESIDENCIAL:
       }
     };
 
+    // v6.0: Usando Gemini 3 Flash Preview para melhor raciocínio
     const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -409,10 +426,10 @@ Para ramo RESIDENCIAL:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-3-flash-preview',  // v6.0: Upgraded from gemini-2.5-flash
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Analise os seguintes documentos:\n${aggregatedText}` }
+          { role: 'user', content: `Analise os seguintes documentos de seguro:\n${aggregatedText}` }
         ],
         tools: [toolSchema],
         tool_choice: { type: "function", function: { name: "extract_policies" } }

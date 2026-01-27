@@ -502,13 +502,14 @@ function cleanNameForMatching(name: string): string {
 }
 
 /**
- * Find client by name with fuzzy matching (85%+ threshold - more flexible)
+ * v6.0: Find client by name with fuzzy matching (70%+ threshold - captures OCR typos)
+ * Threshold reduzido de 85% para 70% para capturar variações como "barda" vs "barba"
  * Busca em até 500 clientes para garantir cobertura adequada
  */
 async function findClientByNameFuzzy(name: string, userId: string) {
   if (!name || name.length < 3) return null;
 
-  // Limpa títulos e sufixos do nome buscado
+  // v6.0: Limpa títulos, sufixos E sanitiza o nome antes de buscar
   const cleanedInputName = cleanNameForMatching(name);
   
   const { data: clients, error } = await supabase
@@ -530,16 +531,16 @@ async function findClientByNameFuzzy(name: string, userId: string) {
 
   scored.sort((a, b) => b.score - a.score);
 
-  // ✅ Threshold de 85% (mais flexível para variações de nome)
-  const FUZZY_THRESHOLD = 0.85;
+  // ✅ v6.0: Threshold de 70% (captura variações como barda/barba, OCR typos)
+  const FUZZY_THRESHOLD = 0.70;
   if (scored[0]?.score >= FUZZY_THRESHOLD) {
-    console.log(`✅ [FUZZY CLIENT] "${name}" → "${scored[0].name}" (${(scored[0].score * 100).toFixed(0)}%)`);
+    console.log(`✅ [FUZZY v6.0] "${name}" → "${scored[0].name}" (${(scored[0].score * 100).toFixed(0)}%)`);
     return scored[0];
   }
 
   // Log para debug quando não encontra match
   if (scored[0]) {
-    console.log(`⚠️ [FUZZY CLIENT] "${name}" melhor match: "${scored[0].name}" (${(scored[0].score * 100).toFixed(0)}% < 85%)`);
+    console.log(`⚠️ [FUZZY v6.0] "${name}" melhor match: "${scored[0].name}" (${(scored[0].score * 100).toFixed(0)}% < 70%)`);
   }
 
   return null;

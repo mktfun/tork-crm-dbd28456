@@ -135,13 +135,85 @@ function generateSmartTitle(policy: any): string {
   return titulo.substring(0, 100);
 }
 
+// =============================================================================
+// v6.0 SYSTEM PROMPT: Chain of Thought + Name Sanitization + Enhanced Extraction
+// =============================================================================
+const systemPrompt = `Você é um ANALISTA SÊNIOR de seguros brasileiro.
+SIGA O PROCESSO ABAIXO RIGOROSAMENTE (Chain of Thought):
+
+## PASSO 1: IDENTIFICAR TIPO DE DOCUMENTO
+Leia o cabeçalho e identifique:
+- APOLICE: Documento emitido com número final
+- PROPOSTA: Antes da emissão (número de proposta)
+- ORCAMENTO: Apenas cotação (sem número definitivo)
+- ENDOSSO: Alteração em apólice existente
+
+## PASSO 2: LOCALIZAR SEÇÃO "DADOS DO SEGURADO"
+Procure por termos: "Segurado", "Titular", "Estipulante", "Proponente"
+EXTRAIA:
+- Nome COMPLETO (ignorar corretores, seguradoras, modelos de veículo)
+- CPF ou CNPJ (apenas dígitos, 11 ou 14 chars)
+- Email (se disponível)
+- Telefone (se disponível)
+
+## PASSO 3: SANITIZAR NOME DO CLIENTE (CRÍTICO!)
+O nome extraído DEVE passar por limpeza:
+- REMOVER palavras que são parte de veículos: modelo, versão, flex, aut, manual, turbo, tsi, tfsi, gti, sedan, hatch, suv
+- REMOVER prefixos de OCR: RA, RG, CP, NR, NO, SEQ, COD, REF, ID, PROP, NUM
+- REMOVER números puros no início ou fim
+- REMOVER títulos: Dr, Dra, Sr, Sra
+- RESULTADO: Apenas o nome da pessoa/empresa
+
+Exemplos de sanitização:
+- "RA TATIANE DELLA BARDA MODELO" → "Tatiane Della Barda"
+- "ALEXANDRE PELLAGIO MODELO 350" → "Alexandre Pellagio"
+- "123456 MARINA DA SILVA" → "Marina Da Silva"
+- "DR JOAO CARLOS MENDES" → "Joao Carlos Mendes"
+- "MARIA SILVA FLEX 1.6" → "Maria Silva"
+
+## PASSO 4: EXTRAIR VALORES FINANCEIROS
+Procure na ordem de prioridade:
+1. "Prêmio Líquido", "Premio Comercial", "Valor Base", "Líquido"
+2. Se não achar líquido mas achar total: premio_liquido = premio_total / 1.0738
+3. IOF = premio_total - premio_liquido (aproximado)
+
+SEMPRE retorne números SEM "R$", usando PONTO como decimal.
+Exemplo: "R$ 1.234,56" → 1234.56
+
+## PASSO 5: IDENTIFICAR RAMO DO SEGURO
+Palavras-chave por ramo:
+- AUTOMÓVEL: placa, veículo, marca, modelo, chassi, rcf, condutor, colisão, roubo
+- RESIDENCIAL: casa, apartamento, imóvel, residência, incêndio residencial
+- VIDA: morte, invalidez, funeral, ap, acidentes pessoais, prestamista
+- EMPRESARIAL: empresa, comercial, cnpj, lucros cessantes, estabelecimento
+- SAÚDE: médico, hospitalar, plano, odonto, ANS
+
+## PASSO 6: EXTRAIR OBJETO SEGURADO
+Para AUTO:
+- objeto_segurado = MARCA + MODELO (ex: "VW Golf GTI 2.0 TSI")
+- identificacao_adicional = PLACA (7 chars, sem UF)
+- HDI formato: "0002866 ‑ Volkswagen Polo" → REMOVER código, usar "Volkswagen Polo"
+- HDI formato: "CNS0059 - SP" → extrair "CNS0059" (sem UF)
+
+Para RESIDENCIAL:
+- objeto_segurado = "Imóvel Residencial"
+- identificacao_adicional = CEP
+
+## REGRAS DE OURO (NÃO VIOLAR!)
+1. CPF/CNPJ: APENAS dígitos (11 ou 14). Nunca null se visível no documento!
+2. Datas: formato YYYY-MM-DD
+3. Valores: números puros (ex: 1234.56)
+4. Nome: SANITIZADO, sem lixo de OCR, sem partes de veículo, sem títulos
+5. Se não encontrar um campo, use null (nunca invente dados)
+6. NUNCA inclua nomes de corretoras ou seguradoras no campo nome_cliente`;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   const startTime = performance.now();
-  console.log("🚀 [SINGLE-OCR v1.0] Processamento individual iniciado...");
+  console.log("🚀 [SINGLE-OCR v6.0 - Gemini 3 Flash] Processamento iniciado...");
 
   try {
     const { base64, fileName, mimeType } = await req.json();
@@ -249,8 +321,8 @@ serve(async (req) => {
     const filteredText = filterEssentialText(extractedText);
     console.log(`📝 [FILTRO] ${extractedText.length} → ${filteredText.length} chars`);
 
-    // ========== AI EXTRACTION (Lovable Gateway) ==========
-    console.log(`🧠 [IA] Analisando documento...`);
+    // ========== AI EXTRACTION (Lovable Gateway - Gemini 3 Flash) ==========
+    console.log(`🧠 [IA v6.0] Analisando com Gemini 3 Flash Preview...`);
     const aiStartTime = performance.now();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -258,64 +330,32 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY não configurada");
     }
 
-    const systemPrompt = `Você é um ANALISTA SÊNIOR de seguros brasileiro.
-Analise o documento e extraia os dados com MÁXIMA PRECISÃO.
-
-## REGRAS DE OURO (CRÍTICO!)
-1. Retorne SEMPRE um objeto JSON válido (não um array)
-2. CPF/CNPJ: EXTRAIA SEMPRE da seção "Dados do Segurado". APENAS NÚMEROS (11 ou 14 dígitos)
-3. Datas: formato YYYY-MM-DD
-4. VALORES: número puro SEM "R$", use PONTO como decimal (ex: 1234.56)
-5. Se não encontrar um campo, use null
-6. NOME: Capture o nome COMPLETO do segurado. IGNORE nomes de corretores ou seguradoras!
-
-## EXTRAÇÃO DE CPF/CNPJ (PRIORIDADE ABSOLUTA!)
-- SEMPRE busque na seção "Dados do Segurado", "Segurado", "Estipulante", "Proponente"
-- Remova pontos, traços e barras: 123.456.789-00 → 12345678900
-- NUNCA deixe cpf_cnpj como null se houver qualquer documento visível!
-
-## EXTRAÇÃO DO PRÊMIO LÍQUIDO
-- Procure "Prêmio Líquido", "Premio Comercial", "Valor Base", "Líquido"
-- NÃO confunda com "Prêmio Total" (inclui IOF!)
-
-## EXTRAÇÃO DE RAMO (PRIORIDADE ABSOLUTA!)
-- Se ler QUALQUER menção a: Veículo, Placa, Marca, Modelo, RCF, Auto, Automóvel, Carro → ramo_seguro = "AUTOMÓVEL"
-- Se ler: Residencial, Residência, Casa, Apartamento, Imóvel → ramo_seguro = "RESIDENCIAL"
-- Se ler: Vida, Morte, Invalidez, AP, Acidentes Pessoais → ramo_seguro = "VIDA"
-- Se ler: Empresarial, Empresa, Comercial → ramo_seguro = "EMPRESARIAL"
-- Se ler: Saúde, Médico, Hospitalar, Plano → ramo_seguro = "SAÚDE"
-
-## VEÍCULOS E PLACAS
-- PLACA: formato ABC-1234 ou ABC1D23 (Mercosul)
-- objeto_segurado = MARCA + MODELO
-- identificacao_adicional = APENAS A PLACA (7 chars)`;
-
     const toolSchema = {
       type: "function",
       function: {
         name: "extract_policy",
-        description: "Extrai dados estruturados de um documento de seguro",
+        description: "Extrai dados estruturados de um documento de seguro brasileiro",
         parameters: {
           type: "object",
           properties: {
             arquivo_origem: { type: "string" },
             tipo_documento: { type: "string", enum: ["APOLICE", "PROPOSTA", "ORCAMENTO", "ENDOSSO"] },
             tipo_operacao: { type: ["string", "null"], enum: ["NOVA", "RENOVACAO", null] },
-            nome_cliente: { type: "string" },
-            cpf_cnpj: { type: ["string", "null"] },
+            nome_cliente: { type: "string", description: "Nome SANITIZADO do cliente - sem prefixos OCR, sem partes de veículo" },
+            cpf_cnpj: { type: ["string", "null"], description: "Apenas dígitos, 11 ou 14 caracteres" },
             email: { type: ["string", "null"] },
             telefone: { type: ["string", "null"] },
             endereco_completo: { type: ["string", "null"] },
             numero_apolice: { type: ["string", "null"] },
             numero_proposta: { type: ["string", "null"] },
             nome_seguradora: { type: "string" },
-            ramo_seguro: { type: "string" },
-            objeto_segurado: { type: ["string", "null"] },
-            identificacao_adicional: { type: ["string", "null"] },
-            data_inicio: { type: ["string", "null"] },
-            data_fim: { type: ["string", "null"] },
-            premio_liquido: { type: ["number", "null"] },
-            premio_total: { type: ["number", "null"] },
+            ramo_seguro: { type: "string", description: "AUTOMÓVEL, RESIDENCIAL, VIDA, EMPRESARIAL, SAÚDE, etc." },
+            objeto_segurado: { type: ["string", "null"], description: "Para AUTO: Marca+Modelo; Para RESIDENCIAL: Imóvel Residencial" },
+            identificacao_adicional: { type: ["string", "null"], description: "Para AUTO: Placa (7 chars); Para RESIDENCIAL: CEP" },
+            data_inicio: { type: ["string", "null"], description: "Formato YYYY-MM-DD" },
+            data_fim: { type: ["string", "null"], description: "Formato YYYY-MM-DD" },
+            premio_liquido: { type: ["number", "null"], description: "Valor sem IOF, número puro" },
+            premio_total: { type: ["number", "null"], description: "Valor com IOF, número puro" },
             iof: { type: ["number", "null"] },
             parcelas: { type: ["number", "null"] },
           },
@@ -331,10 +371,10 @@ Analise o documento e extraia os dados com MÁXIMA PRECISÃO.
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-3-flash-preview',  // v6.0: Upgraded to Gemini 3 Flash
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Analise este documento (${fileName}):\n\n${filteredText}` }
+          { role: 'user', content: `Analise este documento de seguro (${fileName}):\n\n${filteredText}` }
         ],
         tools: [toolSchema],
         tool_choice: { type: "function", function: { name: "extract_policy" } }
@@ -386,8 +426,11 @@ Analise o documento e extraia os dados com MÁXIMA PRECISÃO.
     // Generate smart title
     extractedPolicy.titulo_sugerido = generateSmartTitle(extractedPolicy);
 
+    // v6.0: Log extracted data for debugging
+    console.log(`📋 [EXTRACTED v6.0] Cliente: "${extractedPolicy.nome_cliente}", CPF: ${extractedPolicy.cpf_cnpj || 'N/A'}, Ramo: ${extractedPolicy.ramo_seguro}`);
+
     const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
-    console.log(`✅ [SINGLE-OCR] Concluído em ${totalDuration}s`);
+    console.log(`✅ [SINGLE-OCR v6.0] Concluído em ${totalDuration}s`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -398,7 +441,8 @@ Analise o documento e extraia os dados com MÁXIMA PRECISÃO.
         total_pages: totalPages,
         text_length: filteredText.length,
         ai_time: `${aiDuration}s`,
-        total_time: `${totalDuration}s`
+        total_time: `${totalDuration}s`,
+        model: 'gemini-3-flash-preview'
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

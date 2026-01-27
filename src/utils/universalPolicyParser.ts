@@ -2,7 +2,16 @@
  * ============================================================
  * UNIVERSAL POLICY PARSER v5.7 - "AGGRESSIVE NOISE CLEANUP"
  * 
- * Estratégia: 
+ * @deprecated Este parser foi substituído pela extração via IA (Gemini 3 Flash).
+ * Mantido apenas para fallback/debug quando a IA não está disponível.
+ * Ver: supabase/functions/analyze-policy-single/index.ts
+ * 
+ * O fluxo principal agora usa:
+ * 1. Edge Function analyze-policy-single com Gemini 3 Flash Preview
+ * 2. Sanitização via sanitizeExtractedName() em policyImportService.ts
+ * 3. Fuzzy matching com threshold 70% para variações de OCR
+ * 
+ * Estratégia (quando usado como fallback):
  * 1. Cria versão AlphaNum do texto (só A-Z e 0-9)
  * 2. Localiza âncora no AlphaNum
  * 3. Mapeia posição para texto original
