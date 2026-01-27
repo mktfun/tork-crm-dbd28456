@@ -234,10 +234,38 @@ function alphaWindowExtractMultiple(
  * Valida se um nome é válido para cliente (não é institucional)
  */
 function isValidClientName(name: string): boolean {
-  if (!name || name.length < 5) return false;
+  if (!name) return false;
   
-  const words = name.trim().split(/\s+/);
-  if (words.length < 2) return false;
+  // Remove espaços extras e normaliza
+  const cleanName = name.trim().replace(/\s+/g, ' ');
+  
+  // v5.2: Mínimo de 8 caracteres (mais realista para nomes reais)
+  if (cleanName.length < 8) {
+    console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (muito curto: ${cleanName.length} chars)`);
+    return false;
+  }
+  
+  const words = cleanName.split(' ');
+  
+  // Mínimo de 2 palavras
+  if (words.length < 2) {
+    console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (apenas ${words.length} palavra)`);
+    return false;
+  }
+  
+  // v5.2: CADA palavra deve ter pelo menos 2 caracteres
+  const validWords = words.filter(w => w.length >= 2);
+  if (validWords.length < 2) {
+    console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (palavras muito curtas)`);
+    return false;
+  }
+  
+  // v5.2: Pelo menos UMA palavra deve ter 3+ caracteres (evita "Ra Jj")
+  const hasSubstantialWord = words.some(w => w.length >= 3);
+  if (!hasSubstantialWord) {
+    console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (sem palavra substancial)`);
+    return false;
+  }
   
   // Cria versão alpha do nome para checar blacklist
   const alphaName = name.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -801,11 +829,12 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
     ano_fabricacao: anoFabricacao,
     ano_modelo: anoModelo,
     
-    premio_liquido: premioLiquido,
-    premio_total: premioTotal,
+    // v5.2: Fallback - se não tem prêmio líquido, estima a partir do total
+    premio_liquido: premioLiquido ?? (premioTotal ? Math.round((premioTotal / 1.0738) * 100) / 100 : null),
+    premio_total: premioTotal ?? premioLiquido,
     
     confidence,
-    matched_fields: matchedFields,
+    matched_fields: premioLiquido === null && premioTotal ? [...matchedFields, 'premio_liquido_estimated'] : matchedFields,
     arquivo_origem: fileName,
   };
 }
