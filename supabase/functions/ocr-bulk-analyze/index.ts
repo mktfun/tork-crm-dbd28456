@@ -101,6 +101,116 @@ function extractTextFromPdfBuffer(buffer: Uint8Array): string {
   }
 }
 
+// =============================================================================
+// v6.1 POST-PROCESSING CLEAN: Remove garbage values after AI extraction
+// =============================================================================
+const GARBAGE_PATTERNS = [
+  /^man\s*ual$/i,
+  /^aut(omatico|o)?$/i,
+  /^modelo$/i,
+  /^versao$/i,
+  /^versão$/i,
+  /^segurado$/i,
+  /^titular$/i,
+  /^estipulante$/i,
+  /^proponente$/i,
+  /^ramo$/i,
+  /^proposta$/i,
+  /^apolice$/i,
+  /^apólice$/i,
+  /^item$/i,
+  /^veiculo$/i,
+  /^veículo$/i,
+  /^condutor$/i,
+  /^principal$/i,
+  /^cliente$/i,
+  /^nome$/i,
+  /^cpf$/i,
+  /^cnpj$/i,
+  /^n[°º]?$/i,
+  /^nr$/i,
+  /^ra$/i,
+  /^sp$/i,
+  /^rj$/i,
+  /^mg$/i,
+  /^\d{1,3}$/,  // Numbers with 1-3 digits only
+];
+
+function cleanGarbageValue(value: string | null | undefined): string | null {
+  if (!value) return null;
+  
+  const trimmed = value.toString().trim();
+  
+  // Too short = garbage
+  if (trimmed.length < 3) {
+    console.log(`🧹 [POST-CLEAN] Removendo valor muito curto: "${trimmed}"`);
+    return null;
+  }
+  
+  // Contains suspicious space in middle of word (like "man ual")
+  if (/^[a-z]{1,4}\s+[a-z]{1,4}$/i.test(trimmed) && trimmed.length < 12) {
+    console.log(`🧹 [POST-CLEAN] Removendo OCR com espaço suspeito: "${trimmed}"`);
+    return null;
+  }
+  
+  // Match against garbage patterns
+  for (const pattern of GARBAGE_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      console.log(`🧹 [POST-CLEAN] Removendo garbage match: "${trimmed}"`);
+      return null;
+    }
+  }
+  
+  return trimmed;
+}
+
+function postProcessExtractedPolicy(policy: any): any {
+  // Fields that should never have garbage values
+  const fieldsToClean = [
+    'numero_apolice',
+    'numero_proposta',
+    'objeto_segurado',
+    'identificacao_adicional',
+  ];
+  
+  for (const field of fieldsToClean) {
+    if (policy[field]) {
+      const original = policy[field];
+      const cleaned = cleanGarbageValue(original);
+      if (cleaned !== original) {
+        console.log(`🧹 [POST-CLEAN] ${field}: "${original}" → ${cleaned === null ? 'null' : `"${cleaned}"`}`);
+        policy[field] = cleaned;
+      }
+    }
+  }
+  
+  // Special handling for nome_cliente - more aggressive cleaning
+  if (policy.nome_cliente) {
+    let nome = policy.nome_cliente.toString().trim();
+    
+    // Remove garbage suffixes/prefixes
+    nome = nome
+      .replace(/\s+(manual|aut|auto|automatico|automático|modelo|versao|versão|flex|turbo|tsi|gti|sedan|hatch|suv)\s*$/gi, '')
+      .replace(/^(ra|rg|nr|cp|seq|cod|ref|id|prop|num)\s+/gi, '')
+      .replace(/^\d+\s+/, '')
+      .replace(/\s+\d+$/, '')
+      .trim();
+    
+    // Validate minimum name requirements
+    const words = nome.split(/\s+/).filter((w: string) => w.length >= 2);
+    if (words.length < 2 || nome.length < 5) {
+      console.log(`🧹 [POST-CLEAN] Nome inválido após limpeza: "${nome}" → null`);
+      policy.nome_cliente = null;
+    } else {
+      policy.nome_cliente = words.map((w: string) => 
+        w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+      ).join(' ');
+    }
+  }
+  
+  return policy;
+}
+
 // 🔴 NOMENCLATURA ELITE v4.1: [Primeiro Nome] - [Ramo] ([Objeto]) - [Placa] - [Cia] - [Tipo]
 function generateSmartTitle(policy: any): string {
   // Primeiro nome do cliente (limpa "NÃO IDENTIFICADO")
@@ -308,7 +418,7 @@ serve(async (req) => {
       .map(t => `\n\n=== DOCUMENTO: ${t.fileName} ===\n${t.text}\n`)
       .join('');
 
-    // v6.0: System Prompt com Chain of Thought e sanitização agressiva de nomes
+    // v6.1: System Prompt com Chain of Thought, Negative Constraints e sanitização agressiva
     const systemPrompt = `Você é um ANALISTA SÊNIOR de seguros brasileiro.
 SIGA O PROCESSO ABAIXO RIGOROSAMENTE (Chain of Thought):
 
@@ -368,13 +478,26 @@ Para RESIDENCIAL:
 - objeto_segurado = "Imóvel Residencial"
 - identificacao_adicional = CEP
 
+## ⚠️ NEGATIVE CONSTRAINTS (PROIBIÇÕES ABSOLUTAS) ⚠️
+NÃO EXTRAIA como dados os seguintes termos de instrução do documento:
+- "MANUAL", "MAN UAL", "AUT", "AUTOMÁTICO" → São tipos de câmbio, NÃO são números de apólice
+- "MODELO", "VERSAO", "VERSÃO" → São labels, NÃO são nomes de cliente
+- "SEGURADO", "TITULAR", "ESTIPULANTE" → São headers, NÃO são nomes
+- "RAMO", "PROPOSTA", "APOLICE" → São labels, NÃO são valores
+- Qualquer string < 4 caracteres (ex: "RA", "NR", "SP") → Provavelmente lixo de OCR
+- Qualquer string que contenha espaço no meio de palavra (ex: "man ual") → Lixo de OCR
+
+Se encontrar esses termos onde deveria haver um dado, retorne NULL para o campo.
+
 ## REGRAS DE OURO (NÃO VIOLAR!)
 1. CPF/CNPJ: APENAS dígitos (11 ou 14). Nunca null se visível!
 2. Datas: formato YYYY-MM-DD
 3. Valores: números puros (ex: 1234.56)
 4. Nome: SANITIZADO, sem lixo de OCR, sem partes de veículo
 5. arquivo_origem = nome EXATO do arquivo fonte
-6. NUNCA inclua nomes de corretoras ou seguradoras no campo nome_cliente`;
+6. NUNCA inclua nomes de corretoras ou seguradoras no campo nome_cliente
+7. numero_apolice deve ser um código numérico/alfanumérico, NUNCA "manual" ou similar
+8. objeto_segurado deve ser um veículo/imóvel real, NUNCA termos de instrução`;
 
     const toolSchema = {
       type: "function",
@@ -474,17 +597,23 @@ Para RESIDENCIAL:
 
     console.log(`📊 [IA] ${extractedPolicies.length} apólices extraídas`);
 
-    // Pós-processamento: gerar títulos e validar campos
-    const processedPolicies = extractedPolicies.map((policy: any) => ({
-      ...policy,
-      titulo_sugerido: generateSmartTitle(policy),
-      premio_liquido: typeof policy.premio_liquido === 'number' ? policy.premio_liquido : null,
-      // Normalizar nome do cliente
-      nome_cliente: policy.nome_cliente?.trim() || 'Não Identificado',
-    }));
+    // v6.1: POST-PROCESSING CLEAN + gerar títulos
+    console.log('🧹 [POST-CLEAN v6.1] Iniciando limpeza de garbage em lote...');
+    const processedPolicies = extractedPolicies.map((policy: any) => {
+      // Aplicar limpeza de garbage
+      const cleanedPolicy = postProcessExtractedPolicy({ ...policy });
+      
+      return {
+        ...cleanedPolicy,
+        titulo_sugerido: generateSmartTitle(cleanedPolicy),
+        premio_liquido: typeof cleanedPolicy.premio_liquido === 'number' ? cleanedPolicy.premio_liquido : null,
+        // Fallback para nome se ficou null após limpeza
+        nome_cliente: cleanedPolicy.nome_cliente || 'Não Identificado',
+      };
+    });
 
     const totalDuration = ((performance.now() - totalStartTime) / 1000).toFixed(2);
-    console.log(`✅ [BULK-OCR v4.0] Concluído em ${totalDuration}s`);
+    console.log(`✅ [BULK-OCR v6.1] Concluído em ${totalDuration}s`);
 
     return new Response(JSON.stringify({
       success: true,
