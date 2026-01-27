@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * UNIVERSAL POLICY PARSER v5.1 - "ANTI-NOISE + VEHICLE EXTRACTION"
+ * UNIVERSAL POLICY PARSER v5.6 - "FULL NAME EXTRACTION"
  * 
  * Estratégia: 
  * 1. Cria versão AlphaNum do texto (só A-Z e 0-9)
@@ -8,11 +8,10 @@
  * 3. Mapeia posição para texto original
  * 4. Extrai janela do original e aplica Regex tolerante
  * 
- * v5.1 Improvements:
- * - Institutional blacklist for client name filtering
- * - Expanded premium anchors
- * - Vehicle brand/model/year extraction
- * - Smart objeto_segurado construction
+ * v5.6 Improvements:
+ * - NOME_REGEX agora captura maiúsculas + minúsculas (nome completo)
+ * - cleanOcrNoiseFromName mais agressivo (remove prefixos numéricos)
+ * - Lista expandida de NOISE_PREFIXES (PROP, NUM, NRO, NUMERO)
  * 
  * Zero dependência de IA - 100% determinístico
  * ============================================================
@@ -598,7 +597,8 @@ const DATA_REGEX = /(\d{1,2}[\s]*[\/\-][\s]*\d{1,2}[\s]*[\/\-][\s]*\d{4})/;
 // v5.1: Regex monetário mais robusto
 const VALOR_REGEX = /(?:R\$|BRL)?\s*([\d]{1,3}(?:[.\s]?\d{3})*[,]\d{2})/;
 const APOLICE_REGEX = /(\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d[\s.\-]*\d+)/;
-const NOME_REGEX = /([A-ZÀ-Ú\s]{5,60})/;
+// v5.6: Regex expandido para capturar nome completo (maiúsculas + minúsculas + acentos)
+const NOME_REGEX = /([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{4,80})/;
 
 export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   const matchedFields: string[] = [];
@@ -609,7 +609,7 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
   // Cria versão alfa para busca de âncoras
   const { alpha, indexMap } = createAlphaText(text);
   
-  console.log(`🔍 [PARSER v5.1] Original: ${text.length} chars, Alpha: ${alpha.length} chars`);
+  console.log(`🔍 [PARSER v5.6] Original: ${text.length} chars, Alpha: ${alpha.length} chars`);
   
   // --- CPF/CNPJ ---
   let cpfCnpj: string | null = null;
@@ -765,26 +765,38 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
     if (anoFabricacao) matchedFields.push('ano');
   }
   
-  // --- v5.5: NOME DO CLIENTE (com filtro de ruído OCR + blacklist) ---
+  // --- v5.6: NOME DO CLIENTE (com filtro de ruído OCR agressivo + blacklist) ---
   let nomeCliente: string | null = null;
   
-  // v5.5: Prefixos de ruído comum em OCR que devem ser removidos do início do nome
+  // v5.6: Lista expandida de prefixos de ruído OCR
   const NOISE_PREFIXES = [
     'RA', 'RG', 'CP', 'NR', 'NO', 'SR', 'DR', 'SRA', 'DRA',
-    'N°', 'Nº', 'CPF', 'CNPJ', 'DOC', 'SEQ', 'COD', 'REF', 'ID'
+    'N°', 'Nº', 'CPF', 'CNPJ', 'DOC', 'SEQ', 'COD', 'REF', 'ID',
+    'PROP', 'NUM', 'NRO', 'NUMERO'
   ];
   
   /**
-   * v5.5: Remove prefixos de ruído OCR do início do nome
+   * v5.6: Remove prefixos de ruído OCR AGRESSIVAMENTE do início do nome
+   * Preserva o nome completo após limpar lixo
    */
   function cleanOcrNoiseFromName(rawName: string): string {
     const words = rawName.trim().split(/\s+/);
     
-    // Remove prefixos de ruído no início (enquanto houver mais de 2 palavras)
+    // v5.6: Remove prefixos de ruído AGRESSIVAMENTE
+    // Enquanto houver palavras suficientes, remove lixo do início
     while (words.length > 2) {
       const first = words[0].toUpperCase().replace(/[^A-Z0-9]/g, '');
-      if (NOISE_PREFIXES.includes(first) || (first.length <= 2 && /^[A-Z0-9]+$/.test(first))) {
-        console.log(`🧹 [OCR NOISE v5.5] Removendo prefixo: "${words[0]}"`);
+      
+      // Remove se:
+      // 1. Está na lista de prefixos conhecidos
+      // 2. Tem 2 ou menos caracteres e é alfanumérico puro
+      // 3. Parece número de documento (ex: "123456")
+      if (
+        NOISE_PREFIXES.includes(first) || 
+        (first.length <= 2 && /^[A-Z0-9]+$/.test(first)) ||
+        /^\d+$/.test(first)
+      ) {
+        console.log(`🧹 [OCR v5.6] Removendo prefixo: "${words[0]}"`);
         words.shift();
       } else {
         break;
@@ -802,9 +814,9 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
     5
   );
   
-  // v5.5: Limpa ruído OCR e valida candidatos
+  // v5.6: Limpa ruído OCR e valida candidatos
   for (const candidate of nomeCandidates) {
-    // v5.5: Primeiro limpa ruído OCR (prefixos tipo "RA", "RG", etc)
+    // v5.6: Primeiro limpa ruído OCR (prefixos tipo "RA", "RG", números, etc)
     const cleanedCandidate = cleanOcrNoiseFromName(candidate);
     
     if (isValidClientName(cleanedCandidate)) {
@@ -815,7 +827,7 @@ export function parsePolicy(rawText: string, fileName?: string): ParsedPolicy {
         .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
         .join(' ');
       matchedFields.push('nome');
-      console.log(`✅ [NAME v5.5] Nome limpo: "${candidate}" → "${nomeCliente}"`);
+      console.log(`✅ [NAME v5.6] Nome extraído: "${candidate}" → "${nomeCliente}"`);
       break;
     }
   }
