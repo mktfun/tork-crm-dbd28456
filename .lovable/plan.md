@@ -1,193 +1,279 @@
 
-# Plano: Correção Definitiva de Nome do Cliente + Melhorias na Vinculação
+# Plano: Correção Completa de Vinculação de Cliente na Importação
 
 ## Diagnóstico
 
-O nome "Agora Você Pode Realizar O Programa De Benefícios..." está passando pela validação porque:
+### Problema 1: Prefixo "Ra" no Nome
+O OCR está capturando ruído tipo `"RA JOSE DA SILVA"` onde `"RA"` é lixo. O parser aplica Title Case e fica `"Ra Jose Da Silva"`.
 
-| Critério Atual | Valor | Resultado |
-|----------------|-------|-----------|
-| 8+ caracteres | ~40 chars | PASSA |
-| 2+ palavras | 10 palavras | PASSA |
-| Palavra 3+ chars | "Agora", "Você", etc. | PASSA |
-| Blacklist | Não contém termos | PASSA |
+**Causa raiz**: O parser aceita palavras de 2 caracteres como válidas, e "RA" passa na validação.
 
-Mas claramente é um texto institucional/marketing, NÃO um nome de pessoa.
+### Problema 2: Popover Não Abre/Funciona Mal
+O Popover existe (linhas 1049-1090) mas:
+- Pode estar sendo bloqueado por eventos
+- Não mostra informações úteis (nome, telefone, email, CPF completo)
+- Não permite trocar o cliente vinculado
+
+### Problema 3: Não Dá Pra Selecionar Outro Cliente
+Se a vinculação automática errar, não tem como buscar e selecionar o cliente correto manualmente.
+
+### Problema 4: Dados do Cliente Não São Atualizados
+Quando importa uma apolice com dados novos (telefone, email), essas infos não atualizam o cliente vinculado.
 
 ---
 
-## Solução em 3 Frentes
+## Solucao
 
-### Frente 1: Expandir Blacklist com Frases Institucionais
+### Frente 1: Filtro de Ruido OCR no Parser
 
-**Arquivo**: `src/services/policyImportService.ts` e `src/utils/universalPolicyParser.ts`
+**Arquivo**: `src/utils/universalPolicyParser.ts`
 
-Adicionar termos que indicam texto institucional/marketing:
-
-```typescript
-const INSTITUTIONAL_BLACKLIST = [
-  // Existentes...
-  
-  // v5.4: Frases de marketing/institucional
-  'AGORA', 'VOCE', 'PODE', 'REALIZAR', 'PROGRAMA', 'BENEFICIOS',
-  'APROVEITE', 'DESCONTO', 'PROMOCAO', 'OFERTA', 'EXCLUSIVO',
-  'CLIQUE', 'ACESSE', 'SAIBA', 'MAIS', 'INFORMACOES',
-  'ATENDIMENTO', 'SERVICO', 'PORTAL', 'ONLINE', 'DIGITAL',
-  'TERMOS', 'CONDICOES', 'REGULAMENTO', 'PARTICIPAR',
-  'PAGINA', 'SITE', 'WWW', 'HTTP', 'HTTPS',
-];
-```
-
-### Frente 2: Detectar Padrão de Frase (Muitas Palavras)
-
-Adicionar heurística: nomes reais raramente têm mais de 5 palavras.
+Adicionar filtro para palavras curtas suspeitas no inicio do nome:
 
 ```typescript
-function isValidClientName(name: string): boolean {
-  // ... critérios existentes ...
+// Apos extrair candidato de nome (linha ~780-790)
+// v5.5: Remover prefixos de 2-3 chars que sao ruido comum de OCR
+const NOISE_PREFIXES = ['RA', 'RG', 'CP', 'NR', 'N°', 'NO', 'SR', 'DR'];
+
+function cleanOcrNoiseFromName(name: string): string {
+  const words = name.split(' ').filter(w => w.length > 0);
   
-  // v5.4: Nome com mais de 5 palavras provavelmente é frase institucional
-  if (words.length > 5) {
-    console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (${words.length} palavras - provavelmente frase)`);
-    return false;
+  // Se primeira palavra é ruído típico de OCR, remove
+  if (words.length > 2 && NOISE_PREFIXES.includes(words[0].toUpperCase())) {
+    words.shift();
   }
   
-  // v5.4: Verificar se parece com frase (verbos, artigos em excesso)
-  const verbsAndArticles = ['VOCE', 'PODE', 'PARA', 'COM', 'QUE', 'COMO', 'FAZER', 'TER', 'SER'];
-  const wordSet = new Set(words.map(w => w.toUpperCase()));
-  const matchCount = verbsAndArticles.filter(v => wordSet.has(v)).length;
-  
-  if (matchCount >= 2) {
-    console.log(`🚫 [NAME FILTER] Rejeitado: "${name}" (parece frase: ${matchCount} verbos/artigos)`);
-    return false;
-  }
-  
-  return true;
+  return words.join(' ');
+}
+
+// Aplicar antes de validar:
+const cleanedCandidate = cleanOcrNoiseFromName(candidate);
+if (isValidClientName(cleanedCandidate)) {
+  nomeCliente = formatNameTitleCase(cleanedCandidate);
 }
 ```
 
-### Frente 3: Forçar Edição Manual Quando Nome Inválido
+### Frente 2: Popover com Dados Completos + Busca de Cliente
 
-No `ImportPoliciesModal.tsx`, quando o nome é inválido:
-1. Exibir campo com borda vermelha + placeholder "Digite o nome do cliente"
-2. Bloquear botão "Importar" até que o nome seja editado
-3. Exibir alerta visual na linha
+**Arquivo**: `src/components/policies/ImportPoliciesModal.tsx`
+
+Transformar o Popover em um painel interativo com:
+1. Dados completos do cliente (nome, CPF, telefone, email)
+2. Botao para "Trocar Cliente" que abre busca igual ao CRM
+3. Usar o `ClientSearchCombobox` já existente
+
+```text
++------------------------------------------+
+|  Cliente Vinculado                       |
++------------------------------------------+
+| Nome: Marina Pereira Biso                |
+| CPF:  359.396.078-88                     |
+| Tel:  (11) 99999-9999                    |
+| Email: marina@email.com                  |
++------------------------------------------+
+| [Trocar Cliente]  [Desvincular]          |
++------------------------------------------+
+```
+
+Fluxo ao clicar "Trocar Cliente":
+1. Abre dropdown de busca (ClientSearchCombobox)
+2. Usuario digita nome/CPF/telefone
+3. Seleciona cliente correto
+4. Sistema atualiza item com novo clientId/clientName
+
+### Frente 3: Atualizar Dados do Cliente ao Importar
+
+**Arquivo**: `src/services/policyImportService.ts`
+
+Modificar `upsertClientByDocument` para atualizar campos vazios:
 
 ```typescript
-// Validação visual na UI
-const isNameInvalid = !item.clientName?.trim() || 
-  item.clientName === 'Cliente Não Identificado' ||
-  item.clientName.length > 60 ||  // v5.4: Nomes muito longos são suspeitos
-  item.clientName.split(' ').length > 5; // v5.4: Muitas palavras = frase
-
-// Input com destaque vermelho se inválido
-<Input
-  value={item.clientName}
-  className={cn(
-    "h-8 bg-transparent border-zinc-700/50",
-    isNameInvalid && "border-red-500/50 bg-red-900/10 animate-pulse"
-  )}
-  placeholder="⚠️ Digite o nome do cliente"
-/>
+if (existing) {
+  // v5.5: Atualiza campos vazios do cliente existente
+  const updates: Record<string, any> = {};
+  
+  if (!existing.phone && telefone) updates.phone = telefone;
+  if (!existing.email && email) updates.email = email;
+  if (!existing.address && endereco) updates.address = endereco;
+  
+  if (Object.keys(updates).length > 0) {
+    await supabase
+      .from('clientes')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', existing.id);
+    console.log('Dados do cliente atualizados:', Object.keys(updates));
+  }
+  
+  return { id: existing.id, created: false, name: existing.name };
+}
 ```
+
+### Frente 4: Hook de Clientes para Busca
+
+Utilizar o hook `useAllClients` já existente para alimentar o ClientSearchCombobox no modal de importacao.
 
 ---
 
-## Alterações por Arquivo
+## Alteracoes por Arquivo
 
-| Arquivo | Alteração |
+| Arquivo | Alteracao |
 |---------|-----------|
-| `src/services/policyImportService.ts` | Expandir `INSTITUTIONAL_BLACKLIST`, adicionar heurística de frase em `isValidClientName()` |
-| `src/utils/universalPolicyParser.ts` | Sincronizar mesma lógica de validação (ou importar função compartilhada) |
-| `src/components/policies/ImportPoliciesModal.tsx` | Validação visual + bloquear importação de nomes inválidos |
+| `src/utils/universalPolicyParser.ts` | Adicionar `cleanOcrNoiseFromName()` para filtrar prefixos de ruido |
+| `src/services/policyImportService.ts` | Atualizar campos vazios do cliente no `upsertClientByDocument()`, buscar mais dados (phone, email) |
+| `src/components/policies/ImportPoliciesModal.tsx` | Novo Popover com dados completos + busca de cliente integrada |
 
 ---
 
 ## Resultado Esperado
 
-Antes:
-- "Agora Você Pode Realizar O Pro..." é exibido como nome → Usuário precisa perceber e editar
-
-Depois:
-- Campo aparece VAZIO com placeholder vermelho "⚠️ Digite o nome do cliente"
-- Botão "Importar" desabilitado até edição
-- Nome institucional rejeitado automaticamente
+1. **Nome correto**: "Marina Pereira Biso" em vez de "Ra Marina"
+2. **Popover funcional**: Mostra dados completos do cliente vinculado
+3. **Busca de cliente**: Botao "Trocar Cliente" abre busca igual CRM
+4. **Atualizacao de dados**: Telefone/email novos atualizam cliente existente
+5. **Vinculacao manual**: Se vinculacao automatica errar, usuario corrige facilmente
 
 ---
 
-## Detalhes Técnicos
+## Detalhes Tecnicos
 
-### Nova Função `isValidClientName` (v5.4)
+### Limpeza de Ruido OCR
 
 ```typescript
-function isValidClientName(name: string): boolean {
-  if (!name) return false;
+const NOISE_PREFIXES = [
+  'RA', 'RG', 'CP', 'NR', 'NO', 'SR', 'DR', 'SRA', 'DRA',
+  'N°', 'Nº', 'CPF', 'CNPJ', 'DOC', 'SEQ', 'COD', 'REF'
+];
+
+function cleanOcrNoiseFromName(rawName: string): string {
+  const words = rawName.trim().split(/\s+/);
   
-  const cleanName = name.trim().replace(/\s+/g, ' ');
-  
-  // Mínimo de 8 caracteres
-  if (cleanName.length < 8) return false;
-  
-  const words = cleanName.split(' ');
-  
-  // v5.4: NOVO - Máximo de 5 palavras (nomes reais)
-  if (words.length > 5) return false;
-  
-  // Mínimo de 2 palavras válidas
-  const validWords = words.filter(w => w.length >= 2);
-  if (validWords.length < 2) return false;
-  
-  // Pelo menos uma palavra substancial (3+ chars)
-  if (!words.some(w => w.length >= 3)) return false;
-  
-  const alphaName = name.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-  
-  // Blacklist expandida
-  const BLACKLIST = [
-    // Seguradoras
-    'SEGURADORA', 'SEGUROS', 'CORRETORA', 'TOKIO', 'PORTO', 'HDI',
-    // Termos jurídicos
-    'LTDA', 'SA', 'EIRELI', 'CNPJ', 'CPF',
-    // v5.4: Termos de marketing/frases
-    'AGORA', 'VOCE', 'PODE', 'REALIZAR', 'PROGRAMA', 'BENEFICIOS',
-    'APROVEITE', 'PROMOCAO', 'OFERTA', 'CLIQUE', 'ACESSE',
-    'TERMOS', 'CONDICOES', 'REGULAMENTO', 'PARTICIPAR',
-  ];
-  
-  for (const forbidden of BLACKLIST) {
-    if (alphaName.includes(forbidden)) return false;
+  // Remove prefixos de ruido no inicio
+  while (words.length > 2) {
+    const first = words[0].toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (NOISE_PREFIXES.includes(first) || (first.length <= 2 && /^[A-Z0-9]+$/.test(first))) {
+      words.shift();
+    } else {
+      break;
+    }
   }
   
-  // v5.4: Detectar padrão de frase
-  const verbsAndArticles = ['VOCE', 'PODE', 'PARA', 'COM', 'QUE', 'COMO'];
-  const wordSet = new Set(words.map(w => w.toUpperCase()));
-  const matchCount = verbsAndArticles.filter(v => wordSet.has(v)).length;
-  
-  if (matchCount >= 2) return false;
-  
-  return true;
+  return words.join(' ');
 }
 ```
 
-### Validação na UI (ImportPoliciesModal)
+### Popover Expandido com Busca
+
+```tsx
+<Popover>
+  <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
+    <Badge className="cursor-pointer hover:bg-zinc-600/40">
+      <UserCheck className="w-3 h-3 mr-1" />
+      Vinculado
+    </Badge>
+  </PopoverTrigger>
+  <PopoverContent className="w-80 bg-zinc-900/95 border-zinc-700 p-0 z-[200]" side="top">
+    <div className="p-3 border-b border-zinc-700/50">
+      <div className="flex items-center justify-between">
+        <span className="text-zinc-200 font-medium text-sm flex items-center gap-2">
+          <UserCheck className="w-4 h-4 text-green-400" />
+          Cliente Vinculado
+        </span>
+        <Badge variant="outline" className="text-[10px]">
+          {item.matchedBy === 'cpf_cnpj' ? 'CPF/CNPJ' : 
+           item.matchedBy === 'name_fuzzy' ? 'Nome' : 'Auto'}
+        </Badge>
+      </div>
+    </div>
+    
+    <div className="p-3 space-y-2 text-xs">
+      <div className="flex justify-between">
+        <span className="text-zinc-500">Nome:</span>
+        <span className="text-zinc-200 font-medium">{item.clientName}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-zinc-500">CPF/CNPJ:</span>
+        <span className="text-zinc-300 font-mono">{formatCpf(item.clientCpfCnpj)}</span>
+      </div>
+      {clientDetails?.phone && (
+        <div className="flex justify-between">
+          <span className="text-zinc-500">Telefone:</span>
+          <span className="text-zinc-300">{clientDetails.phone}</span>
+        </div>
+      )}
+      {clientDetails?.email && (
+        <div className="flex justify-between">
+          <span className="text-zinc-500">Email:</span>
+          <span className="text-zinc-300 truncate max-w-[150px]">{clientDetails.email}</span>
+        </div>
+      )}
+    </div>
+    
+    <div className="p-2 border-t border-zinc-700/50 flex gap-2">
+      <Button 
+        size="sm" 
+        variant="outline" 
+        className="flex-1 h-7 text-xs"
+        onClick={() => setShowClientSearch(item.id)}
+      >
+        Trocar Cliente
+      </Button>
+      <Button 
+        size="sm" 
+        variant="ghost" 
+        className="h-7 text-xs text-zinc-400"
+        onClick={() => handleUnlinkClient(item.id)}
+      >
+        Desvincular
+      </Button>
+    </div>
+  </PopoverContent>
+</Popover>
+
+{/* Dialog de busca de cliente */}
+{showClientSearch === item.id && (
+  <ClientSearchCombobox
+    clients={allClients.map(c => ({
+      id: c.id,
+      name: c.name,
+      phone: c.phone || '',
+      email: c.email || ''
+    }))}
+    value={item.clientId || ''}
+    onValueChange={(newClientId) => handleClientChange(item.id, newClientId)}
+    isLoading={loadingClients}
+    placeholder="Buscar cliente..."
+  />
+)}
+```
+
+### Atualizacao de Dados do Cliente
 
 ```typescript
-const isNameSuspicious = (name: string | null): boolean => {
-  if (!name?.trim()) return true;
-  if (name === 'Cliente Não Identificado') return true;
-  if (name.length > 60) return true;
-  if (name.split(' ').length > 5) return true;
+// policyImportService.ts - upsertClientByDocument v5.5
+if (existing) {
+  const updates: Record<string, any> = {};
   
-  const upper = name.toUpperCase();
-  const suspiciousTerms = ['AGORA', 'VOCE', 'PODE', 'PROGRAMA', 'BENEFICIO'];
-  return suspiciousTerms.some(t => upper.includes(t));
-};
-
-// Na validação antes de importar
-const hasInvalidNames = validItems.some(item => isNameSuspicious(item.clientName));
-
-if (hasInvalidNames) {
-  toast.error('Existem clientes com nome inválido. Edite antes de importar.');
-  return;
+  // Atualiza nome se o existente era lixo
+  if (!isValidClientName(existing.name)) {
+    const safeName = sanitizeClientName(nome);
+    if (safeName !== existing.name) updates.name = safeName;
+  }
+  
+  // v5.5: Preenche campos vazios com dados do PDF
+  if (telefone && !existing.phone) updates.phone = telefone;
+  if (email && !existing.email) updates.email = email;
+  if (endereco && !existing.address) updates.address = endereco;
+  
+  if (Object.keys(updates).length > 0) {
+    updates.updated_at = new Date().toISOString();
+    await supabase.from('clientes').update(updates).eq('id', existing.id);
+    console.log(`🔄 [UPSERT v5.5] Cliente atualizado:`, Object.keys(updates));
+  }
+  
+  return { 
+    id: existing.id, 
+    created: false, 
+    name: updates.name || existing.name 
+  };
 }
 ```
