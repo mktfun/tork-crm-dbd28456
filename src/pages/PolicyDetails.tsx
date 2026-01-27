@@ -1,6 +1,6 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Download, FileText, Upload, Calendar, DollarSign, Building2, User, Phone, Mail, MapPin, Edit, Calculator, ArrowRight, Ban, RotateCcw, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Download, FileText, Upload, Calendar, DollarSign, Building2, User, Phone, Mail, MapPin, Edit, Calculator, ArrowRight, Ban, RotateCcw, ExternalLink, CreditCard } from 'lucide-react';
 import { formatDate } from '@/utils/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ import { PolicyRenewalSection } from '@/components/policies/PolicyRenewalSection
 import type { Policy } from '@/types';
 import { CommissionExtract } from '@/components/policies/CommissionExtract';
 import { useToast } from '@/hooks/use-toast';
+import { linkCarteirinhaToPolicy } from '@/services/policyImportService';
 
 export default function PolicyDetails() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +34,7 @@ export default function PolicyDetails() {
   const [client, setClient] = useState<any>(null);
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
   const [isEditPolicyModalOpen, setIsEditPolicyModalOpen] = useState(false);
+  const [isUploadingCarteirinha, setIsUploadingCarteirinha] = useState(false);
 
   const isBudget = policy?.status === 'Orçamento';
 
@@ -105,6 +107,42 @@ export default function PolicyDetails() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+    }
+  };
+
+  // v9.0: Handler para upload de carteirinha
+  const handleCarteirinhaUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !policy) return;
+    
+    // Validar tipo (PDF ou imagem)
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!validTypes.includes(file.type)) {
+      toast({ title: 'Erro', description: 'Formato inválido. Use PDF, JPG ou PNG.', variant: 'destructive' });
+      return;
+    }
+    
+    // Validar tamanho (máximo 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'Erro', description: 'O arquivo deve ter no máximo 10MB.', variant: 'destructive' });
+      return;
+    }
+    
+    try {
+      setIsUploadingCarteirinha(true);
+      const result = await linkCarteirinhaToPolicy(policy.id, file, policy.userId || '');
+      
+      if (result.success) {
+        toast({ title: 'Sucesso', description: 'Carteirinha anexada com sucesso!' });
+        // Recarregar dados
+        window.location.reload();
+      } else {
+        toast({ title: 'Erro', description: result.error || 'Erro ao anexar carteirinha', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Erro ao anexar carteirinha', variant: 'destructive' });
+    } finally {
+      setIsUploadingCarteirinha(false);
     }
   };
 
@@ -440,33 +478,61 @@ export default function PolicyDetails() {
                       </div>
                     )}
 
-                    {/* PDF Anexado (base64) */}
-                    {policy.pdfAnexado && (
-                      <Button variant="outline" className="w-full" onClick={handleDownloadPdf}>
-                        <Download className="w-4 h-4 mr-2" />
-                        Baixar PDF
-                      </Button>
-                    )}
-
-                    {/* PDF via URL do Storage */}
-                    {policy.pdfUrl && !policy.pdfAnexado && (
-                      <div className="space-y-2">
+                    {/* v9.0: Visualização Dual de Documentos */}
+                    <div className="space-y-2">
+                      {/* Botão Ver Apólice */}
+                      {(policy.pdfAnexado || policy.pdfUrl) && (
                         <Button 
                           variant="outline" 
                           className="w-full" 
-                          onClick={() => window.open(policy.pdfUrl, '_blank')}
+                          onClick={() => {
+                            if (policy.pdfAnexado) {
+                              handleDownloadPdf();
+                            } else if (policy.pdfUrl) {
+                              window.open(policy.pdfUrl, '_blank');
+                            }
+                          }}
                         >
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          Ver PDF Original
+                          <FileText className="w-4 h-4 mr-2" />
+                          Ver Apólice
                         </Button>
-                        <Button variant="outline" className="w-full" asChild>
-                          <a href={policy.pdfUrl} download>
-                            <Download className="w-4 h-4 mr-2" />
-                            Baixar PDF
-                          </a>
+                      )}
+                      
+                      {/* Botão Ver Carteirinha */}
+                      {policy.carteirinhaUrl ? (
+                        <Button 
+                          variant="outline" 
+                          className="w-full border-teal-500/30 text-teal-400 hover:bg-teal-500/10" 
+                          onClick={() => window.open(policy.carteirinhaUrl, '_blank')}
+                        >
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          Ver Carteirinha
                         </Button>
-                      </div>
-                    )}
+                      ) : (
+                        <div>
+                          <label htmlFor="carteirinha-upload">
+                            <Button 
+                              asChild 
+                              variant="outline" 
+                              className="w-full border-dashed border-slate-600"
+                              disabled={isUploadingCarteirinha}
+                            >
+                              <span className="cursor-pointer">
+                                <Upload className="w-4 h-4 mr-2" />
+                                {isUploadingCarteirinha ? 'Enviando...' : 'Anexar Carteirinha'}
+                              </span>
+                            </Button>
+                          </label>
+                          <input
+                            id="carteirinha-upload"
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={handleCarteirinhaUpload}
+                            className="hidden"
+                          />
+                        </div>
+                      )}
+                    </div>
 
                     {(policy.status === 'Ativa' || policy.status === 'Aguardando Apólice') && (
                       <AlertDialog>

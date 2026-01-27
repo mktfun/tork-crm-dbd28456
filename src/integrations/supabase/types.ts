@@ -78,6 +78,7 @@ export type Database = {
           automatic_renewal: boolean
           bonus_class: string | null
           brokerage_id: number | null
+          carteirinha_url: string | null
           client_id: string
           commission_rate: number
           created_at: string
@@ -86,6 +87,7 @@ export type Database = {
           installments: number | null
           insurance_company: string | null
           insured_asset: string | null
+          last_ocr_type: string | null
           pdf_attached_data: string | null
           pdf_attached_name: string | null
           pdf_url: string | null
@@ -104,6 +106,7 @@ export type Database = {
           automatic_renewal?: boolean
           bonus_class?: string | null
           brokerage_id?: number | null
+          carteirinha_url?: string | null
           client_id: string
           commission_rate?: number
           created_at?: string
@@ -112,6 +115,7 @@ export type Database = {
           installments?: number | null
           insurance_company?: string | null
           insured_asset?: string | null
+          last_ocr_type?: string | null
           pdf_attached_data?: string | null
           pdf_attached_name?: string | null
           pdf_url?: string | null
@@ -130,6 +134,7 @@ export type Database = {
           automatic_renewal?: boolean
           bonus_class?: string | null
           brokerage_id?: number | null
+          carteirinha_url?: string | null
           client_id?: string
           commission_rate?: number
           created_at?: string
@@ -138,6 +143,7 @@ export type Database = {
           installments?: number | null
           insurance_company?: string | null
           insured_asset?: string | null
+          last_ocr_type?: string | null
           pdf_attached_data?: string | null
           pdf_attached_name?: string | null
           pdf_url?: string | null

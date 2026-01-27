@@ -1314,3 +1314,87 @@ export function classifyImportError(error: any, item: PolicyImportItem): ImportE
   
   return baseError;
 }
+
+// ============================================================
+// v9.0: CARTEIRINHA LINKING FUNCTIONS
+// ============================================================
+
+/**
+ * Vincula uma carteirinha a uma apólice existente
+ * 1. Faz upload do arquivo para storage
+ * 2. Atualiza o campo carteirinha_url na apólice
+ */
+export async function linkCarteirinhaToPolicy(
+  policyId: string,
+  carteirinhaFile: File,
+  userId: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    // 1. Upload para storage
+    const path = `carteirinhas/${userId}/${policyId}/${Date.now()}_${carteirinhaFile.name}`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('policy-docs')
+      .upload(path, carteirinhaFile, { upsert: true });
+    
+    if (uploadError) throw uploadError;
+    
+    // 2. Obter URL pública
+    const { data: urlData } = supabase.storage
+      .from('policy-docs')
+      .getPublicUrl(path);
+    
+    // 3. Atualizar apólice com URL da carteirinha
+    const { error: updateError } = await supabase
+      .from('apolices')
+      .update({ 
+        carteirinha_url: urlData.publicUrl,
+        last_ocr_type: 'carteirinha'
+      })
+      .eq('id', policyId)
+      .eq('user_id', userId);
+    
+    if (updateError) throw updateError;
+    
+    console.log(`✅ [CARTEIRINHA] Vinculada à apólice ${policyId}`);
+    return { success: true, url: urlData.publicUrl };
+  } catch (error) {
+    console.error('❌ [CARTEIRINHA] Erro ao vincular:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Erro desconhecido' 
+    };
+  }
+}
+
+/**
+ * Busca apólices de saúde de um cliente para vincular carteirinha
+ */
+export async function findHealthPoliciesByClient(
+  clientId: string,
+  userId: string
+): Promise<{ id: string; policy_number: string | null; insured_asset: string | null; company_name: string | null }[]> {
+  const { data, error } = await supabase
+    .from('apolices')
+    .select(`
+      id,
+      policy_number,
+      insured_asset,
+      companies:insurance_company(name)
+    `)
+    .eq('user_id', userId)
+    .eq('client_id', clientId)
+    .or('type.ilike.%saude%,type.ilike.%saúde%,type.ilike.%vida%')
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    console.error('❌ Erro ao buscar apólices de saúde:', error);
+    return [];
+  }
+  
+  return (data || []).map(p => ({
+    id: p.id,
+    policy_number: p.policy_number,
+    insured_asset: p.insured_asset,
+    company_name: (p.companies as any)?.name || null
+  }));
+}

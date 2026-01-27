@@ -30,6 +30,8 @@ export function useSupabasePolicies() {
         .from('apolices')
         .select(`
           *,
+          carteirinha_url,
+          last_ocr_type,
           companies:insurance_company (
             id,
             name
@@ -73,7 +75,9 @@ export function useSupabasePolicies() {
         bonus_class: policy.bonus_class,
         automaticRenewal: policy.automatic_renewal,
         companies: policy.companies || undefined,
-        ramos: policy.ramos || undefined
+        ramos: policy.ramos || undefined,
+        carteirinhaUrl: policy.carteirinha_url || undefined,
+        lastOcrType: policy.last_ocr_type as 'apolice' | 'carteirinha' | undefined
       })) || [];
 
       console.log('✅ Apólices carregadas:', formattedPolicies.length);

@@ -7,26 +7,43 @@ const corsHeaders = {
 };
 
 // ============================================================
-// GEMINI VISION EXTRACTOR v8.0 - "CHUNKED AI EXTRACTION"
+// GEMINI VISION EXTRACTOR v9.0 - "DOCUMENT CATEGORIZATION"
 // 
+// Detecta tipo de documento (APOLICE vs CARTEIRINHA) e extrai dados adequados
 // Fluxo: Frontend (2 em 2 páginas) → Gemini Vision → JSON → Merge no Frontend
-// Garante 98%+ de precisão mesmo em apólices longas (6+ páginas)
 // ============================================================
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 // ============================================================
-// SYSTEM PROMPT - EXTRAÇÃO ESTRUTURADA
+// SYSTEM PROMPT - DETECÇÃO DE TIPO + EXTRAÇÃO ESTRUTURADA
 // ============================================================
 
 const SYSTEM_PROMPT = `Você é um especialista em documentos de seguros brasileiros. Extraia os dados do documento anexo e retorne APENAS um JSON válido.
+
+## DETECÇÃO DE TIPO DE DOCUMENTO:
+
+Antes de extrair, identifique o TIPO:
+
+1. **APOLICE** - Documento completo de seguro:
+   - Contém "Condições Gerais", "Prêmio", "Vigência", "Coberturas"
+   - Dados financeiros detalhados
+   - Número da apólice/proposta
+
+2. **CARTEIRINHA** - Documento de identificação de beneficiário:
+   - Termos: "Beneficiário", "Cartão", "Rede de Atendimento", "Plano de Saúde"
+   - Número de matrícula/carteirinha
+   - Operadora de saúde
+   - SEM dados financeiros detalhados
+
+Retorne o campo tipo_documento: "APOLICE" ou "CARTEIRINHA"
 
 ## REGRAS CRÍTICAS:
 
 1. **CPF/CNPJ**: APENAS DÍGITOS (11 para CPF, 14 para CNPJ). Se não encontrar, retorne null.
 
 2. **NOME DO CLIENTE**: 
-   - Extraia da seção "Dados do Segurado" ou "Segurado"
+   - Extraia da seção "Dados do Segurado" ou "Segurado" ou "Titular" ou "Beneficiário"
    - REMOVA prefixos de OCR: RA, RG, CP, NR, NO, SEQ, COD, REF, ID, PROP
    - REMOVA termos de veículo: MODELO, VERSAO, FLEX, AUT, MANUAL, TURBO, TSI, SEDAN, HATCH
    - Se o nome parecer "man ual", "modelo", "segurado" ou lixo similar, retorne null
@@ -45,14 +62,19 @@ const SYSTEM_PROMPT = `Você é um especialista em documentos de seguros brasile
 5. **DATAS**: Formato YYYY-MM-DD (ex: 2024-03-15)
 
 6. **RAMO DO SEGURO**: 
-   - Identifique pelo contexto: AUTO, RESIDENCIAL, VIDA, EMPRESARIAL, etc
-   - Palavras-chave: "veículo", "placa" → AUTO; "residência" → RESIDENCIAL
+   - Identifique pelo contexto: AUTO, RESIDENCIAL, VIDA, EMPRESARIAL, SAUDE, etc
+   - Palavras-chave: "veículo", "placa" → AUTO; "residência" → RESIDENCIAL; "plano de saúde" → SAUDE
 
 7. **OBJETO SEGURADO (para AUTOMÓVEL)**:
    - Formato: "[Marca] [Modelo] [Ano] - Placa: [XXX-0000]"
    - Ex: "VOLKSWAGEN POLO 2024 - Placa: ABC-1234"
 
-8. **SEGURADORA**: Nome completo da companhia de seguros
+8. **SEGURADORA/OPERADORA**: Nome completo da companhia de seguros ou operadora de saúde
+
+## PARA CARTEIRINHA, EXTRAIA TAMBÉM:
+- numero_carteirinha: número de identificação do beneficiário
+- operadora: nome da operadora de saúde
+- validade_cartao: data de validade do cartão (YYYY-MM-DD)
 
 ## PROIBIÇÕES:
 - NÃO extraia termos de instrução (MANUAL, AUT, MODELO) como dados
@@ -123,7 +145,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`📄 [v7.0 GEMINI] Processando: ${fileName} (${(fileBase64.length / 1024).toFixed(0)}KB)`);
+    console.log(`📄 [v9.0 GEMINI] Processando: ${fileName} (${(fileBase64.length / 1024).toFixed(0)}KB)`);
     
     // ========== CHAMADA GEMINI VISION ==========
     const startTime = Date.now();
@@ -154,6 +176,7 @@ serve(async (req) => {
           responseSchema: {
             type: 'object',
             properties: {
+              tipo_documento: { type: 'string', nullable: true, description: 'APOLICE ou CARTEIRINHA' },
               nome_cliente: { type: 'string', nullable: true, description: 'Nome do cliente/segurado (sem lixo de OCR)' },
               cpf_cnpj: { type: 'string', nullable: true, description: 'CPF (11 dígitos) ou CNPJ (14 dígitos) - apenas números' },
               email: { type: 'string', nullable: true },
@@ -162,13 +185,17 @@ serve(async (req) => {
               numero_apolice: { type: 'string', nullable: true, description: 'Número da apólice (NÃO é "manual")' },
               numero_proposta: { type: 'string', nullable: true },
               nome_seguradora: { type: 'string', nullable: true },
-              ramo_seguro: { type: 'string', nullable: true, description: 'AUTO, RESIDENCIAL, VIDA, EMPRESARIAL, etc' },
+              ramo_seguro: { type: 'string', nullable: true, description: 'AUTO, RESIDENCIAL, VIDA, EMPRESARIAL, SAUDE, etc' },
               data_inicio: { type: 'string', nullable: true, description: 'Formato YYYY-MM-DD' },
               data_fim: { type: 'string', nullable: true, description: 'Formato YYYY-MM-DD' },
               objeto_segurado: { type: 'string', nullable: true, description: 'Descrição do bem segurado' },
               placa: { type: 'string', nullable: true, description: 'Placa do veículo (XXX-0000)' },
               premio_liquido: { type: 'number', nullable: true },
               premio_total: { type: 'number', nullable: true },
+              // Campos específicos para CARTEIRINHA
+              numero_carteirinha: { type: 'string', nullable: true, description: 'Número de identificação do beneficiário' },
+              operadora: { type: 'string', nullable: true, description: 'Operadora de saúde' },
+              validade_cartao: { type: 'string', nullable: true, description: 'Validade do cartão (YYYY-MM-DD)' },
             },
           },
         },
@@ -215,6 +242,7 @@ serve(async (req) => {
     
     // ========== POST-PROCESSING: Remove garbage ==========
     const cleaned = {
+      tipo_documento: extracted.tipo_documento || 'APOLICE',
       nome_cliente: cleanGarbageValue(extracted.nome_cliente),
       cpf_cnpj: extracted.cpf_cnpj ? extracted.cpf_cnpj.replace(/\D/g, '') : null,
       email: extracted.email || null,
@@ -230,6 +258,10 @@ serve(async (req) => {
       placa: extracted.placa || null,
       premio_liquido: typeof extracted.premio_liquido === 'number' ? extracted.premio_liquido : null,
       premio_total: typeof extracted.premio_total === 'number' ? extracted.premio_total : null,
+      // Campos de CARTEIRINHA
+      numero_carteirinha: cleanGarbageValue(extracted.numero_carteirinha),
+      operadora: extracted.operadora || null,
+      validade_cartao: extracted.validade_cartao || null,
     };
 
     // Fallback: calcula prêmio líquido se só tiver total
@@ -244,12 +276,17 @@ serve(async (req) => {
       cleaned.cpf_cnpj = null;
     }
 
-    console.log(`✅ [v8.0] Extração concluída em ${durationMs}ms`);
+    console.log(`✅ [v9.0] Extração concluída em ${durationMs}ms`);
+    console.log(`   Tipo: ${cleaned.tipo_documento}`);
     console.log(`   Cliente: ${cleaned.nome_cliente || 'N/A'}`);
     console.log(`   CPF/CNPJ: ${cleaned.cpf_cnpj || 'N/A'}`);
     console.log(`   Apólice: ${cleaned.numero_apolice || 'N/A'}`);
     console.log(`   Prêmio: R$ ${cleaned.premio_liquido?.toFixed(2) || 'N/A'}`);
     console.log(`   Ramo: ${cleaned.ramo_seguro || 'N/A'}`);
+    if (cleaned.tipo_documento === 'CARTEIRINHA') {
+      console.log(`   Carteirinha: ${cleaned.numero_carteirinha || 'N/A'}`);
+      console.log(`   Operadora: ${cleaned.operadora || 'N/A'}`);
+    }
 
     return new Response(JSON.stringify({ 
       success: true, 

@@ -76,6 +76,9 @@ export interface Policy {
     email?: string;
     cpfCnpj?: string;
   };
+  // 🆕 NOVOS CAMPOS - Carteirinha
+  carteirinhaUrl?: string;  // URL da carteirinha no storage
+  lastOcrType?: 'apolice' | 'carteirinha'; // Tipo do último OCR
 }
 
 export interface Task {
