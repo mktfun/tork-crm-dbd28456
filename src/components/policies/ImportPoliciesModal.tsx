@@ -15,7 +15,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Upload, FileText, Check, AlertCircle, Loader2, UserCheck, UserPlus, X, Sparkles, Clock, AlertTriangle, Zap, Eye, ExternalLink, Car, Plus, ChevronDown } from 'lucide-react';
+import { Upload, FileText, Check, AlertCircle, Loader2, UserCheck, UserPlus, X, Sparkles, Clock, AlertTriangle, Zap, Eye, ExternalLink, Car, Plus, ChevronDown, Search, Unlink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSupabaseCompanies } from '@/hooks/useSupabaseCompanies';
@@ -24,6 +24,7 @@ import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
 import { useSupabaseBrokerages } from '@/hooks/useSupabaseBrokerages';
 import { usePolicies } from '@/hooks/useAppData';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAllClients } from '@/hooks/useAllClients';
 import { cn } from '@/lib/utils';
 import { PDFDocument } from 'pdf-lib';
 import { 
@@ -51,6 +52,7 @@ import {
 import { useAppStore } from '@/store';
 import { parsePolicy, ParsedPolicy, inferRamoFromText, CONFIDENCE_THRESHOLD } from '@/utils/universalPolicyParser';
 import { useQueryClient } from '@tanstack/react-query';
+import { ClientSearchCombobox } from '@/components/crm/ClientSearchCombobox';
 
 interface ImportPoliciesModalProps {
   open: boolean;
@@ -166,6 +168,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   
+  // v5.5: Hook para busca de clientes
+  const { allClients, loading: loadingClients } = useAllClients();
+  
   useEffect(() => {
     if (!activeBrokerageId && brokerages.length > 0 && open) {
       console.log('🏢 [AUTO] Selecionando primeira corretora:', brokerages[0].id);
@@ -202,7 +207,53 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
   
   const [editedFields, setEditedFields] = useState<Map<string, Set<string>>>(new Map());
   
+  // v5.5: Estado para busca de cliente no popover
+  const [showClientSearchFor, setShowClientSearchFor] = useState<string | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // v5.5: Handler para trocar cliente vinculado
+  const handleClientChange = useCallback((itemId: string, newClientId: string) => {
+    const selectedClient = allClients.find(c => c.id === newClientId);
+    if (selectedClient) {
+      setItems(prev => prev.map(item => 
+        item.id === itemId 
+          ? { 
+              ...item, 
+              clientId: selectedClient.id,
+              clientName: selectedClient.name,
+              clientCpfCnpj: selectedClient.cpfCnpj || item.clientCpfCnpj,
+              clientStatus: 'matched',
+              matchedBy: 'cpf_cnpj'
+            }
+          : item
+      ));
+      markFieldEdited(itemId, 'clientName');
+      setShowClientSearchFor(null);
+      toast.success(`Cliente alterado para: ${selectedClient.name}`);
+    }
+  }, [allClients]);
+
+  // v5.5: Handler para desvincular cliente
+  const handleUnlinkClient = useCallback((itemId: string) => {
+    setItems(prev => prev.map(item => 
+      item.id === itemId 
+        ? { 
+            ...item, 
+            clientId: undefined,
+            clientStatus: 'new',
+            matchedBy: undefined
+          }
+        : item
+    ));
+    toast.info('Cliente desvinculado');
+  }, []);
+
+  // v5.5: Buscar detalhes do cliente no cache
+  const getClientDetails = useCallback((clientId: string | undefined) => {
+    if (!clientId) return null;
+    return allClients.find(c => c.id === clientId);
+  }, [allClients]);
 
   const resetModal = useCallback(() => {
     setStep('upload');
@@ -220,6 +271,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     setSelectedItemId(null);
     setMobilePreviewOpen(false);
     setEditedFields(new Map());
+    setShowClientSearchFor(null);
   }, []);
 
   const handleClose = () => {
@@ -1046,45 +1098,101 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                 placeholder="CPF/CNPJ"
               />
               {item.clientStatus === 'matched' ? (
-                <Popover>
+                <Popover open={showClientSearchFor === item.id} onOpenChange={(open) => setShowClientSearchFor(open ? item.id : null)}>
                   <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
                     <Badge className="bg-zinc-700/30 text-zinc-200 border border-zinc-500/40 text-[10px] h-5 cursor-pointer hover:bg-zinc-600/40 transition-colors">
                       <UserCheck className="w-3 h-3 mr-1" />
                       Vinculado
                     </Badge>
                   </PopoverTrigger>
-                  <PopoverContent className="w-64 bg-zinc-900 border-zinc-700 p-3 z-[100]" side="top" sideOffset={8}>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-zinc-200 font-medium text-sm">
-                        <UserCheck className="w-4 h-4 text-green-400" />
-                        Cliente Vinculado
+                  <PopoverContent className="w-80 bg-zinc-900/95 border-zinc-700 p-0 z-[200]" side="top" sideOffset={8}>
+                    {/* Header */}
+                    <div className="p-3 border-b border-zinc-700/50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-200 font-medium text-sm flex items-center gap-2">
+                          <UserCheck className="w-4 h-4 text-green-400" />
+                          Cliente Vinculado
+                        </span>
+                        <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-zinc-400 border-zinc-600">
+                          {item.matchedBy === 'cpf_cnpj' && 'CPF/CNPJ'}
+                          {item.matchedBy === 'email' && 'E-mail'}
+                          {item.matchedBy === 'name_fuzzy' && 'Nome (85%+)'}
+                          {item.matchedBy === 'auto_created' && '✨ Auto-criado'}
+                        </Badge>
                       </div>
-                      <div className="space-y-1.5 text-xs">
-                        <div className="flex items-start gap-2">
-                          <span className="text-zinc-500 shrink-0">Nome:</span>
-                          <span className="text-zinc-200 font-medium">{item.clientName}</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <span className="text-zinc-500 shrink-0">CPF/CNPJ:</span>
-                          <span className="text-zinc-300 font-mono">
-                            {item.clientCpfCnpj 
-                              ? item.clientCpfCnpj.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '***.$2.***-**')
-                              : 'Não informado'}
-                          </span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <span className="text-zinc-500 shrink-0">Match:</span>
-                          <Badge variant="outline" className="text-[10px] h-4 px-1 text-zinc-400 border-zinc-600">
-                            {item.matchedBy === 'cpf_cnpj' && 'CPF/CNPJ'}
-                            {item.matchedBy === 'email' && 'E-mail'}
-                            {item.matchedBy === 'name_fuzzy' && 'Nome (85%+)'}
-                            {item.matchedBy === 'auto_created' && '✨ Auto-criado'}
-                          </Badge>
-                        </div>
-                      </div>
-                      <p className="text-zinc-500 text-[10px] pt-1 border-t border-zinc-700/50">
-                        Clique no campo Nome para editar se necessário.
-                      </p>
+                    </div>
+                    
+                    {/* Dados do Cliente */}
+                    <div className="p-3 space-y-2 text-xs">
+                      {(() => {
+                        const clientDetails = getClientDetails(item.clientId);
+                        return (
+                          <>
+                            <div className="flex justify-between items-center">
+                              <span className="text-zinc-500">Nome:</span>
+                              <span className="text-zinc-200 font-medium truncate max-w-[180px]">{item.clientName}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-zinc-500">CPF/CNPJ:</span>
+                              <span className="text-zinc-300 font-mono text-[11px]">
+                                {item.clientCpfCnpj 
+                                  ? item.clientCpfCnpj.length === 11
+                                    ? `${item.clientCpfCnpj.slice(0,3)}.${item.clientCpfCnpj.slice(3,6)}.${item.clientCpfCnpj.slice(6,9)}-${item.clientCpfCnpj.slice(9)}`
+                                    : item.clientCpfCnpj.length === 14
+                                    ? `${item.clientCpfCnpj.slice(0,2)}.${item.clientCpfCnpj.slice(2,5)}.${item.clientCpfCnpj.slice(5,8)}/${item.clientCpfCnpj.slice(8,12)}-${item.clientCpfCnpj.slice(12)}`
+                                    : item.clientCpfCnpj
+                                  : 'Não informado'}
+                              </span>
+                            </div>
+                            {clientDetails?.phone && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-zinc-500">Telefone:</span>
+                                <span className="text-zinc-300">{clientDetails.phone}</span>
+                              </div>
+                            )}
+                            {clientDetails?.email && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-zinc-500">Email:</span>
+                                <span className="text-zinc-300 truncate max-w-[160px]">{clientDetails.email}</span>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                    
+                    {/* Busca de Cliente (v5.5) */}
+                    <div className="p-3 border-t border-zinc-700/50 space-y-2">
+                      <p className="text-zinc-500 text-[10px]">Trocar cliente vinculado:</p>
+                      <ClientSearchCombobox
+                        clients={allClients.map(c => ({
+                          id: c.id,
+                          name: c.name,
+                          phone: c.phone || '',
+                          email: c.email || ''
+                        }))}
+                        value={item.clientId || ''}
+                        onValueChange={(newClientId) => handleClientChange(item.id, newClientId)}
+                        isLoading={loadingClients}
+                        placeholder="Buscar cliente..."
+                      />
+                    </div>
+                    
+                    {/* Ações */}
+                    <div className="p-2 border-t border-zinc-700/50 flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="flex-1 h-7 text-xs text-zinc-400 hover:text-red-400"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUnlinkClient(item.id);
+                          setShowClientSearchFor(null);
+                        }}
+                      >
+                        <Unlink className="w-3 h-3 mr-1" />
+                        Desvincular
+                      </Button>
                     </div>
                   </PopoverContent>
                 </Popover>
