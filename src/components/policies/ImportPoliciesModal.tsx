@@ -528,6 +528,8 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         
         // 6. Se tem documento válido, faz upsert automático de cliente
         let autoClientId: string | undefined;
+        let autoClientName: string | undefined;  // Captura nome do banco para evitar lixo OCR
+        
         if (parsed.cpf_cnpj) {
           const upsertResult = await upsertClientByDocument(
             parsed.cpf_cnpj,
@@ -539,13 +541,15 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           );
           if (upsertResult) {
             autoClientId = upsertResult.id;
-            console.log(`✅ [UPSERT] Cliente ${upsertResult.created ? 'criado' : 'vinculado'}: ${autoClientId}`);
+            autoClientName = upsertResult.name;  // Guarda nome correto do banco
+            console.log(`✅ [UPSERT] Cliente: ${autoClientName} (${upsertResult.created ? 'criado' : 'existente'})`);
           }
         }
         
         // 7. Converte para formato BulkOCRExtractedPolicy
+        // IMPORTANTE: Prioriza nome do banco (autoClientName) sobre nome OCR que pode vir com lixo
         const bulkPolicy: BulkOCRExtractedPolicy = {
-          nome_cliente: parsed.nome_cliente || 'Cliente Não Identificado',
+          nome_cliente: autoClientName || parsed.nome_cliente || 'Cliente Não Identificado',
           cpf_cnpj: parsed.cpf_cnpj,
           email: parsed.email,
           telefone: parsed.telefone,
