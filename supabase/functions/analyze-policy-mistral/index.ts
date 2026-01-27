@@ -103,8 +103,24 @@ function cleanGarbageValue(value: string | null): string | null {
 }
 
 // Chama Mistral OCR para extrair Markdown do PDF
+// FORMATO CORRETO: type: "base64", source_base64, source_type (para dados inline)
 async function callMistralOCR(base64: string, mimeType: string, apiKey: string): Promise<string> {
-  console.log('📖 [OCR] Iniciando extração de texto...');
+  console.log('📖 [OCR] Iniciando extração de texto via Mistral OCR...');
+  
+  // Remove prefixo data:application/pdf;base64, se presente
+  const cleanBase64 = base64.replace(/^data:[^;]+;base64,/, '');
+  
+  // Payload oficial para Mistral OCR com document inline (base64)
+  const payload = {
+    model: 'mistral-ocr-latest',
+    document: {
+      type: 'document_content',
+      content: cleanBase64,
+    },
+    include_image_base64: false,
+  };
+  
+  console.log(`📤 [OCR] Enviando ${(cleanBase64.length / 1024).toFixed(0)}KB para Mistral OCR...`);
   
   const response = await fetch(`${MISTRAL_API_URL}/ocr`, {
     method: 'POST',
@@ -112,24 +128,17 @@ async function callMistralOCR(base64: string, mimeType: string, apiKey: string):
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: 'mistral-ocr-latest',
-      document: {
-        type: 'base64',
-        source_base64: base64,
-        source_type: mimeType,
-      },
-      include_image_base64: false,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('❌ [OCR] Erro:', response.status, errorText);
+    console.error(`❌ [OCR] Erro ${response.status}:`, errorText);
     throw new Error(`Mistral OCR error: ${response.status} - ${errorText}`);
   }
 
   const result = await response.json();
+  console.log('✅ [OCR] Resposta recebida do Mistral');
   
   // Extrai o Markdown de todas as páginas
   const pages = result.pages || [];
@@ -142,7 +151,7 @@ async function callMistralOCR(base64: string, mimeType: string, apiKey: string):
   }
   
   const fullMarkdown = markdownParts.join('\n\n---\n\n');
-  console.log(`✅ [OCR] ${pages.length} página(s) extraídas (${(fullMarkdown.length / 1024).toFixed(1)}KB)`);
+  console.log(`✅ [OCR] ${pages.length} página(s) extraídas (${(fullMarkdown.length / 1024).toFixed(1)}KB Markdown)`);
   
   return fullMarkdown;
 }
