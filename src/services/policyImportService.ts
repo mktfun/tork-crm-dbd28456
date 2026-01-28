@@ -1,5 +1,22 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ExtractedPolicyData, PolicyImportItem, ClientReconcileStatus, ImportError } from '@/types/policyImport';
+import { gerarTransacaoDeComissao } from '@/services/commissionService';
+import { Policy } from '@/types';
+
+// ============================================================
+// TYPES: Policy Import Result
+// ============================================================
+
+export interface PolicyImportResult {
+  success: boolean;
+  policyId?: string;
+  clientId?: string;
+  clientCreated?: boolean;
+  error?: string;
+  errorCode?: string;
+  commissionCreated?: boolean;
+  commissionError?: string;
+}
 
 // ============================================================
 // PHASE 1: Text Normalization & Fuzzy Matching Utilities
@@ -1316,7 +1333,269 @@ export function classifyImportError(error: any, item: PolicyImportItem): ImportE
 }
 
 // ============================================================
-// v9.0: CARTEIRINHA LINKING FUNCTIONS
+// 🎯 CORE ORCHESTRATION: executePolicyImport (Atomic Service Layer)
+// ============================================================
+
+/**
+ * Busca contexto rico para descrição de comissão (cliente + ramo)
+ */
+async function fetchPolicyContext(clientId: string, ramoId?: string): Promise<{ clientName: string; ramoName: string }> {
+  const [clientResult, ramoResult] = await Promise.all([
+    supabase.from('clientes').select('name').eq('id', clientId).single(),
+    ramoId ? supabase.from('ramos').select('nome').eq('id', ramoId).maybeSingle() : Promise.resolve({ data: null })
+  ]);
+  
+  return {
+    clientName: clientResult.data?.name || 'Cliente',
+    ramoName: (ramoResult.data as any)?.nome || 'Seguro'
+  };
+}
+
+/**
+ * 🎯 **FUNÇÃO CENTRALIZADA DE IMPORTAÇÃO**
+ * Orquestra todo o fluxo de importação de uma apólice:
+ * 1. Upsert do cliente via documento (CPF/CNPJ)
+ * 2. Upload do PDF para Storage
+ * 3. Insert da apólice na tabela 'apolices'
+ * 4. Salvamento de itens estruturados (veículos)
+ * 5. Geração de comissão (resiliente - não bloqueia)
+ * 
+ * @returns PolicyImportResult com success, policyId, error, etc.
+ */
+export async function executePolicyImport(
+  item: PolicyImportItem,
+  userId: string,
+  activeBrokerageId: string,
+  options?: {
+    defaultProducerId?: string;
+  }
+): Promise<PolicyImportResult> {
+  console.log(`🚀 [IMPORT] Iniciando importação: ${item.fileName}`);
+  
+  let clientId = item.clientId;
+  let clientCreated = false;
+  
+  try {
+    // ============================================================
+    // STEP 1: Upsert Cliente
+    // ============================================================
+    if (item.clientStatus === 'new' || !clientId) {
+      // Tenta upsert por documento primeiro
+      if (item.clientCpfCnpj) {
+        const upsertResult = await upsertClientByDocument(
+          item.clientCpfCnpj,
+          item.clientName,
+          item.extracted.cliente.email,
+          item.extracted.cliente.telefone,
+          item.extracted.cliente.endereco_completo,
+          userId
+        );
+        
+        if (upsertResult) {
+          clientId = upsertResult.id;
+          clientCreated = upsertResult.created;
+          console.log(`✅ [IMPORT] Cliente ${clientCreated ? 'criado' : 'vinculado'}: ${upsertResult.name}`);
+        }
+      }
+      
+      // Fallback: criar cliente manualmente se upsert falhou
+      if (!clientId) {
+        const newClient = await createClientFromEdited(
+          item.clientName,
+          item.clientCpfCnpj,
+          item.extracted.cliente.email,
+          item.extracted.cliente.telefone,
+          item.extracted.cliente.endereco_completo,
+          userId
+        );
+        clientId = newClient.id;
+        clientCreated = true;
+        console.log(`✅ [IMPORT] Cliente criado via fallback: ${item.clientName}`);
+      }
+    }
+    
+    if (!clientId) {
+      return {
+        success: false,
+        error: 'Não foi possível criar ou vincular cliente',
+        errorCode: 'CLIENT_CREATION_FAILED'
+      };
+    }
+    
+    // ============================================================
+    // STEP 2: Upload PDF
+    // ============================================================
+    const pdfUrl = await uploadPolicyPdf(
+      item.file,
+      userId,
+      item.clientCpfCnpj || undefined,
+      item.numeroApolice || undefined,
+      activeBrokerageId
+    );
+    
+    if (!pdfUrl) {
+      return {
+        success: false,
+        clientId,
+        clientCreated,
+        error: `Upload do PDF falhou para ${item.fileName}`,
+        errorCode: 'UPLOAD_FAILED'
+      };
+    }
+    
+    // ============================================================
+    // STEP 3: Insert Apólice
+    // ============================================================
+    const isOrcamento = item.tipoDocumento === 'ORCAMENTO';
+    const finalStatus = isOrcamento ? 'Orçamento' : 'Ativa';
+    
+    // Nomenclatura Elite
+    const primeiroNome = item.clientName?.split(' ')[0]?.replace(/NÃO|IDENTIFICADO/gi, '').trim() || 'Cliente';
+    const objetoResumo = item.objetoSegurado 
+      ? item.objetoSegurado.split(' ').slice(0, 3).join(' ').substring(0, 25)
+      : '';
+    const placa = item.identificacaoAdicional || '';
+    const seguradoraSigla = item.seguradoraNome?.split(' ')[0]?.toUpperCase() || 'CIA';
+    const tipoDoc = item.tipoDocumento === 'ENDOSSO' 
+      ? 'ENDOSSO' 
+      : item.tipoOperacao === 'RENOVACAO' 
+        ? 'RENOVACAO' 
+        : 'NOVA';
+    
+    let nomenclaturaElite = `${primeiroNome} - ${item.ramoNome || 'Seguro'}`;
+    if (objetoResumo) nomenclaturaElite += ` (${objetoResumo})`;
+    if (placa) nomenclaturaElite += ` - ${placa}`;
+    nomenclaturaElite += ` - ${seguradoraSigla} - ${tipoDoc}`;
+    const insuredAssetFinal = nomenclaturaElite.substring(0, 100);
+    
+    // Verificar se type é UUID (ramo_id) para mapeamento correto
+    const isRamoUuid = item.ramoId && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i.test(item.ramoId);
+    
+    const { data: newPolicy, error: insertError } = await supabase
+      .from('apolices')
+      .insert({
+        user_id: userId,
+        client_id: clientId,
+        policy_number: item.numeroApolice || null,
+        insurance_company: item.seguradoraId,
+        type: item.ramoId,
+        ramo_id: isRamoUuid ? item.ramoId : null,
+        insured_asset: insuredAssetFinal,
+        premium_value: item.premioLiquido,
+        commission_rate: item.commissionRate,
+        status: finalStatus,
+        start_date: item.dataInicio,
+        expiration_date: item.dataFim,
+        pdf_url: pdfUrl,
+        producer_id: item.producerId || options?.defaultProducerId || null,
+        brokerage_id: activeBrokerageId ? Number(activeBrokerageId) : null,
+        automatic_renewal: !isOrcamento
+      })
+      .select()
+      .single();
+    
+    if (insertError) {
+      console.error('❌ [IMPORT] Erro ao inserir apólice:', insertError);
+      return {
+        success: false,
+        clientId,
+        clientCreated,
+        error: `Falha ao criar apólice: ${insertError.message}`,
+        errorCode: insertError.code || 'INSERT_FAILED'
+      };
+    }
+    
+    const policyId = newPolicy.id;
+    console.log(`✅ [IMPORT] Apólice criada: ${policyId} (${item.numeroApolice})`);
+    
+    // ============================================================
+    // STEP 4: Salvar Itens Estruturados (Veículos) - Não Bloqueia
+    // ============================================================
+    if (item.ramoNome) {
+      try {
+        await saveApoliceItens(
+          policyId,
+          item.ramoNome,
+          item.objetoSegurado || '',
+          item.identificacaoAdicional,
+          userId
+        );
+      } catch (itemError) {
+        console.warn('⚠️ [IMPORT] Erro ao salvar itens, mas apólice criada:', itemError);
+      }
+    }
+    
+    // ============================================================
+    // STEP 5: Gerar Comissão (Resiliente - Isolado em try/catch)
+    // ============================================================
+    let commissionCreated = false;
+    let commissionError: string | undefined;
+    
+    if (finalStatus === 'Ativa') {
+      try {
+        console.log(`💰 [IMPORT] Gerando comissão para apólice: ${item.numeroApolice}`);
+        
+        // Buscar contexto para descrição rica
+        const context = await fetchPolicyContext(clientId, item.ramoId || undefined);
+        
+        // Montar objeto Policy para a função de comissão
+        const policyForCommission: Policy = {
+          id: policyId,
+          clientId,
+          policyNumber: item.numeroApolice,
+          insuranceCompany: item.seguradoraId || undefined,
+          type: item.ramoId || undefined,
+          insuredAsset: insuredAssetFinal,
+          premiumValue: item.premioLiquido,
+          commissionRate: item.commissionRate,
+          status: finalStatus as any,
+          expirationDate: item.dataFim,
+          startDate: item.dataInicio,
+          createdAt: new Date().toISOString(),
+          userId,
+          producerId: item.producerId || options?.defaultProducerId,
+          brokerageId: activeBrokerageId ? Number(activeBrokerageId) : undefined,
+          automaticRenewal: !isOrcamento
+        };
+        
+        // Chamar geração de comissão (apenas legado por enquanto - ERP será chamado pelo hook)
+        await gerarTransacaoDeComissao(policyForCommission);
+        commissionCreated = true;
+        console.log(`✅ [IMPORT] Comissão criada para: ${item.numeroApolice}`);
+        
+      } catch (commError: any) {
+        // 🛡️ REGRA DE OURO: Falha na comissão NÃO invalida a importação
+        commissionError = commError.message || 'Erro desconhecido na comissão';
+        console.warn(`⚠️ [IMPORT] Comissão falhou (apólice OK): ${commissionError}`);
+      }
+    } else {
+      console.log(`📋 [IMPORT] Apólice não ativa (${finalStatus}), sem comissão`);
+    }
+    
+    // ============================================================
+    // RESULT: Sucesso
+    // ============================================================
+    return {
+      success: true,
+      policyId,
+      clientId,
+      clientCreated,
+      commissionCreated,
+      commissionError
+    };
+    
+  } catch (error: any) {
+    console.error('❌ [IMPORT] Erro geral:', error);
+    return {
+      success: false,
+      clientId,
+      clientCreated,
+      error: error.message || 'Erro desconhecido na importação',
+      errorCode: error.code || 'UNKNOWN'
+    };
+  }
+}
+
 // ============================================================
 
 /**
