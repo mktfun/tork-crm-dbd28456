@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Loader2, User, Lightbulb, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { X, Send, Loader2, User, Lightbulb, ThumbsUp, ThumbsDown, Plus, History } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -8,12 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-
-interface Message {
-  id?: string;
-  role: 'user' | 'assistant';
-  content: string;
-}
+import { useAIConversations } from '@/hooks/useAIConversations';
+import { ChatHistorySidebar } from './ChatHistorySidebar';
 
 const suggestedQuestions = [
   "Quais apólices vencem nos próximos 30 dias?",
@@ -24,15 +20,34 @@ const suggestedQuestions = [
 
 export function AmorimAIFloating() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState<Set<string>>(new Set());
   const [feedbackNoteId, setFeedbackNoteId] = useState<string | null>(null);
   const [feedbackNote, setFeedbackNote] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useAuth();
+
+  const {
+    conversations,
+    currentConversationId,
+    messages,
+    isLoadingConversations,
+    isLoadingMessages,
+    fetchConversations,
+    loadConversation,
+    createConversation,
+    updateConversationTitle,
+    deleteConversation,
+    persistMessage,
+    startNewConversation,
+    addMessage,
+    setMessages,
+    setCurrentConversationId
+  } = useAIConversations();
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -48,26 +63,12 @@ export function AmorimAIFloating() {
     }
   }, [isOpen]);
 
-  const persistMessage = async (role: 'user' | 'assistant', content: string): Promise<string | null> => {
-    if (!user) return null;
-    
-    try {
-      const { data, error } = await supabase
-        .from('ai_messages')
-        .insert({ user_id: user.id, role, content })
-        .select('id')
-        .single();
-      
-      if (error) {
-        console.error('Error persisting message:', error);
-        return null;
-      }
-      return data?.id || null;
-    } catch (error) {
-      console.error('Error persisting message:', error);
-      return null;
+  // Fetch conversations when history is opened
+  useEffect(() => {
+    if (showHistory && user) {
+      fetchConversations();
     }
-  };
+  }, [showHistory, user, fetchConversations]);
 
   const handleFeedback = async (messageId: string | undefined, feedbackType: 'positive' | 'negative') => {
     if (!messageId || !user || feedbackSent.has(messageId)) return;
@@ -122,22 +123,34 @@ export function AmorimAIFloating() {
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading || !user) return;
 
+    let conversationId = currentConversationId;
+    
+    // Create a new conversation if none exists
+    if (!conversationId) {
+      conversationId = await createConversation();
+      if (!conversationId) {
+        toast.error('Erro ao criar conversa');
+        return;
+      }
+    }
+
     // Persist user message
-    const userMessageId = await persistMessage('user', content.trim());
+    const userMessageId = await persistMessage('user', content.trim(), conversationId);
     
-    const userMessage: Message = { 
+    const userMessage = { 
       id: userMessageId || undefined,
-      role: 'user', 
-      content: content.trim() 
+      role: 'user' as const, 
+      content: content.trim(),
+      conversation_id: conversationId
     };
-    const updatedMessages = [...messages, userMessage];
     
+    const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInput('');
     setIsLoading(true);
 
     try {
-      // Prepare messages for API (convert to OpenAI format)
+      // Prepare messages for API
       const apiMessages = updatedMessages.map(msg => ({
         role: msg.role,
         content: msg.content
@@ -155,15 +168,22 @@ export function AmorimAIFloating() {
       const assistantContent = data?.message || 'Desculpe, não consegui processar sua solicitação.';
       
       // Persist assistant message
-      const assistantMessageId = await persistMessage('assistant', assistantContent);
+      const assistantMessageId = await persistMessage('assistant', assistantContent, conversationId);
 
-      const assistantMessage: Message = {
+      const assistantMessage = {
         id: assistantMessageId || undefined,
-        role: 'assistant',
-        content: assistantContent
+        role: 'assistant' as const,
+        content: assistantContent,
+        conversation_id: conversationId
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
+      // Auto-name the conversation after the first exchange
+      if (updatedMessages.length === 1) {
+        const title = content.trim().slice(0, 50) + (content.length > 50 ? '...' : '');
+        updateConversationTitle(conversationId, title);
+      }
     } catch (error) {
       console.error('AI Assistant error:', error);
       setMessages(prev => [...prev, {
@@ -189,6 +209,21 @@ export function AmorimAIFloating() {
 
   const handleSuggestionClick = (question: string) => {
     sendMessage(question);
+  };
+
+  const handleNewConversation = () => {
+    startNewConversation();
+    setShowHistory(false);
+  };
+
+  const handleSelectConversation = (id: string) => {
+    loadConversation(id);
+    setShowHistory(false);
+  };
+
+  const handleDeleteConversation = async (id: string) => {
+    await deleteConversation(id);
+    toast.success('Conversa excluída');
   };
 
   return (
@@ -238,26 +273,58 @@ export function AmorimAIFloating() {
               "flex flex-col"
             )}
           >
+            {/* History Sidebar */}
+            <ChatHistorySidebar
+              isOpen={showHistory}
+              onClose={() => setShowHistory(false)}
+              conversations={conversations}
+              currentConversationId={currentConversationId}
+              isLoading={isLoadingConversations}
+              onSelectConversation={handleSelectConversation}
+              onDeleteConversation={handleDeleteConversation}
+            />
+
             {/* Header */}
             <div className="p-4 bg-white/5 backdrop-blur-md border-b border-white/10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-white/10 border border-white/10">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleNewConversation}
+                  className="h-9 w-9 hover:bg-white/10"
+                  title="Nova conversa"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowHistory(true)}
+                  className="h-9 w-9 hover:bg-white/10"
+                  title="Histórico"
+                >
+                  <History className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-white/10 border border-white/10">
                   <img 
                     src="/tork_symbol_favicon.png" 
                     alt="Tork AI" 
-                    className="w-5 h-5 object-contain" 
+                    className="w-4 h-4 object-contain" 
                   />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">Assistente Tork</h3>
-                  <p className="text-xs text-muted-foreground/80">Inteligência Operacional</p>
+                  <h3 className="font-semibold text-foreground text-sm">Assistente Tork</h3>
                 </div>
               </div>
+
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsOpen(false)}
-                className="text-muted-foreground hover:text-foreground hover:bg-white/10"
+                className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-white/10"
               >
                 <X className="h-5 w-5" />
               </Button>
@@ -265,7 +332,11 @@ export function AmorimAIFloating() {
 
             {/* Messages Area */}
             <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-              {messages.length === 0 ? (
+              {isLoadingMessages ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : messages.length === 0 ? (
                 <div className="space-y-4">
                   {/* Welcome Message */}
                   <motion.div
