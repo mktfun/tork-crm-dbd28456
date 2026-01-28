@@ -4,6 +4,7 @@ import { GlassSidebar } from '@/components/layout/GlassSidebar';
 import { Header } from '@/components/layout/Header';
 import { SearchCommand } from '@/components/SearchCommand';
 import { ModernMobileNav } from '@/components/layout/ModernMobileNav';
+import { AmorimAIFloating } from '@/components/ai/AmorimAIFloating';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useRealtimeClients } from '@/hooks/useRealtimeClients';
 import { cn } from '@/lib/utils';
@@ -52,6 +53,9 @@ export function RootLayout() {
 
       {/* NAVEGAÇÃO MODERNA APENAS NO MOBILE */}
       {isMobile && <ModernMobileNav />}
+
+      {/* ASSISTENTE IA FLUTUANTE */}
+      <AmorimAIFloating />
 
       {/* BUSCA UNIVERSAL */}
       <SearchCommand open={isSearchOpen} onOpenChange={setIsSearchOpen} />
