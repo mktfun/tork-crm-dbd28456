@@ -13,6 +13,10 @@ interface Brokerage {
   created_at: string;
   updated_at: string;
   user_id: string;
+  // Chatwoot integration fields
+  chatwoot_token: string | null;
+  chatwoot_account_id: string | null;
+  chatwoot_url: string | null;
 }
 
 export function useBrokeragesAdmin() {

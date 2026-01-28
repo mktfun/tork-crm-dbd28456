@@ -5,6 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,13 +26,124 @@ import {
   useUpdateBrokerage,
   useImpersonateBrokerage 
 } from '@/hooks/useBrokeragesAdmin';
-import { MoreHorizontal, Pencil, Ban, UserCheck, Search, RefreshCw } from 'lucide-react';
+import { MoreHorizontal, Pencil, Ban, UserCheck, Search, RefreshCw, Settings2, Loader2, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+
+interface BrokerageIntegrationModalProps {
+  brokerage: {
+    id: number;
+    name: string;
+    chatwoot_token?: string | null;
+    chatwoot_account_id?: string | null;
+    chatwoot_url?: string | null;
+  } | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+function BrokerageIntegrationModal({ brokerage, open, onOpenChange }: BrokerageIntegrationModalProps) {
+  const updateBrokerage = useUpdateBrokerage();
+  const [chatwootToken, setChatwootToken] = useState(brokerage?.chatwoot_token || '');
+  const [chatwootAccountId, setChatwootAccountId] = useState(brokerage?.chatwoot_account_id || '');
+  const [chatwootUrl, setChatwootUrl] = useState(brokerage?.chatwoot_url || '');
+
+  const handleSave = async () => {
+    if (!brokerage) return;
+    
+    try {
+      await updateBrokerage.mutateAsync({
+        id: brokerage.id,
+        updates: {
+          chatwoot_token: chatwootToken || null,
+          chatwoot_account_id: chatwootAccountId || null,
+          chatwoot_url: chatwootUrl || null,
+        },
+      });
+      onOpenChange(false);
+    } catch (error) {
+      // Error is handled by the mutation
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-zinc-100 flex items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-emerald-400" />
+            Configurar Integrações
+          </DialogTitle>
+          <DialogDescription>
+            Configure as integrações do Chatwoot para <span className="font-medium text-zinc-300">{brokerage?.name}</span>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label className="text-zinc-300">URL do Chatwoot</Label>
+            <Input
+              placeholder="https://app.chatwoot.com"
+              value={chatwootUrl}
+              onChange={(e) => setChatwootUrl(e.target.value)}
+              className="bg-zinc-800/50 border-zinc-700"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-zinc-300">Account ID</Label>
+            <Input
+              placeholder="12345"
+              value={chatwootAccountId}
+              onChange={(e) => setChatwootAccountId(e.target.value)}
+              className="bg-zinc-800/50 border-zinc-700"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-zinc-300">Token de API</Label>
+            <Input
+              type="password"
+              placeholder="••••••••••••••••"
+              value={chatwootToken}
+              onChange={(e) => setChatwootToken(e.target.value)}
+              className="bg-zinc-800/50 border-zinc-700"
+            />
+            <p className="text-xs text-zinc-500">O token é armazenado de forma segura</p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="border-zinc-700 text-zinc-300"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={updateBrokerage.isPending}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            {updateBrokerage.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : null}
+            Salvar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function BrokeragesManagement() {
   const [search, setSearch] = useState('');
+  const [integrationModal, setIntegrationModal] = useState<{
+    open: boolean;
+    brokerage: any | null;
+  }>({ open: false, brokerage: null });
+  
   const { data: brokerages, isLoading, refetch } = useBrokeragesAdmin();
   const updateBrokerage = useUpdateBrokerage();
   const { startImpersonation } = useImpersonateBrokerage();
@@ -48,6 +168,10 @@ export function BrokeragesManagement() {
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-brokerages'] });
     refetch();
+  };
+
+  const handleOpenIntegration = (brokerage: any) => {
+    setIntegrationModal({ open: true, brokerage });
   };
 
   return (
@@ -102,6 +226,7 @@ export function BrokeragesManagement() {
                   <TableHead className="text-zinc-400">Nome</TableHead>
                   <TableHead className="text-zinc-400">Slug</TableHead>
                   <TableHead className="text-zinc-400">CNPJ</TableHead>
+                  <TableHead className="text-zinc-400">Chatwoot</TableHead>
                   <TableHead className="text-zinc-400">Portal</TableHead>
                   <TableHead className="text-zinc-400">Criado em</TableHead>
                   <TableHead className="text-zinc-400 text-right">Ações</TableHead>
@@ -110,7 +235,7 @@ export function BrokeragesManagement() {
               <TableBody>
                 {filteredBrokerages.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-zinc-500 py-8">
+                    <TableCell colSpan={7} className="text-center text-zinc-500 py-8">
                       Nenhuma corretora encontrada
                     </TableCell>
                   </TableRow>
@@ -128,6 +253,17 @@ export function BrokeragesManagement() {
                       </TableCell>
                       <TableCell className="text-zinc-300">
                         {brokerage.cnpj || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            (brokerage as any).chatwoot_token
+                              ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                              : 'bg-zinc-700 text-zinc-400'
+                          }
+                        >
+                          {(brokerage as any).chatwoot_token ? 'Configurado' : 'Não Config.'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -160,6 +296,13 @@ export function BrokeragesManagement() {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-zinc-300 focus:bg-zinc-800 focus:text-zinc-100"
+                              onClick={() => handleOpenIntegration(brokerage)}
+                            >
+                              <Settings2 className="h-4 w-4 mr-2" />
+                              Configurar Integrações
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-zinc-300 focus:bg-zinc-800 focus:text-zinc-100"
                               onClick={() => handleImpersonate(brokerage.id, brokerage.name)}
                             >
                               <UserCheck className="h-4 w-4 mr-2" />
@@ -184,6 +327,13 @@ export function BrokeragesManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Integration Modal */}
+      <BrokerageIntegrationModal
+        brokerage={integrationModal.brokerage}
+        open={integrationModal.open}
+        onOpenChange={(open) => setIntegrationModal({ ...integrationModal, open })}
+      />
     </div>
   );
 }

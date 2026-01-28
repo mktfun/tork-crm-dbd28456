@@ -377,6 +377,9 @@ export type Database = {
       brokerages: {
         Row: {
           api_key: string | null
+          chatwoot_account_id: string | null
+          chatwoot_token: string | null
+          chatwoot_url: string | null
           cnpj: string | null
           created_at: string
           financial_settings: Json | null
@@ -396,6 +399,9 @@ export type Database = {
         }
         Insert: {
           api_key?: string | null
+          chatwoot_account_id?: string | null
+          chatwoot_token?: string | null
+          chatwoot_url?: string | null
           cnpj?: string | null
           created_at?: string
           financial_settings?: Json | null
@@ -415,6 +421,9 @@ export type Database = {
         }
         Update: {
           api_key?: string | null
+          chatwoot_account_id?: string | null
+          chatwoot_token?: string | null
+          chatwoot_url?: string | null
           cnpj?: string | null
           created_at?: string
           financial_settings?: Json | null
@@ -1815,6 +1824,27 @@ export type Database = {
           },
         ]
       }
+      system_settings: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string | null
+          value: string
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string | null
+          value: string
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           client_id: string | null
@@ -2435,6 +2465,7 @@ export type Database = {
           transaction_id: string
         }[]
       }
+      get_admin_metrics: { Args: never; Returns: Json }
       get_brokerage_by_slug: { Args: { p_slug: string }; Returns: Json }
       get_cash_flow_data: {
         Args: {
