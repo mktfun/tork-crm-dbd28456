@@ -121,17 +121,7 @@ function App() {
                   <Route path="crm/automation" element={<AIAutomation />} />
                   <Route path="documentacao" element={<Documentation />} />
                   
-                  {/* Super Admin com layout isolado */}
-                  <Route path="super-admin" element={
-                    <AdminProtectedRoute>
-                      <SuperAdminLayout />
-                    </AdminProtectedRoute>
-                  }>
-                    <Route index element={<AdminDashboard />} />
-                    <Route path="brokerages" element={<BrokeragesManagement />} />
-                    <Route path="ai-config" element={<AIConfigPanel />} />
-                    <Route path="logs" element={<SystemLogs />} />
-                  </Route>
+                  {/* Super Admin routes moved outside - see below */}
                   <Route path="demo/mobile-menu" element={<ModernMobileMenuDemo />} />
                   
                   {/* Rotas de configurações com layout próprio */}
@@ -162,6 +152,21 @@ function App() {
                   <Route path="policies" element={<PortalPolicies />} />
                   <Route path="cards" element={<PortalCards />} />
                   <Route path="profile" element={<PortalProfile />} />
+                </Route>
+
+                {/* Área Global de Administração - ISOLADA DO LAYOUT OPERACIONAL */}
+                <Route 
+                  path="/dashboard/super-admin" 
+                  element={
+                    <AdminProtectedRoute>
+                      <SuperAdminLayout />
+                    </AdminProtectedRoute>
+                  }
+                >
+                  <Route index element={<AdminDashboard />} />
+                  <Route path="brokerages" element={<BrokeragesManagement />} />
+                  <Route path="ai-config" element={<AIConfigPanel />} />
+                  <Route path="logs" element={<SystemLogs />} />
                 </Route>
                 
                 <Route path="*" element={<NotFound />} />
