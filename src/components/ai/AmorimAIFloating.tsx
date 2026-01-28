@@ -107,40 +107,27 @@ export function AmorimAIFloating() {
       {/* Floating Button */}
       <AnimatePresence>
         {!isOpen && (
-          <motion.div
+          <motion.button
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            className="fixed bottom-6 right-6 z-50"
+            onClick={() => setIsOpen(true)}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className={cn(
+              "fixed bottom-6 right-6 z-50",
+              "w-14 h-14 rounded-full flex items-center justify-center",
+              "bg-white/10 backdrop-blur-md",
+              "border border-white/20 hover:bg-white/20",
+              "shadow-2xl transition-all duration-300"
+            )}
           >
-            <Button
-              onClick={() => setIsOpen(true)}
-              size="lg"
-              className={cn(
-                "h-14 w-14 rounded-full shadow-2xl",
-                "bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700",
-                "hover:from-violet-500 hover:via-purple-500 hover:to-indigo-600",
-                "border border-white/20",
-                "transition-all duration-300 hover:scale-110"
-              )}
-            >
-              <Sparkles className="h-6 w-6 text-white" />
-            </Button>
-            
-            {/* Pulse ring animation */}
-            <motion.div
-              className="absolute inset-0 rounded-full bg-violet-500/30"
-              animate={{
-                scale: [1, 1.4, 1.4],
-                opacity: [0.5, 0, 0]
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeOut"
-              }}
+            <img 
+              src="/tork_symbol_favicon.png" 
+              alt="Tork AI" 
+              className="w-6 h-6 object-contain" 
             />
-          </motion.div>
+          </motion.button>
         )}
       </AnimatePresence>
 
