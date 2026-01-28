@@ -1,8 +1,9 @@
 import { KpiCard } from '@/components/policies/KpiCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSuperAdminStats, useAIUsageByDay } from '@/hooks/useSuperAdminStats';
-import { Building2, Users, Brain, Activity } from 'lucide-react';
+import { useAdminMetrics, formatBytes } from '@/hooks/useSuperAdminData';
+import { useAIUsageByDay } from '@/hooks/useSuperAdminStats';
+import { Building2, Users, Brain, Activity, Database, HardDrive, FileText, UserCheck } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -17,7 +18,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export function AdminDashboard() {
-  const { data: stats, isLoading: statsLoading } = useSuperAdminStats();
+  const { data: metrics, isLoading: metricsLoading, error: metricsError } = useAdminMetrics();
   const { data: aiUsage, isLoading: aiLoading } = useAIUsageByDay(7);
 
   const formatDate = (dateStr: string) => {
@@ -33,43 +34,71 @@ export function AdminDashboard() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-zinc-100">Dashboard Administrativo</h1>
-        <p className="text-sm text-zinc-400 mt-1">Visão geral do sistema Tork</p>
+        <p className="text-sm text-zinc-400 mt-1">Visão geral do sistema Tork com dados em tempo real</p>
       </div>
 
       {/* KPIs */}
-      {statsLoading ? (
+      {metricsLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <Skeleton key={i} className="h-32 bg-zinc-800" />
           ))}
         </div>
+      ) : metricsError ? (
+        <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400">
+          Erro ao carregar métricas. Verifique se você tem permissões de admin.
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard
             title="Total de Corretoras"
-            value={stats?.totalBrokerages || 0}
+            value={metrics?.total_brokerages || 0}
             icon={Building2}
             subtitle="Cadastradas no sistema"
           />
           <KpiCard
             title="Usuários Totais"
-            value={stats?.totalUsers || 0}
+            value={metrics?.total_users || 0}
             icon={Users}
             subtitle="Perfis ativos"
             variant="success"
           />
           <KpiCard
             title="Requisições de IA"
-            value={(stats?.totalAIRequests || 0).toLocaleString('pt-BR')}
+            value={(metrics?.total_ai_requests || 0).toLocaleString('pt-BR')}
             icon={Brain}
             subtitle="Total histórico"
           />
           <KpiCard
             title="Status do Sistema"
-            value={stats?.systemStatus || 'Operacional'}
+            value="Operacional"
             icon={Activity}
             subtitle="Todos os serviços"
             variant="success"
+          />
+        </div>
+      )}
+
+      {/* Secondary KPIs */}
+      {!metricsLoading && !metricsError && metrics && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <KpiCard
+            title="Total de Apólices"
+            value={(metrics.total_policies || 0).toLocaleString('pt-BR')}
+            icon={FileText}
+            subtitle="No sistema"
+          />
+          <KpiCard
+            title="Total de Clientes"
+            value={(metrics.total_clients || 0).toLocaleString('pt-BR')}
+            icon={UserCheck}
+            subtitle="Cadastrados"
+          />
+          <KpiCard
+            title="Tamanho do Banco"
+            value={formatBytes(metrics.db_size_bytes || 0)}
+            icon={Database}
+            subtitle="Uso de disco"
           />
         </div>
       )}
@@ -128,6 +157,49 @@ export function AdminDashboard() {
                 />
               </BarChart>
             </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Infrastructure Health */}
+      <Card className="bg-zinc-900/50 border-zinc-800">
+        <CardHeader>
+          <CardTitle className="text-zinc-100 flex items-center gap-2">
+            <HardDrive className="h-5 w-5" />
+            Saúde do Banco de Dados
+          </CardTitle>
+          <CardDescription>Métricas de infraestrutura do Supabase</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {metricsLoading ? (
+            <Skeleton className="h-24 bg-zinc-800" />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-blue-500/20">
+                    <Database className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-zinc-400">Uso de Disco (Database)</p>
+                    <p className="text-xl font-semibold text-zinc-100">
+                      {formatBytes(metrics?.db_size_bytes || 0)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-emerald-500/20">
+                    <Activity className="h-5 w-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-zinc-400">Status de Conexão</p>
+                    <p className="text-xl font-semibold text-emerald-400">Conectado</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
