@@ -1,10 +1,11 @@
-import React, { useRef } from 'react';
-import { Shield, Phone, Calendar, Download, Car, Home, Heart, Briefcase } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Shield, Phone, Calendar, Download, Car, Home, Heart, Briefcase, FileText, Image, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatPhoneForTel } from '@/utils/insuranceAssistance';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VirtualCardProps {
   policy: {
@@ -14,6 +15,7 @@ interface VirtualCardProps {
     start_date: string | null;
     expiration_date: string;
     insured_asset: string | null;
+    carteirinha_url?: string | null;
   };
   clientName: string;
   clientCpf: string | null;
@@ -31,6 +33,7 @@ export function VirtualCard({
   canDownload,
 }: VirtualCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const getTypeIcon = (type: string | null) => {
     const t = type?.toLowerCase() || '';
@@ -50,11 +53,11 @@ export function VirtualCard({
     return cpf;
   };
 
-  const handleDownload = async () => {
+  // Download as PNG (html2canvas)
+  const handleDownloadPng = async () => {
     if (!cardRef.current) return;
 
     try {
-      // Importação dinâmica do html2canvas
       const html2canvas = (await import('html2canvas')).default;
       
       const canvas = await html2canvas(cardRef.current, {
@@ -68,10 +71,50 @@ export function VirtualCard({
       link.href = canvas.toDataURL('image/png');
       link.click();
       
-      toast.success('Carteirinha baixada com sucesso!');
+      toast.success('Imagem baixada com sucesso!');
     } catch (error) {
-      console.error('Error downloading card:', error);
-      toast.error('Erro ao baixar carteirinha');
+      console.error('Error downloading PNG:', error);
+      toast.error('Erro ao baixar imagem');
+    }
+  };
+
+  // Download imported PDF directly
+  const handleDownloadImportedPdf = () => {
+    if (policy.carteirinha_url) {
+      window.open(policy.carteirinha_url, '_blank');
+      toast.success('Abrindo carteirinha...');
+    }
+  };
+
+  // Generate PDF via Edge Function
+  const handleGeneratePdf = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-card-pdf', {
+        body: { policy_id: policy.id },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Erro ao gerar PDF');
+      }
+
+      // Convert response to blob and download
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `carteirinha-${policy.policy_number || policy.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success('Carteirinha PDF gerada com sucesso!');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Erro ao gerar carteirinha PDF');
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -173,16 +216,48 @@ export function VirtualCard({
         </div>
       </div>
 
-      {/* Download Button - Silver */}
+      {/* Download Buttons */}
       {canDownload && (
-        <Button
-          onClick={handleDownload}
-          variant="outline"
-          className="w-full border-white/[0.06] bg-zinc-900/50 hover:bg-zinc-800/50 text-white"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Baixar Carteirinha
-        </Button>
+        <div className="space-y-2">
+          {/* Primary button: Imported PDF or Generate PDF */}
+          {policy.carteirinha_url ? (
+            <Button
+              onClick={handleDownloadImportedPdf}
+              className="w-full bg-zinc-700 hover:bg-zinc-600 text-white"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Baixar Carteirinha (PDF)
+            </Button>
+          ) : (
+            <Button
+              onClick={handleGeneratePdf}
+              disabled={isGeneratingPdf}
+              className="w-full bg-zinc-700 hover:bg-zinc-600 text-white"
+            >
+              {isGeneratingPdf ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Gerando documento...
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Gerar Carteirinha Oficial (PDF)
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Secondary button: PNG download */}
+          <Button
+            onClick={handleDownloadPng}
+            variant="ghost"
+            className="w-full text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+          >
+            <Image className="w-4 h-4 mr-2" />
+            Baixar como Imagem (PNG)
+          </Button>
+        </div>
       )}
     </div>
   );
