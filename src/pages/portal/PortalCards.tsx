@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CreditCard, AlertCircle } from 'lucide-react';
+import { CreditCard, AlertCircle, Eye } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { VirtualCard } from '@/components/portal/VirtualCard';
 import { getCompanyAssistance } from '@/utils/insuranceAssistance';
+import { usePortalPermissions } from '@/hooks/usePortalPermissions';
 
 interface Policy {
   id: string;
@@ -36,8 +38,10 @@ export default function PortalCards() {
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [companies, setCompanies] = useState<Record<string, Company>>({});
   const [clientData, setClientData] = useState<{ name: string; cpf_cnpj: string | null } | null>(null);
-  const [canDownload, setCanDownload] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Hook centralizado de permissões
+  const { canDownloadCards, isLoading: permissionsLoading } = usePortalPermissions();
 
   useEffect(() => {
     const storedClient = sessionStorage.getItem('portal_client');
@@ -47,30 +51,10 @@ export default function PortalCards() {
         name: client.name || '',
         cpf_cnpj: client.cpf_cnpj || null,
       });
-      // Busca híbrida: client_id + CPF + email (apenas apólices ativas)
       fetchCardsHybrid(client);
-      fetchPortalConfig(client.user_id);
     }
   }, []);
 
-  const fetchPortalConfig = async (userId: string) => {
-    try {
-      const { data } = await supabase
-        .from('brokerages')
-        .select('portal_allow_card_download')
-        .eq('user_id', userId)
-        .limit(1)
-        .maybeSingle();
-
-      if (data) {
-        setCanDownload(data.portal_allow_card_download ?? true);
-      }
-    } catch (err) {
-      console.error('Error fetching portal config:', err);
-    }
-  };
-
-  // BUSCA HÍBRIDA PARA CARTEIRINHAS: client_id + CPF + email (apenas ativas)
   const fetchCardsHybrid = async (client: ClientData) => {
     try {
       const { data: policiesData, error: policiesError } = await supabase
@@ -111,11 +95,10 @@ export default function PortalCards() {
     const company = companies[policy.insurance_company];
     if (!company) return null;
 
-    // Usa a função utilitária que faz matching fuzzy com fallback
     return getCompanyAssistance(company.name, company.assistance_phone);
   };
 
-  if (isLoading) {
+  if (isLoading || permissionsLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-48 bg-zinc-800" />
@@ -128,7 +111,15 @@ export default function PortalCards() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-light text-white tracking-wide">Minhas Carteirinhas</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-light text-white tracking-wide">Minhas Carteirinhas</h2>
+        {!canDownloadCards && (
+          <Badge variant="outline" className="border-zinc-700 text-zinc-400 gap-1">
+            <Eye className="w-3 h-3" />
+            Visualização apenas
+          </Badge>
+        )}
+      </div>
 
       {policies.length === 0 ? (
         <Card className="bg-black/70 border-white/[0.06] backdrop-blur-2xl">
@@ -153,7 +144,7 @@ export default function PortalCards() {
                 clientCpf={clientData?.cpf_cnpj || null}
                 companyName={company?.name || null}
                 assistancePhone={getAssistancePhone(policy)}
-                canDownload={canDownload}
+                canDownload={canDownloadCards}
               />
             );
           })}

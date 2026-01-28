@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { User, Phone, Mail, MapPin, Loader2, Check, KeyRound } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { User, Phone, Mail, MapPin, Loader2, Check, KeyRound, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { usePortalPermissions } from '@/hooks/usePortalPermissions';
 
 interface ClientProfile {
   phone: string;
@@ -39,6 +41,9 @@ export default function PortalProfile() {
   const [clientName, setClientName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [slug, setSlug] = useState('');
+
+  // Hook centralizado de permissões
+  const { canEditProfile, isLoading: permissionsLoading } = usePortalPermissions();
 
   useEffect(() => {
     const clientData = sessionStorage.getItem('portal_client');
@@ -148,7 +153,7 @@ export default function PortalProfile() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || permissionsLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-48 bg-zinc-800" />
@@ -160,6 +165,16 @@ export default function PortalProfile() {
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-light text-white tracking-wide">Meus Dados</h2>
+
+      {/* Alert de restrição de edição */}
+      {!canEditProfile && (
+        <Alert className="bg-zinc-900/80 border-zinc-700/50 text-zinc-300">
+          <Lock className="h-4 w-4 text-zinc-400" />
+          <AlertDescription className="text-zinc-400">
+            As alterações de cadastro devem ser solicitadas diretamente à sua corretora.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Profile Card */}
       <Card className="bg-[#0A0A0A] border-white/5 backdrop-blur-xl">
@@ -186,7 +201,12 @@ export default function PortalProfile() {
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
               maxLength={15}
-              className="bg-zinc-950/50 border-white/10 text-white focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-11"
+              readOnly={!canEditProfile}
+              className={`bg-zinc-950/50 border-white/10 text-white h-11 ${
+                canEditProfile 
+                  ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
+                  : 'cursor-not-allowed opacity-60'
+              }`}
             />
           </div>
 
@@ -200,7 +220,12 @@ export default function PortalProfile() {
               placeholder="seu@email.com"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="bg-zinc-950/50 border-white/10 text-white focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-11"
+              readOnly={!canEditProfile}
+              className={`bg-zinc-950/50 border-white/10 text-white h-11 ${
+                canEditProfile 
+                  ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
+                  : 'cursor-not-allowed opacity-60'
+              }`}
             />
           </div>
 
@@ -213,7 +238,12 @@ export default function PortalProfile() {
               value={form.cep || ''}
               onChange={(e) => setForm({ ...form, cep: formatCep(e.target.value) })}
               maxLength={9}
-              className="bg-zinc-950/50 border-white/10 text-white focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-11"
+              readOnly={!canEditProfile}
+              className={`bg-zinc-950/50 border-white/10 text-white h-11 ${
+                canEditProfile 
+                  ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
+                  : 'cursor-not-allowed opacity-60'
+              }`}
             />
           </div>
 
@@ -227,7 +257,12 @@ export default function PortalProfile() {
               placeholder="Rua, número"
               value={form.address || ''}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
-              className="bg-zinc-950/50 border-white/10 text-white focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-11"
+              readOnly={!canEditProfile}
+              className={`bg-zinc-950/50 border-white/10 text-white h-11 ${
+                canEditProfile 
+                  ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
+                  : 'cursor-not-allowed opacity-60'
+              }`}
             />
           </div>
 
@@ -240,7 +275,12 @@ export default function PortalProfile() {
                 placeholder="Cidade"
                 value={form.city || ''}
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
-                className="bg-zinc-950/50 border-white/10 text-white focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-11"
+                readOnly={!canEditProfile}
+                className={`bg-zinc-950/50 border-white/10 text-white h-11 ${
+                  canEditProfile 
+                    ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
+                    : 'cursor-not-allowed opacity-60'
+                }`}
               />
             </div>
             <div className="space-y-2">
@@ -251,32 +291,40 @@ export default function PortalProfile() {
                 value={form.state || ''}
                 onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })}
                 maxLength={2}
-                className="bg-zinc-950/50 border-white/10 text-white focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-11"
+                readOnly={!canEditProfile}
+                className={`bg-zinc-950/50 border-white/10 text-white h-11 ${
+                  canEditProfile 
+                    ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
+                    : 'cursor-not-allowed opacity-60'
+                }`}
               />
             </div>
           </div>
 
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="w-full bg-white text-black font-medium hover:bg-zinc-200 h-12"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              <>
-                <Check className="w-4 h-4 mr-2" />
-                Salvar Alterações
-              </>
-            )}
-          </Button>
+          {/* Save Button - only show if editing is allowed */}
+          {canEditProfile && (
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="w-full bg-white text-black font-medium hover:bg-zinc-200 h-12"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Salvar Alterações
+                </>
+              )}
+            </Button>
+          )}
         </CardContent>
       </Card>
 
-      {/* Change Password */}
+      {/* Change Password - always available */}
       <Card className="bg-[#0A0A0A] border-white/5 backdrop-blur-xl">
         <CardContent className="p-4">
           <Button
