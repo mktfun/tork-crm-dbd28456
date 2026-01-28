@@ -1,14 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Loader2, User, Lightbulb } from 'lucide-react';
+import { X, Send, Loader2, User, Lightbulb, ThumbsUp, ThumbsDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface Message {
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
 }
@@ -25,6 +27,9 @@ export function AmorimAIFloating() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState<Set<string>>(new Set());
+  const [feedbackNoteId, setFeedbackNoteId] = useState<string | null>(null);
+  const [feedbackNote, setFeedbackNote] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useAuth();
@@ -43,10 +48,88 @@ export function AmorimAIFloating() {
     }
   }, [isOpen]);
 
+  const persistMessage = async (role: 'user' | 'assistant', content: string): Promise<string | null> => {
+    if (!user) return null;
+    
+    try {
+      const { data, error } = await supabase
+        .from('ai_messages')
+        .insert({ user_id: user.id, role, content })
+        .select('id')
+        .single();
+      
+      if (error) {
+        console.error('Error persisting message:', error);
+        return null;
+      }
+      return data?.id || null;
+    } catch (error) {
+      console.error('Error persisting message:', error);
+      return null;
+    }
+  };
+
+  const handleFeedback = async (messageId: string | undefined, feedbackType: 'positive' | 'negative') => {
+    if (!messageId || !user || feedbackSent.has(messageId)) return;
+
+    try {
+      const { error } = await supabase
+        .from('ai_message_feedback')
+        .insert({
+          message_id: messageId,
+          user_id: user.id,
+          feedback_type: feedbackType,
+          feedback_note: null
+        });
+
+      if (error) throw error;
+
+      setFeedbackSent(prev => new Set([...prev, messageId]));
+      
+      if (feedbackType === 'negative') {
+        setFeedbackNoteId(messageId);
+        toast.info('O que podemos melhorar?', { duration: 3000 });
+      } else {
+        toast.success('Obrigado pelo feedback!', { duration: 2000 });
+      }
+    } catch (error) {
+      console.error('Error sending feedback:', error);
+      toast.error('Erro ao enviar feedback');
+    }
+  };
+
+  const submitFeedbackNote = async () => {
+    if (!feedbackNoteId || !feedbackNote.trim() || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('ai_message_feedback')
+        .update({ feedback_note: feedbackNote.trim() })
+        .eq('message_id', feedbackNoteId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast.success('Feedback enviado. Obrigado!');
+      setFeedbackNoteId(null);
+      setFeedbackNote('');
+    } catch (error) {
+      console.error('Error updating feedback note:', error);
+      toast.error('Erro ao enviar nota');
+    }
+  };
+
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading || !user) return;
 
-    const userMessage: Message = { role: 'user', content: content.trim() };
+    // Persist user message
+    const userMessageId = await persistMessage('user', content.trim());
+    
+    const userMessage: Message = { 
+      id: userMessageId || undefined,
+      role: 'user', 
+      content: content.trim() 
+    };
     const updatedMessages = [...messages, userMessage];
     
     setMessages(updatedMessages);
@@ -69,9 +152,15 @@ export function AmorimAIFloating() {
 
       if (error) throw error;
 
+      const assistantContent = data?.message || 'Desculpe, não consegui processar sua solicitação.';
+      
+      // Persist assistant message
+      const assistantMessageId = await persistMessage('assistant', assistantContent);
+
       const assistantMessage: Message = {
+        id: assistantMessageId || undefined,
         role: 'assistant',
-        content: data?.message || 'Desculpe, não consegui processar sua solicitação.'
+        content: assistantContent
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -223,35 +312,106 @@ export function AmorimAIFloating() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.05 }}
                       className={cn(
-                        "flex gap-3",
-                        message.role === 'user' ? 'justify-end' : 'justify-start'
+                        "group",
+                        message.role === 'user' ? 'flex flex-col items-end' : 'flex flex-col items-start'
                       )}
                     >
-                      {message.role === 'assistant' && (
-                        <div className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center bg-white/10 border border-white/10">
-                          <img src="/tork_symbol_favicon.png" alt="Tork" className="w-4 h-4 object-contain" />
-                        </div>
-                      )}
-                      
                       <div className={cn(
-                        "max-w-[80%] rounded-2xl px-4 py-3",
-                        message.role === 'user' 
-                          ? "bg-primary text-primary-foreground rounded-br-sm" 
-                          : "bg-white/10 text-foreground rounded-bl-sm"
+                        "flex gap-3",
+                        message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
                       )}>
-                        {message.role === 'assistant' ? (
-                          <div className="prose prose-sm prose-invert max-w-none">
-                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                        {message.role === 'assistant' && (
+                          <div className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center bg-white/10 border border-white/10">
+                            <img src="/tork_symbol_favicon.png" alt="Tork" className="w-4 h-4 object-contain" />
                           </div>
-                        ) : (
-                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        )}
+                        
+                        <div className={cn(
+                          "max-w-[80%] rounded-2xl px-4 py-3",
+                          message.role === 'user' 
+                            ? "bg-primary text-primary-foreground rounded-br-sm" 
+                            : "bg-white/10 text-foreground rounded-bl-sm"
+                        )}>
+                          {message.role === 'assistant' ? (
+                            <div className="prose prose-sm prose-invert max-w-none">
+                              <ReactMarkdown>{message.content}</ReactMarkdown>
+                            </div>
+                          ) : (
+                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          )}
+                        </div>
+
+                        {message.role === 'user' && (
+                          <div className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center bg-white/5 border border-white/10">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                          </div>
                         )}
                       </div>
 
-                      {message.role === 'user' && (
-                        <div className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center bg-white/5 border border-white/10">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                        </div>
+                      {/* Feedback buttons for assistant messages */}
+                      {message.role === 'assistant' && message.id && !feedbackSent.has(message.id) && (
+                        <motion.div 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="flex gap-1 mt-2 ml-11 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <button 
+                            onClick={() => handleFeedback(message.id, 'positive')}
+                            className="p-1.5 hover:bg-green-500/20 rounded-lg border border-transparent hover:border-green-500/30 transition-all"
+                            title="Resposta útil"
+                          >
+                            <ThumbsUp className="h-3.5 w-3.5 text-muted-foreground hover:text-green-400" />
+                          </button>
+                          <button 
+                            onClick={() => handleFeedback(message.id, 'negative')}
+                            className="p-1.5 hover:bg-red-500/20 rounded-lg border border-transparent hover:border-red-500/30 transition-all"
+                            title="Resposta pode melhorar"
+                          >
+                            <ThumbsDown className="h-3.5 w-3.5 text-muted-foreground hover:text-red-400" />
+                          </button>
+                        </motion.div>
+                      )}
+
+                      {/* Feedback sent indicator */}
+                      {message.role === 'assistant' && message.id && feedbackSent.has(message.id) && (
+                        <span className="text-xs text-muted-foreground/60 ml-11 mt-1">
+                          ✓ Feedback enviado
+                        </span>
+                      )}
+
+                      {/* Feedback note input for negative feedback */}
+                      {feedbackNoteId === message.id && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="ml-11 mt-2 w-full max-w-[280px]"
+                        >
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={feedbackNote}
+                              onChange={(e) => setFeedbackNote(e.target.value)}
+                              placeholder="O que poderia melhorar?"
+                              className="flex-1 px-3 py-1.5 text-xs bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') submitFeedbackNote();
+                                if (e.key === 'Escape') {
+                                  setFeedbackNoteId(null);
+                                  setFeedbackNote('');
+                                }
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              onClick={submitFeedbackNote}
+                              disabled={!feedbackNote.trim()}
+                              className="h-7 px-2 text-xs"
+                            >
+                              Enviar
+                            </Button>
+                          </div>
+                        </motion.div>
                       )}
                     </motion.div>
                   ))}

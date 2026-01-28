@@ -22,7 +22,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SYSTEM_PROMPT = `Você é um assistente virtual especializado em ajudar corretores de seguros a gerenciar sua carteira de clientes e apólices. 
+const BASE_SYSTEM_PROMPT = `Você é o Assistente Tork, um assistente virtual especializado em ajudar corretores de seguros a gerenciar sua carteira de clientes e apólices. 
 
 Você tem acesso às seguintes ferramentas:
 - search_clients: Buscar clientes por nome, CPF/CNPJ, email ou telefone
@@ -41,6 +41,39 @@ Você deve:
 5. Ser proativo em identificar oportunidades e riscos
 
 Sempre que o usuário fizer uma pergunta, analise se precisa usar alguma ferramenta para obter dados atualizados antes de responder.`;
+
+async function buildSystemPrompt(supabase: any, userId: string): Promise<string> {
+  try {
+    // Buscar padrões aprendidos com alta confiança
+    const { data: patterns, error } = await supabase
+      .from('ai_learned_patterns')
+      .select('pattern_type, pattern_data, confidence_score')
+      .eq('user_id', userId)
+      .gte('confidence_score', 0.7)
+      .order('confidence_score', { ascending: false });
+
+    if (error || !patterns || patterns.length === 0) {
+      return BASE_SYSTEM_PROMPT;
+    }
+
+    // Construir contexto aprendido
+    const learnedContext = patterns.map((p: { pattern_type: string; pattern_data: any; confidence_score: number }) => 
+      `- ${p.pattern_type}: ${JSON.stringify(p.pattern_data)} (confiança: ${(p.confidence_score * 100).toFixed(0)}%)`
+    ).join('\n');
+
+    return `${BASE_SYSTEM_PROMPT}
+
+<contexto_aprendido>
+Informações personalizadas sobre este usuário baseadas em interações anteriores:
+${learnedContext}
+
+Use este contexto para personalizar suas respostas e antecipar as necessidades do usuário.
+</contexto_aprendido>`;
+  } catch (error) {
+    console.error('Error building system prompt:', error);
+    return BASE_SYSTEM_PROMPT;
+  }
+}
 
 const TOOLS = [
   {
@@ -433,9 +466,17 @@ serve(async (req) => {
     console.log('Processing request for user:', userId);
     console.log('Messages:', messages.length);
 
+    // Criar cliente Supabase com service role para buscar padrões
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Construir system prompt com contexto personalizado
+    const systemPrompt = await buildSystemPrompt(supabase, userId);
+
     // Primeira chamada para a IA
     let aiMessages = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: systemPrompt },
       ...messages
     ];
 
@@ -470,12 +511,7 @@ serve(async (req) => {
       // Adicionar a mensagem da IA com tool calls ao histórico
       aiMessages.push(result.choices[0].message);
 
-      // Criar cliente Supabase com service role
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-      // Executar todas as tool calls
+      // Executar todas as tool calls (supabase já criado acima)
       for (const toolCall of toolCalls) {
         const toolResult = await executeToolCall(toolCall, supabase, userId);
 
