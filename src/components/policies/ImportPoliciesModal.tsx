@@ -22,7 +22,7 @@ import { useSupabaseCompanies } from '@/hooks/useSupabaseCompanies';
 import { useSupabaseProducers } from '@/hooks/useSupabaseProducers';
 import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
 import { useSupabaseBrokerages } from '@/hooks/useSupabaseBrokerages';
-import { usePolicies } from '@/hooks/useAppData';
+// usePolicies removido - agora usamos executePolicyImport diretamente
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAllClients } from '@/hooks/useAllClients';
 import { cn } from '@/lib/utils';
@@ -47,7 +47,9 @@ import {
   createSeguradora,
   createRamo,
   saveApoliceItens,
-  upsertClientByDocument
+  upsertClientByDocument,
+  executePolicyImport,
+  PolicyImportResult
 } from '@/services/policyImportService';
 import { useAppStore } from '@/store';
 // v11.0: Mistral Intelligence - OCR + LLM Pipeline
@@ -217,7 +219,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
   const { producers } = useSupabaseProducers();
   const { data: ramos = [] } = useSupabaseRamos();
   const { brokerages } = useSupabaseBrokerages();
-  const { addPolicy } = usePolicies();
+  // addPolicy removido - agora usamos executePolicyImport do service layer
   const activeBrokerageId = useAppStore(state => state.activeBrokerageId);
   const setActiveBrokerage = useAppStore(state => state.setActiveBrokerage);
   const isMobile = useIsMobile();
@@ -947,10 +949,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       if (name === 'Não Identificado') return true;
       if (name.toUpperCase().includes('NÃO IDENTIFICADO')) return true;
       if (name.toUpperCase().includes('NAO IDENTIFICADO')) return true;
-      if (name.length > 60) return true; // Nomes muito longos são suspeitos
-      if (name.split(' ').length > 5) return true; // Muitas palavras = frase
+      if (name.length > 60) return true;
+      if (name.split(' ').length > 5) return true;
       
-      // Termos de marketing/institucional
       const upper = name.toUpperCase();
       const suspiciousTerms = ['AGORA', 'VOCE', 'PODE', 'PROGRAMA', 'BENEFICIO', 'REALIZAR', 'TERMOS', 'CONDICOES'];
       if (suspiciousTerms.some(t => upper.includes(t))) return true;
@@ -985,111 +986,65 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     let errors = 0;
     const collectedErrors: ImportError[] = [];
 
+    // 🎯 **REFATORADO**: Usa executePolicyImport do Service Layer
     for (let i = 0; i < validItems.length; i++) {
       setProcessingIndex(i);
       const item = validItems[i];
 
       try {
-        let clientId = item.clientId;
-
-        if (item.clientStatus === 'new') {
-          const newClient = await createClientFromEdited(
-            item.clientName,
-            item.clientCpfCnpj,
-            item.extracted.cliente.email,
-            item.extracted.cliente.telefone,
-            item.extracted.cliente.endereco_completo,
-            user.id
-          );
-          clientId = newClient.id;
-        }
-
-        const pdfUrl = await uploadPolicyPdf(
-          item.file, 
+        const result: PolicyImportResult = await executePolicyImport(
+          item,
           user.id,
-          item.clientCpfCnpj || undefined,
-          item.numeroApolice || undefined,
-          activeBrokerageId
+          activeBrokerageId,
+          { defaultProducerId: defaultProducerId || undefined }
         );
 
-        if (!pdfUrl) {
-          throw new Error(`Upload do PDF falhou para ${item.fileName}`);
-        }
-
-        const isOrcamento = item.tipoDocumento === 'ORCAMENTO';
-        const finalStatus = isOrcamento ? 'Orçamento' : 'Ativa';
-        
-        const primeiroNome = item.clientName?.split(' ')[0]?.replace(/NÃO|IDENTIFICADO/gi, '').trim() || 'Cliente';
-        const objetoResumo = item.objetoSegurado 
-          ? item.objetoSegurado.split(' ').slice(0, 3).join(' ').substring(0, 25)
-          : '';
-        const placa = item.identificacaoAdicional || '';
-        const seguradoraSigla = item.seguradoraNome?.split(' ')[0]?.toUpperCase() || 'CIA';
-        const tipoDoc = item.tipoDocumento === 'ENDOSSO' 
-          ? 'ENDOSSO' 
-          : item.tipoOperacao === 'RENOVACAO' 
-            ? 'RENOVACAO' 
-            : 'NOVA';
-        
-        let nomenclaturaElite = `${primeiroNome} - ${item.ramoNome || 'Seguro'}`;
-        if (objetoResumo) nomenclaturaElite += ` (${objetoResumo})`;
-        if (placa) nomenclaturaElite += ` - ${placa}`;
-        nomenclaturaElite += ` - ${seguradoraSigla} - ${tipoDoc}`;
-        const insuredAssetFinal = nomenclaturaElite.substring(0, 100);
-        
-        const newPolicy = await addPolicy({
-          clientId: clientId!,
-          policyNumber: item.numeroApolice,
-          insuranceCompany: item.seguradoraId!,
-          type: item.ramoId!,
-          insuredAsset: insuredAssetFinal,
-          premiumValue: item.premioLiquido,
-          commissionRate: item.commissionRate,
-          startDate: item.dataInicio,
-          expirationDate: item.dataFim,
-          producerId: item.producerId || defaultProducerId || undefined,
-          status: finalStatus,
-          automaticRenewal: !isOrcamento,
-          isBudget: isOrcamento,
-          pdfUrl,
-          brokerageId: activeBrokerageId ? Number(activeBrokerageId) : undefined,
-        });
-
-        // 🚗 Salvar itens estruturados (veículos) se for ramo Auto
-        if (newPolicy?.id && item.ramoNome) {
-          try {
-            await saveApoliceItens(
-              newPolicy.id,
-              item.ramoNome,
-              item.objetoSegurado || '',
-              item.identificacaoAdicional,
-              user.id
-            );
-          } catch (itemError) {
-            console.warn('⚠️ [ITENS] Erro ao salvar itens, mas apólice criada:', itemError);
+        if (result.success) {
+          success++;
+          
+          // Log de comissão (informativo)
+          if (result.commissionCreated) {
+            console.log(`💰 [IMPORT] Comissão criada para: ${item.numeroApolice}`);
+          } else if (result.commissionError) {
+            console.warn(`⚠️ [IMPORT] Comissão falhou (apólice OK): ${result.commissionError}`);
           }
+        } else {
+          // Classificar e coletar erro
+          const importError: ImportError = {
+            itemId: item.id,
+            fileName: item.fileName,
+            clientName: item.clientName,
+            stage: result.errorCode === 'CLIENT_CREATION_FAILED' ? 'cliente' 
+                 : result.errorCode === 'UPLOAD_FAILED' ? 'upload' 
+                 : 'apolice',
+            errorCode: result.errorCode || 'UNKNOWN',
+            errorMessage: result.error || 'Erro desconhecido'
+          };
+          collectedErrors.push(importError);
+          
+          console.table([{
+            arquivo: item.fileName,
+            cliente: item.clientName,
+            etapa: importError.stage,
+            codigo: importError.errorCode,
+            mensagem: importError.errorMessage
+          }]);
+          
+          errors++;
         }
-
-        success++;
       } catch (error: any) {
-        console.error('❌ [ERROR] Falha ao importar:', item.fileName, error);
+        console.error('❌ [ERROR] Falha inesperada ao importar:', item.fileName, error);
         
-        // Classify and collect error
         const importError = classifyImportError(error, item);
         collectedErrors.push(importError);
-        
-        // Log formatted error
-        console.table([{
-          arquivo: item.fileName,
-          cliente: item.clientName,
-          etapa: importError.stage,
-          codigo: importError.errorCode,
-          mensagem: importError.errorMessage
-        }]);
-        
         errors++;
       }
     }
+
+    // Invalidar queries para atualizar UI
+    queryClient.invalidateQueries({ queryKey: ['policies'] });
+    queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
 
     setImportErrors(collectedErrors);
     setImportResults({ success, errors });
