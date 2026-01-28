@@ -9,6 +9,7 @@ import { AdminProtectedRoute } from "@/components/auth/AdminProtectedRoute";
 import { RootLayout } from "./layouts/RootLayout";
 import { SettingsLayout } from "./layouts/SettingsLayout";
 import { PortalLayout } from "./layouts/PortalLayout";
+import { SuperAdminLayout } from "./layouts/SuperAdminLayout";
 import Dashboard from "./pages/Dashboard";
 import Policies from "./pages/Policies";
 import PolicyDetails from "./pages/PolicyDetails";
@@ -38,8 +39,8 @@ import AIAutomation from "./pages/AIAutomation";
 import ChatTorkSettings from "./pages/settings/ChatTorkSettings";
 import PortalSettings from "./pages/settings/PortalSettings";
 import Documentation from "./pages/Documentation";
-import SuperAdmin from "./pages/SuperAdmin";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
+import { AdminDashboard, BrokeragesManagement, AIConfigPanel, SystemLogs } from "./components/superadmin";
 
 // Portal do Cliente
 import PortalLogin from "./pages/portal/PortalLogin";
@@ -119,11 +120,18 @@ function App() {
                   <Route path="crm" element={<CRM />} />
                   <Route path="crm/automation" element={<AIAutomation />} />
                   <Route path="documentacao" element={<Documentation />} />
+                  
+                  {/* Super Admin com layout isolado */}
                   <Route path="super-admin" element={
                     <AdminProtectedRoute>
-                      <SuperAdmin />
+                      <SuperAdminLayout />
                     </AdminProtectedRoute>
-                  } />
+                  }>
+                    <Route index element={<AdminDashboard />} />
+                    <Route path="brokerages" element={<BrokeragesManagement />} />
+                    <Route path="ai-config" element={<AIConfigPanel />} />
+                    <Route path="logs" element={<SystemLogs />} />
+                  </Route>
                   <Route path="demo/mobile-menu" element={<ModernMobileMenuDemo />} />
                   
                   {/* Rotas de configurações com layout próprio */}
