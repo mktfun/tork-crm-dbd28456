@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_usage_logs: {
+        Row: {
+          brokerage_id: number | null
+          created_at: string | null
+          feature: string
+          id: string
+          provider: string
+          tokens_used: number | null
+        }
+        Insert: {
+          brokerage_id?: number | null
+          created_at?: string | null
+          feature: string
+          id?: string
+          provider: string
+          tokens_used?: number | null
+        }
+        Update: {
+          brokerage_id?: number | null
+          created_at?: string | null
+          feature?: string
+          id?: string
+          provider?: string
+          tokens_used?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_logs_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apolice_itens: {
         Row: {
           ano_fabricacao: number | null
