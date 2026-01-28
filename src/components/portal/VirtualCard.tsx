@@ -1,11 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Shield, Phone, Calendar, Download, Car, Home, Heart, Briefcase, FileText, Image, Loader2 } from 'lucide-react';
+import { Shield, Phone, Calendar, Car, Home, Heart, Briefcase, FileText, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatPhoneForTel } from '@/utils/insuranceAssistance';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 
 interface VirtualCardProps {
   policy: {
@@ -33,7 +32,6 @@ export function VirtualCard({
   canDownload,
 }: VirtualCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const getTypeIcon = (type: string | null) => {
     const t = type?.toLowerCase() || '';
@@ -67,7 +65,7 @@ export function VirtualCard({
       });
 
       const link = document.createElement('a');
-      link.download = `carteirinha-${policy.policy_number || policy.id}.png`;
+      link.download = `carteirinha-${policy.policy_number || 'seguro'}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
       
@@ -79,42 +77,10 @@ export function VirtualCard({
   };
 
   // Download imported PDF directly
-  const handleDownloadImportedPdf = () => {
+  const handleDownloadPdf = () => {
     if (policy.carteirinha_url) {
       window.open(policy.carteirinha_url, '_blank');
       toast.success('Abrindo carteirinha...');
-    }
-  };
-
-  // Generate PDF via Edge Function
-  const handleGeneratePdf = async () => {
-    setIsGeneratingPdf(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-card-pdf', {
-        body: { policy_id: policy.id },
-      });
-
-      if (error) {
-        throw new Error(error.message || 'Erro ao gerar PDF');
-      }
-
-      // Convert response to blob and download
-      const blob = new Blob([data], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `carteirinha-${policy.policy_number || policy.id}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      toast.success('Carteirinha PDF gerada com sucesso!');
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast.error('Erro ao gerar carteirinha PDF');
-    } finally {
-      setIsGeneratingPdf(false);
     }
   };
 
@@ -169,7 +135,7 @@ export function VirtualCard({
               </div>
               <div>
                 <p className="text-zinc-500 text-[10px] uppercase tracking-widest">Nº Apólice</p>
-                <p className="text-white font-mono text-sm truncate">{policy.policy_number || '---'}</p>
+                <p className="text-white font-mono text-sm truncate">{policy.policy_number || 'Pendente'}</p>
               </div>
             </div>
 
@@ -216,37 +182,17 @@ export function VirtualCard({
         </div>
       </div>
 
-      {/* Download Buttons */}
-      {canDownload && (
+      {/* Download Buttons - Only show if carteirinha_url exists and canDownload is true */}
+      {canDownload && policy.carteirinha_url && (
         <div className="space-y-2">
-          {/* Primary button: Imported PDF or Generate PDF */}
-          {policy.carteirinha_url ? (
-            <Button
-              onClick={handleDownloadImportedPdf}
-              className="w-full bg-zinc-700 hover:bg-zinc-600 text-white"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Baixar Carteirinha (PDF)
-            </Button>
-          ) : (
-            <Button
-              onClick={handleGeneratePdf}
-              disabled={isGeneratingPdf}
-              className="w-full bg-zinc-700 hover:bg-zinc-600 text-white"
-            >
-              {isGeneratingPdf ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Gerando documento...
-                </>
-              ) : (
-                <>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Gerar Carteirinha Oficial (PDF)
-                </>
-              )}
-            </Button>
-          )}
+          {/* Primary button: Download imported PDF */}
+          <Button
+            onClick={handleDownloadPdf}
+            className="w-full bg-zinc-700 hover:bg-zinc-600 text-white"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Baixar Carteirinha (PDF)
+          </Button>
 
           {/* Secondary button: PNG download */}
           <Button
@@ -258,6 +204,18 @@ export function VirtualCard({
             Baixar como Imagem (PNG)
           </Button>
         </div>
+      )}
+
+      {/* Show only PNG download when no carteirinha_url but canDownload is true */}
+      {canDownload && !policy.carteirinha_url && (
+        <Button
+          onClick={handleDownloadPng}
+          variant="ghost"
+          className="w-full text-zinc-400 hover:text-white hover:bg-zinc-800/50"
+        >
+          <Image className="w-4 h-4 mr-2" />
+          Baixar como Imagem (PNG)
+        </Button>
       )}
     </div>
   );

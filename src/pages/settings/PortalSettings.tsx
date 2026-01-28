@@ -36,8 +36,8 @@ export default function PortalSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Link de produção hardcoded com slug dinâmico
-  const baseUrl = 'https://crm.tork.services';
+  // URL dinâmica baseada no ambiente atual
+  const baseUrl = window.location.origin;
   const portalLink = brokerageSlug ? `${baseUrl}/${brokerageSlug}/portal` : null;
 
   useEffect(() => {

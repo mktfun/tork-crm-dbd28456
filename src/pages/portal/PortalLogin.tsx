@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Shield, Loader2, User, Lock } from 'lucide-react';
+import { Shield, Loader2, User, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -21,30 +21,25 @@ interface GetBrokerageResponse {
   error?: string;
 }
 
-interface PortalLoginResponse {
-  success: boolean;
-  error?: string;
-  is_first_access?: boolean;
-  client?: {
-    id: string;
-    name: string;
-    cpf_cnpj: string | null;
-    email: string | null;
-    phone: string | null;
-    user_id: string;
-  };
-  brokerage?: BrokerageData;
+interface ClientMatch {
+  id: string;
+  name: string;
+  email: string | null;
+  cpf_cnpj: string | null;
+  user_id: string;
 }
 
 export default function PortalLogin() {
   const { brokerageSlug } = useParams<{ brokerageSlug: string }>();
   const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+  const [confirmationInput, setConfirmationInput] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingBrokerage, setIsLoadingBrokerage] = useState(true);
   const [brokerage, setBrokerage] = useState<BrokerageData | null>(null);
   const [isValidBrokerage, setIsValidBrokerage] = useState(true);
+  const [matchedClients, setMatchedClients] = useState<ClientMatch[]>([]);
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const navigate = useNavigate();
 
   // Fetch brokerage data on mount
@@ -88,8 +83,8 @@ export default function PortalLogin() {
   }, [brokerageSlug]);
 
   const handleLogin = async () => {
-    if (!identifier || !password) {
-      setError('Preencha todos os campos');
+    if (!identifier.trim()) {
+      setError('Digite seu CPF, e-mail ou nome completo');
       return;
     }
 
@@ -102,10 +97,10 @@ export default function PortalLogin() {
     setError('');
 
     try {
-      const { data, error: rpcError } = await supabase.rpc('verify_portal_login_scoped' as any, {
-        p_brokerage_slug: brokerageSlug,
+      // Chama a nova função de identificação sem senha
+      const { data, error: rpcError } = await supabase.rpc('identify_portal_client', {
         p_identifier: identifier.trim(),
-        p_password: password
+        p_brokerage_slug: brokerageSlug
       });
 
       if (rpcError) {
@@ -115,41 +110,86 @@ export default function PortalLogin() {
         return;
       }
 
-      const response = data as unknown as PortalLoginResponse;
+      const clients = (data as unknown as ClientMatch[]) || [];
 
-      if (!response?.success) {
-        setError(response?.error || 'Credenciais inválidas');
+      if (clients.length === 0) {
+        // Nenhum cliente encontrado
+        setError('Cliente não encontrado nesta corretora');
         setIsLoading(false);
         return;
       }
 
-      // Save client and brokerage data to session
-      sessionStorage.setItem('portal_client', JSON.stringify(response.client));
-      sessionStorage.setItem('portal_brokerage_slug', brokerageSlug);
-      if (response.brokerage) {
-        sessionStorage.setItem('portal_brokerage', JSON.stringify(response.brokerage));
+      if (clients.length === 1) {
+        // Login direto - único cliente encontrado
+        completeLogin(clients[0]);
+        return;
       }
-      
-      if (response.is_first_access) {
-        toast.success('Primeiro acesso! Complete seu cadastro.');
-        navigate(`/${brokerageSlug}/portal/onboarding`, { replace: true });
-      } else {
-        toast.success(`Bem-vindo, ${response.client?.name?.split(' ')[0]}!`);
-        navigate(`/${brokerageSlug}/portal/home`, { replace: true });
-      }
+
+      // Múltiplos clientes (homônimos) - solicitar confirmação
+      setMatchedClients(clients);
+      setNeedsConfirmation(true);
+      setIsLoading(false);
 
     } catch (err) {
       console.error('Login error:', err);
       setError('Erro ao realizar login');
-    } finally {
       setIsLoading(false);
     }
   };
 
+  const handleConfirmation = () => {
+    if (!confirmationInput.trim()) {
+      setError('Digite seu CPF ou e-mail para confirmar');
+      return;
+    }
+
+    const cleanInput = confirmationInput.trim().toLowerCase();
+    const cleanCpf = confirmationInput.replace(/\D/g, '');
+
+    // Filtra pelo CPF ou email
+    const matched = matchedClients.find(client => {
+      const clientCpf = client.cpf_cnpj?.replace(/\D/g, '') || '';
+      const clientEmail = client.email?.toLowerCase() || '';
+      
+      return clientCpf === cleanCpf || clientEmail === cleanInput;
+    });
+
+    if (!matched) {
+      setError('Não foi possível confirmar sua identidade. Verifique os dados.');
+      return;
+    }
+
+    setIsLoading(true);
+    completeLogin(matched);
+  };
+
+  const completeLogin = (client: ClientMatch) => {
+    // Salva os dados na sessão
+    sessionStorage.setItem('portal_client', JSON.stringify(client));
+    sessionStorage.setItem('portal_brokerage_slug', brokerageSlug!);
+    if (brokerage) {
+      sessionStorage.setItem('portal_brokerage', JSON.stringify(brokerage));
+    }
+
+    toast.success(`Bem-vindo, ${client.name?.split(' ')[0]}!`);
+    navigate(`/${brokerageSlug}/portal/home`, { replace: true });
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleLogin();
+      if (needsConfirmation) {
+        handleConfirmation();
+      } else {
+        handleLogin();
+      }
     }
+  };
+
+  const resetForm = () => {
+    setNeedsConfirmation(false);
+    setMatchedClients([]);
+    setConfirmationInput('');
+    setError('');
   };
 
   // Loading state - Black & Silver
@@ -218,41 +258,67 @@ export default function PortalLogin() {
 
           {/* Login Form */}
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="identifier" className="text-zinc-400 text-sm font-light tracking-wide">
-                CPF, E-mail ou Nome
-              </Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
-                <Input
-                  id="identifier"
-                  type="text"
-                  placeholder="Digite seu CPF, e-mail ou nome"
-                  value={identifier}
-                  onChange={(e) => { setIdentifier(e.target.value); setError(''); }}
-                  onKeyPress={handleKeyPress}
-                  className="bg-black/60 border-zinc-700/50 text-white placeholder:text-zinc-600 pl-10 h-12 rounded-xl focus:border-zinc-400/60 focus:ring-1 focus:ring-zinc-400/20"
-                />
+            {!needsConfirmation ? (
+              // Formulário inicial - apenas identificador
+              <div className="space-y-2">
+                <Label htmlFor="identifier" className="text-zinc-400 text-sm font-light tracking-wide">
+                  CPF, E-mail ou Nome Completo
+                </Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                  <Input
+                    id="identifier"
+                    type="text"
+                    placeholder="Digite seu CPF, e-mail ou nome"
+                    value={identifier}
+                    onChange={(e) => { setIdentifier(e.target.value); setError(''); }}
+                    onKeyPress={handleKeyPress}
+                    className="bg-black/60 border-zinc-700/50 text-white placeholder:text-zinc-600 pl-10 h-12 rounded-xl focus:border-zinc-400/60 focus:ring-1 focus:ring-zinc-400/20"
+                  />
+                </div>
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-zinc-400 text-sm font-light tracking-wide">
-                Senha
-              </Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Digite sua senha"
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                  onKeyPress={handleKeyPress}
-                  className="bg-black/60 border-zinc-700/50 text-white placeholder:text-zinc-600 pl-10 h-12 rounded-xl focus:border-zinc-400/60 focus:ring-1 focus:ring-zinc-400/20"
-                />
+            ) : (
+              // Formulário de confirmação (homônimos)
+              <div className="space-y-4">
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-amber-200 text-sm font-medium">
+                        Encontramos {matchedClients.length} clientes com esse nome
+                      </p>
+                      <p className="text-amber-400/70 text-xs mt-1">
+                        Para sua segurança, confirme sua identidade
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmation" className="text-zinc-400 text-sm font-light tracking-wide">
+                    Confirme seu CPF ou E-mail
+                  </Label>
+                  <Input
+                    id="confirmation"
+                    type="text"
+                    placeholder="Digite seu CPF ou e-mail"
+                    value={confirmationInput}
+                    onChange={(e) => { setConfirmationInput(e.target.value); setError(''); }}
+                    onKeyPress={handleKeyPress}
+                    className="bg-black/60 border-zinc-700/50 text-white placeholder:text-zinc-600 h-12 rounded-xl focus:border-zinc-400/60 focus:ring-1 focus:ring-zinc-400/20"
+                    autoFocus
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="text-zinc-500 text-sm hover:text-zinc-300 transition-colors"
+                >
+                  ← Voltar
+                </button>
               </div>
-            </div>
+            )}
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
@@ -262,7 +328,7 @@ export default function PortalLogin() {
 
             {/* Silver Metallic Button */}
             <Button 
-              onClick={handleLogin} 
+              onClick={needsConfirmation ? handleConfirmation : handleLogin} 
               className="w-full h-12 bg-zinc-100 hover:bg-white text-zinc-950 font-semibold rounded-xl text-base tracking-wide transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_-5px_rgba(255,255,255,0.5)]"
               disabled={isLoading}
             >
@@ -271,19 +337,12 @@ export default function PortalLogin() {
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Entrando...
                 </>
+              ) : needsConfirmation ? (
+                'Confirmar e Entrar'
               ) : (
                 'Entrar'
               )}
             </Button>
-
-            <div className="text-center pt-4 border-t border-white/[0.06]">
-              <p className="text-zinc-500 text-sm font-light">
-                Primeiro acesso? Use seu <span className="text-zinc-300">CPF</span> como senha
-              </p>
-              <p className="text-zinc-600 text-xs mt-1">
-                Sem CPF? Use <span className="text-zinc-400">123456</span>
-              </p>
-            </div>
           </div>
         </CardContent>
       </Card>

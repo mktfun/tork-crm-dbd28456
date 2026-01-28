@@ -2803,6 +2803,16 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      identify_portal_client: {
+        Args: { p_brokerage_slug: string; p_identifier: string }
+        Returns: {
+          cpf_cnpj: string
+          email: string
+          id: string
+          name: string
+          user_id: string
+        }[]
+      }
       is_admin: { Args: { user_id?: string }; Returns: boolean }
       link_manual_transactions: { Args: { p_user_id: string }; Returns: string }
       merge_duplicate_clients: { Args: { p_user_id: string }; Returns: Json }
