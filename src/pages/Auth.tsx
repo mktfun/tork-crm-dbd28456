@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { Navigate, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,7 @@ import { motion } from 'framer-motion';
 export default function Auth() {
   const { user, loading, signIn, signUp, resetPassword } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const from = location.state?.from?.pathname || '/dashboard';
 
   const [isLoading, setIsLoading] = useState(false);
@@ -33,9 +34,16 @@ export default function Auth() {
   const [resetEmail, setResetEmail] = useState('');
   const [showResetForm, setShowResetForm] = useState(false);
 
-  // Se já estiver logado, redirecionar
+  // Navegação programática para evitar erro de Router context
+  useEffect(() => {
+    if (!loading && user) {
+      navigate(from, { replace: true });
+    }
+  }, [user, loading, navigate, from]);
+
+  // Navegação em progresso
   if (user) {
-    return <Navigate to={from} replace />;
+    return null;
   }
 
   const handleLogin = async (e: React.FormEvent) => {

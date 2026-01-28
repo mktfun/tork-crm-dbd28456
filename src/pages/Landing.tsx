@@ -1,10 +1,19 @@
+import { useEffect } from "react";
 import { HeroGeometric, SocialProofSection, FeaturesSection, BenefitsSection, PricingSection, FinalCTASection } from "@/components/ui/shape-landing-hero";
 import { useAuth } from "@/hooks/useAuth";
-import { Navigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
 function Landing() {
     const { user, loading } = useAuth();
+    const navigate = useNavigate();
+
+    // Navegação programática para evitar erro de Router context
+    useEffect(() => {
+        if (!loading && user) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [user, loading, navigate]);
 
     // Premium BLACK & SILVER loading state
     if (loading) {
@@ -57,9 +66,9 @@ function Landing() {
         );
     }
 
-    // Se o usuário está logado, redireciona para o dashboard
+    // Navegação em progresso - mostrar null enquanto redireciona
     if (user) {
-        return <Navigate to="/dashboard" replace />;
+        return null;
     }
 
     return (

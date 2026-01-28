@@ -1,4 +1,5 @@
-import { Outlet, NavLink, useLocation, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -13,7 +14,6 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const navItems = [
@@ -45,6 +45,13 @@ export function SuperAdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Navegação programática para evitar erro de Router context
+  useEffect(() => {
+    if (!isLoading && profile?.role !== 'admin') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [profile, isLoading, navigate]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success('Sessão encerrada');
@@ -63,8 +70,9 @@ export function SuperAdminLayout() {
     );
   }
 
+  // Navegação em progresso
   if (profile?.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />;
+    return null;
   }
 
   return (

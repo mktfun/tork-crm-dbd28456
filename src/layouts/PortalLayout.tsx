@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Outlet, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Home, FileText, CreditCard, User, LogOut, Loader2, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -92,9 +92,16 @@ export function PortalLayout() {
     );
   }
 
-  // Redirect if not logged in or wrong brokerage
+  // Navegação programática para evitar erro de Router context
+  useEffect(() => {
+    if (!isLoading && !client) {
+      navigate(`/${brokerageSlug}/portal`, { replace: true });
+    }
+  }, [client, isLoading, navigate, brokerageSlug]);
+
+  // Navegação em progresso
   if (!client) {
-    return <Navigate to={`/${brokerageSlug}/portal`} replace />;
+    return null;
   }
 
   const handleLogout = () => {

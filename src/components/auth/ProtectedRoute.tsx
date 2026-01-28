@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { Navigate, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 interface ProtectedRouteProps {
@@ -9,6 +10,14 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // Navegação programática para evitar erro de Router context
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/', { state: { from: location }, replace: true });
+    }
+  }, [user, loading, navigate, location]);
 
   // Premium BLACK & SILVER loading state
   if (loading) {
@@ -61,9 +70,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
+  // Navegação em progresso
   if (!user) {
-    // Salva a localização atual para redirecionar após o login
-    return <Navigate to="/" state={{ from: location }} replace />;
+    return null;
   }
 
   return <>{children}</>;
