@@ -14,6 +14,125 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_improvement_log: {
+        Row: {
+          after_value: Json | null
+          before_value: Json | null
+          created_at: string | null
+          id: string
+          improvement_type: string
+          reason: string | null
+          user_id: string | null
+        }
+        Insert: {
+          after_value?: Json | null
+          before_value?: Json | null
+          created_at?: string | null
+          id?: string
+          improvement_type: string
+          reason?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          after_value?: Json | null
+          before_value?: Json | null
+          created_at?: string | null
+          id?: string
+          improvement_type?: string
+          reason?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ai_learned_patterns: {
+        Row: {
+          confidence_score: number | null
+          created_at: string | null
+          id: string
+          last_reinforced: string | null
+          pattern_data: Json
+          pattern_type: string
+          user_id: string | null
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string | null
+          id?: string
+          last_reinforced?: string | null
+          pattern_data?: Json
+          pattern_type: string
+          user_id?: string | null
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string | null
+          id?: string
+          last_reinforced?: string | null
+          pattern_data?: Json
+          pattern_type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ai_message_feedback: {
+        Row: {
+          created_at: string | null
+          feedback_note: string | null
+          feedback_type: string
+          id: string
+          message_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          feedback_note?: string | null
+          feedback_type: string
+          id?: string
+          message_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          feedback_note?: string | null
+          feedback_type?: string
+          id?: string
+          message_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_message_feedback_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "ai_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          role: string
+          user_id: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          role: string
+          user_id?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          role?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       ai_usage_logs: {
         Row: {
           brokerage_id: number | null
