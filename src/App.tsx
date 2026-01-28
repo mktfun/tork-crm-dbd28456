@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { AdminProtectedRoute } from "@/components/auth/AdminProtectedRoute";
 import { RootLayout } from "./layouts/RootLayout";
 import { SettingsLayout } from "./layouts/SettingsLayout";
 import { PortalLayout } from "./layouts/PortalLayout";
@@ -38,6 +39,7 @@ import ChatTorkSettings from "./pages/settings/ChatTorkSettings";
 import PortalSettings from "./pages/settings/PortalSettings";
 import Documentation from "./pages/Documentation";
 import SuperAdmin from "./pages/SuperAdmin";
+import SuperAdminLogin from "./pages/SuperAdminLogin";
 
 // Portal do Cliente
 import PortalLogin from "./pages/portal/PortalLogin";
@@ -93,6 +95,9 @@ function App() {
                 <Route path="/sinistros" element={<Navigate to="/dashboard/sinistros" replace />} />
                 <Route path="/reports" element={<Navigate to="/dashboard/reports" replace />} />
 
+                {/* Super Admin Login - Public route */}
+                <Route path="/super-admin/login" element={<SuperAdminLogin />} />
+
                 {/* Todas as rotas do sistema são protegidas */}
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
@@ -114,7 +119,11 @@ function App() {
                   <Route path="crm" element={<CRM />} />
                   <Route path="crm/automation" element={<AIAutomation />} />
                   <Route path="documentacao" element={<Documentation />} />
-                  <Route path="super-admin" element={<SuperAdmin />} />
+                  <Route path="super-admin" element={
+                    <AdminProtectedRoute>
+                      <SuperAdmin />
+                    </AdminProtectedRoute>
+                  } />
                   <Route path="demo/mobile-menu" element={<ModernMobileMenuDemo />} />
                   
                   {/* Rotas de configurações com layout próprio */}
