@@ -180,6 +180,9 @@ export interface Brokerage {
   susep_code?: string;
   logo_url?: string;
   financial_settings?: BrokerageFinancialSettings;
+  portal_allow_policy_download?: boolean;
+  portal_allow_card_download?: boolean;
+  portal_allow_profile_edit?: boolean;
   createdAt: string;
 }
 

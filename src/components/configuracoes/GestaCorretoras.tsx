@@ -4,7 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useForm } from 'react-hook-form';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Edit, Trash2, Building2 } from 'lucide-react';
@@ -17,6 +19,9 @@ const brokerageSchema = z.object({
   cnpj: z.string().optional(),
   susep_code: z.string().optional(),
   logo_url: z.string().optional(),
+  portal_allow_policy_download: z.boolean().optional(),
+  portal_allow_card_download: z.boolean().optional(),
+  portal_allow_profile_edit: z.boolean().optional(),
 });
 
 type BrokerageFormData = z.infer<typeof brokerageSchema>;
@@ -33,6 +38,9 @@ export function GestaoCorretoras() {
       cnpj: '',
       susep_code: '',
       logo_url: '',
+      portal_allow_policy_download: false,
+      portal_allow_card_download: false,
+      portal_allow_profile_edit: false,
     },
   });
 
@@ -62,6 +70,9 @@ export function GestaoCorretoras() {
       cnpj: brokerage.cnpj || '',
       susep_code: brokerage.susep_code || '',
       logo_url: brokerage.logo_url || '',
+      portal_allow_policy_download: brokerage.portal_allow_policy_download ?? false,
+      portal_allow_card_download: brokerage.portal_allow_card_download ?? false,
+      portal_allow_profile_edit: brokerage.portal_allow_profile_edit ?? false,
     });
     setIsDialogOpen(true);
   };
@@ -139,7 +150,65 @@ export function GestaoCorretoras() {
               className="bg-slate-800 border-slate-700 text-white"
             />
           </div>
-          <div className="flex justify-end gap-2">
+
+          <Separator className="my-4 bg-slate-700" />
+
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-slate-200">Configurações do Portal do Cliente</h4>
+            
+            <Controller
+              name="portal_allow_policy_download"
+              control={form.control}
+              render={({ field }) => (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="portal_allow_policy_download" className="text-slate-300 cursor-pointer">
+                    Permitir download de apólices no portal
+                  </Label>
+                  <Switch
+                    id="portal_allow_policy_download"
+                    checked={field.value ?? false}
+                    onCheckedChange={field.onChange}
+                  />
+                </div>
+              )}
+            />
+
+            <Controller
+              name="portal_allow_card_download"
+              control={form.control}
+              render={({ field }) => (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="portal_allow_card_download" className="text-slate-300 cursor-pointer">
+                    Permitir download de carteirinhas no portal
+                  </Label>
+                  <Switch
+                    id="portal_allow_card_download"
+                    checked={field.value ?? false}
+                    onCheckedChange={field.onChange}
+                  />
+                </div>
+              )}
+            />
+
+            <Controller
+              name="portal_allow_profile_edit"
+              control={form.control}
+              render={({ field }) => (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="portal_allow_profile_edit" className="text-slate-300 cursor-pointer">
+                    Permitir edição de perfil pelo cliente
+                  </Label>
+                  <Switch
+                    id="portal_allow_profile_edit"
+                    checked={field.value ?? false}
+                    onCheckedChange={field.onChange}
+                  />
+                </div>
+              )}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
