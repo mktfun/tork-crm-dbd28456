@@ -240,9 +240,19 @@ export function PolicyDetailModal({
               )}
 
               {!canDownloadPdf && hasPdf && (
-                <p className="text-center text-zinc-500 text-sm font-light">
-                  Download desabilitado pelo corretor
-                </p>
+                <Card className="bg-zinc-900/50 border-zinc-700/50">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <AlertTriangle className="w-5 h-5 text-zinc-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-zinc-400 text-sm font-light">
+                        O download de documentos está temporariamente desabilitado.
+                      </p>
+                      <p className="text-zinc-500 text-xs mt-1">
+                        Entre em contato com sua corretora para solicitar a apólice.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </div>
           )}

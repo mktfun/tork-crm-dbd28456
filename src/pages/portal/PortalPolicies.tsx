@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Shield, Calendar, Building2, Car, Home, Heart, Briefcase, AlertCircle, ChevronRight } from 'lucide-react';
+import { Shield, Calendar, Building2, Car, Home, Heart, Briefcase, AlertCircle, ChevronRight, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PolicyDetailModal } from '@/components/portal/PolicyDetailModal';
+import { usePortalPermissions } from '@/hooks/usePortalPermissions';
 
 interface Policy {
   id: string;
@@ -28,11 +30,6 @@ interface Company {
   name: string;
 }
 
-interface PortalConfig {
-  canViewPdf: boolean;
-  canDownloadPdf: boolean;
-}
-
 interface ClientData {
   id: string;
   name: string;
@@ -47,40 +44,19 @@ export default function PortalPolicies() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
   const [clientData, setClientData] = useState<ClientData | null>(null);
-  const [portalConfig, setPortalConfig] = useState<PortalConfig>({ canViewPdf: true, canDownloadPdf: true });
+  
+  // Hook centralizado de permissões
+  const { canDownloadPolicies, isLoading: permissionsLoading } = usePortalPermissions();
 
   useEffect(() => {
     const storedClient = sessionStorage.getItem('portal_client');
     if (storedClient) {
       const client: ClientData = JSON.parse(storedClient);
       setClientData(client);
-      // Busca híbrida: client_id + CPF + email
       fetchDataHybrid(client);
-      fetchPortalConfig(client.user_id);
     }
   }, []);
 
-  const fetchPortalConfig = async (userId: string) => {
-    try {
-      const { data } = await supabase
-        .from('brokerages')
-        .select('portal_allow_policy_download')
-        .eq('user_id', userId)
-        .limit(1)
-        .maybeSingle();
-
-      if (data) {
-        setPortalConfig({
-          canViewPdf: true, // Sempre pode ver se tem acesso ao portal
-          canDownloadPdf: data.portal_allow_policy_download ?? true,
-        });
-      }
-    } catch (err) {
-      console.error('Error fetching portal config:', err);
-    }
-  };
-
-  // BUSCA HÍBRIDA: client_id + CPF + email (resolve problema de clientes sem CPF)
   const fetchDataHybrid = async (client: ClientData) => {
     try {
       const { data: policiesData, error: policiesError } = await supabase
@@ -143,7 +119,7 @@ export default function PortalPolicies() {
     setSelectedPolicy(policy);
   };
 
-  if (isLoading) {
+  if (isLoading || permissionsLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-48 bg-zinc-800" />
@@ -157,6 +133,16 @@ export default function PortalPolicies() {
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-light text-white tracking-wide">Meus Seguros</h2>
+
+      {/* Alert de restrição de download */}
+      {!canDownloadPolicies && (
+        <Alert className="bg-zinc-900/80 border-zinc-700/50 text-zinc-300">
+          <Lock className="h-4 w-4 text-zinc-400" />
+          <AlertDescription className="text-zinc-400">
+            O download de documentos está temporariamente desabilitado. Entre em contato com sua corretora para solicitar a apólice.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {policies.length === 0 ? (
         <Card className="bg-black/70 border-white/[0.06] backdrop-blur-2xl">
@@ -227,8 +213,8 @@ export default function PortalPolicies() {
           clientId={clientData.id}
           userId={clientData.user_id}
           companyName={selectedPolicy?.insurance_company ? companies[selectedPolicy.insurance_company] || null : null}
-          canViewPdf={portalConfig.canViewPdf}
-          canDownloadPdf={portalConfig.canDownloadPdf}
+          canViewPdf={true}
+          canDownloadPdf={canDownloadPolicies}
         />
       )}
     </div>
