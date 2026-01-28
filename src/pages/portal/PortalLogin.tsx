@@ -83,7 +83,9 @@ export default function PortalLogin() {
   }, [brokerageSlug]);
 
   const handleLogin = async () => {
-    if (!identifier.trim()) {
+    const cleanIdentifier = identifier.trim();
+    
+    if (!cleanIdentifier) {
       setError('Digite seu CPF, e-mail ou nome completo');
       return;
     }
@@ -96,16 +98,36 @@ export default function PortalLogin() {
     setIsLoading(true);
     setError('');
 
+    // DEBUG: Log de pré-vôo
+    console.log('🔍 DEBUG LOGIN - Enviando:', { 
+      slug: brokerageSlug, 
+      identifier: cleanIdentifier,
+      identifierLength: cleanIdentifier.length
+    });
+
     try {
       // Chama a nova função de identificação sem senha
       const { data, error: rpcError } = await supabase.rpc('identify_portal_client', {
-        p_identifier: identifier.trim(),
+        p_identifier: cleanIdentifier,
         p_brokerage_slug: brokerageSlug
       });
 
+      // DEBUG: Log de resposta
+      console.log('📊 DEBUG LOGIN - Resposta RPC:', { 
+        data, 
+        error: rpcError,
+        dataType: typeof data,
+        dataLength: Array.isArray(data) ? data.length : 'não é array'
+      });
+
       if (rpcError) {
-        console.error('RPC Error:', rpcError);
-        setError('Erro ao realizar login');
+        console.error('❌ RPC Error completo:', {
+          message: rpcError.message,
+          code: rpcError.code,
+          details: rpcError.details,
+          hint: rpcError.hint
+        });
+        setError(`Erro ao realizar login (${rpcError.code || 'RPC_FAIL'})`);
         setIsLoading(false);
         return;
       }
@@ -113,11 +135,14 @@ export default function PortalLogin() {
       const clients = (data as unknown as ClientMatch[]) || [];
 
       if (clients.length === 0) {
-        // Nenhum cliente encontrado
-        setError('Cliente não encontrado nesta corretora');
+        // Nenhum cliente encontrado - mensagem detalhada para debug
+        console.warn('⚠️ Nenhum cliente encontrado. Params:', { slug: brokerageSlug, identifier: cleanIdentifier });
+        setError(`Cliente não encontrado para esta corretora (Slug: ${brokerageSlug})`);
         setIsLoading(false);
         return;
       }
+
+      console.log('✅ Cliente(s) encontrado(s):', clients.length, clients);
 
       if (clients.length === 1) {
         // Login direto - único cliente encontrado
@@ -131,8 +156,8 @@ export default function PortalLogin() {
       setIsLoading(false);
 
     } catch (err) {
-      console.error('Login error:', err);
-      setError('Erro ao realizar login');
+      console.error('💥 Login catch error:', err);
+      setError('Erro inesperado ao realizar login');
       setIsLoading(false);
     }
   };
