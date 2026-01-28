@@ -19,7 +19,7 @@ const corsHeaders = {
 
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1';
 
-// System prompt para extração estruturada - v12.3 with premium differentiation
+// System prompt para extração estruturada - v12.4 with enhanced premium extraction
 const EXTRACTION_PROMPT = `Você é um perito especialista em extração de dados de documentos de seguros brasileiros.
 
 ## INSTRUÇÕES CRÍTICAS:
@@ -42,27 +42,53 @@ Analise o Markdown fornecido e extraia os dados estruturados. Retorne APENAS JSO
    - Números válidos geralmente têm 6+ dígitos
    - NÃO confunda com "Manual" (transmissão de veículo)
 
-4. **VALORES (PRÊMIOS)** - BUSCA EXAUSTIVA E DIFERENCIAÇÃO CRÍTICA:
-   - Retorne como NUMBER (float), não string
+4. **VALORES (PRÊMIOS)** - ⚠️ REGRA FINANCEIRA CRÍTICA (BASE DA COMISSÃO):
+
+   ### PRIORIDADE ABSOLUTA: PRÊMIO LÍQUIDO
+   
+   O valor mais importante é o **PRÊMIO LÍQUIDO** - é o valor BASE do seguro que será usado para calcular comissão.
+   
+   **SINÔNIMOS ACEITOS PARA PRÊMIO LÍQUIDO** (buscar nesta ordem):
+   - "Prêmio Líquido"
+   - "Premio Liquido"
+   - "Importe Líquido"
+   - "Valor Líquido"
+   - "Prêmio Comercial"
+   - "Prêmio Tarifário"
+   - "Prêmio Individual"
+   - "Prêmio Puro"
+   - "Líquido do Seguro"
+   - Geralmente aparece em seção de resumo financeiro ou demonstrativo de prêmio
+   
+   **SINÔNIMOS ACEITOS PARA PRÊMIO TOTAL**:
+   - "Prêmio Total"
+   - "Premio Total"
+   - "Valor Total"
+   - "Total a Pagar"
+   - "Custo Total"
+   - "Prêmio com IOF"
+   - "Total do Seguro"
+   - "Valor Final"
+   
+   ### ⛔ VALORES A IGNORAR (NÃO são o prêmio principal):
+   - "Prêmio de Cobertura" ou "Prêmio de Coberturas" (soma de coberturas individuais)
+   - "IOF" (imposto)
+   - "Custo de Apólice" (taxa administrativa)
+   - "Prêmio Adicional" (adicionais opcionais)
+   - "Adicional de Fracionamento" (juros de parcelamento)
+   - Valores individuais de tabelas de coberturas (ex: "Colisão: R$ X")
+   
+   ### REGRA DE FALLBACK:
+   1. Se encontrar Prêmio Líquido → use diretamente
+   2. Se NÃO encontrar Líquido mas encontrar Total → calcule: premio_total / 1.0738
+   3. Se encontrar parcelas → multiplique: valor_parcela × num_parcelas
+   
+   ### FORMATAÇÃO OBRIGATÓRIA:
+   - Retorne como NUMBER (float puro), não string
    - R$ 1.234,56 → 1234.56
-   
-   ⚠️ ATENÇÃO: O "PRÊMIO LÍQUIDO" NÃO É o mesmo que "Prêmio de Coberturas"!
-   
-   - **PRÊMIO LÍQUIDO** (o que queremos): É o valor BASE do seguro ANTES de encargos, IOF e custos administrativos.
-     * Sinônimos: "Prêmio Líquido", "Premio Liquido", "Importe Líquido", "Valor Líquido"
-     * "Prêmio Comercial", "Prêmio Tarifário", "Prêmio Individual", "Prêmio Puro"
-     * Geralmente aparece em seção de resumo financeiro ou demonstrativo de prêmio
-   
-   - **PRÊMIO DE COBERTURAS** (NÃO confundir): É a soma dos valores de cada cobertura individual.
-     * Geralmente aparece em tabela de coberturas (ex: "Colisão: R$ X", "Terceiros: R$ Y")
-     * NÃO use este valor como premio_liquido
-   
-   - **PRÊMIO TOTAL**: É o valor FINAL com IOF e encargos incluídos.
-     * Sinônimos: "Prêmio Total", "Premio Total", "Valor Total", "Total a Pagar"
-     * "Custo Total", "Prêmio com IOF", "Total do Seguro", "Valor Final"
-   
-   - FALLBACK 1: Se não encontrar líquido, calcule: premio_total / 1.0738 (remove IOF)
-   - FALLBACK 2: Se encontrar parcelas, multiplique valor_parcela × num_parcelas
+   - Sem símbolos de moeda (R$, $)
+   - Sem separadores de milhar
+   - Use ponto como separador decimal
 
 5. **DATAS (VIGÊNCIA)** - BUSCA EXAUSTIVA:
    - Formato OBRIGATÓRIO: YYYY-MM-DD (ex: 2024-03-15)
