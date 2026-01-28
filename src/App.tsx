@@ -37,6 +37,7 @@ import AIAutomation from "./pages/AIAutomation";
 import ChatTorkSettings from "./pages/settings/ChatTorkSettings";
 import PortalSettings from "./pages/settings/PortalSettings";
 import Documentation from "./pages/Documentation";
+import SuperAdmin from "./pages/SuperAdmin";
 
 // Portal do Cliente
 import PortalLogin from "./pages/portal/PortalLogin";
@@ -113,6 +114,7 @@ function App() {
                   <Route path="crm" element={<CRM />} />
                   <Route path="crm/automation" element={<AIAutomation />} />
                   <Route path="documentacao" element={<Documentation />} />
+                  <Route path="super-admin" element={<SuperAdmin />} />
                   <Route path="demo/mobile-menu" element={<ModernMobileMenuDemo />} />
                   
                   {/* Rotas de configurações com layout próprio */}
