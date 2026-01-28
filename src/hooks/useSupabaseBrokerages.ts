@@ -32,6 +32,9 @@ export function useSupabaseBrokerages() {
         susep_code: brokerage.susep_code,
         logo_url: brokerage.logo_url,
         financial_settings: brokerage.financial_settings,
+        portal_allow_policy_download: brokerage.portal_allow_policy_download,
+        portal_allow_card_download: brokerage.portal_allow_card_download,
+        portal_allow_profile_edit: brokerage.portal_allow_profile_edit,
         createdAt: brokerage.created_at,
       })) || [];
 
@@ -89,6 +92,9 @@ export function useSupabaseBrokerages() {
       if (updates.susep_code !== undefined) updateData.susep_code = updates.susep_code;
       if (updates.logo_url !== undefined) updateData.logo_url = updates.logo_url;
       if (updates.financial_settings !== undefined) updateData.financial_settings = updates.financial_settings;
+      if (updates.portal_allow_policy_download !== undefined) updateData.portal_allow_policy_download = updates.portal_allow_policy_download;
+      if (updates.portal_allow_card_download !== undefined) updateData.portal_allow_card_download = updates.portal_allow_card_download;
+      if (updates.portal_allow_profile_edit !== undefined) updateData.portal_allow_profile_edit = updates.portal_allow_profile_edit;
 
       if (Object.keys(updateData).length === 0) {
         throw new Error('No valid fields to update');
