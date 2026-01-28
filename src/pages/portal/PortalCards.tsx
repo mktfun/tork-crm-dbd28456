@@ -15,6 +15,7 @@ interface Policy {
   insurance_company: string | null;
   type: string | null;
   status: string;
+  carteirinha_url: string | null;
 }
 
 interface Company {

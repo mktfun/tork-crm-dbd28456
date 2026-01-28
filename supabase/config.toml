@@ -9,7 +9,6 @@ verify_jwt = false
 [functions.analyze-policy]
 verify_jwt = false
 
-
 [functions.analyze-receipt]
 verify_jwt = false
 
@@ -32,6 +31,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.extract-quote-data]
+verify_jwt = false
+
+[functions.generate-card-pdf]
 verify_jwt = false
 
 [functions.ocr-bulk-analyze]
