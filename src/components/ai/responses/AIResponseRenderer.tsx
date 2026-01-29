@@ -5,7 +5,43 @@ import { FinancialCard } from './FinancialCard';
 import { PolicyListCard } from './PolicyListCard';
 import { ClientListCard } from './ClientListCard';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Shield } from 'lucide-react';
+import { 
+  BookOpen, 
+  Shield, 
+  TrendingUp, 
+  TrendingDown, 
+  AlertTriangle, 
+  CheckCircle, 
+  FileText, 
+  Users, 
+  Calendar,
+  DollarSign,
+  Briefcase,
+  Target,
+  Rocket,
+  Lightbulb,
+  ClipboardList,
+  type LucideIcon
+} from 'lucide-react';
+
+// Mapeamento de ícones para sintaxe [Icon:Name]
+const ICON_MAP: Record<string, LucideIcon> = {
+  Shield,
+  BookOpen,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  CheckCircle,
+  FileText,
+  Users,
+  Calendar,
+  DollarSign,
+  Briefcase,
+  Target,
+  Rocket,
+  Lightbulb,
+  ClipboardList,
+};
 
 interface AIResponseRendererProps {
   content: string;
@@ -39,6 +75,44 @@ function detectSources(text: string): Array<{ source: string; icon: React.Compon
   return detectedSources;
 }
 
+// Parser para sintaxe [Icon:Name] no texto
+function parseIconSyntax(text: string): React.ReactNode[] {
+  const iconRegex = /\[Icon:(\w+)\]/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = iconRegex.exec(text)) !== null) {
+    // Add text before the icon
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    
+    // Add the icon component
+    const iconName = match[1];
+    const IconComponent = ICON_MAP[iconName];
+    if (IconComponent) {
+      parts.push(
+        <IconComponent 
+          key={`icon-${match.index}`} 
+          className="inline-block h-4 w-4 mr-1 text-primary" 
+        />
+      );
+    } else {
+      parts.push(match[0]); // Keep original text if icon not found
+    }
+    
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : [text];
+}
+
 /**
  * AIResponseRenderer: Componente híbrido que separa Markdown de JSON estruturado.
  * 
@@ -47,7 +121,7 @@ function detectSources(text: string): Array<{ source: string; icon: React.Compon
  * - Dados estruturados encapsulados em <data_json>...</data_json>
  * 
  * Este componente extrai e renderiza cada parte apropriadamente.
- * FASE P2.2: Suporte a tabelas premium e formatação densa com Glassmorphism.
+ * FASE P3.6: Suporte a ícones dinâmicos, tabelas premium e estilo Tork Premium.
  */
 export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content }) => {
   const jsonRegex = /<data_json>([\s\S]*?)<\/data_json>/g;
@@ -108,28 +182,28 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
     }
   };
 
-  // Custom Markdown components for premium Glassmorphism styling
+  // Custom Markdown components for premium Glassmorphism styling (TORK PREMIUM)
   const markdownComponents = {
-    // Premium Table Styling
+    // Premium Table Styling with enhanced glass effect
     table: ({ children }: any) => (
-      <div className="w-full overflow-x-auto my-4 rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm">
+      <div className="w-full overflow-x-auto my-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-1">
         <table className="w-full border-collapse text-sm">
           {children}
         </table>
       </div>
     ),
     thead: ({ children }: any) => (
-      <thead className="bg-white/10 border-b border-white/10">
+      <thead className="bg-white/10 border-b border-white/15">
         {children}
       </thead>
     ),
     th: ({ children }: any) => (
-      <th className="text-left p-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+      <th className="text-left p-3 text-xs font-semibold uppercase tracking-wider text-primary">
         {children}
       </th>
     ),
     td: ({ children }: any) => (
-      <td className="p-3 text-sm border-b border-white/5">
+      <td className="p-3 text-sm border-b border-white/5 text-foreground/90">
         {children}
       </td>
     ),
@@ -140,54 +214,71 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
     ),
     // Lists with proper spacing
     ul: ({ children }: any) => (
-      <ul className="pl-5 space-y-2 my-3 list-disc marker:text-muted-foreground">
+      <ul className="pl-5 space-y-2 my-3 list-disc marker:text-primary/70">
         {children}
       </ul>
     ),
     ol: ({ children }: any) => (
-      <ol className="pl-5 space-y-2 my-3 list-decimal marker:text-muted-foreground">
+      <ol className="pl-5 space-y-2 my-3 list-decimal marker:text-primary/70">
         {children}
       </ol>
     ),
     li: ({ children }: any) => (
-      <li className="text-sm leading-relaxed">
+      <li className="text-sm leading-relaxed text-foreground/90">
         {children}
       </li>
     ),
-    // Headings with icons support
-    h3: ({ children }: any) => (
-      <h3 className="text-base font-bold mt-4 mb-2 flex items-center gap-2 text-foreground">
-        {children}
-      </h3>
-    ),
-    h4: ({ children }: any) => (
-      <h4 className="text-sm font-semibold mt-3 mb-1.5 text-foreground/90">
-        {children}
-      </h4>
-    ),
-    // Blockquotes for SUSEP alerts
+    // Headings with icon parsing support
+    h3: ({ children }: any) => {
+      const textContent = typeof children === 'string' ? children : 
+        Array.isArray(children) ? children.map(c => typeof c === 'string' ? c : '').join('') : '';
+      const parsedContent = typeof children === 'string' ? parseIconSyntax(children) : children;
+      
+      return (
+        <h3 className="text-base font-bold mt-5 mb-3 flex items-center gap-2 text-foreground border-b border-white/10 pb-2">
+          {parsedContent}
+        </h3>
+      );
+    },
+    h4: ({ children }: any) => {
+      const parsedContent = typeof children === 'string' ? parseIconSyntax(children) : children;
+      
+      return (
+        <h4 className="text-sm font-semibold mt-4 mb-2 text-foreground/95 flex items-center gap-1.5">
+          {parsedContent}
+        </h4>
+      );
+    },
+    // Blockquotes for SUSEP alerts and critical tips (enhanced style)
     blockquote: ({ children }: any) => (
-      <blockquote className="my-3 pl-4 border-l-2 border-yellow-500/50 bg-yellow-500/10 rounded-r-lg py-2 pr-3 text-sm italic">
-        {children}
+      <blockquote className="my-4 pl-4 border-l-3 border-yellow-500/70 bg-yellow-500/10 rounded-r-xl py-3 pr-4 text-sm backdrop-blur-sm">
+        <div className="flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+          <div className="text-yellow-100/90 font-medium">{children}</div>
+        </div>
       </blockquote>
     ),
-    // Strong text
+    // Strong text with primary color
     strong: ({ children }: any) => (
       <strong className="font-bold text-foreground">
         {children}
       </strong>
     ),
-    // Code blocks
+    // Code blocks with glass effect
     code: ({ children }: any) => (
-      <code className="px-1.5 py-0.5 rounded bg-white/10 text-xs font-mono">
+      <code className="px-1.5 py-0.5 rounded bg-white/10 text-xs font-mono text-primary">
         {children}
       </code>
     ),
-    // Paragraphs
+    // Paragraphs with proper spacing
     p: ({ children }: any) => (
-      <p className="text-sm leading-relaxed mb-2">
+      <p className="text-sm leading-relaxed mb-3 text-foreground/90">
         {children}
       </p>
+    ),
+    // Horizontal rules for section separation
+    hr: () => (
+      <hr className="my-4 border-t border-white/10" />
     ),
   };
 
