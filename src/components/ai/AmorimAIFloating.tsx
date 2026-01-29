@@ -337,12 +337,12 @@ export function AmorimAIFloating() {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className={cn(
-              "fixed bottom-4 right-4 z-50",
-              "w-[450px] h-[700px] max-h-[95vh]",
+              "fixed bottom-6 right-6 z-50",
+              "w-[550px] h-[calc(100vh-100px)] max-w-[95vw] max-h-[90vh]",
               "rounded-2xl overflow-hidden",
               "bg-background/95 backdrop-blur-xl",
               "border border-white/10",
-              "shadow-2xl",
+              "shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)]",
               "flex flex-col"
             )}
           >
@@ -471,10 +471,10 @@ export function AmorimAIFloating() {
                         )}
                         
                         <div className={cn(
-                          "max-w-[80%] rounded-2xl px-4 py-3",
+                          "rounded-2xl px-4 py-3",
                           message.role === 'user' 
-                            ? "bg-primary text-primary-foreground rounded-br-sm" 
-                            : "bg-white/10 text-foreground rounded-bl-sm"
+                            ? "max-w-[80%] bg-primary text-primary-foreground rounded-br-sm" 
+                            : "w-full bg-white/10 text-foreground rounded-bl-sm"
                         )}>
                         {message.role === 'assistant' ? (
                             // Lógica refinada: Tool > Pensando > Conteúdo
