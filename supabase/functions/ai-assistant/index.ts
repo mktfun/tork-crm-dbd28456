@@ -69,6 +69,15 @@ Seu tom de voz é profissional, claro, confiante e empático. Você não apenas 
   <rule priority="6">
     **RESPOSTA PARA DADOS NÃO ENCONTRADOS:** Se uma ferramenta retornar uma lista vazia ou nenhum resultado, diga claramente: "Não encontrei [item] com esses critérios no sistema." NUNCA tente sugerir dados que não existem.
   </rule>
+  <rule priority="7">
+    **CONFIRMAÇÃO PARA DELEÇÃO:** Você está ESTRITAMENTE PROIBIDO de executar 'delete_client' ou 'delete_policy' sem uma confirmação EXPLÍCITA e TEXTUAL do usuário. Se o usuário pedir para deletar algo, primeiro responda: "Você tem certeza que deseja excluir permanentemente [item]? Essa ação não pode ser desfeita. Confirme digitando 'Sim, pode deletar'." Somente execute a ferramenta se o usuário responder afirmativamente.
+  </rule>
+  <rule priority="8">
+    **VALIDAÇÃO DE DADOS OBRIGATÓRIOS:** Para criar um cliente (create_client), os campos 'name' e 'phone' são OBRIGATÓRIOS. Se o usuário não fornecer esses dados, NÃO execute a ferramenta. Responda educadamente pedindo as informações faltantes: "Para criar o cliente, preciso do nome completo e telefone. Pode me informar?"
+  </rule>
+  <rule priority="9">
+    **FEEDBACK DE ESCRITA:** Após executar com sucesso qualquer ferramenta de escrita (create, update, delete, move), inclua um emoji de confirmação na resposta. Exemplo: "✅ Cliente João Silva criado com sucesso!" ou "✅ Lead movido para a etapa Negociação."
+  </rule>
 </rules>
 
 <format_instruction>
@@ -140,6 +149,29 @@ Você tem 5 seguradoras cadastradas no sistema:
   </tool>
   <tool name="get_ramos">
     <description>Lista todos os ramos de seguro disponíveis. Use para validar ramos antes de filtrar.</description>
+  </tool>
+  
+  <!-- FERRAMENTAS DE ESCRITA (FASE P2) -->
+  <tool name="move_deal_to_stage">
+    <description>Move um deal/lead para outra etapa do funil CRM. Requer o ID do deal e o ID da nova etapa.</description>
+  </tool>
+  <tool name="create_client">
+    <description>Cria um novo cliente no sistema. Campos obrigatórios: name, phone. Opcionais: email, cpf_cnpj, address, birth_date.</description>
+  </tool>
+  <tool name="update_client">
+    <description>Atualiza dados de um cliente existente.</description>
+  </tool>
+  <tool name="create_policy">
+    <description>Cria uma nova apólice vinculada a um cliente.</description>
+  </tool>
+  <tool name="update_policy">
+    <description>Atualiza dados de uma apólice existente.</description>
+  </tool>
+  <tool name="delete_client">
+    <description>Exclui permanentemente um cliente. REQUER CONFIRMAÇÃO EXPLÍCITA DO USUÁRIO.</description>
+  </tool>
+  <tool name="delete_policy">
+    <description>Exclui permanentemente uma apólice. REQUER CONFIRMAÇÃO EXPLÍCITA DO USUÁRIO.</description>
   </tool>
 </tools_guide>`;
 
@@ -466,6 +498,129 @@ const TOOLS = [
       name: "get_ramos",
       description: "Retorna a lista de todos os ramos de seguro (Ex: Automóvel, Vida, Residencial) disponíveis no sistema.",
       parameters: { type: "object", properties: {} }
+    }
+  },
+  // ========== FERRAMENTAS DE ESCRITA (FASE P2) ==========
+  {
+    type: "function",
+    function: {
+      name: "move_deal_to_stage",
+      description: "Move um deal/lead para outra etapa do funil CRM.",
+      parameters: {
+        type: "object",
+        properties: {
+          deal_id: { type: "string", description: "ID do deal (UUID)" },
+          stage_id: { type: "string", description: "ID da nova etapa (UUID)" }
+        },
+        required: ["deal_id", "stage_id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_client",
+      description: "Cria um novo cliente no sistema. Campos obrigatórios: name, phone.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Nome completo do cliente" },
+          phone: { type: "string", description: "Telefone do cliente" },
+          email: { type: "string", description: "Email do cliente (opcional)" },
+          cpf_cnpj: { type: "string", description: "CPF ou CNPJ do cliente (opcional)" },
+          address: { type: "string", description: "Endereço (opcional)" },
+          birth_date: { type: "string", description: "Data de nascimento AAAA-MM-DD (opcional)" }
+        },
+        required: ["name", "phone"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_client",
+      description: "Atualiza dados de um cliente existente.",
+      parameters: {
+        type: "object",
+        properties: {
+          client_id: { type: "string", description: "ID do cliente (UUID)" },
+          name: { type: "string", description: "Novo nome" },
+          phone: { type: "string", description: "Novo telefone" },
+          email: { type: "string", description: "Novo email" },
+          cpf_cnpj: { type: "string", description: "Novo CPF/CNPJ" },
+          status: { type: "string", enum: ["Ativo", "Inativo"], description: "Novo status" }
+        },
+        required: ["client_id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_policy",
+      description: "Cria uma nova apólice vinculada a um cliente.",
+      parameters: {
+        type: "object",
+        properties: {
+          client_id: { type: "string", description: "ID do cliente (UUID)" },
+          policy_number: { type: "string", description: "Número da apólice" },
+          premium_value: { type: "number", description: "Valor do prêmio" },
+          start_date: { type: "string", description: "Data de início AAAA-MM-DD" },
+          expiration_date: { type: "string", description: "Data de vencimento AAAA-MM-DD" },
+          insurance_company: { type: "string", description: "ID da seguradora (UUID)" },
+          ramo_id: { type: "string", description: "ID do ramo (UUID)" },
+          status: { type: "string", enum: ["Ativa", "Orçamento", "Aguardando Apólice"], description: "Status inicial" }
+        },
+        required: ["client_id", "expiration_date"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_policy",
+      description: "Atualiza dados de uma apólice existente.",
+      parameters: {
+        type: "object",
+        properties: {
+          policy_id: { type: "string", description: "ID da apólice (UUID)" },
+          policy_number: { type: "string", description: "Novo número" },
+          premium_value: { type: "number", description: "Novo valor do prêmio" },
+          status: { type: "string", enum: ["Ativa", "Cancelada", "Vencida", "Renovada"], description: "Novo status" },
+          expiration_date: { type: "string", description: "Nova data de vencimento" }
+        },
+        required: ["policy_id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_client",
+      description: "Exclui permanentemente um cliente. REQUER CONFIRMAÇÃO EXPLÍCITA.",
+      parameters: {
+        type: "object",
+        properties: {
+          client_id: { type: "string", description: "ID do cliente a ser excluído (UUID)" },
+          confirmed: { type: "boolean", description: "Deve ser true para confirmar a exclusão" }
+        },
+        required: ["client_id", "confirmed"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_policy",
+      description: "Exclui permanentemente uma apólice. REQUER CONFIRMAÇÃO EXPLÍCITA.",
+      parameters: {
+        type: "object",
+        properties: {
+          policy_id: { type: "string", description: "ID da apólice a ser excluída (UUID)" },
+          confirmed: { type: "boolean", description: "Deve ser true para confirmar a exclusão" }
+        },
+        required: ["policy_id", "confirmed"]
+      }
     }
   }
 ];
@@ -864,6 +1019,304 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
     }
 
     return { success: false, error: `Tipo de relatório '${type}' não implementado.` };
+  },
+
+  // ========== FERRAMENTAS DE ESCRITA (FASE P2 - AGENTE AUTÔNOMO) ==========
+  
+  move_deal_to_stage: async (args, supabase, userId) => {
+    const { deal_id, stage_id } = args;
+
+    // Verificar se o deal existe e pertence ao usuário
+    const { data: deal, error: dealError } = await supabase
+      .from('crm_deals')
+      .select('id, title, stage_id')
+      .eq('id', deal_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (dealError || !deal) {
+      throw new Error('Deal não encontrado ou não pertence a você');
+    }
+
+    // Verificar se a etapa existe
+    const { data: stage, error: stageError } = await supabase
+      .from('crm_stages')
+      .select('id, name')
+      .eq('id', stage_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (stageError || !stage) {
+      throw new Error('Etapa não encontrada');
+    }
+
+    // Atualizar o deal
+    const { error: updateError } = await supabase
+      .from('crm_deals')
+      .update({ stage_id, updated_at: new Date().toISOString() })
+      .eq('id', deal_id)
+      .eq('user_id', userId);
+
+    if (updateError) throw updateError;
+
+    console.log(`[TOOL] move_deal_to_stage: Deal "${deal.title}" movido para "${stage.name}"`);
+    return { 
+      success: true, 
+      action: 'move_deal',
+      message: `Deal "${deal.title}" movido para a etapa "${stage.name}"`,
+      deal_id,
+      new_stage_id: stage_id,
+      new_stage_name: stage.name
+    };
+  },
+
+  create_client: async (args, supabase, userId) => {
+    const { name, phone, email, cpf_cnpj, address, birth_date } = args;
+
+    // Validação obrigatória
+    if (!name || !phone) {
+      throw new Error('Nome e telefone são obrigatórios para criar um cliente');
+    }
+
+    const insertData: any = {
+      user_id: userId,
+      name: name.trim(),
+      phone: phone.trim(),
+      email: email?.trim() || '',
+      status: 'Ativo'
+    };
+
+    if (cpf_cnpj) insertData.cpf_cnpj = cpf_cnpj.trim();
+    if (address) insertData.address = address.trim();
+    if (birth_date) insertData.birth_date = birth_date;
+
+    const { data, error } = await supabase
+      .from('clientes')
+      .insert(insertData)
+      .select('id, name, phone, email, status')
+      .single();
+
+    if (error) throw error;
+
+    console.log(`[TOOL] create_client: Cliente "${name}" criado com ID ${data.id}`);
+    return { 
+      success: true, 
+      action: 'create_client',
+      message: `Cliente "${name}" criado com sucesso`,
+      client: data 
+    };
+  },
+
+  update_client: async (args, supabase, userId) => {
+    const { client_id, ...updateFields } = args;
+
+    // Verificar se o cliente existe
+    const { data: existing, error: checkError } = await supabase
+      .from('clientes')
+      .select('id, name')
+      .eq('id', client_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (checkError || !existing) {
+      throw new Error('Cliente não encontrado ou não pertence a você');
+    }
+
+    // Montar objeto de atualização apenas com campos fornecidos
+    const updates: any = { updated_at: new Date().toISOString() };
+    if (updateFields.name) updates.name = updateFields.name.trim();
+    if (updateFields.phone) updates.phone = updateFields.phone.trim();
+    if (updateFields.email !== undefined) updates.email = updateFields.email.trim();
+    if (updateFields.cpf_cnpj) updates.cpf_cnpj = updateFields.cpf_cnpj.trim();
+    if (updateFields.status) updates.status = updateFields.status;
+
+    const { data, error } = await supabase
+      .from('clientes')
+      .update(updates)
+      .eq('id', client_id)
+      .eq('user_id', userId)
+      .select('id, name, phone, email, status')
+      .single();
+
+    if (error) throw error;
+
+    console.log(`[TOOL] update_client: Cliente "${data.name}" atualizado`);
+    return { 
+      success: true, 
+      action: 'update_client',
+      message: `Cliente "${data.name}" atualizado com sucesso`,
+      client: data 
+    };
+  },
+
+  create_policy: async (args, supabase, userId) => {
+    const { client_id, policy_number, premium_value, start_date, expiration_date, insurance_company, ramo_id, status = 'Ativa' } = args;
+
+    // Verificar se o cliente existe
+    const { data: client, error: clientError } = await supabase
+      .from('clientes')
+      .select('id, name')
+      .eq('id', client_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (clientError || !client) {
+      throw new Error('Cliente não encontrado');
+    }
+
+    const insertData: any = {
+      user_id: userId,
+      client_id,
+      expiration_date,
+      status,
+      premium_value: premium_value || 0,
+      commission_rate: 0
+    };
+
+    if (policy_number) insertData.policy_number = policy_number;
+    if (start_date) insertData.start_date = start_date;
+    if (insurance_company) insertData.insurance_company = insurance_company;
+    if (ramo_id) insertData.ramo_id = ramo_id;
+
+    const { data, error } = await supabase
+      .from('apolices')
+      .insert(insertData)
+      .select('id, policy_number, status, premium_value')
+      .single();
+
+    if (error) throw error;
+
+    console.log(`[TOOL] create_policy: Apólice criada para cliente "${client.name}"`);
+    return { 
+      success: true, 
+      action: 'create_policy',
+      message: `Apólice ${policy_number || data.id} criada para ${client.name}`,
+      policy: data,
+      client_name: client.name
+    };
+  },
+
+  update_policy: async (args, supabase, userId) => {
+    const { policy_id, ...updateFields } = args;
+
+    // Verificar se a apólice existe
+    const { data: existing, error: checkError } = await supabase
+      .from('apolices')
+      .select('id, policy_number, clientes(name)')
+      .eq('id', policy_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (checkError || !existing) {
+      throw new Error('Apólice não encontrada ou não pertence a você');
+    }
+
+    // Montar objeto de atualização
+    const updates: any = { updated_at: new Date().toISOString() };
+    if (updateFields.policy_number) updates.policy_number = updateFields.policy_number;
+    if (updateFields.premium_value !== undefined) updates.premium_value = updateFields.premium_value;
+    if (updateFields.status) updates.status = updateFields.status;
+    if (updateFields.expiration_date) updates.expiration_date = updateFields.expiration_date;
+
+    const { data, error } = await supabase
+      .from('apolices')
+      .update(updates)
+      .eq('id', policy_id)
+      .eq('user_id', userId)
+      .select('id, policy_number, status, premium_value')
+      .single();
+
+    if (error) throw error;
+
+    console.log(`[TOOL] update_policy: Apólice ${data.policy_number || policy_id} atualizada`);
+    return { 
+      success: true, 
+      action: 'update_policy',
+      message: `Apólice ${data.policy_number || policy_id} atualizada com sucesso`,
+      policy: data 
+    };
+  },
+
+  delete_client: async (args, supabase, userId) => {
+    const { client_id, confirmed } = args;
+
+    if (!confirmed) {
+      throw new Error('A exclusão requer confirmação explícita (confirmed: true)');
+    }
+
+    // Verificar se o cliente existe
+    const { data: client, error: checkError } = await supabase
+      .from('clientes')
+      .select('id, name')
+      .eq('id', client_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (checkError || !client) {
+      throw new Error('Cliente não encontrado ou não pertence a você');
+    }
+
+    // Verificar se há apólices vinculadas
+    const { count: policyCount } = await supabase
+      .from('apolices')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', client_id);
+
+    if (policyCount && policyCount > 0) {
+      throw new Error(`Não é possível excluir: o cliente tem ${policyCount} apólice(s) vinculada(s)`);
+    }
+
+    const { error } = await supabase
+      .from('clientes')
+      .delete()
+      .eq('id', client_id)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    console.log(`[TOOL] delete_client: Cliente "${client.name}" excluído`);
+    return { 
+      success: true, 
+      action: 'delete_client',
+      message: `Cliente "${client.name}" excluído permanentemente`,
+      deleted_id: client_id 
+    };
+  },
+
+  delete_policy: async (args, supabase, userId) => {
+    const { policy_id, confirmed } = args;
+
+    if (!confirmed) {
+      throw new Error('A exclusão requer confirmação explícita (confirmed: true)');
+    }
+
+    // Verificar se a apólice existe
+    const { data: policy, error: checkError } = await supabase
+      .from('apolices')
+      .select('id, policy_number, clientes(name)')
+      .eq('id', policy_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (checkError || !policy) {
+      throw new Error('Apólice não encontrada ou não pertence a você');
+    }
+
+    const { error } = await supabase
+      .from('apolices')
+      .delete()
+      .eq('id', policy_id)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    console.log(`[TOOL] delete_policy: Apólice ${policy.policy_number || policy_id} excluída`);
+    return { 
+      success: true, 
+      action: 'delete_policy',
+      message: `Apólice ${policy.policy_number || policy_id} excluída permanentemente`,
+      deleted_id: policy_id 
+    };
   }
 };
 

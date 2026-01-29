@@ -1,6 +1,31 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
+
+// Lista de ferramentas de escrita que devem invalidar o cache
+const WRITE_TOOLS = [
+  'move_deal_to_stage',
+  'create_client',
+  'update_client',
+  'create_policy',
+  'update_policy',
+  'delete_client',
+  'delete_policy',
+  'create_appointment'
+];
+
+// Mapeamento de ferramentas para as chaves de cache que devem ser invalidadas
+const TOOL_CACHE_KEYS: Record<string, string[]> = {
+  'move_deal_to_stage': ['crm_deals', 'crm_pipelines'],
+  'create_client': ['clientes', 'clients'],
+  'update_client': ['clientes', 'clients'],
+  'delete_client': ['clientes', 'clients'],
+  'create_policy': ['apolices', 'policies'],
+  'update_policy': ['apolices', 'policies'],
+  'delete_policy': ['apolices', 'policies'],
+  'create_appointment': ['appointments']
+};
 
 export interface AIConversation {
   id: string;
@@ -36,7 +61,20 @@ export function useAIConversations() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const completedWriteToolsRef = useRef<Set<string>>(new Set());
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Função para invalidar cache quando ferramentas de escrita são completadas
+  const invalidateCacheForTool = useCallback((toolName: string) => {
+    const cacheKeys = TOOL_CACHE_KEYS[toolName];
+    if (cacheKeys) {
+      console.log(`[CACHE-INVALIDATE] Invalidando cache para: ${cacheKeys.join(', ')}`);
+      cacheKeys.forEach(key => {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      });
+    }
+  }, [queryClient]);
 
   // Fetch all conversations for the user
   const fetchConversations = useCallback(async () => {
@@ -247,6 +285,7 @@ export function useAIConversations() {
 
     setIsStreaming(true);
     abortControllerRef.current = new AbortController();
+    completedWriteToolsRef.current.clear(); // Reset completed tools for new message
     
     // Prepare messages for API (exclude loading messages)
     const apiMessages = messages
@@ -381,8 +420,15 @@ export function useAIConversations() {
             
             // Detect tool execution results (custom event from backend)
             if (parsed.tool_result && onToolCall) {
-              console.log('[SSE-FRONT] Tool result:', parsed.tool_result.name);
-              onToolCall({ toolName: parsed.tool_result.name, status: 'completed' });
+              const toolResultName = parsed.tool_result.name;
+              console.log('[SSE-FRONT] Tool result:', toolResultName);
+              onToolCall({ toolName: toolResultName, status: 'completed' });
+              
+              // Invalidar cache se for uma ferramenta de escrita
+              if (WRITE_TOOLS.includes(toolResultName) && !completedWriteToolsRef.current.has(toolResultName)) {
+                completedWriteToolsRef.current.add(toolResultName);
+                invalidateCacheForTool(toolResultName);
+              }
             }
             
             const deltaContent = parsed.choices?.[0]?.delta?.content as string | undefined;
@@ -432,7 +478,7 @@ export function useAIConversations() {
       setIsStreaming(false);
       abortControllerRef.current = null;
     }
-  }, [user, messages]);
+  }, [user, messages, invalidateCacheForTool]);
 
   // Cleanup on unmount
   useEffect(() => {
