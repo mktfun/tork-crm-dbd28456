@@ -337,8 +337,8 @@ export function AmorimAIFloating() {
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className={cn(
-              "fixed bottom-6 right-6 z-50",
-              "w-[500px] h-[750px] max-h-[90vh]",
+              "fixed bottom-4 right-4 z-50",
+              "w-[450px] h-[700px] max-h-[95vh]",
               "rounded-2xl overflow-hidden",
               "bg-background/95 backdrop-blur-xl",
               "border border-white/10",
@@ -476,23 +476,22 @@ export function AmorimAIFloating() {
                             ? "bg-primary text-primary-foreground rounded-br-sm" 
                             : "bg-white/10 text-foreground rounded-bl-sm"
                         )}>
-		                        {message.role === 'assistant' ? (
-		                            <>
-		                              {message.content !== '' && <AIResponseRenderer content={message.content} />}
-		                              {message.isLoading && (
-		                                <div className="mt-2">
-		                                  {toolExecutions.length > 0 ? (
-		                                    <ToolExecutionStatus executions={toolExecutions} />
-		                                  ) : message.content === '' ? (
-		                                    <div className="flex items-center gap-2 text-muted-foreground">
-		                                      <Loader2 className="w-4 h-4 animate-spin" />
-		                                      <span className="text-sm">Pensando...</span>
-		                                    </div>
-		                                  ) : null}
-		                                </div>
-		                              )}
-		                            </>
-		                          ) : (
+                        {message.role === 'assistant' ? (
+                            // Lógica refinada: Tool > Pensando > Conteúdo
+                            toolExecutions.length > 0 ? (
+                              // Prioridade 1: Ferramentas em execução - APENAS isso
+                              <ToolExecutionStatus executions={toolExecutions} />
+                            ) : message.isLoading && message.content === '' ? (
+                              // Prioridade 2: Aguardando início (sem conteúdo ainda)
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="text-sm">Pensando...</span>
+                              </div>
+                            ) : (
+                              // Prioridade 3: Renderizar conteúdo (streaming ou completo)
+                              <AIResponseRenderer content={message.content} />
+                            )
+                          ) : (
                             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                           )}
                         </div>
