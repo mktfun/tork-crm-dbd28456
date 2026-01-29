@@ -68,6 +68,30 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_knowledge_base: {
+        Row: {
+          content: string
+          created_at: string | null
+          embedding: string | null
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
       ai_learned_patterns: {
         Row: {
           confidence_score: number | null
@@ -3035,6 +3059,19 @@ export type Database = {
       }
       is_admin: { Args: { user_id?: string }; Returns: boolean }
       link_manual_transactions: { Args: { p_user_id: string }; Returns: string }
+      match_knowledge: {
+        Args: {
+          match_count: number
+          match_threshold: number
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          id: string
+          metadata: Json
+          similarity: number
+        }[]
+      }
       merge_duplicate_clients: { Args: { p_user_id: string }; Returns: Json }
       migrate_missing_transactions: { Args: never; Returns: Json }
       preview_apolices_filtradas: {

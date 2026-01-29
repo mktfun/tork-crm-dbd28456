@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Loader2, User, Lightbulb, ThumbsUp, ThumbsDown, Plus, History, StopCircle } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { AIResponseRenderer } from './responses/AIResponseRenderer';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
@@ -483,9 +483,7 @@ export function AmorimAIFloating() {
                                 <span className="text-sm">Pensando...</span>
                               </div>
                             ) : (
-                              <div className="prose prose-sm prose-invert max-w-none">
-                                <ReactMarkdown>{message.content}</ReactMarkdown>
-                              </div>
+                              <AIResponseRenderer content={message.content} />
                             )
                           ) : (
                             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
