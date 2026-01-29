@@ -123,6 +123,10 @@ const knowledgeBase = [
     metadata: { source: "susep", category: "servicos", topic: "assistencia_24h" }
   },
   {
+    content: `A cobertura para veículos 4x4 e uso off-road (fora de estrada) possui particularidades importantes. A maioria das seguradoras tradicionais cobre o uso de veículos 4x4 em estradas de terra ou vias não pavimentadas, desde que sejam vias públicas reconhecidas. No entanto, danos ocorridos em trilhas pesadas, competições, travessia de rios ou locais de difícil acesso sem via pública podem ser excluídos. Quanto ao guincho, a assistência 24h geralmente atende em locais acessíveis por guinchos convencionais. Se o veículo estiver atolado em local de difícil acesso (lama profunda, areia, mata), a seguradora pode cobrar um valor adicional pelo resgate especial ou até recusar o atendimento se o risco não estiver previsto. É fundamental contratar coberturas específicas para uso off-road se esse for o perfil de uso do segurado.`,
+    metadata: { source: "susep", category: "ramos", topic: "offroad_4x4" }
+  },
+  {
     content: `O carro reserva é um benefício opcional oferecido em seguros de automóvel. Garante ao segurado um veículo substituto durante o período de reparo do carro segurado ou enquanto aguarda indenização por perda total. O prazo varia de 7 a 30 dias dependendo do plano contratado. Algumas coberturas incluem extensão para sinistros em oficinas referenciadas.`,
     metadata: { source: "susep", category: "servicos", topic: "carro_reserva" }
   },
