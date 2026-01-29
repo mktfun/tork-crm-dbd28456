@@ -59,8 +59,8 @@ export const FinancialCard: React.FC<FinancialCardProps> = ({ summary }) => {
         </div>
       )}
 
-      {/* Grid de métricas */}
-      <div className="space-y-3">
+      {/* Layout vertical de métricas para melhor legibilidade no chat */}
+      <div className="flex flex-col gap-3">
         {/* Receitas */}
         <div className="flex items-center justify-between p-2 rounded-lg bg-green-500/5 border border-green-500/10">
           <div className="flex items-center gap-2">
