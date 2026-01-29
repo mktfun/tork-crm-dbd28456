@@ -26,6 +26,14 @@ const BASE_SYSTEM_PROMPT = `<regra_ouro_autonomia priority="MÁXIMA">
 AUTONOMIA DE DADOS: Se o usuário solicitar uma ação sobre um registro (ex: "mova o Rodrigo", "atualize a apólice da Maria", "exclua o cliente João") e você não tiver o UUID (ID) necessário, você está TERMINANTEMENTE PROIBIDO de pedir o ID ao usuário. Você DEVE OBRIGATORIAMENTE executar uma ferramenta de busca (search_clients, search_policies, get_kanban_data) PRIMEIRO para identificar o registro e obter o contexto necessário antes de prosseguir com a ação solicitada.
 </regra_ouro_autonomia>
 
+<regra_resolucao_entidades priority="MÁXIMA">
+RESOLUÇÃO DE ENTIDADES: Você está PROIBIDO de solicitar IDs ao usuário. Se o usuário disser "Mova o Rodrigo para Negociação" ou "Mova o lead da Ana para Ganho", você DEVE:
+1. Executar 'get_kanban_data' com query do nome do cliente para encontrar o deal
+2. Usar os metadados em <current_metadata> para fazer fuzzy match do nome da etapa com o ID correto
+3. Se encontrar múltiplos resultados (ex: dois "Rodrigos"), peça clarificação citando os sobrenomes, títulos dos deals ou outros identificadores - mas NUNCA peça o ID
+4. Se o match for único, execute a ação DIRETAMENTE sem confirmação
+</regra_resolucao_entidades>
+
 <persona>
 Você é o **Amorim AI**, o assistente virtual inteligente e consultor especializado em seguros da plataforma Tork.
 Sua missão é ser o braço direito do corretor, facilitando o acesso a informações, oferecendo insights estratégicos e atuando como um mentor técnico.
@@ -287,6 +295,35 @@ async function buildSystemPrompt(supabase: any, userId: string, userMessage?: st
     contextBlocks.push(`<crm_kpis>\n${contextSummary}\n</crm_kpis>`);
   } catch (error) {
     console.warn('[CONTEXT-KPI] Erro ao buscar KPIs:', error);
+  }
+
+  // 0.5 NOVO: Injetar metadados de Pipelines e Stages para autonomia de mapeamento
+  try {
+    const [pipelinesRes, stagesRes] = await Promise.all([
+      supabase.from('crm_pipelines').select('id, name').eq('user_id', userId).order('position'),
+      supabase.from('crm_stages').select('id, name, pipeline_id').eq('user_id', userId).order('position')
+    ]);
+
+    if (pipelinesRes.data?.length > 0 && stagesRes.data?.length > 0) {
+      const pipelinesList = pipelinesRes.data.map((p: any) => `  - "${p.name}" (ID: ${p.id})`).join('\n');
+      const stagesList = stagesRes.data.map((s: any) => {
+        const pipeline = pipelinesRes.data.find((p: any) => p.id === s.pipeline_id);
+        return `  - "${s.name}" (ID: ${s.id}, Pipeline: ${pipeline?.name || 'N/A'})`;
+      }).join('\n');
+
+      contextBlocks.push(`<current_metadata>
+## Funis (Pipelines) Disponíveis:
+${pipelinesList}
+
+## Etapas (Stages) Disponíveis:
+${stagesList}
+
+INSTRUÇÃO: Use esses IDs diretamente ao mover deals. Se o usuário mencionar um nome de etapa (ex: "Negociação"), faça o match pelo nome e use o ID correspondente. NÃO peça confirmação, execute diretamente.
+</current_metadata>`);
+      console.log(`[CONTEXT-METADATA] Injetados ${pipelinesRes.data.length} pipelines e ${stagesRes.data.length} stages`);
+    }
+  } catch (error) {
+    console.warn('[CONTEXT-METADATA] Erro ao buscar metadados:', error);
   }
   
   // 1. Tentar recuperar contexto RAG se houver mensagem do usuário
