@@ -22,7 +22,11 @@ const corsHeaders = {
 };
 
 // ========== SYSTEM PROMPT HÍBRIDO (FASE 7 - HYBRID ARCHITECTURE) ==========
-const BASE_SYSTEM_PROMPT = `<persona>
+const BASE_SYSTEM_PROMPT = `<regra_ouro_autonomia priority="MÁXIMA">
+AUTONOMIA DE DADOS: Se o usuário solicitar uma ação sobre um registro (ex: "mova o Rodrigo", "atualize a apólice da Maria", "exclua o cliente João") e você não tiver o UUID (ID) necessário, você está TERMINANTEMENTE PROIBIDO de pedir o ID ao usuário. Você DEVE OBRIGATORIAMENTE executar uma ferramenta de busca (search_clients, search_policies, get_kanban_data) PRIMEIRO para identificar o registro e obter o contexto necessário antes de prosseguir com a ação solicitada.
+</regra_ouro_autonomia>
+
+<persona>
 Você é o **Amorim AI**, o assistente virtual inteligente e consultor especializado em seguros da plataforma Tork.
 Sua missão é ser o braço direito do corretor, facilitando o acesso a informações, oferecendo insights estratégicos e atuando como um mentor técnico.
 Você é um especialista profundo em normas SUSEP, produtos de seguros (Auto, Moto, Residencial, Bike, Celular, Empresarial, RC), Planos de Saúde e Consórcios.
@@ -149,6 +153,9 @@ Você tem 5 seguradoras cadastradas no sistema:
   </tool>
   <tool name="get_ramos">
     <description>Lista todos os ramos de seguro disponíveis. Use para validar ramos antes de filtrar.</description>
+  </tool>
+  <tool name="get_kanban_data">
+    <description>Busca deals/leads no CRM por nome do cliente ou título. Use OBRIGATORIAMENTE para encontrar o ID de um deal antes de movê-lo no funil.</description>
   </tool>
   
   <!-- FERRAMENTAS DE ESCRITA (FASE P2) -->
@@ -498,6 +505,21 @@ const TOOLS = [
       name: "get_ramos",
       description: "Retorna a lista de todos os ramos de seguro (Ex: Automóvel, Vida, Residencial) disponíveis no sistema.",
       parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_kanban_data",
+      description: "Busca deals/leads no CRM por nome do cliente ou título. Use para encontrar deals antes de movê-los no funil.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Termo de busca (nome do cliente ou título do deal)" },
+          pipeline_id: { type: "string", description: "ID do pipeline específico (opcional)" }
+        },
+        required: []
+      }
     }
   },
   // ========== FERRAMENTAS DE ESCRITA (FASE P2) ==========
@@ -1023,6 +1045,68 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
 
   // ========== FERRAMENTAS DE ESCRITA (FASE P2 - AGENTE AUTÔNOMO) ==========
   
+  get_kanban_data: async (args, supabase, userId) => {
+    const { query, pipeline_id } = args;
+    
+    // Buscar deals com informações de stage e cliente
+    let qb = supabase
+      .from('crm_deals')
+      .select(`
+        id,
+        title,
+        value,
+        notes,
+        created_at,
+        stage_id,
+        client_id,
+        crm_stages!inner(id, name, color, pipeline_id),
+        clientes(id, name, phone, email)
+      `)
+      .eq('user_id', userId)
+      .order('position', { ascending: true })
+      .limit(20);
+
+    if (pipeline_id) {
+      qb = qb.eq('crm_stages.pipeline_id', pipeline_id);
+    }
+
+    const { data: deals, error } = await qb;
+    if (error) throw error;
+
+    // Filtrar por query se fornecido
+    let filteredDeals = deals || [];
+    if (query) {
+      const normalizedQuery = query.toLowerCase();
+      filteredDeals = filteredDeals.filter((d: any) =>
+        d.title?.toLowerCase().includes(normalizedQuery) ||
+        d.clientes?.name?.toLowerCase().includes(normalizedQuery)
+      );
+    }
+
+    // Buscar etapas disponíveis para contexto
+    const { data: stages } = await supabase
+      .from('crm_stages')
+      .select('id, name, pipeline_id')
+      .eq('user_id', userId)
+      .order('position', { ascending: true });
+
+    console.log(`[TOOL] get_kanban_data: Encontrados ${filteredDeals.length} deals`);
+    return {
+      success: true,
+      deals: filteredDeals.map((d: any) => ({
+        id: d.id,
+        title: d.title,
+        value: d.value,
+        stage_id: d.stage_id,
+        stage_name: d.crm_stages?.name,
+        client_id: d.client_id,
+        client_name: d.clientes?.name
+      })),
+      available_stages: stages || [],
+      total_count: filteredDeals.length
+    };
+  },
+
   move_deal_to_stage: async (args, supabase, userId) => {
     const { deal_id, stage_id } = args;
 

@@ -270,6 +270,8 @@ export function AmorimAIFloating() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Trava de concorrência: ignora cliques duplos
+    if (isLoading || isStreaming) return;
     sendMessage(input);
   };
 
