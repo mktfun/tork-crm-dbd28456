@@ -653,9 +653,12 @@ serve(async (req) => {
   console.log(`\n${'='.repeat(60)}`);
   console.log(`[AI-ASSISTANT] REQUEST START`);
   console.log(`[REQ-META] Method: ${req.method} | URL: ${req.url}`);
+  console.log(`[SSE-DEBUG] Accept Header: ${req.headers.get('accept')}`);
+  console.log(`[SSE-DEBUG] Content-Type Header: ${req.headers.get('content-type')}`);
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    console.log(`[SSE-DEBUG] CORS preflight handled`);
+    return new Response('ok', { headers: corsHeaders });
   }
 
   const controller = new AbortController();
@@ -810,14 +813,31 @@ serve(async (req) => {
       });
 
       if (!streamResponse.ok || !streamResponse.body) {
+        const errText = await streamResponse.text();
+        console.error(`[SSE-DEBUG] Stream response failed: ${streamResponse.status} | Body: ${errText}`);
         throw new Error(`Stream error: ${streamResponse.status}`);
       }
 
       clearTimeout(timeoutId);
-      console.log(`[STREAM-MODE] Piping response to client...`);
+      console.log(`[SSE-DEBUG] Stream response OK, piping to client...`);
+      console.log(`[SSE-DEBUG] Gateway Content-Type: ${streamResponse.headers.get('content-type')}`);
 
-      // Retornar o stream diretamente
-      return new Response(streamResponse.body, {
+      // Criar um TransformStream para logar os chunks
+      const transformStream = new TransformStream({
+        transform(chunk, controller) {
+          const decoded = new TextDecoder().decode(chunk);
+          console.log(`[SSE-DEBUG] Chunk enfileirado (${chunk.byteLength} bytes):`, decoded.slice(0, 150));
+          controller.enqueue(chunk);
+        },
+        flush() {
+          console.log(`[SSE-DEBUG] Stream finalizado com sinalizador [DONE]`);
+        }
+      });
+
+      // Pipe através do transform para logar
+      const readableStream = streamResponse.body.pipeThrough(transformStream);
+
+      return new Response(readableStream, {
         headers: { 
           ...corsHeaders, 
           'Content-Type': 'text/event-stream',

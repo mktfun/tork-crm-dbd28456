@@ -250,10 +250,13 @@ export function useAIConversations() {
     apiMessages.push({ role: 'user', content });
 
     try {
+      console.log('[SSE-FRONT] Iniciando fetch para IA...');
+      
       const response = await fetch(getStreamUrl(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({ 
@@ -265,6 +268,8 @@ export function useAIConversations() {
         signal: abortControllerRef.current.signal,
       });
 
+      console.log('[SSE-FRONT] Status:', response.status, '| Content-Type:', response.headers.get('Content-Type'));
+
       // Handle rate limit and credit errors
       if (response.status === 429) {
         throw new Error('Limite de requisições excedido. Aguarde alguns segundos.');
@@ -272,8 +277,14 @@ export function useAIConversations() {
       if (response.status === 402) {
         throw new Error('Créditos de IA esgotados. Entre em contato com o suporte.');
       }
-      if (!response.ok || !response.body) {
-        throw new Error('Falha ao conectar com o assistente.');
+      if (!response.ok) {
+        const errorMsg = await response.text();
+        console.error('[SSE-FRONT] Erro fatal no handshake:', errorMsg);
+        throw new Error(errorMsg || 'Falha ao conectar com o assistente.');
+      }
+      if (!response.body) {
+        console.error('[SSE-FRONT] Response body is null');
+        throw new Error('Falha ao conectar com o assistente - stream vazio.');
       }
 
       const reader = response.body.getReader();
@@ -285,11 +296,18 @@ export function useAIConversations() {
       // Add empty assistant message to start receiving content
       setMessages(prev => [...prev, { role: 'assistant', content: '', conversation_id: conversationId }]);
 
+      console.log('[SSE-FRONT] Iniciando loop de leitura do stream...');
+
       while (!streamDone) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log('[SSE-FRONT] Stream reader done');
+          break;
+        }
         
-        textBuffer += decoder.decode(value, { stream: true });
+        const rawChunk = decoder.decode(value, { stream: true });
+        console.log('[SSE-FRONT] Bruto recebido:', rawChunk.slice(0, 200));
+        textBuffer += rawChunk;
 
         // Process line-by-line
         let newlineIndex: number;
