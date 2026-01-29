@@ -71,14 +71,24 @@ export function useAIConversations() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Função para invalidar cache quando ferramentas de escrita são completadas
-  const invalidateCacheForTool = useCallback((toolName: string) => {
+// Função para invalidar e refetch agressivo quando ferramentas de escrita são completadas
+  const invalidateCacheForTool = useCallback(async (toolName: string) => {
     const cacheKeys = TOOL_CACHE_KEYS[toolName];
     if (cacheKeys) {
-      console.log(`[CACHE-INVALIDATE] Invalidando cache para: ${cacheKeys.join(', ')}`);
-      cacheKeys.forEach(key => {
-        queryClient.invalidateQueries({ queryKey: [key] });
-      });
+      console.log(`[CACHE-INVALIDATE] Invalidando e refetch agressivo para: ${cacheKeys.join(', ')}`);
+      
+      // Invalidação + Refetch duplo para garantir sincronização imediata
+      await Promise.all(cacheKeys.map(async (key) => {
+        await queryClient.invalidateQueries({ queryKey: [key] });
+        await queryClient.refetchQueries({ queryKey: [key], type: 'active' });
+      }));
+      
+      // Chaves críticas adicionais para garantir Kanban e listagens sempre atualizadas
+      const criticalKeys = ['crm_deals', 'kanban', 'clientes', 'apolices'];
+      await Promise.all(criticalKeys.map(async (key) => {
+        await queryClient.invalidateQueries({ queryKey: [key] });
+        await queryClient.refetchQueries({ queryKey: [key], type: 'active' });
+      }));
     }
   }, [queryClient]);
 
