@@ -6,6 +6,9 @@ import { useQueryClient } from '@tanstack/react-query';
 // Lista de ferramentas de escrita que devem invalidar o cache
 const WRITE_TOOLS = [
   'move_deal_to_stage',
+  'create_deal',
+  'update_deal',
+  'delete_deal',
   'create_client',
   'update_client',
   'create_policy',
@@ -17,7 +20,10 @@ const WRITE_TOOLS = [
 
 // Mapeamento de ferramentas para as chaves de cache que devem ser invalidadas
 const TOOL_CACHE_KEYS: Record<string, string[]> = {
-  'move_deal_to_stage': ['crm_deals', 'crm_pipelines'],
+  'move_deal_to_stage': ['crm_deals', 'crm_stages', 'crm_pipelines'],
+  'create_deal': ['crm_deals', 'crm_stages', 'crm_pipelines'],
+  'update_deal': ['crm_deals', 'crm_stages'],
+  'delete_deal': ['crm_deals', 'crm_stages', 'crm_pipelines'],
   'create_client': ['clientes', 'clients'],
   'update_client': ['clientes', 'clients'],
   'delete_client': ['clientes', 'clients'],
