@@ -22,6 +22,7 @@ const SOURCE_PATTERNS = [
   { pattern: /(?:de acordo com|conforme|segundo)\s+(?:o\s+)?manual\s+técnico/gi, source: 'Manual Técnico', icon: BookOpen },
   { pattern: /(?:de acordo com|conforme|segundo)\s+(?:as?\s+)?normas?/gi, source: 'Norma Regulatória', icon: Shield },
   { pattern: /(?:base de conhecimento|conhecimento técnico)/gi, source: 'Base Técnica', icon: BookOpen },
+  { pattern: /(?:circular|resolução)\s+(?:susep|cnsp)/gi, source: 'SUSEP', icon: Shield },
 ];
 
 function detectSources(text: string): Array<{ source: string; icon: React.ComponentType<any> }> {
@@ -46,7 +47,7 @@ function detectSources(text: string): Array<{ source: string; icon: React.Compon
  * - Dados estruturados encapsulados em <data_json>...</data_json>
  * 
  * Este componente extrai e renderiza cada parte apropriadamente.
- * FASE P2.1: Adiciona badges de citação para fontes do RAG.
+ * FASE P2.2: Suporte a tabelas premium e formatação densa com Glassmorphism.
  */
 export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content }) => {
   const jsonRegex = /<data_json>([\s\S]*?)<\/data_json>/g;
@@ -107,12 +108,97 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
     }
   };
 
+  // Custom Markdown components for premium Glassmorphism styling
+  const markdownComponents = {
+    // Premium Table Styling
+    table: ({ children }: any) => (
+      <div className="w-full overflow-x-auto my-4 rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm">
+        <table className="w-full border-collapse text-sm">
+          {children}
+        </table>
+      </div>
+    ),
+    thead: ({ children }: any) => (
+      <thead className="bg-white/10 border-b border-white/10">
+        {children}
+      </thead>
+    ),
+    th: ({ children }: any) => (
+      <th className="text-left p-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        {children}
+      </th>
+    ),
+    td: ({ children }: any) => (
+      <td className="p-3 text-sm border-b border-white/5">
+        {children}
+      </td>
+    ),
+    tr: ({ children }: any) => (
+      <tr className="hover:bg-white/5 transition-colors">
+        {children}
+      </tr>
+    ),
+    // Lists with proper spacing
+    ul: ({ children }: any) => (
+      <ul className="pl-5 space-y-2 my-3 list-disc marker:text-muted-foreground">
+        {children}
+      </ul>
+    ),
+    ol: ({ children }: any) => (
+      <ol className="pl-5 space-y-2 my-3 list-decimal marker:text-muted-foreground">
+        {children}
+      </ol>
+    ),
+    li: ({ children }: any) => (
+      <li className="text-sm leading-relaxed">
+        {children}
+      </li>
+    ),
+    // Headings with icons support
+    h3: ({ children }: any) => (
+      <h3 className="text-base font-bold mt-4 mb-2 flex items-center gap-2 text-foreground">
+        {children}
+      </h3>
+    ),
+    h4: ({ children }: any) => (
+      <h4 className="text-sm font-semibold mt-3 mb-1.5 text-foreground/90">
+        {children}
+      </h4>
+    ),
+    // Blockquotes for SUSEP alerts
+    blockquote: ({ children }: any) => (
+      <blockquote className="my-3 pl-4 border-l-2 border-yellow-500/50 bg-yellow-500/10 rounded-r-lg py-2 pr-3 text-sm italic">
+        {children}
+      </blockquote>
+    ),
+    // Strong text
+    strong: ({ children }: any) => (
+      <strong className="font-bold text-foreground">
+        {children}
+      </strong>
+    ),
+    // Code blocks
+    code: ({ children }: any) => (
+      <code className="px-1.5 py-0.5 rounded bg-white/10 text-xs font-mono">
+        {children}
+      </code>
+    ),
+    // Paragraphs
+    p: ({ children }: any) => (
+      <p className="text-sm leading-relaxed mb-2">
+        {children}
+      </p>
+    ),
+  };
+
   return (
     <div className="space-y-3">
-      {/* Texto em Markdown */}
+      {/* Texto em Markdown com styling premium */}
       {textContent && (
         <div className="prose prose-sm prose-invert max-w-none">
-          <ReactMarkdown>{textContent}</ReactMarkdown>
+          <ReactMarkdown components={markdownComponents}>
+            {textContent}
+          </ReactMarkdown>
         </div>
       )}
       
