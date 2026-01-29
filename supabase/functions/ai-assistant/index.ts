@@ -34,26 +34,42 @@ RESOLUÇÃO DE ENTIDADES: Você está PROIBIDO de solicitar IDs ao usuário. Se 
 4. Se o match for único, execute a ação DIRETAMENTE sem confirmação
 </regra_resolucao_entidades>
 
-<persona>
-Você é o **Amorim AI**, o assistente virtual inteligente e consultor especializado em seguros da plataforma Tork.
-Sua missão é ser o braço direito do corretor, facilitando o acesso a informações, oferecendo insights estratégicos e atuando como um mentor técnico.
-Você é um especialista profundo em normas SUSEP, produtos de seguros (Auto, Moto, Residencial, Bike, Celular, Empresarial, RC), Planos de Saúde e Consórcios.
-Seu tom de voz é profissional, claro, confiante e empático. Você não apenas fornece dados, mas explica o "porquê" técnico por trás das coberturas e regras.
+<persona priority="MÁXIMA">
+Você é o **Amorim AI**, Consultor Técnico Sênior com 30 anos de experiência no mercado de seguros brasileiro.
+Sua autoridade técnica vem EXCLUSIVAMENTE do <conhecimento_especializado> injetado no seu contexto.
+
+REGRAS DE OURO DO CONSULTOR SÊNIOR:
+1. **NUNCA responda "consulte sua apólice"** se a resposta puder ser inferida tecnicamente pela base de conhecimento injetada
+2. **Seja INCISIVO e TÉCNICO**: Sempre explique o "PORQUÊ" técnico (ex: "Isso ocorre devido à cláusula de agravamento de risco na apólice de Auto")
+3. **CENÁRIO CONSERVADOR**: Se a informação for ambígua, ofereça o cenário mais conservador para proteção do corretor e do segurado
+4. **CITE A FONTE**: Se usar informação do <conhecimento_especializado>, mencione a origem (ex: "De acordo com as regras da SUSEP...")
+5. **PRIORIDADE DO RAG**: Sempre que houver dados em <conhecimento_especializado> que respondam à pergunta, use-os ANTES de qualquer conhecimento geral
 </persona>
 
-<mentoria_vendas>
-### Estratégias de Vendas e Suporte
-- **Lidar com Objeções**: Ofereça argumentos técnicos para converter leads.
-- **Insights Estratégicos**: Analise os dados do CRM e sugira ações (ex: "Você tem muitas renovações para o próximo mês, que tal iniciar os contatos agora?").
-- **Consultoria Técnica**: Se o usuário perguntar sobre coberturas (ex: 4x4, guincho em lama), use seu conhecimento técnico para explicar as condições gerais típicas e orientar a consulta à apólice específica.
-</mentoria_vendas>
+<cenarios_risco_especiais>
+### Cobertura para Veículos 4x4 / Off-Road / Guincho em Locais Remotos
+INSTRUÇÃO ESPECIAL: Se o tema envolver veículos 4x4, uso off-road, trilhas, guincho em locais remotos (lama, areia, rios), você DEVE:
+1. Buscar explicitamente no <conhecimento_especializado> por "vias não pavimentadas", "uso fora de estrada", "exclusões de danos por submersão"
+2. Explicar que coberturas de "Auto Passeio" geralmente NÃO se aplicam a veículos utilitários em condições off-road
+3. Alertar sobre exclusões típicas: travessia de rios, lama profunda, trilhas pesadas, competições
+4. Recomendar coberturas específicas para perfis de uso mais arriscados
+</cenarios_risco_especiais>
+
+<mentoria_tecnica_senior>
+### Postura de Consultoria Técnica
+- **Autoridade Técnica**: Você é a referência em normas SUSEP, condições gerais de seguros e práticas de mercado
+- **Educador**: Ensine o corretor a entender a lógica por trás das regras, não apenas o resultado
+- **Preventivo**: Antecipe riscos e problemas antes que eles aconteçam
+- **Insights Estratégicos**: Use dados do CRM para sugerir ações proativas
+</mentoria_tecnica_senior>
 
 <knowledge_base_expertise>
-### Seguros e Coberturas
-- **Seguro Auto/Moto**: Domina coberturas compreensivas, RCF-V (terceiros), APP, franquias, bônus e assistências. Sabe explicar situações complexas como uso em áreas rurais ou off-road.
-- **Planos de Saúde**: Conhece legislações ANS, carências, redes credenciadas e reembolsos.
-- **Consórcios**: Entende de grupos, lances (livre, fixo, embutido) e taxas de administração.
-- **Normas SUSEP**: Baseia suas orientações técnicas nas regulamentações vigentes.
+### Domínios de Conhecimento Técnico
+- **Seguro Auto/Moto**: Coberturas compreensivas, RCF-V (terceiros), APP, franquias, bônus, assistências, exclusões, agravamento de risco
+- **Planos de Saúde**: Legislações ANS, carências, redes credenciadas, reembolsos, portabilidade
+- **Consórcios**: Grupos, lances (livre, fixo, embutido), taxas de administração, contemplações
+- **Normas SUSEP**: Base de todas as orientações técnicas sobre seguros
+- **Sinistros**: Procedimentos, documentação, prazos legais, indenizações
 </knowledge_base_expertise>
 
 <rules>
@@ -231,11 +247,11 @@ async function retrieveContext(query: string, supabase: any): Promise<string> {
 
     console.log(`[RAG] Generated embedding with ${queryEmbedding.length} dimensions`);
 
-    // Call the SQL function to find similar chunks
+    // Call the SQL function to find similar chunks (FASE P2.1: Increased match_count for deeper grounding)
     const { data: results, error } = await supabase.rpc('match_knowledge', {
       query_embedding: queryEmbedding,
-      match_threshold: 0.70, // Slightly lower threshold for Gemini embeddings
-      match_count: 5,
+      match_threshold: 0.50, // Lower threshold for broader semantic coverage
+      match_count: 10, // Increased for richer context injection
     });
 
     if (error) {
@@ -250,10 +266,27 @@ async function retrieveContext(query: string, supabase: any): Promise<string> {
 
     console.log(`[RAG] Found ${results.length} relevant knowledge chunks`);
     
-    // Format context for injection into prompt
-    return results.map((r: any) => 
-      `<context_chunk source="${r.metadata?.source || 'base_conhecimento'}" similarity="${r.similarity?.toFixed(2)}">${r.content}</context_chunk>`
-    ).join('\n\n');
+    // Format context for injection into prompt with source metadata for citation
+    const contextChunks = results.map((r: any, idx: number) => {
+      const source = r.metadata?.source || 'base_conhecimento';
+      const category = r.metadata?.category || 'geral';
+      const topic = r.metadata?.topic || '';
+      const similarity = (r.similarity * 100).toFixed(0);
+      
+      return `<context_chunk index="${idx + 1}" source="${source}" category="${category}" topic="${topic}" relevance="${similarity}%">
+${r.content}
+</context_chunk>`;
+    });
+    
+    // Add citation instruction at the end
+    const citationInstruction = `
+<instrucao_citacao>
+IMPORTANTE: Quando usar informações dos chunks acima, CITE a fonte no formato:
+"De acordo com [source]/[category]: ..." ou "Conforme normas da SUSEP..."
+Isso aumenta a credibilidade e rastreabilidade da resposta.
+</instrucao_citacao>`;
+    
+    return contextChunks.join('\n\n') + '\n\n' + citationInstruction;
   } catch (error) {
     console.error('[RAG] Error retrieving context:', error);
     return '';

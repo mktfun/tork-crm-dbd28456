@@ -3061,8 +3061,8 @@ export type Database = {
       link_manual_transactions: { Args: { p_user_id: string }; Returns: string }
       match_knowledge: {
         Args: {
-          match_count: number
-          match_threshold: number
+          match_count?: number
+          match_threshold?: number
           query_embedding: string
         }
         Returns: {
