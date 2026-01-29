@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, AlertCircle, ChevronDown, Database, Search, FileText, Calendar, Users, TrendingUp, Building2, Layers, GitBranch, UserPlus, Edit, Trash2, Move, Sparkles } from 'lucide-react';
+import { CheckCircle, Loader2, AlertCircle, ChevronDown, ChevronUp, Database, Search, FileText, Calendar, Users, TrendingUp, Building2, Layers, GitBranch, UserPlus, Edit, Trash2, Move } from 'lucide-react';
 
 export interface ToolStep {
   label: string;
@@ -22,19 +22,6 @@ export const TOOL_DISPLAY_CONFIG: Record<string, {
   description: string;
   steps: string[] 
 }> = {
-  // Etapa inicial fake para feedback imediato
-  _initializing: {
-    name: 'Iniciando Assistente',
-    icon: Sparkles,
-    description: '⚙️ Preparando resposta...',
-    steps: ['Analisando solicitação']
-  },
-  _analyzing: {
-    name: 'Analisando Solicitação',
-    icon: Search,
-    description: '🔍 Processando sua pergunta...',
-    steps: ['Interpretando contexto']
-  },
   search_clients: {
     name: 'Buscar Clientes',
     icon: Search,
@@ -171,13 +158,13 @@ export function ToolExecutionStatus({ executions }: ToolExecutionStatusProps) {
     exec.steps.every(s => s.status === 'done' || s.status === 'error')
   );
 
-  // Auto-collapse quando tudo completar (cascata animada)
+  // Auto-collapse when all complete
   useEffect(() => {
     if (allComplete && !hasAutoCollapsed) {
       const timer = setTimeout(() => {
         setIsExpanded(false);
         setHasAutoCollapsed(true);
-      }, 800); // Reduzido para transição mais fluida
+      }, 1500);
       return () => clearTimeout(timer);
     }
   }, [allComplete, hasAutoCollapsed]);
@@ -199,252 +186,211 @@ export function ToolExecutionStatus({ executions }: ToolExecutionStatusProps) {
     e.status === 'error' || e.steps.some(s => s.status === 'error')
   ).length;
 
-  // Título dinâmico reativo ao status
-  const headerText = !allComplete 
-    ? `⚙️ Processando ${executions.length === 1 ? 'solicitação' : `${executions.length} etapas`}...`
-    : errorCount > 0
-      ? `⚠️ ${successCount} concluída${successCount !== 1 ? 's' : ''}, ${errorCount} com erro`
-      : `✅ ${executions.length === 1 ? 'Etapa concluída' : `${executions.length} etapas concluídas`}`;
-
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="mb-2"
+      exit={{ opacity: 0, y: -10 }}
+      className="mb-3"
     >
-      {/* Summary Header - Estética Glass Premium Flutuante */}
+      {/* Summary Header */}
       <motion.button
         onClick={() => setIsExpanded(!isExpanded)}
         className={`
           w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl
-          bg-white/5 backdrop-blur-md
-          border border-white/10 hover:border-white/15
-          transition-all duration-200 group
-          ${allComplete ? 'opacity-60 hover:opacity-80' : ''}
+          bg-gradient-to-r from-primary/10 to-primary/5
+          border border-primary/20 hover:border-primary/30
+          transition-all duration-300 group
+          ${allComplete ? 'opacity-80' : ''}
         `}
-        whileHover={{ scale: 1.003 }}
-        whileTap={{ scale: 0.997 }}
+        whileHover={{ scale: 1.005 }}
+        whileTap={{ scale: 0.995 }}
       >
         <div className="flex items-center gap-2">
           {!allComplete ? (
-            // Glow Pulse Effect Premium
-            <motion.div 
-              className="relative w-2.5 h-2.5"
-              animate={{
-                scale: [1, 1.3, 1],
-                opacity: [0.6, 1, 0.6]
-              }}
-              transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <div className="absolute inset-0 rounded-full bg-primary shadow-[0_0_10px_rgba(var(--primary),0.7)]" />
-            </motion.div>
+            <div className="relative">
+              <Loader2 className="w-4 h-4 text-primary animate-spin" />
+              <div className="absolute inset-0 w-4 h-4 bg-primary/30 rounded-full animate-ping" />
+            </div>
           ) : errorCount > 0 ? (
-            <AlertCircle className="w-2.5 h-2.5 text-destructive" />
+            <AlertCircle className="w-4 h-4 text-destructive" />
           ) : (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-            >
-              <CheckCircle className="w-2.5 h-2.5 text-green-500" />
-            </motion.div>
+            <CheckCircle className="w-4 h-4 text-green-500" />
           )}
-          <span className="text-[10px] font-medium text-foreground/70">
-            {headerText}
+          <span className="text-sm font-medium text-foreground">
+            {!allComplete 
+              ? `Processando ${executions.length} ${executions.length === 1 ? 'etapa' : 'etapas'}...`
+              : errorCount > 0
+                ? `${successCount} concluída${successCount !== 1 ? 's' : ''}, ${errorCount} com erro`
+                : `✅ ${executions.length} ${executions.length === 1 ? 'etapa concluída' : 'etapas concluídas'}`
+            }
           </span>
         </div>
         <motion.div
           animate={{ rotate: isExpanded ? 180 : 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: 0.2 }}
         >
-          <ChevronDown className="w-2.5 h-2.5 text-muted-foreground/60 group-hover:text-foreground/60 transition-colors" />
+          <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
         </motion.div>
       </motion.button>
 
-      {/* Expanded Timeline - Cascata Animada */}
-      <AnimatePresence mode="sync">
+      {/* Expanded Timeline */}
+      <AnimatePresence>
         {isExpanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
             className="overflow-hidden"
           >
-            <div className="pt-1.5 pl-0.5 space-y-1">
-              <AnimatePresence mode="popLayout">
-                {executions.map((execution, execIndex) => {
-                  const config = TOOL_DISPLAY_CONFIG[execution.toolName] || {
-                    name: execution.displayName,
-                    icon: Database,
-                    description: 'Processando...',
-                    steps: ['Executando...']
-                  };
-                  const IconComponent = config.icon;
-                  
-                  const isRunning = execution.status === 'running' || 
-                    execution.steps.some(s => s.status === 'running');
-                  const isSuccess = execution.status === 'success' || 
-                    execution.steps.every(s => s.status === 'done');
-                  const isError = execution.status === 'error' || 
-                    execution.steps.some(s => s.status === 'error');
+            <div className="pt-3 pl-2 space-y-2">
+              {executions.map((execution, execIndex) => {
+                const config = TOOL_DISPLAY_CONFIG[execution.toolName] || {
+                  name: execution.displayName,
+                  icon: Database,
+                  description: 'Processando...',
+                  steps: ['Executando...']
+                };
+                const IconComponent = config.icon;
+                
+                const isRunning = execution.status === 'running' || 
+                  execution.steps.some(s => s.status === 'running');
+                const isSuccess = execution.status === 'success' || 
+                  execution.steps.every(s => s.status === 'done');
+                const isError = execution.status === 'error' || 
+                  execution.steps.some(s => s.status === 'error');
 
-                  return (
+                return (
+                  <motion.div
+                    key={`${execution.toolName}-${execIndex}`}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: execIndex * 0.1 }}
+                    className="relative"
+                  >
+                    {/* Timeline connector */}
+                    {execIndex < executions.length - 1 && (
+                      <div className="absolute left-[11px] top-8 bottom-0 w-px bg-gradient-to-b from-primary/30 to-transparent" />
+                    )}
+
+                    {/* Tool Card */}
                     <motion.div
-                      key={`${execution.toolName}-${execIndex}`}
-                      layout
-                      initial={{ opacity: 0, height: 0, x: -8 }}
-                      animate={{ 
-                        opacity: isSuccess && !isRunning ? 0.4 : 1, 
-                        height: 'auto',
-                        x: 0 
-                      }}
-                      exit={{ opacity: 0, height: 0, x: 8 }}
-                      transition={{ 
-                        duration: 0.2,
-                        delay: isSuccess ? 0 : execIndex * 0.1, // Cascata na entrada
-                        layout: { duration: 0.2 }
-                      }}
-                      className="relative overflow-hidden"
+                      className={`
+                        relative flex items-start gap-3 p-2.5 rounded-lg
+                        transition-all duration-300
+                        ${isRunning 
+                          ? 'bg-primary/10 border border-primary/30 shadow-[0_0_15px_rgba(var(--primary),0.15)]' 
+                          : isError
+                            ? 'bg-destructive/10 border border-destructive/30'
+                            : 'bg-muted/30 border border-transparent'
+                        }
+                      `}
+                      animate={isRunning ? {
+                        boxShadow: [
+                          '0 0 10px rgba(var(--primary), 0.1)',
+                          '0 0 20px rgba(var(--primary), 0.2)',
+                          '0 0 10px rgba(var(--primary), 0.1)'
+                        ]
+                      } : {}}
+                      transition={{ duration: 2, repeat: isRunning ? Infinity : 0 }}
                     >
-                      {/* Timeline connector minimalista */}
-                      {execIndex < executions.length - 1 && !isSuccess && (
-                        <motion.div 
-                          className="absolute left-[7px] top-6 bottom-0 w-px bg-gradient-to-b from-white/8 to-transparent"
-                          initial={{ scaleY: 0 }}
-                          animate={{ scaleY: 1 }}
-                          transition={{ delay: 0.1 }}
-                        />
-                      )}
+                      {/* Status Icon */}
+                      <div className={`
+                        flex-shrink-0 p-1.5 rounded-lg
+                        ${isRunning 
+                          ? 'bg-primary/20 border border-primary/40' 
+                          : isError
+                            ? 'bg-destructive/20 border border-destructive/40'
+                            : 'bg-green-500/20 border border-green-500/40'
+                        }
+                      `}>
+                        {isRunning ? (
+                          <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+                        ) : isError ? (
+                          <AlertCircle className="w-3.5 h-3.5 text-destructive" />
+                        ) : (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+                          >
+                            <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                          </motion.div>
+                        )}
+                      </div>
 
-                      {/* Tool Card - Glass Flutuante */}
-                      <motion.div
-                        layout
-                        className={`
-                          relative flex items-start gap-2 p-1.5 rounded-lg
-                          transition-colors duration-200
-                          ${isRunning 
-                            ? 'bg-white/[0.03] border border-white/8' 
-                            : isError
-                              ? 'bg-destructive/[0.03] border border-destructive/15'
-                              : 'bg-transparent border border-transparent'
-                          }
-                        `}
-                        animate={isRunning ? {
-                          boxShadow: [
-                            '0 0 4px rgba(255, 255, 255, 0.02)',
-                            '0 0 8px rgba(255, 255, 255, 0.05)',
-                            '0 0 4px rgba(255, 255, 255, 0.02)'
-                          ]
-                        } : { boxShadow: 'none' }}
-                        transition={{ duration: 1.5, repeat: isRunning ? Infinity : 0 }}
-                      >
-                        {/* Status Icon - Compacto */}
-                        <div className={`
-                          flex-shrink-0 p-0.5 rounded
-                          ${isRunning 
-                            ? 'bg-primary/8' 
-                            : isError
-                              ? 'bg-destructive/8'
-                              : 'bg-green-500/8'
-                          }
-                        `}>
-                          {isRunning ? (
-                            <motion.div 
-                              className="relative w-2.5 h-2.5"
-                              animate={{
-                                scale: [1, 1.2, 1],
-                                opacity: [0.7, 1, 0.7]
-                              }}
-                              transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                            >
-                              <div className="absolute inset-0 rounded-full bg-primary shadow-[0_0_4px_rgba(var(--primary),0.4)]" />
-                            </motion.div>
-                          ) : isError ? (
-                            <AlertCircle className="w-2.5 h-2.5 text-destructive" />
-                          ) : (
-                            <motion.div
-                              initial={{ scale: 0, rotate: -180 }}
-                              animate={{ scale: 1, rotate: 0 }}
-                              transition={{ type: 'spring', stiffness: 400, damping: 12 }}
-                            >
-                              <CheckCircle className="w-2.5 h-2.5 text-green-500/80" />
-                            </motion.div>
-                          )}
-                        </div>
-
-                      {/* Content - Minimalista quando completo */}
+                      {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                           <IconComponent className={`
-                            w-2.5 h-2.5 flex-shrink-0
-                            ${isRunning ? 'text-primary/80' : isError ? 'text-destructive/70' : 'text-muted-foreground/40'}
+                            w-3.5 h-3.5 flex-shrink-0
+                            ${isRunning ? 'text-primary' : isError ? 'text-destructive' : 'text-muted-foreground'}
                           `} />
                           <span className={`
-                            text-[10px] font-medium truncate
-                            ${isRunning ? 'text-foreground/90' : 'text-muted-foreground/50'}
+                            text-sm font-medium truncate
+                            ${isRunning ? 'text-foreground' : 'text-muted-foreground'}
                           `}>
                             {config.name}
                           </span>
                         </div>
 
-                        {/* Description - Apenas quando running (colapsa ao concluir) */}
-                        <AnimatePresence mode="wait">
-                          {isRunning && (
+                        {/* Description - only show when running or error */}
+                        <AnimatePresence>
+                          {(isRunning || isError) && (
                             <motion.p
-                              initial={{ height: 0, opacity: 0, marginTop: 0 }}
-                              animate={{ height: 'auto', opacity: 1, marginTop: 2 }}
-                              exit={{ height: 0, opacity: 0, marginTop: 0 }}
-                              transition={{ duration: 0.15 }}
-                              className="text-[9px] leading-tight text-muted-foreground/50"
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className={`
+                                text-xs mt-1
+                                ${isError ? 'text-destructive' : 'text-muted-foreground'}
+                              `}
                             >
-                              {config.description}
+                              {isError 
+                                ? execution.steps.find(s => s.status === 'error')?.error || 'Erro na execução'
+                                : config.description
+                              }
                             </motion.p>
                           )}
                         </AnimatePresence>
 
-                        {/* Progress Steps - Apenas quando running (cascata de colapso) */}
-                        <AnimatePresence mode="wait">
+                        {/* Progress Steps - only show when running */}
+                        <AnimatePresence>
                           {isRunning && (
                             <motion.div
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: 'auto', opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.2 }}
-                              className="mt-1 space-y-0.5"
+                              className="mt-2 space-y-1"
                             >
                               {execution.steps.map((step, stepIndex) => (
                                 <motion.div
                                   key={stepIndex}
-                                  initial={{ opacity: 0, x: -4 }}
+                                  initial={{ opacity: 0, x: -10 }}
                                   animate={{ opacity: 1, x: 0 }}
-                                  exit={{ opacity: 0, x: 4 }}
-                                  transition={{ delay: stepIndex * 0.05, duration: 0.15 }}
-                                  className="flex items-center gap-1 text-[9px]"
+                                  transition={{ delay: stepIndex * 0.1 }}
+                                  className="flex items-center gap-2 text-xs"
                                 >
                                   {step.status === 'done' ? (
-                                    <CheckCircle className="w-2 h-2 text-green-500/60 flex-shrink-0" />
+                                    <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />
                                   ) : step.status === 'running' ? (
-                                    <motion.div 
-                                      className="w-2 h-2 rounded-full bg-primary/80 flex-shrink-0"
-                                      animate={{ opacity: [0.4, 1, 0.4] }}
-                                      transition={{ duration: 0.8, repeat: Infinity }}
-                                    />
+                                    <div className="relative">
+                                      <div className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                                    </div>
                                   ) : step.status === 'error' ? (
-                                    <AlertCircle className="w-2 h-2 text-destructive flex-shrink-0" />
+                                    <AlertCircle className="w-3 h-3 text-destructive flex-shrink-0" />
                                   ) : (
-                                    <div className="w-2 h-2 rounded-full border border-muted-foreground/15 flex-shrink-0" />
+                                    <div className="w-3 h-3 rounded-full border border-muted-foreground/30 flex-shrink-0" />
                                   )}
                                   <span className={
                                     step.status === 'done' 
-                                      ? 'text-muted-foreground/30 line-through' 
+                                      ? 'text-muted-foreground/60 line-through' 
                                       : step.status === 'running'
-                                        ? 'text-foreground/70'
+                                        ? 'text-foreground'
                                         : step.status === 'error'
-                                          ? 'text-destructive/70'
-                                          : 'text-muted-foreground/20'
+                                          ? 'text-destructive'
+                                          : 'text-muted-foreground/40'
                                   }>
                                     {step.label}
                                   </span>
@@ -458,7 +404,6 @@ export function ToolExecutionStatus({ executions }: ToolExecutionStatusProps) {
                   </motion.div>
                 );
               })}
-              </AnimatePresence>
             </div>
           </motion.div>
         )}

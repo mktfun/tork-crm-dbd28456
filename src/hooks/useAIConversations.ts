@@ -311,15 +311,6 @@ export function useAIConversations() {
       }
     }, 30000);
     
-    // FASE P3.3: Timeout de 2s para feedback de fallback
-    let hasReceivedSignal = false;
-    const fallbackTimeoutId = setTimeout(() => {
-      if (!hasReceivedSignal) {
-        console.log('[SSE-FRONT] 2s sem sinal, emitindo tool fake de análise');
-        onToolCall?.({ toolName: '_analyzing', status: 'started' });
-      }
-    }, 2000);
-    
     // Prepare messages for API (exclude loading messages)
     const apiMessages = messages
       .filter(msg => !msg.isLoading)
@@ -330,7 +321,7 @@ export function useAIConversations() {
     apiMessages.push({ role: 'user', content });
 
     // Inject loading message immediately for instant feedback
-    // Timeline substitui o loader (FASE P3.3)
+    // We only show "Pensando..." if no tool is executing yet
     setMessages(prev => [...prev, { 
       role: 'assistant', 
       content: '', 
@@ -433,9 +424,6 @@ export function useAIConversations() {
           const jsonStr = line.slice(6).trim();
           if (jsonStr === '[DONE]') {
             streamDone = true;
-            console.log('[SSE-FRONT] Received [DONE] marker, finalizing stream');
-            // FASE P3.4: Forçar conclusão de todas as ferramentas pendentes
-            onToolCall?.({ toolName: '_stream_complete', status: 'completed' });
             break;
           }
 
@@ -449,8 +437,6 @@ export function useAIConversations() {
                 const toolName = tc.function?.name;
                 if (toolName && onToolCall) {
                   console.log('[SSE-FRONT] Tool call detected:', toolName);
-                  hasReceivedSignal = true; // Marca que recebeu sinal real
-                  clearTimeout(fallbackTimeoutId); // Cancela fallback
                   onToolCall({ toolName, status: 'started' });
                 }
               }
@@ -460,7 +446,6 @@ export function useAIConversations() {
             if (parsed.tool_result && onToolCall) {
               const toolResultName = parsed.tool_result.name;
               console.log('[SSE-FRONT] Tool result:', toolResultName);
-              hasReceivedSignal = true;
               onToolCall({ toolName: toolResultName, status: 'completed' });
               
               // Invalidar cache se for uma ferramenta de escrita
@@ -472,8 +457,6 @@ export function useAIConversations() {
             
             const deltaContent = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (deltaContent) {
-              hasReceivedSignal = true; // Texto recebido = sinal válido
-              clearTimeout(fallbackTimeoutId);
               fullContent += deltaContent;
               // Update the last message with accumulated content and clear loading state
               updateLastAssistantMessage(fullContent, false);
@@ -506,19 +489,11 @@ export function useAIConversations() {
         }
       }
 
-      // FASE P3.4: Fechamento atômico - marca conclusão definitiva
-      console.log('[SSE-FRONT] Stream finalizado, limpando estados');
-      clearTimeout(fallbackTimeoutId); // Limpar fallback timeout
-      
-      // Forçar fechamento de ferramentas fake (_analyzing, _initializing)
-      onToolCall?.({ toolName: '_analyzing', status: 'completed' });
-      onToolCall?.({ toolName: '_initializing', status: 'completed' });
-      
+      // Mark as finished
       updateLastAssistantMessage(fullContent, true);
       onComplete?.(fullContent);
     } catch (error) {
       clearTimeout(timeoutId); // Limpar timeout em caso de erro
-      clearTimeout(fallbackTimeoutId); // Limpar fallback timeout
       
       if ((error as Error).name === 'AbortError') {
         console.log('[SSE-FRONT] Stream abortado');
@@ -532,7 +507,6 @@ export function useAIConversations() {
       }
     } finally {
       clearTimeout(timeoutId); // Garantir limpeza do timeout
-      clearTimeout(fallbackTimeoutId); // Garantir limpeza do fallback
       setIsStreaming(false);
       abortControllerRef.current = null;
     }
