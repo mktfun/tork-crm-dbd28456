@@ -338,7 +338,7 @@ export function AmorimAIFloating() {
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className={cn(
               "fixed bottom-6 right-6 z-50",
-              "w-[400px] h-[600px] max-h-[80vh]",
+              "w-[500px] h-[750px] max-h-[90vh]",
               "rounded-2xl overflow-hidden",
               "bg-background/95 backdrop-blur-xl",
               "border border-white/10",
@@ -476,28 +476,23 @@ export function AmorimAIFloating() {
                             ? "bg-primary text-primary-foreground rounded-br-sm" 
                             : "bg-white/10 text-foreground rounded-bl-sm"
                         )}>
-	                        {message.role === 'assistant' ? (
-	                            message.isLoading ? (
-	                              // Loader inteligente: mostra ToolExecutionStatus se tools ativas, senão "Pensando..."
-	                              toolExecutions.length > 0 ? (
-	                                <ToolExecutionStatus executions={toolExecutions} />
-	                              ) : (
-	                                <div className="flex items-center gap-2 text-muted-foreground">
-	                                  <Loader2 className="w-4 h-4 animate-spin" />
-	                                  <span className="text-sm">Pensando...</span>
-	                                </div>
-	                              )
-	                            ) : (
-	                              <>
-	                                <AIResponseRenderer content={message.content} />
-	                                {isStreaming && toolExecutions.length > 0 && (
-	                                  <div className="mt-2 pt-2 border-t border-white/5">
-	                                    <ToolExecutionStatus executions={toolExecutions} />
-	                                  </div>
-	                                )}
-	                              </>
-	                            )
-	                          ) : (
+		                        {message.role === 'assistant' ? (
+		                            <>
+		                              {message.content !== '' && <AIResponseRenderer content={message.content} />}
+		                              {message.isLoading && (
+		                                <div className="mt-2">
+		                                  {toolExecutions.length > 0 ? (
+		                                    <ToolExecutionStatus executions={toolExecutions} />
+		                                  ) : message.content === '' ? (
+		                                    <div className="flex items-center gap-2 text-muted-foreground">
+		                                      <Loader2 className="w-4 h-4 animate-spin" />
+		                                      <span className="text-sm">Pensando...</span>
+		                                    </div>
+		                                  ) : null}
+		                                </div>
+		                              )}
+		                            </>
+		                          ) : (
                             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                           )}
                         </div>
@@ -577,24 +572,7 @@ export function AmorimAIFloating() {
                     </motion.div>
                   ))}
 
-	                  {/* Loading indicator */}
-	                  {isLoading && toolExecutions.length === 0 && !isStreaming && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="flex gap-3"
-                    >
-                      <div className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center bg-white/10 border border-white/10">
-                        <img src="/tork_symbol_favicon.png" alt="Tork" className="w-4 h-4 object-contain" />
-                      </div>
-                      <div className="bg-white/10 rounded-2xl rounded-bl-sm px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                          <span className="text-sm text-muted-foreground">Pensando...</span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
+
                 </div>
               )}
             </ScrollArea>

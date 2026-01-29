@@ -60,38 +60,50 @@ export const FinancialCard: React.FC<FinancialCardProps> = ({ summary }) => {
       )}
 
       {/* Grid de métricas */}
-      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="space-y-3">
         {/* Receitas */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <TrendingUp className="h-3 w-3 text-green-400" />
-            <span>Receitas</span>
+        <div className="flex items-center justify-between p-2 rounded-lg bg-green-500/5 border border-green-500/10">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-md bg-green-500/20">
+              <TrendingUp className="h-4 w-4 text-green-400" />
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">Receitas</span>
           </div>
-          <p className="text-sm font-semibold text-green-400">
+          <p className="text-sm font-bold text-green-400">
             {formatCurrency(income)}
           </p>
         </div>
 
         {/* Despesas */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <TrendingDown className="h-3 w-3 text-red-400" />
-            <span>Despesas</span>
+        <div className="flex items-center justify-between p-2 rounded-lg bg-red-500/5 border border-red-500/10">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-md bg-red-500/20">
+              <TrendingDown className="h-4 w-4 text-red-400" />
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">Despesas</span>
           </div>
-          <p className="text-sm font-semibold text-red-400">
+          <p className="text-sm font-bold text-red-400">
             {formatCurrency(expenses)}
           </p>
         </div>
 
         {/* Saldo */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Wallet className="h-3 w-3" />
-            <span>Saldo</span>
+        <div className={cn(
+          "flex items-center justify-between p-2 rounded-lg border",
+          balance >= 0 ? "bg-primary/5 border-primary/10" : "bg-red-500/5 border-red-500/10"
+        )}>
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "p-1.5 rounded-md",
+              balance >= 0 ? "bg-primary/20" : "bg-red-500/20"
+            )}>
+              <Wallet className={cn("h-4 w-4", balance >= 0 ? "text-primary" : "text-red-400")} />
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">Saldo Líquido</span>
           </div>
           <p className={cn(
-            "text-sm font-semibold",
-            balance >= 0 ? 'text-green-400' : 'text-red-400'
+            "text-sm font-bold",
+            balance >= 0 ? 'text-primary' : 'text-red-400'
           )}>
             {formatCurrency(balance)}
           </p>
