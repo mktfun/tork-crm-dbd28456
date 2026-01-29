@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Loader2, User, Lightbulb, ThumbsUp, ThumbsDown, Plus, History, StopCircle } from 'lucide-react';
+import { X, Send, Loader2, User, Lightbulb, ThumbsUp, ThumbsDown, Plus, History, StopCircle, Maximize2, Minimize2 } from 'lucide-react';
 import { AIResponseRenderer } from './responses/AIResponseRenderer';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -32,9 +32,13 @@ const MAX_HEIGHT_RATIO = 0.95; // 95% of viewport height
 const DEFAULT_WIDTH = 550;
 const DEFAULT_HEIGHT = 700;
 
+// FASE P5: Limite de caracteres do input
+const MAX_INPUT_CHARS = 4000;
+
 interface WindowDimensions {
   width: number;
   height: number;
+  isMaximized?: boolean; // FASE P5: Persistência de estado maximizado
 }
 
 const suggestedQuestions = [
@@ -57,12 +61,13 @@ export function AmorimAIFloating() {
   const toolProgressTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const currentMessageIndexRef = useRef<number>(-1);
 
-  // === RESIZE STATE (FASE P4) ===
+  // === RESIZE STATE (FASE P4 + P5) ===
   const [savedDimensions, setSavedDimensions] = useLocalStorage<WindowDimensions>(
     'tork-assistant-window-dimensions',
-    { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT }
+    { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT, isMaximized: false }
   );
   const [windowSize, setWindowSize] = useState<WindowDimensions>(savedDimensions);
+  const [isMaximized, setIsMaximized] = useState(savedDimensions.isMaximized || false);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeEdge, setResizeEdge] = useState<'left' | 'top' | 'corner' | null>(null);
   const resizeStartRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -254,6 +259,9 @@ export function AmorimAIFloating() {
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading || isStreaming || !user) return;
 
+    // FASE P5: Compressão de espaços em branco para economia de tokens
+    const compressedContent = content.trim().replace(/\s+/g, ' ');
+
     let conversationId = currentConversationId;
     
     // Create a new conversation if none exists
@@ -266,12 +274,12 @@ export function AmorimAIFloating() {
     }
 
     // Persist user message
-    const userMessageId = await persistMessage('user', content.trim(), conversationId);
+    const userMessageId = await persistMessage('user', compressedContent, conversationId);
     
     const userMessage = { 
       id: userMessageId || undefined,
       role: 'user' as const, 
-      content: content.trim(),
+      content: compressedContent,
       conversation_id: conversationId
     };
     
@@ -286,7 +294,7 @@ export function AmorimAIFloating() {
     try {
       // Use streaming with tool call handler
       await sendMessageWithStream(
-        content.trim(),
+        compressedContent,
         conversationId,
         async (fullContent) => {
           // Persist assistant message after streaming is complete
@@ -341,9 +349,17 @@ export function AmorimAIFloating() {
     // Shift+Enter: comportamento padrão de nova linha (não precisa fazer nada)
   };
 
-  // Auto-resize do textarea
+  // Auto-resize do textarea com limite de caracteres (FASE P5)
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
+    const newValue = e.target.value;
+    
+    // FASE P5: Limite de caracteres
+    if (newValue.length > MAX_INPUT_CHARS) {
+      toast.warning(`Limite de ${MAX_INPUT_CHARS} caracteres atingido`);
+      return;
+    }
+    
+    setInput(newValue);
     
     // Auto-resize: reseta altura e calcula nova altura baseada no conteúdo
     const textarea = e.target;
@@ -418,10 +434,28 @@ export function AmorimAIFloating() {
       setIsResizing(false);
       setResizeEdge(null);
       resizeStartRef.current = null;
-      // Persist to localStorage
-      setSavedDimensions(windowSize);
+      // Persist to localStorage with maximized state
+      setSavedDimensions({ ...windowSize, isMaximized });
     }
-  }, [isResizing, windowSize, setSavedDimensions]);
+  }, [isResizing, windowSize, isMaximized, setSavedDimensions]);
+
+  // FASE P5: Toggle modo tela cheia
+  const toggleMaximized = useCallback(() => {
+    const newMaximized = !isMaximized;
+    setIsMaximized(newMaximized);
+    
+    if (newMaximized) {
+      // Expandir para 90% da tela
+      const maxWidth = Math.min(window.innerWidth * 0.9, 1400);
+      const maxHeight = window.innerHeight * 0.9;
+      setWindowSize({ width: maxWidth, height: maxHeight, isMaximized: true });
+      setSavedDimensions({ width: maxWidth, height: maxHeight, isMaximized: true });
+    } else {
+      // Restaurar tamanho padrão
+      setWindowSize({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT, isMaximized: false });
+      setSavedDimensions({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT, isMaximized: false });
+    }
+  }, [isMaximized, setSavedDimensions]);
 
   // Global mouse event listeners for resize
   useEffect(() => {
@@ -441,10 +475,11 @@ export function AmorimAIFloating() {
     };
   }, [isResizing, handleResizeMove, handleResizeEnd, resizeEdge]);
 
-  // Sync with localStorage on open
+  // Sync with localStorage on open (including maximized state)
   useEffect(() => {
     if (isOpen) {
       setWindowSize(savedDimensions);
+      setIsMaximized(savedDimensions.isMaximized || false);
     }
   }, [isOpen, savedDimensions]);
 
@@ -580,18 +615,34 @@ export function AmorimAIFloating() {
                 </div>
               </div>
 
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsOpen(false)}
-                className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-white/10"
-              >
-                <X className="h-5 w-5" />
-              </Button>
+              {/* FASE P5: Botões de controle (Maximizar + Fechar) */}
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleMaximized}
+                  className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-white/10"
+                  title={isMaximized ? "Restaurar tamanho" : "Modo Foco / Tela Cheia"}
+                >
+                  {isMaximized ? (
+                    <Minimize2 className="h-4 w-4" />
+                  ) : (
+                    <Maximize2 className="h-4 w-4" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsOpen(false)}
+                  className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-white/10"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
 
-            {/* Messages Area */}
-            <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+            {/* Messages Area - FASE P5: overscroll-behavior-contain */}
+            <ScrollArea className="flex-1 p-4 overscroll-contain" ref={scrollRef}>
               {isLoadingMessages ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -837,6 +888,16 @@ export function AmorimAIFloating() {
                   </Button>
                 )}
               </div>
+              
+              {/* FASE P5: Contador de caracteres */}
+              {input.length > 0 && (
+                <div className={cn(
+                  "flex justify-end mt-1 text-xs",
+                  input.length > MAX_INPUT_CHARS * 0.9 ? "text-destructive" : "text-muted-foreground"
+                )}>
+                  <span>{input.length}/{MAX_INPUT_CHARS}</span>
+                </div>
+              )}
               
               {!user && (
                 <p className="text-xs text-muted-foreground mt-2 text-center">
