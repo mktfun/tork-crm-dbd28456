@@ -479,20 +479,26 @@ export function AmorimAIFloating() {
                             : "w-full bg-white/10 text-foreground rounded-bl-sm"
                         )}>
                         {message.role === 'assistant' ? (
-                            // Lógica refinada: Tool > Pensando > Conteúdo
-                            toolExecutions.length > 0 ? (
-                              // Prioridade 1: Ferramentas em execução - APENAS isso
-                              <ToolExecutionStatus executions={toolExecutions} />
-                            ) : message.isLoading && message.content === '' ? (
-                              // Prioridade 2: Aguardando início (sem conteúdo ainda)
-                              <div className="flex items-center gap-2 text-muted-foreground">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span className="text-sm">Pensando...</span>
-                              </div>
-                            ) : (
-                              // Prioridade 3: Renderizar conteúdo (streaming ou completo)
-                              <AIResponseRenderer content={message.content} />
-                            )
+                            // Lógica refinada: Coexistência de Tool + Conteúdo
+                            <div className="space-y-3">
+                              {/* Sempre mostrar ToolExecutionStatus se houver ferramentas em execução */}
+                              {toolExecutions.length > 0 && (
+                                <ToolExecutionStatus executions={toolExecutions} />
+                              )}
+                              
+                              {/* Mostrar loader apenas se não há tools e não há conteúdo */}
+                              {toolExecutions.length === 0 && message.isLoading && message.content === '' && (
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  <span className="text-sm">Pensando...</span>
+                                </div>
+                              )}
+                              
+                              {/* Renderizar conteúdo sempre que existir (streaming ou completo) */}
+                              {message.content && (
+                                <AIResponseRenderer content={message.content} />
+                              )}
+                            </div>
                           ) : (
                             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                           )}
