@@ -309,10 +309,24 @@ export function AmorimAIFloating() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Enter envia, Shift+Enter quebra linha
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage(input);
     }
+    // Shift+Enter: comportamento padrão de nova linha (não precisa fazer nada)
+  };
+
+  // Auto-resize do textarea
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    
+    // Auto-resize: reseta altura e calcula nova altura baseada no conteúdo
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    const maxHeight = 120; // 5 linhas aproximadamente
+    const newHeight = Math.min(textarea.scrollHeight, maxHeight);
+    textarea.style.height = `${newHeight}px`;
   };
 
   const handleSuggestionClick = (question: string) => {
@@ -637,18 +651,21 @@ export function AmorimAIFloating() {
                 <textarea
                   ref={inputRef}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
-                  placeholder="Digite sua pergunta..."
+                  placeholder="Digite sua pergunta... (Enter envia, Shift+Enter nova linha)"
                   disabled={isLoading || isStreaming || !user}
                   rows={1}
                   className={cn(
                     "flex-1 bg-transparent px-4 py-3 text-sm text-foreground",
                     "placeholder:text-muted-foreground resize-none",
                     "focus:outline-none disabled:opacity-50",
-                    "max-h-32"
+                    "overflow-y-auto scrollbar-thin scrollbar-thumb-white/20"
                   )}
-                  style={{ minHeight: '44px' }}
+                  style={{ 
+                    minHeight: '44px',
+                    maxHeight: '120px' // 5 linhas max
+                  }}
                 />
                 {isStreaming ? (
                   <Button
