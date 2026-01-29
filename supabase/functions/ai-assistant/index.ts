@@ -55,6 +55,8 @@ const BASE_SYSTEM_PROMPT = `<persona>
   - get_appointments: Agenda do dia
   - create_appointment: Criar novo agendamento
   - generate_report: Gerar relatórios estruturados
+  - get_companies: Lista todas as seguradoras cadastradas
+  - get_ramos: Lista todos os ramos de seguro disponíveis
 </available_tools>`;
 
 async function buildSystemPrompt(supabase: any, userId: string): Promise<string> {
@@ -242,6 +244,22 @@ const TOOLS = [
         },
         required: ["type", "period"]
       }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_companies",
+      description: "Retorna a lista de todas as seguradoras cadastradas no sistema. Use para validar nomes de seguradoras ou listar opções disponíveis.",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_ramos",
+      description: "Retorna a lista de todos os ramos de seguro (Ex: Automóvel, Vida, Residencial) disponíveis no sistema.",
+      parameters: { type: "object", properties: {} }
     }
   }
 ];
@@ -491,6 +509,31 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
 
     if (error) throw error;
     return { success: true, date, total_count: count, appointments: data };
+  },
+
+  // --- DADOS MESTRES (FASE 4C) ---
+  get_companies: async (args, supabase, userId) => {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('id, name')
+      .eq('user_id', userId)
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    console.log(`[TOOL] get_companies: Encontradas ${data?.length || 0} seguradoras`);
+    return { success: true, count: data?.length || 0, companies: data || [] };
+  },
+
+  get_ramos: async (args, supabase, userId) => {
+    const { data, error } = await supabase
+      .from('ramos')
+      .select('id, nome')
+      .eq('user_id', userId)
+      .order('nome', { ascending: true });
+
+    if (error) throw error;
+    console.log(`[TOOL] get_ramos: Encontrados ${data?.length || 0} ramos`);
+    return { success: true, count: data?.length || 0, ramos: data || [] };
   },
 
   create_appointment: async (args, supabase, userId) => {
