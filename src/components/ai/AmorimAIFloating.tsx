@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { useAIConversations, ToolCallEvent } from '@/hooks/useAIConversations';
+import { useAIConversations, ToolCallEvent, AIMessage } from '@/hooks/useAIConversations';
 import { ChatHistorySidebar } from './ChatHistorySidebar';
 import { 
   ToolExecutionStatus, 
@@ -17,6 +17,11 @@ import {
   advanceToolStep, 
   completeToolExecution 
 } from './ToolExecutionStatus';
+
+// Extended message type with tool executions attached
+interface MessageWithTools extends AIMessage {
+  toolExecutions?: ToolExecution[];
+}
 
 const suggestedQuestions = [
   "Quais apólices vencem nos próximos 30 dias?",
@@ -33,8 +38,10 @@ export function AmorimAIFloating() {
   const [feedbackNoteId, setFeedbackNoteId] = useState<string | null>(null);
   const [feedbackNote, setFeedbackNote] = useState('');
   const [showHistory, setShowHistory] = useState(false);
-  const [toolExecutions, setToolExecutions] = useState<ToolExecution[]>([]);
+  const [activeToolExecutions, setActiveToolExecutions] = useState<ToolExecution[]>([]);
+  const [messageToolExecutions, setMessageToolExecutions] = useState<Map<number, ToolExecution[]>>(new Map());
   const toolProgressTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const currentMessageIndexRef = useRef<number>(-1);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -138,11 +145,23 @@ export function AmorimAIFloating() {
     }
   };
 
-  // Handler para eventos de tool call
+  // Handler para eventos de tool call - now attaches to current message
   const handleToolCall = useCallback((event: ToolCallEvent) => {
+    const messageIndex = currentMessageIndexRef.current;
+    
     if (event.status === 'started') {
       const newExecution = createToolExecution(event.toolName);
-      setToolExecutions(prev => [...prev, newExecution]);
+      
+      // Update active executions (for real-time display)
+      setActiveToolExecutions(prev => [...prev, newExecution]);
+      
+      // Also track per-message for persistence
+      setMessageToolExecutions(prev => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(messageIndex) || [];
+        newMap.set(messageIndex, [...existing, newExecution]);
+        return newMap;
+      });
       
       // Simular progresso dos steps
       const stepCount = newExecution.steps.length;
@@ -150,11 +169,16 @@ export function AmorimAIFloating() {
       
       for (let i = 1; i < stepCount; i++) {
         const timer = setTimeout(() => {
-          setToolExecutions(prev => 
-            prev.map(exec => 
-              exec.toolName === event.toolName ? advanceToolStep(exec) : exec
-            )
-          );
+          const updateExecution = (exec: ToolExecution) => 
+            exec.toolName === event.toolName ? advanceToolStep(exec) : exec;
+          
+          setActiveToolExecutions(prev => prev.map(updateExecution));
+          setMessageToolExecutions(prev => {
+            const newMap = new Map(prev);
+            const existing = newMap.get(messageIndex) || [];
+            newMap.set(messageIndex, existing.map(updateExecution));
+            return newMap;
+          });
         }, interval * i);
         
         toolProgressTimersRef.current.set(`${event.toolName}-${i}`, timer);
@@ -168,31 +192,37 @@ export function AmorimAIFloating() {
         }
       });
       
-      // Completar a execução e remover após delay
-      setToolExecutions(prev => 
-        prev.map(exec => 
-          exec.toolName === event.toolName ? completeToolExecution(exec) : exec
-        )
-      );
+      const completeExecution = (exec: ToolExecution) => 
+        exec.toolName === event.toolName ? completeToolExecution(exec) : exec;
       
+      // Complete in both states
+      setActiveToolExecutions(prev => prev.map(completeExecution));
+      setMessageToolExecutions(prev => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(messageIndex) || [];
+        newMap.set(messageIndex, existing.map(completeExecution));
+        return newMap;
+      });
+      
+      // Remove from active after delay (but keep in message history)
       setTimeout(() => {
-        setToolExecutions(prev => 
+        setActiveToolExecutions(prev => 
           prev.filter(exec => exec.toolName !== event.toolName)
         );
       }, 800);
     }
   }, []);
 
-  // Limpar tool executions quando streaming termina
+  // Limpar active tool executions quando streaming termina (but keep message history)
   useEffect(() => {
     if (!isStreaming && !isLoading) {
       // Pequeno delay para mostrar conclusão
       const timer = setTimeout(() => {
-        setToolExecutions([]);
+        setActiveToolExecutions([]);
         // Limpar todos os timers
         toolProgressTimersRef.current.forEach(clearTimeout);
         toolProgressTimersRef.current.clear();
-      }, 1000);
+      }, 1500);
       return () => clearTimeout(timer);
     }
   }, [isStreaming, isLoading]);
@@ -224,7 +254,10 @@ export function AmorimAIFloating() {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
-    setToolExecutions([]); // Reset tool executions
+    setActiveToolExecutions([]); // Reset active tool executions
+    
+    // Track the index of the upcoming assistant message
+    currentMessageIndexRef.current = messages.length + 1; // +1 for user message, assistant will be next
 
     try {
       // Use streaming with tool call handler
@@ -480,25 +513,35 @@ export function AmorimAIFloating() {
                         )}>
                         {message.role === 'assistant' ? (
                             // Lógica refinada: Coexistência de Tool + Conteúdo
-                            <div className="space-y-3">
-                              {/* Sempre mostrar ToolExecutionStatus se houver ferramentas em execução */}
-                              {toolExecutions.length > 0 && (
-                                <ToolExecutionStatus executions={toolExecutions} />
-                              )}
+                            (() => {
+                              // Get tool executions for this specific message
+                              const isCurrentMessage = idx === messages.length - 1 && (isLoading || isStreaming);
+                              const msgToolExecutions = isCurrentMessage 
+                                ? activeToolExecutions 
+                                : (messageToolExecutions.get(idx) || []);
                               
-                              {/* Mostrar loader apenas se não há tools e não há conteúdo */}
-                              {toolExecutions.length === 0 && message.isLoading && message.content === '' && (
-                                <div className="flex items-center gap-2 text-muted-foreground">
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                  <span className="text-sm">Pensando...</span>
+                              return (
+                                <div className="space-y-3">
+                                  {/* Sempre mostrar ToolExecutionStatus se houver ferramentas */}
+                                  {msgToolExecutions.length > 0 && (
+                                    <ToolExecutionStatus executions={msgToolExecutions} />
+                                  )}
+                                  
+                                  {/* Mostrar loader apenas se não há tools e não há conteúdo */}
+                                  {msgToolExecutions.length === 0 && message.isLoading && message.content === '' && (
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      <span className="text-sm">Pensando...</span>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Renderizar conteúdo sempre que existir (streaming ou completo) */}
+                                  {message.content && (
+                                    <AIResponseRenderer content={message.content} />
+                                  )}
                                 </div>
-                              )}
-                              
-                              {/* Renderizar conteúdo sempre que existir (streaming ou completo) */}
-                              {message.content && (
-                                <AIResponseRenderer content={message.content} />
-                              )}
-                            </div>
+                              );
+                            })()
                           ) : (
                             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                           )}
