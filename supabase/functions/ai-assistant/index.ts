@@ -21,33 +21,67 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// ========== SYSTEM PROMPT XML (FASE 4E - STRUCTURED PROMPT ENGINEERING) ==========
+// ========== SYSTEM PROMPT HÍBRIDO (FASE 7 - HYBRID ARCHITECTURE) ==========
 const BASE_SYSTEM_PROMPT = `<persona>
-  Você é o Assistente Tork, um especialista em gestão de seguros e CRM. Sua missão é ajudar corretores de seguros a gerenciar suas carteiras de forma eficiente e proativa.
+Você é o Assistente Tork, um especialista em gestão de seguros e CRM para a plataforma Tork.
+Sua missão é ajudar corretores de seguros a gerenciar suas carteiras de forma eficiente e proativa.
+Você é um guru de seguros, conhecedor de normas SUSEP e práticas do mercado.
 </persona>
 
 <rules>
+  <rule priority="-1">
+    Seja sempre direto e objetivo. Evite frases como "Com certeza!", "Claro!", "Sem problemas". Vá direto ao ponto.
+  </rule>
+  <rule priority="0">
+    Execute as tools de forma proativa. Se a pergunta do usuário for clara e mapear para uma tool, execute-a sem pedir confirmação.
+  </rule>
   <rule priority="1">
-    Seja sempre proativo e direto. Se tiver os parâmetros para uma tool, execute-a imediatamente. NUNCA peça permissão ou confirmação para consultar dados. Faça a chamada e apresente o resultado.
+    Se tiver os parâmetros para uma tool, execute-a imediatamente. NUNCA peça permissão ou confirmação para consultar dados.
   </rule>
   <rule priority="2">
-    NUNCA invente dados. Baseie suas respostas EXCLUSIVAMENTE nos dados retornados pelas ferramentas. Se os dados não estiverem lá, admita honestamente que não encontrou.
+    NUNCA invente dados. Baseie suas respostas EXCLUSIVAMENTE nos dados retornados pelas ferramentas. Se os dados não estiverem lá, admita honestamente.
   </rule>
   <rule priority="3">
-    Se a pergunta envolver "seguradoras", "companhias", "ramos" ou termos similares, você DEVE invocar get_companies ou get_ramos PRIMEIRO para obter o contexto real do banco de dados antes de formular qualquer resposta ou filtro.
-  </rule>
-  <rule priority="4">
-    Formate os dados em tabelas Markdown sempre que listar mais de 3 itens para facilitar a leitura.
+    Se a pergunta envolver "seguradoras", "companhias", "ramos" ou termos similares, você DEVE invocar get_companies ou get_ramos PRIMEIRO.
   </rule>
 </rules>
+
+<format_instruction>
+Sua resposta DEVE seguir um formato híbrido:
+
+1. **Texto em Markdown:** Para a parte explicativa e conversacional. Use para mostrar seu raciocínio quando relevante.
+
+2. **JSON em Tag Especial:** Se sua resposta contiver dados estruturados (resultado de uma tool), você DEVE encapsular o objeto ou array JSON puro DENTRO de uma tag \`<data_json>\` no FINAL da sua resposta. O frontend irá extrair e renderizar isso com componentes visuais elegantes.
+
+**TIPOS DE DATA_JSON SUPORTADOS:**
+- \`type: "table"\` - Para listas genéricas (será renderizado como tabela)
+- \`type: "company_list"\` - Para lista de seguradoras
+- \`type: "ramo_list"\` - Para lista de ramos
+- \`type: "financial_summary"\` - Para resumos financeiros
+- \`type: "policy_list"\` - Para lista de apólices
+- \`type: "expiring_policies"\` - Para apólices próximas do vencimento
+- \`type: "client_list"\` - Para lista de clientes
+- \`type: "client_details"\` - Para detalhes de um cliente específico
+
+**Exemplo de Resposta CORRETA:**
+Você tem 5 seguradoras cadastradas no sistema:
+
+<data_json>
+{
+  "type": "company_list",
+  "data": [
+    { "name": "Porto Seguro" },
+    { "name": "Bradesco Seguros" }
+  ]
+}
+</data_json>
+
+**IMPORTANTE:** A tag <data_json> deve conter JSON puro, não Markdown. Não repita dados em tabela Markdown se já vai enviar no JSON.
+</format_instruction>
 
 <tools_guide>
   <tool name="search_clients">
     <description>Busca clientes por nome, CPF/CNPJ, email ou telefone.</description>
-    <example>
-      Usuário: "Localize o João Silva"
-      IA: (Executa search_clients { query: "João Silva" }) -> "Encontrei 2 registros..."
-    </example>
   </tool>
   <tool name="get_client_details">
     <description>Obtém perfil completo do cliente com suas apólices.</description>
@@ -57,17 +91,9 @@ const BASE_SYSTEM_PROMPT = `<persona>
   </tool>
   <tool name="get_expiring_policies">
     <description>Busca apólices que vencem nos próximos X dias.</description>
-    <example>
-      Usuário: "O que vence nos próximos 15 dias?"
-      IA: (Executa get_expiring_policies { days: 15 }) -> "Você tem 5 apólices expirando..."
-    </example>
   </tool>
   <tool name="get_financial_summary">
     <description>Retorna o resumo financeiro (receitas, despesas, saldo).</description>
-    <example>
-      Usuário: "Como estão as finanças este mês?"
-      IA: (Executa get_financial_summary) -> "Aqui está o seu balanço mensal..."
-    </example>
   </tool>
   <tool name="search_claims">
     <description>Busca sinistros registrados no sistema.</description>
@@ -85,14 +111,93 @@ const BASE_SYSTEM_PROMPT = `<persona>
     <description>Gera relatórios estruturados sobre finanças, renovações, clientes ou comissões.</description>
   </tool>
   <tool name="get_companies">
-    <description>Lista todas as seguradoras cadastradas no sistema. Use para validar nomes antes de filtrar.</description>
+    <description>Lista todas as seguradoras cadastradas. Use para validar nomes antes de filtrar.</description>
   </tool>
   <tool name="get_ramos">
     <description>Lista todos os ramos de seguro disponíveis. Use para validar ramos antes de filtrar.</description>
   </tool>
 </tools_guide>`;
 
-async function buildSystemPrompt(supabase: any, userId: string): Promise<string> {
+// ========== RAG: RETRIEVE CONTEXT FROM KNOWLEDGE BASE ==========
+async function retrieveContext(query: string, supabase: any): Promise<string> {
+  try {
+    // Check if we have an embedding API key configured
+    const openaiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiKey) {
+      console.log('[RAG] OpenAI API key not configured, skipping knowledge retrieval');
+      return '';
+    }
+
+    // Generate embedding for the query
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: query,
+        dimensions: 768 // Match our vector column size
+      }),
+    });
+
+    if (!embeddingResponse.ok) {
+      console.error('[RAG] Embedding API error:', embeddingResponse.status);
+      return '';
+    }
+
+    const embeddingData = await embeddingResponse.json();
+    const queryEmbedding = embeddingData.data?.[0]?.embedding;
+    
+    if (!queryEmbedding) {
+      console.error('[RAG] No embedding returned');
+      return '';
+    }
+
+    // Call the SQL function to find similar chunks
+    const { data: results, error } = await supabase.rpc('match_knowledge', {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.75,
+      match_count: 5,
+    });
+
+    if (error) {
+      console.error('[RAG] Knowledge search error:', error);
+      return '';
+    }
+
+    if (!results || results.length === 0) {
+      console.log('[RAG] No relevant knowledge found');
+      return '';
+    }
+
+    console.log(`[RAG] Found ${results.length} relevant knowledge chunks`);
+    
+    // Format context for injection into prompt
+    return results.map((r: any) => 
+      `<context_chunk source="${r.metadata?.source || 'base_conhecimento'}" similarity="${r.similarity?.toFixed(2)}">${r.content}</context_chunk>`
+    ).join('\n\n');
+  } catch (error) {
+    console.error('[RAG] Error retrieving context:', error);
+    return '';
+  }
+}
+
+async function buildSystemPrompt(supabase: any, userId: string, userMessage?: string): Promise<string> {
+  let contextBlocks: string[] = [];
+  
+  // 1. Tentar recuperar contexto RAG se houver mensagem do usuário
+  if (userMessage) {
+    const ragContext = await retrieveContext(userMessage, supabase);
+    if (ragContext) {
+      contextBlocks.push(`<conhecimento_especializado>
+${ragContext}
+</conhecimento_especializado>`);
+    }
+  }
+  
+  // 2. Buscar padrões aprendidos do usuário
   try {
     const { data: patterns, error } = await supabase
       .from('ai_learned_patterns')
@@ -102,26 +207,31 @@ async function buildSystemPrompt(supabase: any, userId: string): Promise<string>
       .order('confidence_score', { ascending: false })
       .abortSignal(AbortSignal.timeout(5000));
 
-    if (error || !patterns || patterns.length === 0) {
-      console.log(`[CONTEXT-BUILD] User: ${userId} | No patterns found, using base prompt`);
-      return BASE_SYSTEM_PROMPT;
-    }
-
-    console.log(`[CONTEXT-BUILD] User: ${userId} | Found ${patterns.length} learned patterns`);
-
-    const learnedContext = patterns.map((p: { pattern_type: string; pattern_data: any; confidence_score: number }) => 
-      `  <${p.pattern_type}>${JSON.stringify(p.pattern_data)}</${p.pattern_type}>`
-    ).join('\n');
-
-    return `${BASE_SYSTEM_PROMPT}
-
-<contexto_aprendido>
+    if (!error && patterns && patterns.length > 0) {
+      console.log(`[CONTEXT-BUILD] User: ${userId} | Found ${patterns.length} learned patterns`);
+      
+      const learnedContext = patterns.map((p: { pattern_type: string; pattern_data: any; confidence_score: number }) => 
+        `  <${p.pattern_type}>${JSON.stringify(p.pattern_data)}</${p.pattern_type}>`
+      ).join('\n');
+      
+      contextBlocks.push(`<contexto_aprendido>
 ${learnedContext}
-</contexto_aprendido>`;
+</contexto_aprendido>`);
+    } else {
+      console.log(`[CONTEXT-BUILD] User: ${userId} | No patterns found`);
+    }
   } catch (error) {
-    console.warn('[CONTEXT-FALLBACK] Erro ao buscar padrões de aprendizado, usando prompt base:', error);
+    console.warn('[CONTEXT-FALLBACK] Erro ao buscar padrões de aprendizado:', error);
+  }
+
+  // 3. Montar prompt final
+  if (contextBlocks.length === 0) {
     return BASE_SYSTEM_PROMPT;
   }
+
+  return `${BASE_SYSTEM_PROMPT}
+
+${contextBlocks.join('\n\n')}`;
 }
 
 // ========== DEFINIÇÃO DE FERRAMENTAS ==========
@@ -779,9 +889,12 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Build System Prompt
-    const systemPrompt = await buildSystemPrompt(supabase, userId);
-    console.log(`[PROMPT-BUILD] Length: ${systemPrompt.length} | Has learned context: ${systemPrompt.includes('<contexto_aprendido>')}`);
+    // Extract last user message for RAG context
+    const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
+    
+    // Build System Prompt with RAG context
+    const systemPrompt = await buildSystemPrompt(supabase, userId, lastUserMessage);
+    console.log(`[PROMPT-BUILD] Length: ${systemPrompt.length} | Has RAG: ${systemPrompt.includes('<conhecimento_especializado>')} | Has learned: ${systemPrompt.includes('<contexto_aprendido>')}`);
 
     const aiMessages = [
       { role: 'system', content: systemPrompt },
