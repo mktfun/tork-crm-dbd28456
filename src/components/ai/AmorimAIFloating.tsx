@@ -526,7 +526,7 @@ export function AmorimAIFloating() {
                             : "w-full bg-white/10 text-foreground rounded-bl-sm"
                         )}>
                         {message.role === 'assistant' ? (
-                            // Lógica refinada: Coexistência de Tool + Conteúdo
+                            // Lógica refinada: Timeline substitui loader completamente (FASE P3.3)
                             (() => {
                               // Get tool executions for this specific message
                               const isCurrentMessage = idx === messages.length - 1 && (isLoading || isStreaming);
@@ -534,19 +534,22 @@ export function AmorimAIFloating() {
                                 ? activeToolExecutions 
                                 : (messageToolExecutions.get(idx) || []);
                               
+                              // FASE P3.3: Se está loading mas sem tools, mostra etapa inicial fake
+                              const showInitialStep = isCurrentMessage && msgToolExecutions.length === 0 && message.isLoading && message.content === '';
+                              const initialExecution = showInitialStep ? [{
+                                toolName: '_initializing',
+                                displayName: 'Iniciando Assistente',
+                                status: 'running' as const,
+                                steps: [{ label: 'Analisando solicitação', status: 'running' as const }]
+                              }] : [];
+                              
+                              const executionsToShow = msgToolExecutions.length > 0 ? msgToolExecutions : initialExecution;
+                              
                               return (
-                                <div className="space-y-3">
-                                  {/* Sempre mostrar ToolExecutionStatus se houver ferramentas */}
-                                  {msgToolExecutions.length > 0 && (
-                                    <ToolExecutionStatus executions={msgToolExecutions} />
-                                  )}
-                                  
-                                  {/* Mostrar loader apenas se não há tools e não há conteúdo */}
-                                  {msgToolExecutions.length === 0 && message.isLoading && message.content === '' && (
-                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                      <span className="text-sm">Pensando...</span>
-                                    </div>
+                                <div className="space-y-2">
+                                  {/* Timeline é o único feedback visual - sem loader "Pensando..." */}
+                                  {executionsToShow.length > 0 && (
+                                    <ToolExecutionStatus executions={executionsToShow} />
                                   )}
                                   
                                   {/* Renderizar conteúdo sempre que existir (streaming ou completo) */}
