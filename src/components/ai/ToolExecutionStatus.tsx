@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Loader2, AlertCircle, ChevronDown, ChevronUp, Database, Search, FileText, Calendar, Users, TrendingUp, Building2, Layers, GitBranch, UserPlus, Edit, Trash2, Move } from 'lucide-react';
+import { CheckCircle, AlertCircle, ChevronDown, Database, Search, FileText, Calendar, Users, TrendingUp, Building2, Layers, GitBranch, UserPlus, Edit, Trash2, Move, Sparkles } from 'lucide-react';
 
 export interface ToolStep {
   label: string;
@@ -22,6 +22,19 @@ export const TOOL_DISPLAY_CONFIG: Record<string, {
   description: string;
   steps: string[] 
 }> = {
+  // Etapa inicial fake para feedback imediato
+  _initializing: {
+    name: 'Iniciando Assistente',
+    icon: Sparkles,
+    description: '⚙️ Preparando resposta...',
+    steps: ['Analisando solicitação']
+  },
+  _analyzing: {
+    name: 'Analisando Solicitação',
+    icon: Search,
+    description: '🔍 Processando sua pergunta...',
+    steps: ['Interpretando contexto']
+  },
   search_clients: {
     name: 'Buscar Clientes',
     icon: Search,
@@ -191,33 +204,40 @@ export function ToolExecutionStatus({ executions }: ToolExecutionStatusProps) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="mb-3"
+      className="mb-2"
     >
-      {/* Summary Header */}
+      {/* Summary Header - Estética Glass Premium */}
       <motion.button
         onClick={() => setIsExpanded(!isExpanded)}
         className={`
           w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl
-          bg-gradient-to-r from-primary/10 to-primary/5
-          border border-primary/20 hover:border-primary/30
+          bg-white/5 backdrop-blur-md
+          border border-white/10 hover:border-white/20
           transition-all duration-300 group
-          ${allComplete ? 'opacity-80' : ''}
+          ${allComplete ? 'opacity-70' : ''}
         `}
-        whileHover={{ scale: 1.005 }}
-        whileTap={{ scale: 0.995 }}
+        whileHover={{ scale: 1.002 }}
+        whileTap={{ scale: 0.998 }}
       >
         <div className="flex items-center gap-2">
           {!allComplete ? (
-            <div className="relative">
-              <Loader2 className="w-4 h-4 text-primary animate-spin" />
-              <div className="absolute inset-0 w-4 h-4 bg-primary/30 rounded-full animate-ping" />
-            </div>
+            // Glow Pulse Effect ao invés de Spinner
+            <motion.div 
+              className="relative w-3 h-3"
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.7, 1, 0.7]
+              }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <div className="absolute inset-0 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--primary),0.6)]" />
+            </motion.div>
           ) : errorCount > 0 ? (
-            <AlertCircle className="w-4 h-4 text-destructive" />
+            <AlertCircle className="w-3 h-3 text-destructive" />
           ) : (
-            <CheckCircle className="w-4 h-4 text-green-500" />
+            <CheckCircle className="w-3 h-3 text-green-500" />
           )}
-          <span className="text-sm font-medium text-foreground">
+          <span className="text-[11px] font-medium text-foreground/80">
             {!allComplete 
               ? `Processando ${executions.length} ${executions.length === 1 ? 'etapa' : 'etapas'}...`
               : errorCount > 0
@@ -230,7 +250,7 @@ export function ToolExecutionStatus({ executions }: ToolExecutionStatusProps) {
           animate={{ rotate: isExpanded ? 180 : 0 }}
           transition={{ duration: 0.2 }}
         >
-          <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+          <ChevronDown className="w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors" />
         </motion.div>
       </motion.button>
 
@@ -244,7 +264,7 @@ export function ToolExecutionStatus({ executions }: ToolExecutionStatusProps) {
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             className="overflow-hidden"
           >
-            <div className="pt-3 pl-2 space-y-2">
+            <div className="pt-2 pl-1 space-y-1.5">
               {executions.map((execution, execIndex) => {
                 const config = TOOL_DISPLAY_CONFIG[execution.toolName] || {
                   name: execution.displayName,
@@ -264,72 +284,81 @@ export function ToolExecutionStatus({ executions }: ToolExecutionStatusProps) {
                 return (
                   <motion.div
                     key={`${execution.toolName}-${execIndex}`}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: execIndex * 0.1 }}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: isSuccess && !isRunning ? 0.5 : 1, x: 0 }}
+                    transition={{ delay: execIndex * 0.08 }}
                     className="relative"
                   >
                     {/* Timeline connector */}
                     {execIndex < executions.length - 1 && (
-                      <div className="absolute left-[11px] top-8 bottom-0 w-px bg-gradient-to-b from-primary/30 to-transparent" />
+                      <div className="absolute left-[9px] top-7 bottom-0 w-px bg-gradient-to-b from-white/10 to-transparent" />
                     )}
 
-                    {/* Tool Card */}
+                    {/* Tool Card - Estética Glass Minimalista */}
                     <motion.div
                       className={`
-                        relative flex items-start gap-3 p-2.5 rounded-lg
+                        relative flex items-start gap-2.5 p-2 rounded-lg
                         transition-all duration-300
                         ${isRunning 
-                          ? 'bg-primary/10 border border-primary/30 shadow-[0_0_15px_rgba(var(--primary),0.15)]' 
+                          ? 'bg-white/5 border border-white/10' 
                           : isError
-                            ? 'bg-destructive/10 border border-destructive/30'
-                            : 'bg-muted/30 border border-transparent'
+                            ? 'bg-destructive/5 border border-destructive/20'
+                            : 'bg-transparent border border-transparent'
                         }
                       `}
                       animate={isRunning ? {
                         boxShadow: [
-                          '0 0 10px rgba(var(--primary), 0.1)',
-                          '0 0 20px rgba(var(--primary), 0.2)',
-                          '0 0 10px rgba(var(--primary), 0.1)'
+                          '0 0 6px rgba(255, 255, 255, 0.05)',
+                          '0 0 12px rgba(255, 255, 255, 0.1)',
+                          '0 0 6px rgba(255, 255, 255, 0.05)'
                         ]
                       } : {}}
                       transition={{ duration: 2, repeat: isRunning ? Infinity : 0 }}
                     >
-                      {/* Status Icon */}
+                      {/* Status Icon - Glow Pulse para Running */}
                       <div className={`
-                        flex-shrink-0 p-1.5 rounded-lg
+                        flex-shrink-0 p-1 rounded-md
                         ${isRunning 
-                          ? 'bg-primary/20 border border-primary/40' 
+                          ? 'bg-primary/10' 
                           : isError
-                            ? 'bg-destructive/20 border border-destructive/40'
-                            : 'bg-green-500/20 border border-green-500/40'
+                            ? 'bg-destructive/10'
+                            : 'bg-green-500/10'
                         }
                       `}>
                         {isRunning ? (
-                          <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+                          <motion.div 
+                            className="relative w-3 h-3"
+                            animate={{
+                              scale: [1, 1.15, 1],
+                              opacity: [0.8, 1, 0.8]
+                            }}
+                            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                          >
+                            <div className="absolute inset-0 rounded-full bg-primary shadow-[0_0_6px_rgba(var(--primary),0.5)]" />
+                          </motion.div>
                         ) : isError ? (
-                          <AlertCircle className="w-3.5 h-3.5 text-destructive" />
+                          <AlertCircle className="w-3 h-3 text-destructive" />
                         ) : (
                           <motion.div
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             transition={{ type: 'spring', stiffness: 500, damping: 20 }}
                           >
-                            <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                            <CheckCircle className="w-3 h-3 text-green-500" />
                           </motion.div>
                         )}
                       </div>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <IconComponent className={`
-                            w-3.5 h-3.5 flex-shrink-0
-                            ${isRunning ? 'text-primary' : isError ? 'text-destructive' : 'text-muted-foreground'}
+                            w-3 h-3 flex-shrink-0
+                            ${isRunning ? 'text-primary' : isError ? 'text-destructive' : 'text-muted-foreground/60'}
                           `} />
                           <span className={`
-                            text-sm font-medium truncate
-                            ${isRunning ? 'text-foreground' : 'text-muted-foreground'}
+                            text-[11px] font-medium truncate
+                            ${isRunning ? 'text-foreground' : 'text-muted-foreground/70'}
                           `}>
                             {config.name}
                           </span>
@@ -343,8 +372,8 @@ export function ToolExecutionStatus({ executions }: ToolExecutionStatusProps) {
                               animate={{ height: 'auto', opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
                               className={`
-                                text-xs mt-1
-                                ${isError ? 'text-destructive' : 'text-muted-foreground'}
+                                text-[10px] mt-0.5 leading-tight
+                                ${isError ? 'text-destructive' : 'text-muted-foreground/60'}
                               `}
                             >
                               {isError 
@@ -362,35 +391,37 @@ export function ToolExecutionStatus({ executions }: ToolExecutionStatusProps) {
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: 'auto', opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
-                              className="mt-2 space-y-1"
+                              className="mt-1.5 space-y-0.5"
                             >
                               {execution.steps.map((step, stepIndex) => (
                                 <motion.div
                                   key={stepIndex}
-                                  initial={{ opacity: 0, x: -10 }}
+                                  initial={{ opacity: 0, x: -5 }}
                                   animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: stepIndex * 0.1 }}
-                                  className="flex items-center gap-2 text-xs"
+                                  transition={{ delay: stepIndex * 0.08 }}
+                                  className="flex items-center gap-1.5 text-[10px]"
                                 >
                                   {step.status === 'done' ? (
-                                    <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />
+                                    <CheckCircle className="w-2.5 h-2.5 text-green-500/70 flex-shrink-0" />
                                   ) : step.status === 'running' ? (
-                                    <div className="relative">
-                                      <div className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                                    </div>
+                                    <motion.div 
+                                      className="w-2.5 h-2.5 rounded-full bg-primary flex-shrink-0"
+                                      animate={{ opacity: [0.5, 1, 0.5] }}
+                                      transition={{ duration: 1, repeat: Infinity }}
+                                    />
                                   ) : step.status === 'error' ? (
-                                    <AlertCircle className="w-3 h-3 text-destructive flex-shrink-0" />
+                                    <AlertCircle className="w-2.5 h-2.5 text-destructive flex-shrink-0" />
                                   ) : (
-                                    <div className="w-3 h-3 rounded-full border border-muted-foreground/30 flex-shrink-0" />
+                                    <div className="w-2.5 h-2.5 rounded-full border border-muted-foreground/20 flex-shrink-0" />
                                   )}
                                   <span className={
                                     step.status === 'done' 
-                                      ? 'text-muted-foreground/60 line-through' 
+                                      ? 'text-muted-foreground/40 line-through' 
                                       : step.status === 'running'
-                                        ? 'text-foreground'
+                                        ? 'text-foreground/80'
                                         : step.status === 'error'
                                           ? 'text-destructive'
-                                          : 'text-muted-foreground/40'
+                                          : 'text-muted-foreground/30'
                                   }>
                                     {step.label}
                                   </span>
