@@ -303,13 +303,34 @@ export function useAIConversations() {
     abortControllerRef.current = new AbortController();
     completedWriteToolsRef.current.clear(); // Reset completed tools for new message
 
-    // Timeout de 30 segundos para resiliência
-    const timeoutId = setTimeout(() => {
+    // === FASE P3.5: Resiliência de Streaming ===
+    // Timeout global de 90 segundos para consultorias técnicas longas
+    const GLOBAL_TIMEOUT_MS = 90000;
+    // Watchdog de inatividade: 15 segundos sem chunks = conexão morta
+    const WATCHDOG_INACTIVITY_MS = 15000;
+    
+    let lastActivityTime = Date.now();
+    let watchdogIntervalId: ReturnType<typeof setInterval> | null = null;
+    let accumulatedContent = ''; // Track content for partial preservation
+    let wasAbortedByWatchdog = false;
+    let wasAbortedByTimeout = false;
+
+    const globalTimeoutId = setTimeout(() => {
       if (abortControllerRef.current) {
-        console.warn('[SSE-FRONT] Timeout de 30s atingido, abortando requisição');
+        console.warn('[SSE-FRONT] Timeout global de 90s atingido, abortando requisição');
+        wasAbortedByTimeout = true;
         abortControllerRef.current.abort();
       }
-    }, 30000);
+    }, GLOBAL_TIMEOUT_MS);
+
+    // Cleanup function to clear all timers
+    const cleanupTimers = () => {
+      clearTimeout(globalTimeoutId);
+      if (watchdogIntervalId) {
+        clearInterval(watchdogIntervalId);
+        watchdogIntervalId = null;
+      }
+    };
     
     // Prepare messages for API (exclude loading messages)
     const apiMessages = messages
@@ -350,7 +371,7 @@ export function useAIConversations() {
       const { data: { session } } = await supabase.auth.getSession();
       const authToken = session?.access_token || SUPABASE_ANON_KEY;
       
-      console.log('[SSE-FRONT] Iniciando fetch para IA...');
+      console.log('[SSE-FRONT] Iniciando fetch para IA (timeout: 90s, watchdog: 15s)...');
       console.log('[DEBUG-NETWORK] Endpoint IA:', AI_ASSISTANT_URL);
       console.log('[DEBUG-NETWORK] Auth type:', session?.access_token ? 'User JWT' : 'Anon Key');
       
@@ -396,7 +417,17 @@ export function useAIConversations() {
       let fullContent = '';
       let streamDone = false;
 
-      // Loading message was already injected, no need to add another
+      // === WATCHDOG: Monitor de atividade por chunk ===
+      watchdogIntervalId = setInterval(() => {
+        const inactivityDuration = Date.now() - lastActivityTime;
+        if (inactivityDuration > WATCHDOG_INACTIVITY_MS) {
+          console.warn(`[SSE-WATCHDOG] Inatividade de ${Math.round(inactivityDuration / 1000)}s detectada, abortando...`);
+          wasAbortedByWatchdog = true;
+          if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+          }
+        }
+      }, 2000); // Check every 2 seconds
 
       console.log('[SSE-FRONT] Iniciando loop de leitura do stream...');
 
@@ -406,6 +437,9 @@ export function useAIConversations() {
           console.log('[SSE-FRONT] Stream reader done');
           break;
         }
+        
+        // === WATCHDOG: Atualizar timestamp de atividade ===
+        lastActivityTime = Date.now();
         
         const rawChunk = decoder.decode(value, { stream: true });
         console.log('[SSE-FRONT] Bruto recebido:', rawChunk.slice(0, 200));
@@ -458,6 +492,7 @@ export function useAIConversations() {
             const deltaContent = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (deltaContent) {
               fullContent += deltaContent;
+              accumulatedContent = fullContent; // Track for partial preservation
               // Update the last message with accumulated content and clear loading state
               updateLastAssistantMessage(fullContent, false);
             }
@@ -483,32 +518,56 @@ export function useAIConversations() {
             const deltaContent = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (deltaContent) {
               fullContent += deltaContent;
+              accumulatedContent = fullContent;
               updateLastAssistantMessage(fullContent, false);
             }
           } catch { /* ignore partial leftovers */ }
         }
       }
 
-      // Mark as finished
+      // Mark as finished (success)
+      cleanupTimers();
       updateLastAssistantMessage(fullContent, true);
       onComplete?.(fullContent);
     } catch (error) {
-      clearTimeout(timeoutId); // Limpar timeout em caso de erro
+      cleanupTimers(); // Limpar todos os timers em caso de erro
       
       if ((error as Error).name === 'AbortError') {
         console.log('[SSE-FRONT] Stream abortado');
-        // Verificar se foi timeout ou cancelamento manual
-        updateLastAssistantMessage(
-          'Ops, o servidor demorou muito para responder. Pode tentar de novo?',
-          true
-        );
+        
+        // === FASE P3.5: Preservação de Conteúdo Parcial ===
+        // NUNCA resetar conteúdo - preservar o que já foi recebido
+        if (accumulatedContent.length > 0) {
+          // Adicionar sufixo visual discreto ao conteúdo preservado
+          let suffix = '';
+          if (wasAbortedByWatchdog) {
+            suffix = '\n\n*[⚠️ Conexão perdida após 15s de inatividade. Conteúdo parcial preservado.]*';
+          } else if (wasAbortedByTimeout) {
+            suffix = '\n\n*[⏱️ Tempo limite de 90s atingido. Conteúdo parcial preservado.]*';
+          } else {
+            suffix = '\n\n*[🛑 Resposta interrompida. Conteúdo parcial preservado.]*';
+          }
+          updateLastAssistantMessage(accumulatedContent + suffix, true);
+          console.log('[SSE-FRONT] Conteúdo parcial preservado:', accumulatedContent.length, 'caracteres');
+        } else {
+          // Sem conteúdo recebido, mostrar mensagem de erro apropriada
+          let errorMessage = 'Ops, algo deu errado. Pode tentar de novo?';
+          if (wasAbortedByWatchdog) {
+            errorMessage = '⚠️ A conexão ficou inativa por muito tempo. Verifique sua internet e tente novamente.';
+          } else if (wasAbortedByTimeout) {
+            errorMessage = '⏱️ O servidor demorou muito para responder. Tente uma pergunta mais específica.';
+          }
+          updateLastAssistantMessage(errorMessage, true);
+        }
       } else {
         throw error;
       }
     } finally {
-      clearTimeout(timeoutId); // Garantir limpeza do timeout
+      // === Saneamento de Memória: Garantir limpeza rigorosa ===
+      cleanupTimers();
       setIsStreaming(false);
       abortControllerRef.current = null;
+      console.log('[SSE-FRONT] Cleanup completo - timers limpos, controller nullificado');
     }
   }, [user, messages, invalidateCacheForTool]);
 
