@@ -435,64 +435,113 @@ async function executeToolCall(toolCall: any, supabase: any, userId: string) {
 }
 
 serve(async (req) => {
+  // ========== 1. ENTRADA DA REQUISIÇÃO ==========
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`[AI-ASSISTANT] REQUEST START`);
+  console.log(`[REQ-META] Method: ${req.method} | URL: ${req.url}`);
+  console.log(`[REQ-HEADERS] ${JSON.stringify(Object.fromEntries(req.headers.entries()), null, 2)}`);
+
   if (req.method === 'OPTIONS') {
+    console.log(`[CORS] Preflight request handled`);
     return new Response(null, { headers: corsHeaders });
   }
 
   // Controller para timeout global de 30s
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const requestStartTime = Date.now();
+  const requestId = crypto.randomUUID().slice(0, 8);
 
   try {
-    const { messages, userId, conversationId } = await req.json();
-    const requestId = crypto.randomUUID().slice(0, 8);
+    // ========== 2. PROCESSAMENTO DO BODY ==========
+    const rawBody = await req.text();
+    console.log(`[REQ-BODY-RAW] ${rawBody.substring(0, 500)}${rawBody.length > 500 ? '...(truncated)' : ''}`);
+    
+    const { messages, userId, conversationId } = JSON.parse(rawBody);
+    
+    console.log(`[REQ-PARSED] Request ID: ${requestId}`);
+    console.log(`[REQ-PARSED] User ID: ${userId}`);
+    console.log(`[REQ-PARSED] Conversation ID: ${conversationId || 'NEW'}`);
+    console.log(`[REQ-PARSED] Messages count: ${messages?.length || 0}`);
+    if (messages?.length > 0) {
+      console.log(`[REQ-MESSAGES] Last message role: ${messages[messages.length - 1]?.role}`);
+      console.log(`[REQ-MESSAGES] Last message preview: ${messages[messages.length - 1]?.content?.substring(0, 100)}...`);
+    }
 
-    console.log(`[AI-REQUEST] ID: ${requestId} | User: ${userId} | Conv: ${conversationId || 'new'} | Messages: ${messages?.length || 0}`);
-
-    // --- LÓGICA DE RATE LIMITING ---
+    // ========== 3. RATE LIMITING ==========
+    console.log(`[RATE-LIMIT] Checking for identifier: ${userId || 'anonymous'}`);
     const identifier = userId || req.headers.get("x-forwarded-for") || 'anon';
-    const { success } = await ratelimit.limit(identifier);
+    const rateLimitStart = Date.now();
+    const { success, remaining, limit } = await ratelimit.limit(identifier);
+    console.log(`[RATE-LIMIT] Duration: ${Date.now() - rateLimitStart}ms | Success: ${success} | Remaining: ${remaining}/${limit}`);
 
     if (!success) {
-      console.warn(`[RATE-LIMIT] User: ${userId} | Exceeded limit`);
+      console.warn(`[RATE-LIMIT-EXCEEDED] User: ${userId} | Identifier: ${identifier}`);
       clearTimeout(timeoutId);
       return new Response(JSON.stringify({ 
-        error: "Limite de requisições excedido. Tente novamente em alguns segundos." 
+        error: "Limite de requisições excedido. Tente novamente em alguns segundos.",
+        code: 'RATE_LIMIT_EXCEEDED'
       }), {
         status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-    // ---------------------------------
 
+    // ========== 4. VALIDAÇÃO ==========
     if (!userId) {
+      console.error(`[VALIDATION-ERROR] userId is required but was not provided`);
       clearTimeout(timeoutId);
       throw new Error('userId é obrigatório');
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    console.log(`[CONFIG] LOVABLE_API_KEY present: ${!!LOVABLE_API_KEY} | Prefix: ${LOVABLE_API_KEY?.substring(0, 8)}...`);
+    
     if (!LOVABLE_API_KEY) {
-      clearTimeout(timeoutId);
       console.error('[CONFIG-ERROR] LOVABLE_API_KEY não configurada');
+      clearTimeout(timeoutId);
       throw new Error('LOVABLE_API_KEY não configurada');
     }
 
-    // Criar cliente Supabase com service role para buscar padrões
+    // ========== 5. SUPABASE CLIENT ==========
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    console.log(`[SUPABASE] URL: ${supabaseUrl?.substring(0, 30)}...`);
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Construir system prompt com contexto personalizado (com fallback)
+    // ========== 6. SYSTEM PROMPT BUILD ==========
+    console.log(`[PROMPT-BUILD] Starting system prompt construction for user: ${userId}`);
     const startBuild = Date.now();
     const systemPrompt = await buildSystemPrompt(supabase, userId);
-    console.log(`[CONTEXT-BUILD] Duration: ${Date.now() - startBuild}ms`);
+    const promptDuration = Date.now() - startBuild;
+    console.log(`[PROMPT-BUILD] Duration: ${promptDuration}ms`);
+    console.log(`[PROMPT-BUILD] Prompt length: ${systemPrompt.length} chars`);
+    console.log(`[PROMPT-BUILD] Preview: ${systemPrompt.substring(0, 200)}...`);
+    console.log(`[PROMPT-BUILD] Has learned context: ${systemPrompt.includes('<contexto_aprendido>')}`);
 
-    // Primeira chamada para a IA
-    let aiMessages = [
+    // ========== 7. PREPARAÇÃO DA CHAMADA À IA ==========
+    const aiMessages = [
       { role: 'system', content: systemPrompt },
       ...messages
     ];
 
+    console.log(`[AI-PREP] Total messages to send: ${aiMessages.length}`);
+    aiMessages.forEach((msg: { role: string; content?: string }, idx: number) => {
+      console.log(`[AI-PREP] Message ${idx}: role=${msg.role}, content_length=${msg.content?.length || 0}`);
+    });
+
+    const aiRequestBody = {
+      model: 'google/gemini-2.5-flash',
+      messages: aiMessages,
+      tools: TOOLS,
+      tool_choice: 'auto',
+    };
+
+    console.log(`[AI-GATEWAY] Calling Lovable AI Gateway...`);
+    console.log(`[AI-GATEWAY] Model: ${aiRequestBody.model}`);
+    console.log(`[AI-GATEWAY] Tools count: ${TOOLS.length}`);
+
+    // ========== 8. CHAMADA À IA ==========
     const startAI = Date.now();
     let response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -500,23 +549,33 @@ serve(async (req) => {
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp',
-        messages: aiMessages,
-        tools: TOOLS,
-        tool_choice: 'auto',
-      }),
+      body: JSON.stringify(aiRequestBody),
       signal: controller.signal,
     });
 
+    const aiResponseDuration = Date.now() - startAI;
+    console.log(`[AI-GATEWAY] Response received in ${aiResponseDuration}ms`);
+    console.log(`[AI-GATEWAY] Status: ${response.status} ${response.statusText}`);
+    console.log(`[AI-GATEWAY] Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
+
+    // ========== 9. TRATAMENTO DE ERROS DO GATEWAY ==========
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[AI-GATEWAY-ERROR] Status: ${response.status} | Body: ${errorText}`);
+      console.error(`${'='.repeat(60)}`);
+      console.error(`[AI-GATEWAY-ERROR] === GATEWAY ERROR DETAILS ===`);
+      console.error(`[AI-GATEWAY-ERROR] Status: ${response.status}`);
+      console.error(`[AI-GATEWAY-ERROR] Status Text: ${response.statusText}`);
+      console.error(`[AI-GATEWAY-ERROR] Response Body: ${errorText}`);
+      console.error(`[AI-GATEWAY-ERROR] Request ID: ${requestId}`);
+      console.error(`[AI-GATEWAY-ERROR] User ID: ${userId}`);
+      console.error(`${'='.repeat(60)}`);
+      
       clearTimeout(timeoutId);
       
       if (response.status === 429) {
         return new Response(JSON.stringify({ 
-          error: "Limite de requisições da IA excedido. Aguarde alguns segundos." 
+          error: "Limite de requisições da IA excedido. Aguarde alguns segundos.",
+          code: 'AI_RATE_LIMIT'
         }), {
           status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -524,7 +583,8 @@ serve(async (req) => {
       }
       if (response.status === 402) {
         return new Response(JSON.stringify({ 
-          error: "Créditos de IA esgotados. Entre em contato com o suporte." 
+          error: "Créditos de IA esgotados. Entre em contato com o suporte.",
+          code: 'AI_CREDITS_EXHAUSTED'
         }), {
           status: 402,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -535,28 +595,42 @@ serve(async (req) => {
     }
 
     let result = await response.json();
-    console.log(`[AI-RESPONSE] Duration: ${Date.now() - startAI}ms | Has tools: ${!!result.choices[0].message.tool_calls}`);
+    console.log(`[AI-RESPONSE] First response parsed successfully`);
+    console.log(`[AI-RESPONSE] Has tool_calls: ${!!result.choices?.[0]?.message?.tool_calls}`);
+    console.log(`[AI-RESPONSE] Finish reason: ${result.choices?.[0]?.finish_reason}`);
 
-    // Se a IA solicitou tool calls, executar
+    // ========== 10. LOOP DE TOOL CALLS ==========
     let toolIterations = 0;
     const maxToolIterations = 5;
+    let currentMessages = [...aiMessages];
     
     while (result.choices[0].message.tool_calls && toolIterations < maxToolIterations) {
       toolIterations++;
       const toolCalls = result.choices[0].message.tool_calls;
-      console.log(`[TOOL-CALL] Iteration: ${toolIterations} | Tools: ${toolCalls.length}`);
+      
+      console.log(`${'─'.repeat(40)}`);
+      console.log(`[TOOL-LOOP] Iteration ${toolIterations}/${maxToolIterations}`);
+      console.log(`[TOOL-LOOP] Tools requested: ${toolCalls.length}`);
+      toolCalls.forEach((tc: { function: { name: string; arguments: string } }, idx: number) => {
+        console.log(`[TOOL-LOOP] Tool ${idx + 1}: ${tc.function.name} | Args: ${tc.function.arguments}`);
+      });
 
       // Adicionar a mensagem da IA com tool calls ao histórico
-      aiMessages.push(result.choices[0].message);
+      currentMessages.push(result.choices[0].message);
 
       // Executar todas as tool calls
       for (const toolCall of toolCalls) {
         const toolStart = Date.now();
+        console.log(`[TOOL-EXEC] Executing: ${toolCall.function.name}`);
+        
         const toolResult = await executeToolCall(toolCall, supabase, userId);
-        console.log(`[TOOL-EXEC] ${toolCall.function.name} | Duration: ${Date.now() - toolStart}ms`);
+        const toolDuration = Date.now() - toolStart;
+        
+        console.log(`[TOOL-EXEC] ${toolCall.function.name} completed in ${toolDuration}ms`);
+        console.log(`[TOOL-EXEC] Result preview: ${toolResult.output.substring(0, 200)}...`);
 
         // Adicionar resultado da tool ao histórico
-        aiMessages.push({
+        currentMessages.push({
           role: 'tool',
           tool_call_id: toolResult.tool_call_id,
           content: toolResult.output
@@ -564,6 +638,9 @@ serve(async (req) => {
       }
 
       // Chamar a IA novamente com os resultados das tools
+      console.log(`[TOOL-LOOP] Calling AI with tool results...`);
+      const toolLoopStart = Date.now();
+      
       response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -571,31 +648,43 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.0-flash-exp',
-          messages: aiMessages,
+          model: 'google/gemini-2.5-flash',
+          messages: currentMessages,
           tools: TOOLS,
           tool_choice: 'auto',
         }),
         signal: controller.signal,
       });
 
+      console.log(`[TOOL-LOOP] AI response in ${Date.now() - toolLoopStart}ms | Status: ${response.status}`);
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[AI-GATEWAY-ERROR] Tool iteration ${toolIterations} | Status: ${response.status} | Body: ${errorText}`);
+        console.error(`[TOOL-LOOP-ERROR] Iteration ${toolIterations} failed`);
+        console.error(`[TOOL-LOOP-ERROR] Status: ${response.status} | Body: ${errorText}`);
         throw new Error(`AI Gateway error: ${response.status}`);
       }
 
       result = await response.json();
+      console.log(`[TOOL-LOOP] Response has more tools: ${!!result.choices?.[0]?.message?.tool_calls}`);
     }
 
     if (toolIterations >= maxToolIterations) {
-      console.warn(`[TOOL-LIMIT] Max iterations (${maxToolIterations}) reached`);
+      console.warn(`[TOOL-LIMIT] Max iterations (${maxToolIterations}) reached - breaking loop`);
     }
 
+    // ========== 11. RESPOSTA FINAL ==========
     clearTimeout(timeoutId);
     const assistantMessage = result.choices[0].message.content;
+    const totalDuration = Date.now() - requestStartTime;
 
-    console.log(`[AI-COMPLETE] Request: ${requestId} | Total duration: ${Date.now() - startAI}ms | Tool iterations: ${toolIterations}`);
+    console.log(`${'='.repeat(60)}`);
+    console.log(`[AI-COMPLETE] Request ${requestId} completed successfully`);
+    console.log(`[AI-COMPLETE] Total duration: ${totalDuration}ms`);
+    console.log(`[AI-COMPLETE] Tool iterations: ${toolIterations}`);
+    console.log(`[AI-COMPLETE] Response length: ${assistantMessage?.length || 0} chars`);
+    console.log(`[AI-COMPLETE] Response preview: ${assistantMessage?.substring(0, 150)}...`);
+    console.log(`${'='.repeat(60)}\n`);
 
     return new Response(
       JSON.stringify({ message: assistantMessage }),
@@ -604,12 +693,27 @@ serve(async (req) => {
 
   } catch (error: unknown) {
     clearTimeout(timeoutId);
+    const totalDuration = Date.now() - requestStartTime;
+    
+    console.error(`${'='.repeat(60)}`);
+    console.error(`[FATAL-ERROR] === UNHANDLED EXCEPTION ===`);
+    console.error(`[FATAL-ERROR] Request ID: ${requestId}`);
+    console.error(`[FATAL-ERROR] Duration before crash: ${totalDuration}ms`);
+    console.error(`[FATAL-ERROR] Error class: ${error?.constructor?.name}`);
+    console.error(`[FATAL-ERROR] Error name: ${error instanceof Error ? error.name : 'Unknown'}`);
+    console.error(`[FATAL-ERROR] Error message: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`[FATAL-ERROR] Stack trace: ${error instanceof Error ? error.stack : 'No stack available'}`);
+    console.error(`${'='.repeat(60)}`);
     
     // Tratamento específico de timeout
     if (error instanceof Error && error.name === 'AbortError') {
       console.error('[TIMEOUT-ERROR] Request aborted after 30s');
       return new Response(
-        JSON.stringify({ error: 'A requisição excedeu o tempo limite de 30 segundos. Tente uma pergunta mais simples.' }),
+        JSON.stringify({ 
+          error: 'A requisição excedeu o tempo limite de 30 segundos. Tente uma pergunta mais simples.',
+          code: 'TIMEOUT_ERROR',
+          requestId
+        }),
         {
           status: 504,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -617,11 +721,11 @@ serve(async (req) => {
       );
     }
 
-    console.error('[AI-ERROR] Unhandled exception:', error);
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Erro desconhecido no processamento da IA',
-        code: 'AI_PROCESSING_ERROR'
+        code: 'AI_PROCESSING_ERROR',
+        requestId
       }),
       {
         status: 500,
