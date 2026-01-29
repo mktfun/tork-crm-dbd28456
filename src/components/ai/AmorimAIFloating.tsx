@@ -476,12 +476,17 @@ export function AmorimAIFloating() {
                             ? "bg-primary text-primary-foreground rounded-br-sm" 
                             : "bg-white/10 text-foreground rounded-bl-sm"
                         )}>
-                          {message.role === 'assistant' ? (
+                        {message.role === 'assistant' ? (
                             message.isLoading ? (
-                              <div className="flex items-center gap-2 text-muted-foreground">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span className="text-sm">Pensando...</span>
-                              </div>
+                              // Loader inteligente: mostra ToolExecutionStatus se tools ativas, senão "Pensando..."
+                              toolExecutions.length > 0 ? (
+                                <ToolExecutionStatus executions={toolExecutions} />
+                              ) : (
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  <span className="text-sm">Pensando...</span>
+                                </div>
+                              )
                             ) : (
                               <AIResponseRenderer content={message.content} />
                             )
