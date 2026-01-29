@@ -708,12 +708,12 @@ export function AmorimAIFloating() {
                           </div>
                         )}
                         
-                        {/* FASE P5.2: Contenção com overflow-visible para permitir scroll interno em componentes filhos */}
+                        {/* FASE P5.1: Contenção de layout - min-w-0 permite Flexbox encolher, max-w-full + overflow-hidden evitam estouro */}
                         <div className={cn(
                           "rounded-2xl px-4 py-3 min-w-0",
                           message.role === 'user' 
                             ? "max-w-[80%] bg-primary text-primary-foreground rounded-br-sm" 
-                            : "w-full max-w-full overflow-visible bg-white/10 text-foreground rounded-bl-sm"
+                            : "w-full max-w-full overflow-hidden bg-white/10 text-foreground rounded-bl-sm"
                         )}>
                         {message.role === 'assistant' ? (
                             // Lógica refinada: Coexistência de Tool + Conteúdo

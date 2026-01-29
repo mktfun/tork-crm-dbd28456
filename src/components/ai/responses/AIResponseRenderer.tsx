@@ -289,24 +289,19 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
   };
 
   return (
-    // FASE P5.2: Contenção raiz com scroll inteligente - texto quebra linha, tabelas ativam scroll lateral
-    <div className="w-full max-w-full">
-      {/* Wrapper de scroll inteligente com scrollbar Tork Premium */}
-      <div className="max-w-full overflow-x-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-        <div className="space-y-3 break-words whitespace-pre-wrap">
-          {/* Texto em Markdown com styling premium + GFM */}
-          {textContent && (
-            <div className="prose prose-sm prose-invert max-w-none w-full">
-              <ReactMarkdown 
-                remarkPlugins={[remarkGfm]} 
-                components={markdownComponents}
-              >
-                {textContent}
-              </ReactMarkdown>
-            </div>
-          )}
+    // FASE P5.1: Contenção raiz com break-words e max-w-full
+    <div className="space-y-3 w-full max-w-full break-words">
+      {/* Texto em Markdown com styling premium + GFM */}
+      {textContent && (
+        <div className="prose prose-sm prose-invert max-w-none w-full">
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]} 
+            components={markdownComponents}
+          >
+            {textContent}
+          </ReactMarkdown>
         </div>
-      </div>
+      )}
       
       {/* Dados estruturados */}
       {matches.map((data, index) => renderStructuredData(data, index))}
