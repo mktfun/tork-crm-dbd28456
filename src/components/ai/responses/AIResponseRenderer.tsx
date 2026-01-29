@@ -185,10 +185,10 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
 
   // Custom Markdown components for premium Glassmorphism styling (TORK PREMIUM + GFM)
   const markdownComponents = {
-    // Premium Table Styling with enhanced glass effect and zebra stripes
+    // FASE P5.1: Premium Table Styling with internal scroll containment
     table: ({ children }: any) => (
-      <div className="w-full overflow-x-auto my-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm">
-        <table className="w-full border-collapse text-sm min-w-max">
+      <div className="w-full max-w-full overflow-x-auto my-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+        <table className="w-full border-collapse text-sm min-w-max whitespace-nowrap">
           {children}
         </table>
       </div>
@@ -289,10 +289,11 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
   };
 
   return (
-    <div className="space-y-3">
+    // FASE P5.1: Contenção raiz com break-words e max-w-full
+    <div className="space-y-3 w-full max-w-full break-words">
       {/* Texto em Markdown com styling premium + GFM */}
       {textContent && (
-        <div className="prose prose-sm prose-invert max-w-none">
+        <div className="prose prose-sm prose-invert max-w-none w-full">
           <ReactMarkdown 
             remarkPlugins={[remarkGfm]} 
             components={markdownComponents}

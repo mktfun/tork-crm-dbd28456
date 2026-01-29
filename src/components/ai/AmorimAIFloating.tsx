@@ -686,7 +686,7 @@ export function AmorimAIFloating() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="flex flex-col space-y-4">
                   {messages.map((message, idx) => (
                     <motion.div
                       key={idx}
@@ -708,11 +708,12 @@ export function AmorimAIFloating() {
                           </div>
                         )}
                         
+                        {/* FASE P5.1: Contenção de layout - min-w-0 permite Flexbox encolher, max-w-full + overflow-hidden evitam estouro */}
                         <div className={cn(
-                          "rounded-2xl px-4 py-3",
+                          "rounded-2xl px-4 py-3 min-w-0",
                           message.role === 'user' 
                             ? "max-w-[80%] bg-primary text-primary-foreground rounded-br-sm" 
-                            : "w-full bg-white/10 text-foreground rounded-bl-sm"
+                            : "w-full max-w-full overflow-hidden bg-white/10 text-foreground rounded-bl-sm"
                         )}>
                         {message.role === 'assistant' ? (
                             // Lógica refinada: Coexistência de Tool + Conteúdo
@@ -724,7 +725,8 @@ export function AmorimAIFloating() {
                                 : (messageToolExecutions.get(idx) || []);
                               
                               return (
-                                <div className="space-y-3">
+                                <div className="space-y-3 w-full max-w-full break-words">
+                                  {/* FASE P5.1: Contenção de layout aplicada */}
                                   {/* Sempre mostrar ToolExecutionStatus se houver ferramentas */}
                                   {msgToolExecutions.length > 0 && (
                                     <ToolExecutionStatus executions={msgToolExecutions} />
