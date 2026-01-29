@@ -713,7 +713,7 @@ export function AmorimAIFloating() {
                           "rounded-2xl px-4 py-3 min-w-0",
                           message.role === 'user' 
                             ? "max-w-[80%] bg-primary text-primary-foreground rounded-br-sm" 
-                            : "w-full max-w-full overflow-x-auto bg-white/10 text-foreground rounded-bl-sm scrollbar-none"
+                            : "w-full max-w-[calc(100%-40px)] overflow-x-auto bg-white/10 text-foreground rounded-bl-sm scrollbar-none"
                         )}>
                         {message.role === 'assistant' ? (
                             // Lógica refinada: Coexistência de Tool + Conteúdo
