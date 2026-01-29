@@ -477,9 +477,16 @@ export function AmorimAIFloating() {
                             : "bg-white/10 text-foreground rounded-bl-sm"
                         )}>
                           {message.role === 'assistant' ? (
-                            <div className="prose prose-sm prose-invert max-w-none">
-                              <ReactMarkdown>{message.content}</ReactMarkdown>
-                            </div>
+                            message.isLoading ? (
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="text-sm">Pensando...</span>
+                              </div>
+                            ) : (
+                              <div className="prose prose-sm prose-invert max-w-none">
+                                <ReactMarkdown>{message.content}</ReactMarkdown>
+                              </div>
+                            )
                           ) : (
                             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                           )}

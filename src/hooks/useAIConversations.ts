@@ -15,6 +15,7 @@ export interface AIMessage {
   role: 'user' | 'assistant';
   content: string;
   conversation_id?: string;
+  isLoading?: boolean; // Flag de controle visual granular
 }
 
 export interface ToolCallEvent {
@@ -247,12 +248,38 @@ export function useAIConversations() {
     setIsStreaming(true);
     abortControllerRef.current = new AbortController();
     
-    // Prepare messages for API
-    const apiMessages = messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }));
+    // Prepare messages for API (exclude loading messages)
+    const apiMessages = messages
+      .filter(msg => !msg.isLoading)
+      .map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
     apiMessages.push({ role: 'user', content });
+
+    // Inject loading message immediately for instant feedback
+    setMessages(prev => [...prev, { 
+      role: 'assistant', 
+      content: 'Pensando...', 
+      conversation_id: conversationId,
+      isLoading: true 
+    }]);
+
+    // Helper to update the last assistant message
+    const updateLastAssistantMessage = (newContent: string, isFinished: boolean) => {
+      setMessages(prev => {
+        const updated = [...prev];
+        const lastIndex = updated.length - 1;
+        if (updated[lastIndex]?.role === 'assistant') {
+          updated[lastIndex] = { 
+            ...updated[lastIndex], 
+            content: newContent, 
+            isLoading: !isFinished 
+          };
+        }
+        return updated;
+      });
+    };
 
     try {
       // Obter session para autenticação
@@ -305,8 +332,7 @@ export function useAIConversations() {
       let fullContent = '';
       let streamDone = false;
 
-      // Add empty assistant message to start receiving content
-      setMessages(prev => [...prev, { role: 'assistant', content: '', conversation_id: conversationId }]);
+      // Loading message was already injected, no need to add another
 
       console.log('[SSE-FRONT] Iniciando loop de leitura do stream...');
 
@@ -361,16 +387,8 @@ export function useAIConversations() {
             const deltaContent = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (deltaContent) {
               fullContent += deltaContent;
-              // Update the last message with accumulated content
-              setMessages(prev => {
-                if (prev.length === 0) return prev;
-                const updated = [...prev];
-                updated[updated.length - 1] = { 
-                  ...updated[updated.length - 1], 
-                  content: fullContent 
-                };
-                return updated;
-              });
+              // Update the last message with accumulated content and clear loading state
+              updateLastAssistantMessage(fullContent, false);
             }
           } catch {
             // Incomplete JSON, put back and wait for more data
@@ -394,20 +412,14 @@ export function useAIConversations() {
             const deltaContent = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (deltaContent) {
               fullContent += deltaContent;
-              setMessages(prev => {
-                if (prev.length === 0) return prev;
-                const updated = [...prev];
-                updated[updated.length - 1] = { 
-                  ...updated[updated.length - 1], 
-                  content: fullContent 
-                };
-                return updated;
-              });
+              updateLastAssistantMessage(fullContent, false);
             }
           } catch { /* ignore partial leftovers */ }
         }
       }
 
+      // Mark as finished
+      updateLastAssistantMessage(fullContent, true);
       onComplete?.(fullContent);
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
