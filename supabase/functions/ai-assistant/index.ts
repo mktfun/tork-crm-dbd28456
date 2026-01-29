@@ -1768,6 +1768,8 @@ serve(async (req) => {
             messages: currentMessages,
             tools: TOOLS,
             tool_choice: 'auto',
+            max_tokens: 8192, // FASE P5: Expansão para alta densidade de dados
+            temperature: 0.2, // FASE P5: Concisão técnica e redução de alucinações
           }),
           signal: controller.signal,
         });
@@ -1791,6 +1793,8 @@ serve(async (req) => {
           model: 'google/gemini-2.5-flash',
           messages: currentMessages,
           stream: true,
+          max_tokens: 8192, // FASE P5: Expansão para respostas técnicas longas
+          temperature: 0.2, // FASE P5: Concisão técnica
         }),
         signal: controller.signal,
       });
@@ -1877,6 +1881,8 @@ serve(async (req) => {
         messages: aiMessages,
         tools: TOOLS,
         tool_choice: 'auto',
+        max_tokens: 8192, // FASE P5: Alta densidade de dados
+        temperature: 0.2, // FASE P5: Concisão técnica
       }),
       signal: controller.signal,
     });
@@ -1933,6 +1939,8 @@ serve(async (req) => {
           messages: currentMessages,
           tools: TOOLS,
           tool_choice: 'auto',
+          max_tokens: 8192, // FASE P5: Alta densidade de dados
+          temperature: 0.2, // FASE P5: Concisão técnica
         }),
         signal: controller.signal,
       });
