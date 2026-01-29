@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { GlassCard } from '@/components/ui/glass-card';
-import { FileText, Calendar, DollarSign, User, Building, ChevronRight } from 'lucide-react';
+import { FileText, Calendar, DollarSign, User, Building, ChevronRight, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Policy {
@@ -32,7 +32,7 @@ interface PolicyListCardProps {
 
 /**
  * PolicyListCard: Exibe lista de apólices em cards compactos com design Liquid Glass.
- * Agora com links clicáveis e layout responsivo.
+ * Inclui links clicáveis, cliente, seguradora e ramo para máxima navegabilidade.
  */
 export const PolicyListCard: React.FC<PolicyListCardProps> = ({ 
   policies, 
@@ -113,43 +113,47 @@ export const PolicyListCard: React.FC<PolicyListCardProps> = ({
             hasValidId && "hover:bg-white/15 cursor-pointer group"
           )}>
             <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0 space-y-1">
-	                {/* Número e Status */}
-	                <div className="flex items-center gap-2 min-w-0 flex-wrap">
-	                  <div className="flex items-center gap-2 min-w-0">
-	                    <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-	                    <span className="text-sm font-medium truncate">{policyNumber}</span>
-	                  </div>
-	                  {getStatusBadge(policy.status)}
-	                </div>
-                
-                {/* Cliente */}
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
-                  <User className="h-3 w-3 flex-shrink-0" />
-                  <span className="truncate">{clientName}</span>
+              {/* Coluna Esquerda: Informações principais */}
+              <div className="flex-1 min-w-0 space-y-1.5">
+                {/* Linha 1: Número da apólice + Status */}
+                <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <FileText className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                    <span className="text-sm font-medium truncate">{policyNumber}</span>
+                  </div>
+                  {getStatusBadge(policy.status)}
                 </div>
                 
-                {/* Ramo e Seguradora */}
-                {(ramo || company) && (
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground min-w-0">
-                    {ramo && <span className="truncate max-w-[100px]">{ramo}</span>}
-                    {company && (
-                      <div className="flex items-center gap-1 min-w-0">
-                        <Building className="h-3 w-3 flex-shrink-0" />
-                        <span className="truncate max-w-[100px]">{company}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Linha 2: Cliente (sempre visível) */}
+                <div className="flex items-center gap-1.5 text-xs text-foreground min-w-0">
+                  <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                  <span className="truncate font-medium">{clientName}</span>
+                </div>
+                
+                {/* Linha 3: Seguradora + Ramo (grid para melhor layout) */}
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                  {company && (
+                    <div className="flex items-center gap-1 min-w-0">
+                      <Building className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate">{company}</span>
+                    </div>
+                  )}
+                  {ramo && (
+                    <div className="flex items-center gap-1 min-w-0">
+                      <Shield className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate">{ramo}</span>
+                    </div>
+                  )}
+                </div>
               </div>
               
-              {/* Valores e Navegação */}
-              <div className="flex items-center gap-2">
+              {/* Coluna Direita: Valores + Navegação */}
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <div className="text-right space-y-1">
                   {premium !== undefined && (
                     <div className="flex items-center gap-1 justify-end">
                       <DollarSign className="h-3 w-3 text-green-400" />
-                      <span className="text-sm font-medium text-green-400">
+                      <span className="text-sm font-semibold text-green-400">
                         {formatCurrency(premium)}
                       </span>
                     </div>
