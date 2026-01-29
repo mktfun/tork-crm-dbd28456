@@ -433,6 +433,9 @@ export function useAIConversations() {
           const jsonStr = line.slice(6).trim();
           if (jsonStr === '[DONE]') {
             streamDone = true;
+            console.log('[SSE-FRONT] Received [DONE] marker, finalizing stream');
+            // FASE P3.4: Forçar conclusão de todas as ferramentas pendentes
+            onToolCall?.({ toolName: '_stream_complete', status: 'completed' });
             break;
           }
 
@@ -503,8 +506,14 @@ export function useAIConversations() {
         }
       }
 
-      // Mark as finished
+      // FASE P3.4: Fechamento atômico - marca conclusão definitiva
+      console.log('[SSE-FRONT] Stream finalizado, limpando estados');
       clearTimeout(fallbackTimeoutId); // Limpar fallback timeout
+      
+      // Forçar fechamento de ferramentas fake (_analyzing, _initializing)
+      onToolCall?.({ toolName: '_analyzing', status: 'completed' });
+      onToolCall?.({ toolName: '_initializing', status: 'completed' });
+      
       updateLastAssistantMessage(fullContent, true);
       onComplete?.(fullContent);
     } catch (error) {
