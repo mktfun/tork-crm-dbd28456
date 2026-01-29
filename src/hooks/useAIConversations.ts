@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -17,12 +17,20 @@ export interface AIMessage {
   conversation_id?: string;
 }
 
+// URL base para chamadas de streaming
+const getStreamUrl = () => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  return `${supabaseUrl}/functions/v1/ai-assistant`;
+};
+
 export function useAIConversations() {
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { user } = useAuth();
 
   // Fetch all conversations for the user
@@ -193,7 +201,7 @@ export function useAIConversations() {
     setMessages(prev => [...prev, message]);
   }, []);
 
-  // Update last message (for streaming or corrections)
+  // Update last message (for streaming)
   const updateLastMessage = useCallback((content: string) => {
     setMessages(prev => {
       if (prev.length === 0) return prev;
@@ -203,6 +211,174 @@ export function useAIConversations() {
     });
   }, []);
 
+  // Append to last message (for streaming delta)
+  const appendToLastMessage = useCallback((delta: string) => {
+    setMessages(prev => {
+      if (prev.length === 0) return prev;
+      const updated = [...prev];
+      const lastMsg = updated[updated.length - 1];
+      updated[updated.length - 1] = { ...lastMsg, content: lastMsg.content + delta };
+      return updated;
+    });
+  }, []);
+
+  // Cancel ongoing stream
+  const cancelStream = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+  }, []);
+
+  // Send message with streaming support
+  const sendMessageWithStream = useCallback(async (
+    content: string,
+    conversationId: string,
+    onComplete?: (fullContent: string) => void
+  ): Promise<void> => {
+    if (!user) return;
+
+    setIsStreaming(true);
+    abortControllerRef.current = new AbortController();
+    
+    // Prepare messages for API
+    const apiMessages = messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+    apiMessages.push({ role: 'user', content });
+
+    try {
+      const response = await fetch(getStreamUrl(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ 
+          messages: apiMessages,
+          userId: user.id,
+          conversationId,
+          stream: true
+        }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      // Handle rate limit and credit errors
+      if (response.status === 429) {
+        throw new Error('Limite de requisições excedido. Aguarde alguns segundos.');
+      }
+      if (response.status === 402) {
+        throw new Error('Créditos de IA esgotados. Entre em contato com o suporte.');
+      }
+      if (!response.ok || !response.body) {
+        throw new Error('Falha ao conectar com o assistente.');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = '';
+      let fullContent = '';
+      let streamDone = false;
+
+      // Add empty assistant message to start receiving content
+      setMessages(prev => [...prev, { role: 'assistant', content: '', conversation_id: conversationId }]);
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        textBuffer += decoder.decode(value, { stream: true });
+
+        // Process line-by-line
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+
+          if (line.endsWith('\r')) line = line.slice(0, -1);
+          if (line.startsWith(':') || line.trim() === '') continue;
+          if (!line.startsWith('data: ')) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === '[DONE]') {
+            streamDone = true;
+            break;
+          }
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const deltaContent = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (deltaContent) {
+              fullContent += deltaContent;
+              // Update the last message with accumulated content
+              setMessages(prev => {
+                if (prev.length === 0) return prev;
+                const updated = [...prev];
+                updated[updated.length - 1] = { 
+                  ...updated[updated.length - 1], 
+                  content: fullContent 
+                };
+                return updated;
+              });
+            }
+          } catch {
+            // Incomplete JSON, put back and wait for more data
+            textBuffer = line + '\n' + textBuffer;
+            break;
+          }
+        }
+      }
+
+      // Final flush
+      if (textBuffer.trim()) {
+        for (let raw of textBuffer.split('\n')) {
+          if (!raw) continue;
+          if (raw.endsWith('\r')) raw = raw.slice(0, -1);
+          if (raw.startsWith(':') || raw.trim() === '') continue;
+          if (!raw.startsWith('data: ')) continue;
+          const jsonStr = raw.slice(6).trim();
+          if (jsonStr === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const deltaContent = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (deltaContent) {
+              fullContent += deltaContent;
+              setMessages(prev => {
+                if (prev.length === 0) return prev;
+                const updated = [...prev];
+                updated[updated.length - 1] = { 
+                  ...updated[updated.length - 1], 
+                  content: fullContent 
+                };
+                return updated;
+              });
+            }
+          } catch { /* ignore partial leftovers */ }
+        }
+      }
+
+      onComplete?.(fullContent);
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') {
+        console.log('Stream aborted by user');
+      } else {
+        throw error;
+      }
+    } finally {
+      setIsStreaming(false);
+      abortControllerRef.current = null;
+    }
+  }, [user, messages]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cancelStream();
+    };
+  }, [cancelStream]);
+
   return {
     // State
     conversations,
@@ -210,6 +386,7 @@ export function useAIConversations() {
     messages,
     isLoadingConversations,
     isLoadingMessages,
+    isStreaming,
     
     // Actions
     fetchConversations,
@@ -221,6 +398,9 @@ export function useAIConversations() {
     startNewConversation,
     addMessage,
     updateLastMessage,
+    appendToLastMessage,
+    sendMessageWithStream,
+    cancelStream,
     setMessages,
     setCurrentConversationId
   };

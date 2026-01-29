@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Loader2, User, Lightbulb, ThumbsUp, ThumbsDown, Plus, History } from 'lucide-react';
+import { X, Send, Loader2, User, Lightbulb, ThumbsUp, ThumbsDown, Plus, History, StopCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -37,6 +37,7 @@ export function AmorimAIFloating() {
     messages,
     isLoadingConversations,
     isLoadingMessages,
+    isStreaming,
     fetchConversations,
     loadConversation,
     createConversation,
@@ -46,15 +47,23 @@ export function AmorimAIFloating() {
     startNewConversation,
     addMessage,
     setMessages,
-    setCurrentConversationId
+    setCurrentConversationId,
+    sendMessageWithStream,
+    cancelStream
   } = useAIConversations();
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll with smooth behavior on content change
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTo({
+          top: scrollContainer.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
     }
-  }, [messages]);
+  }, [messages, messages[messages.length - 1]?.content]);
 
   // Focus input when opened
   useEffect(() => {
@@ -121,7 +130,7 @@ export function AmorimAIFloating() {
   };
 
   const sendMessage = async (content: string) => {
-    if (!content.trim() || isLoading || !user) return;
+    if (!content.trim() || isLoading || isStreaming || !user) return;
 
     let conversationId = currentConversationId;
     
@@ -144,52 +153,46 @@ export function AmorimAIFloating() {
       conversation_id: conversationId
     };
     
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
     try {
-      // Prepare messages for API
-      const apiMessages = updatedMessages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-
-      const { data, error } = await supabase.functions.invoke('ai-assistant', {
-        body: { 
-          messages: apiMessages,
-          userId: user.id
+      // Use streaming
+      await sendMessageWithStream(
+        content.trim(),
+        conversationId,
+        async (fullContent) => {
+          // Persist assistant message after streaming is complete
+          await persistMessage('assistant', fullContent, conversationId!);
+          
+          // Auto-name the conversation after the first exchange
+          if (messages.length === 0) {
+            const title = content.trim().slice(0, 50) + (content.length > 50 ? '...' : '');
+            updateConversationTitle(conversationId!, title);
+          }
         }
-      });
-
-      if (error) throw error;
-
-      const assistantContent = data?.message || 'Desculpe, não consegui processar sua solicitação.';
-      
-      // Persist assistant message
-      const assistantMessageId = await persistMessage('assistant', assistantContent, conversationId);
-
-      const assistantMessage = {
-        id: assistantMessageId || undefined,
-        role: 'assistant' as const,
-        content: assistantContent,
-        conversation_id: conversationId
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-
-      // Auto-name the conversation after the first exchange
-      if (updatedMessages.length === 1) {
-        const title = content.trim().slice(0, 50) + (content.length > 50 ? '...' : '');
-        updateConversationTitle(conversationId, title);
-      }
+      );
     } catch (error) {
       console.error('AI Assistant error:', error);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: '⚠️ Erro ao conectar com o assistente. Tente novamente em alguns segundos.'
-      }]);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      
+      // Remove empty assistant message if exists and add error
+      setMessages(prev => {
+        const lastMsg = prev[prev.length - 1];
+        if (lastMsg?.role === 'assistant' && lastMsg.content === '') {
+          return [...prev.slice(0, -1), {
+            role: 'assistant' as const,
+            content: `⚠️ ${errorMessage}`
+          }];
+        }
+        return [...prev, {
+          role: 'assistant' as const,
+          content: `⚠️ ${errorMessage}`
+        }];
+      });
+      
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -522,7 +525,7 @@ export function AmorimAIFloating() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Digite sua pergunta..."
-                  disabled={isLoading || !user}
+                  disabled={isLoading || isStreaming || !user}
                   rows={1}
                   className={cn(
                     "flex-1 bg-transparent px-4 py-3 text-sm text-foreground",
@@ -532,22 +535,37 @@ export function AmorimAIFloating() {
                   )}
                   style={{ minHeight: '44px' }}
                 />
-                <Button
-                  type="submit"
-                  size="icon"
-                  disabled={!input.trim() || isLoading || !user}
-                  className={cn(
-                    "h-10 w-10 m-1 rounded-lg",
-                    "bg-primary hover:bg-primary/90",
-                    "disabled:opacity-50 disabled:cursor-not-allowed"
-                  )}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </Button>
+                {isStreaming ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    onClick={cancelStream}
+                    className={cn(
+                      "h-10 w-10 m-1 rounded-lg",
+                      "bg-destructive hover:bg-destructive/90"
+                    )}
+                    title="Cancelar"
+                  >
+                    <StopCircle className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={!input.trim() || isLoading || !user}
+                    className={cn(
+                      "h-10 w-10 m-1 rounded-lg",
+                      "bg-primary hover:bg-primary/90",
+                      "disabled:opacity-50 disabled:cursor-not-allowed"
+                    )}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
               </div>
               
               {!user && (
