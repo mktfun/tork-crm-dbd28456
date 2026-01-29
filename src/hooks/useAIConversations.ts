@@ -17,11 +17,10 @@ export interface AIMessage {
   conversation_id?: string;
 }
 
-// URL base para chamadas de streaming
-const getStreamUrl = () => {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  return `${supabaseUrl}/functions/v1/ai-assistant`;
-};
+// Constantes de configuração (derivadas do client.ts)
+const SUPABASE_URL = "https://jaouwhckqqnaxqyfvgyq.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imphb3V3aGNrcXFuYXhxeWZ2Z3lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxNzQyNTksImV4cCI6MjA2Nzc1MDI1OX0.lQ72wQeKL9F9L9T-1kjJif5SEY_cHYFI7rM-uXN5ARc";
+const AI_ASSISTANT_URL = `${SUPABASE_URL}/functions/v1/ai-assistant`;
 
 export function useAIConversations() {
   const [conversations, setConversations] = useState<AIConversation[]>([]);
@@ -250,14 +249,21 @@ export function useAIConversations() {
     apiMessages.push({ role: 'user', content });
 
     try {
-      console.log('[SSE-FRONT] Iniciando fetch para IA...');
+      // Obter session para autenticação
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token || SUPABASE_ANON_KEY;
       
-      const response = await fetch(getStreamUrl(), {
+      console.log('[SSE-FRONT] Iniciando fetch para IA...');
+      console.log('[DEBUG-NETWORK] Endpoint IA:', AI_ASSISTANT_URL);
+      console.log('[DEBUG-NETWORK] Auth type:', session?.access_token ? 'User JWT' : 'Anon Key');
+      
+      const response = await fetch(AI_ASSISTANT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          'Authorization': `Bearer ${authToken}`,
+          'apikey': SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({ 
           messages: apiMessages,
