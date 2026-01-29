@@ -36,6 +36,9 @@ verify_jwt = false
 [functions.generate-card-pdf]
 verify_jwt = false
 
+[functions.generate-embeddings]
+verify_jwt = false
+
 [functions.ocr-bulk-analyze]
 verify_jwt = false
 

@@ -118,47 +118,51 @@ Você tem 5 seguradoras cadastradas no sistema:
   </tool>
 </tools_guide>`;
 
-// ========== RAG: RETRIEVE CONTEXT FROM KNOWLEDGE BASE ==========
+// ========== RAG: RETRIEVE CONTEXT FROM KNOWLEDGE BASE (GEMINI EMBEDDINGS) ==========
 async function retrieveContext(query: string, supabase: any): Promise<string> {
   try {
-    // Check if we have an embedding API key configured
-    const openaiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiKey) {
-      console.log('[RAG] OpenAI API key not configured, skipping knowledge retrieval');
+    // Use Google AI API key (Gemini)
+    const geminiKey = Deno.env.get('GOOGLE_AI_API_KEY') || Deno.env.get('GEMINI_API_KEY');
+    if (!geminiKey) {
+      console.log('[RAG] GOOGLE_AI_API_KEY not configured, skipping knowledge retrieval');
       return '';
     }
 
-    // Generate embedding for the query
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: query,
-        dimensions: 768 // Match our vector column size
-      }),
-    });
+    // Generate embedding using Gemini text-embedding-004
+    const embeddingResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${geminiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'models/text-embedding-004',
+          content: { parts: [{ text: query }] },
+          taskType: 'RETRIEVAL_QUERY',
+          outputDimensionality: 768 // Match our vector column size
+        }),
+      }
+    );
 
     if (!embeddingResponse.ok) {
-      console.error('[RAG] Embedding API error:', embeddingResponse.status);
+      const errorText = await embeddingResponse.text();
+      console.error('[RAG] Gemini Embedding API error:', embeddingResponse.status, errorText);
       return '';
     }
 
     const embeddingData = await embeddingResponse.json();
-    const queryEmbedding = embeddingData.data?.[0]?.embedding;
+    const queryEmbedding = embeddingData.embedding?.values;
     
-    if (!queryEmbedding) {
-      console.error('[RAG] No embedding returned');
+    if (!queryEmbedding || queryEmbedding.length === 0) {
+      console.error('[RAG] No embedding returned from Gemini');
       return '';
     }
+
+    console.log(`[RAG] Generated embedding with ${queryEmbedding.length} dimensions`);
 
     // Call the SQL function to find similar chunks
     const { data: results, error } = await supabase.rpc('match_knowledge', {
       query_embedding: queryEmbedding,
-      match_threshold: 0.75,
+      match_threshold: 0.70, // Slightly lower threshold for Gemini embeddings
       match_count: 5,
     });
 
