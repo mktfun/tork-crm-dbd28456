@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useAIConversations, ToolCallEvent, AIMessage } from '@/hooks/useAIConversations';
 import { ChatHistorySidebar } from './ChatHistorySidebar';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { 
   ToolExecutionStatus, 
   ToolExecution, 
@@ -21,6 +22,19 @@ import {
 // Extended message type with tool executions attached
 interface MessageWithTools extends AIMessage {
   toolExecutions?: ToolExecution[];
+}
+
+// Window dimension constraints
+const MIN_WIDTH = 320;
+const MIN_HEIGHT = 400;
+const MAX_WIDTH = 900;
+const MAX_HEIGHT_RATIO = 0.95; // 95% of viewport height
+const DEFAULT_WIDTH = 550;
+const DEFAULT_HEIGHT = 700;
+
+interface WindowDimensions {
+  width: number;
+  height: number;
 }
 
 const suggestedQuestions = [
@@ -42,6 +56,16 @@ export function AmorimAIFloating() {
   const [messageToolExecutions, setMessageToolExecutions] = useState<Map<number, ToolExecution[]>>(new Map());
   const toolProgressTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const currentMessageIndexRef = useRef<number>(-1);
+
+  // === RESIZE STATE (FASE P4) ===
+  const [savedDimensions, setSavedDimensions] = useLocalStorage<WindowDimensions>(
+    'tork-assistant-window-dimensions',
+    { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT }
+  );
+  const [windowSize, setWindowSize] = useState<WindowDimensions>(savedDimensions);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeEdge, setResizeEdge] = useState<'left' | 'top' | 'corner' | null>(null);
+  const resizeStartRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -348,6 +372,82 @@ export function AmorimAIFloating() {
     toast.success('Conversa excluída');
   };
 
+  // === RESIZE HANDLERS (FASE P4) ===
+  const handleResizeStart = useCallback((
+    e: React.MouseEvent,
+    edge: 'left' | 'top' | 'corner'
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    setResizeEdge(edge);
+    resizeStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      width: windowSize.width,
+      height: windowSize.height
+    };
+  }, [windowSize]);
+
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!isResizing || !resizeStartRef.current) return;
+
+    const { x: startX, y: startY, width: startWidth, height: startHeight } = resizeStartRef.current;
+    const maxHeight = window.innerHeight * MAX_HEIGHT_RATIO;
+    
+    let newWidth = startWidth;
+    let newHeight = startHeight;
+
+    if (resizeEdge === 'left' || resizeEdge === 'corner') {
+      // Dragging left edge means we're expanding to the left (inverting delta)
+      const deltaX = startX - e.clientX;
+      newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startWidth + deltaX));
+    }
+
+    if (resizeEdge === 'top' || resizeEdge === 'corner') {
+      // Dragging top edge means we're expanding upward (inverting delta)
+      const deltaY = startY - e.clientY;
+      newHeight = Math.max(MIN_HEIGHT, Math.min(maxHeight, startHeight + deltaY));
+    }
+
+    setWindowSize({ width: newWidth, height: newHeight });
+  }, [isResizing, resizeEdge]);
+
+  const handleResizeEnd = useCallback(() => {
+    if (isResizing) {
+      setIsResizing(false);
+      setResizeEdge(null);
+      resizeStartRef.current = null;
+      // Persist to localStorage
+      setSavedDimensions(windowSize);
+    }
+  }, [isResizing, windowSize, setSavedDimensions]);
+
+  // Global mouse event listeners for resize
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', handleResizeMove);
+      window.addEventListener('mouseup', handleResizeEnd);
+      // Prevent text selection during resize
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = resizeEdge === 'corner' ? 'nwse-resize' : 
+                                   resizeEdge === 'left' ? 'ew-resize' : 'ns-resize';
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleResizeMove);
+      window.removeEventListener('mouseup', handleResizeEnd);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isResizing, handleResizeMove, handleResizeEnd, resizeEdge]);
+
+  // Sync with localStorage on open
+  useEffect(() => {
+    if (isOpen) {
+      setWindowSize(savedDimensions);
+    }
+  }, [isOpen, savedDimensions]);
+
   return (
     <>
       {/* Floating Button */}
@@ -385,16 +485,54 @@ export function AmorimAIFloating() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            style={{
+              width: windowSize.width,
+              height: windowSize.height,
+            }}
             className={cn(
               "fixed bottom-6 right-6 z-50",
-              "w-[550px] h-[calc(100vh-100px)] max-w-[95vw] max-h-[90vh]",
-              "rounded-2xl overflow-hidden",
+              "rounded-2xl overflow-visible",
               "bg-background/95 backdrop-blur-xl",
               "border border-white/10",
               "shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)]",
-              "flex flex-col"
+              "flex flex-col",
+              isResizing && "border-primary/30 shadow-[0_0_20px_rgba(var(--primary),0.15)]"
             )}
           >
+            {/* === RESIZE HANDLES (FASE P4) === */}
+            {/* Left Edge Handle */}
+            <div
+              onMouseDown={(e) => handleResizeStart(e, 'left')}
+              className={cn(
+                "absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10",
+                "hover:bg-primary/20 transition-colors",
+                isResizing && resizeEdge === 'left' && "bg-primary/30"
+              )}
+              style={{ transform: 'translateX(-50%)' }}
+            />
+            
+            {/* Top Edge Handle */}
+            <div
+              onMouseDown={(e) => handleResizeStart(e, 'top')}
+              className={cn(
+                "absolute left-0 right-0 top-0 h-2 cursor-ns-resize z-10",
+                "hover:bg-primary/20 transition-colors",
+                isResizing && resizeEdge === 'top' && "bg-primary/30"
+              )}
+              style={{ transform: 'translateY(-50%)' }}
+            />
+            
+            {/* Corner Handle (Top-Left) */}
+            <div
+              onMouseDown={(e) => handleResizeStart(e, 'corner')}
+              className={cn(
+                "absolute left-0 top-0 w-4 h-4 cursor-nwse-resize z-20",
+                "hover:bg-primary/30 transition-colors rounded-br-lg",
+                isResizing && resizeEdge === 'corner' && "bg-primary/40"
+              )}
+              style={{ transform: 'translate(-25%, -25%)' }}
+            />
+
             {/* History Sidebar */}
             <ChatHistorySidebar
               isOpen={showHistory}
