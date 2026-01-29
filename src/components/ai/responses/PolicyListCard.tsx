@@ -40,6 +40,11 @@ export const PolicyListCard: React.FC<PolicyListCardProps> = ({
   totalCount,
   returnedCount 
 }) => {
+  // Debug: Log policy data for development audit
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[PolicyListCard] Render data:', policies);
+  }
+
   if (!policies || policies.length === 0) {
     return (
       <GlassCard className="p-3">
@@ -103,8 +108,9 @@ export const PolicyListCard: React.FC<PolicyListCardProps> = ({
         const clientName = policy.cliente_nome || policy.clientes?.name || 'Cliente não informado';
         const premium = policy.premium_value || policy.valor_premio;
         const expDate = policy.expiration_date || policy.vencimento;
-        const ramo = policy.ramos?.nome || policy.ramo;
-        const company = policy.companies?.name || policy.seguradora;
+        const ramo = policy.ramos?.nome || policy.ramo || 'Ramo não identificado';
+        // Prioridade de mapeamento resiliente para seguradora
+        const companyName = policy.companies?.name || policy.seguradora || 'Seguradora não identificada';
         const hasValidId = policy.id && policy.id.length > 0;
         
         const CardContent = (
@@ -130,20 +136,16 @@ export const PolicyListCard: React.FC<PolicyListCardProps> = ({
                   <span className="truncate font-medium">{clientName}</span>
                 </div>
                 
-                {/* Linha 3: Seguradora + Ramo (grid para melhor layout) */}
+                {/* Linha 3: Seguradora + Ramo (grid para melhor layout, sempre visível) */}
                 <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                  {company && (
-                    <div className="flex items-center gap-1 min-w-0">
-                      <Building className="h-3 w-3 flex-shrink-0" />
-                      <span className="truncate">{company}</span>
-                    </div>
-                  )}
-                  {ramo && (
-                    <div className="flex items-center gap-1 min-w-0">
-                      <Shield className="h-3 w-3 flex-shrink-0" />
-                      <span className="truncate">{ramo}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1 min-w-0">
+                    <Building className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{companyName}</span>
+                  </div>
+                  <div className="flex items-center gap-1 min-w-0">
+                    <Shield className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{ramo}</span>
+                  </div>
                 </div>
               </div>
               
