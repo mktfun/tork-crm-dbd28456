@@ -286,6 +286,14 @@ export function useAIConversations() {
     setIsStreaming(true);
     abortControllerRef.current = new AbortController();
     completedWriteToolsRef.current.clear(); // Reset completed tools for new message
+
+    // Timeout de 30 segundos para resiliência
+    const timeoutId = setTimeout(() => {
+      if (abortControllerRef.current) {
+        console.warn('[SSE-FRONT] Timeout de 30s atingido, abortando requisição');
+        abortControllerRef.current.abort();
+      }
+    }, 30000);
     
     // Prepare messages for API (exclude loading messages)
     const apiMessages = messages
@@ -469,12 +477,20 @@ export function useAIConversations() {
       updateLastAssistantMessage(fullContent, true);
       onComplete?.(fullContent);
     } catch (error) {
+      clearTimeout(timeoutId); // Limpar timeout em caso de erro
+      
       if ((error as Error).name === 'AbortError') {
-        console.log('Stream aborted by user');
+        console.log('[SSE-FRONT] Stream abortado');
+        // Verificar se foi timeout ou cancelamento manual
+        updateLastAssistantMessage(
+          'Ops, o servidor demorou muito para responder. Pode tentar de novo?',
+          true
+        );
       } else {
         throw error;
       }
     } finally {
+      clearTimeout(timeoutId); // Garantir limpeza do timeout
       setIsStreaming(false);
       abortControllerRef.current = null;
     }
