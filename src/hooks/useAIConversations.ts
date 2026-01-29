@@ -491,7 +491,11 @@ export function useAIConversations() {
             
             const deltaContent = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (deltaContent) {
-              fullContent += deltaContent;
+              // Saneamento de caracteres para tabelas Markdown (FASE P3.7)
+              // Remove espaços acidentais no início de linhas que começam com '|'
+              const sanitizedContent = deltaContent.replace(/^\s+\|/gm, '|');
+              
+              fullContent += sanitizedContent;
               accumulatedContent = fullContent; // Track for partial preservation
               // Update the last message with accumulated content and clear loading state
               updateLastAssistantMessage(fullContent, false);

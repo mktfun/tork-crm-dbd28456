@@ -146,9 +146,16 @@ ESTRUTURA DE RESPOSTA - REGRAS OBRIGATÓRIAS (TORK PREMIUM):
    Exemplo: "### 📋 Checklist de Documentos" ou "### ⚠️ Riscos Excluídos"
 
 2. **Tabelas Markdown** para comparativos de coberturas, checklists ou listas estruturadas:
-   | Item | Obrigatório | Observação |
-   |------|-------------|------------|
-   | ...  | ...         | ...        |
+
+| Item | Obrigatório | Observação |
+|------|-------------|------------|
+| ...  | ...         | ...        |
+
+**REGRAS DE TABELAS (CRÍTICO):**
+- SEMPRE insira uma linha em branco (newline) ANTES do início da tabela
+- SEMPRE insira uma linha em branco APÓS o término da tabela
+- NUNCA insira espaços antes do primeiro caractere '|' de cada linha
+- Use '---' para separar cabeçalho do corpo (obrigatório GFM)
 
 3. **Negrito** para termos técnicos e valores monetários:
    "A **franquia** é de **R$ 3.500**"

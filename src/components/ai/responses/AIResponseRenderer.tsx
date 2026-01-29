@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { TableComponent } from './TableComponent';
 import { FinancialCard } from './FinancialCard';
 import { PolicyListCard } from './PolicyListCard';
@@ -182,12 +183,12 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
     }
   };
 
-  // Custom Markdown components for premium Glassmorphism styling (TORK PREMIUM)
+  // Custom Markdown components for premium Glassmorphism styling (TORK PREMIUM + GFM)
   const markdownComponents = {
-    // Premium Table Styling with enhanced glass effect
+    // Premium Table Styling with enhanced glass effect and zebra stripes
     table: ({ children }: any) => (
-      <div className="w-full overflow-x-auto my-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-1">
-        <table className="w-full border-collapse text-sm">
+      <div className="w-full overflow-x-auto my-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm">
+        <table className="w-full border-collapse text-sm min-w-max">
           {children}
         </table>
       </div>
@@ -197,8 +198,13 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
         {children}
       </thead>
     ),
+    tbody: ({ children }: any) => (
+      <tbody className="[&>tr:nth-child(even)]:bg-white/[0.03]">
+        {children}
+      </tbody>
+    ),
     th: ({ children }: any) => (
-      <th className="text-left p-3 text-xs font-semibold uppercase tracking-wider text-primary">
+      <th className="text-left p-3 text-xs font-semibold uppercase tracking-wider text-primary whitespace-nowrap">
         {children}
       </th>
     ),
@@ -284,10 +290,13 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
 
   return (
     <div className="space-y-3">
-      {/* Texto em Markdown com styling premium */}
+      {/* Texto em Markdown com styling premium + GFM */}
       {textContent && (
         <div className="prose prose-sm prose-invert max-w-none">
-          <ReactMarkdown components={markdownComponents}>
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]} 
+            components={markdownComponents}
+          >
             {textContent}
           </ReactMarkdown>
         </div>
