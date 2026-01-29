@@ -803,6 +803,9 @@ serve(async (req) => {
 
       let result = await response.json();
 
+      // Track tool calls for streaming events
+      const executedTools: string[] = [];
+      
       // Process tool calls
       while (result.choices[0].message.tool_calls && toolIterations < maxToolIterations) {
         toolIterations++;
@@ -812,6 +815,7 @@ serve(async (req) => {
         currentMessages.push(result.choices[0].message);
 
         for (const toolCall of toolCalls) {
+          executedTools.push(toolCall.function.name);
           const toolResult = await executeToolCall(toolCall, supabase, userId);
           currentMessages.push({
             role: 'tool',
@@ -867,23 +871,56 @@ serve(async (req) => {
       clearTimeout(timeoutId);
       console.log(`[SSE-DEBUG] Stream response OK, piping to client...`);
       console.log(`[SSE-DEBUG] Gateway Content-Type: ${streamResponse.headers.get('content-type')}`);
+      console.log(`[SSE-DEBUG] Executed tools to emit:`, executedTools);
 
-      // Criar um TransformStream para logar os chunks
-      const transformStream = new TransformStream({
-        transform(chunk, controller) {
-          const decoded = new TextDecoder().decode(chunk);
-          console.log(`[SSE-DEBUG] Chunk enfileirado (${chunk.byteLength} bytes):`, decoded.slice(0, 150));
-          controller.enqueue(chunk);
+      // Criar um ReadableStream customizado que injeta eventos de tool antes do stream
+      const encoder = new TextEncoder();
+      let hasStarted = false;
+
+      const customStream = new ReadableStream({
+        async start(controller) {
+          // Primeiro, emitir eventos de tool_calls executadas
+          for (const toolName of executedTools) {
+            const toolStartEvent = formatSSE({
+              choices: [{ delta: { tool_calls: [{ function: { name: toolName } }] } }]
+            });
+            controller.enqueue(encoder.encode(toolStartEvent));
+            console.log(`[SSE-DEBUG] Emitindo tool_call event:`, toolName);
+          }
+          
+          // Depois, emitir resultados das tools
+          for (const toolName of executedTools) {
+            const toolResultEvent = formatSSE({ tool_result: { name: toolName } });
+            controller.enqueue(encoder.encode(toolResultEvent));
+            console.log(`[SSE-DEBUG] Emitindo tool_result event:`, toolName);
+          }
         },
-        flush() {
-          console.log(`[SSE-DEBUG] Stream finalizado com sinalizador [DONE]`);
+        async pull(controller) {
+          if (!hasStarted) {
+            hasStarted = true;
+            const reader = streamResponse.body!.getReader();
+            
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                  console.log(`[SSE-DEBUG] Stream finalizado com sinalizador [DONE]`);
+                  controller.close();
+                  break;
+                }
+                const decoded = new TextDecoder().decode(value);
+                console.log(`[SSE-DEBUG] Chunk enfileirado (${value.byteLength} bytes):`, decoded.slice(0, 150));
+                controller.enqueue(value);
+              }
+            } catch (err) {
+              console.error(`[SSE-DEBUG] Stream error:`, err);
+              controller.error(err);
+            }
+          }
         }
       });
 
-      // Pipe através do transform para logar
-      const readableStream = streamResponse.body.pipeThrough(transformStream);
-
-      return new Response(readableStream, {
+      return new Response(customStream, {
         headers: { 
           ...corsHeaders, 
           'Content-Type': 'text/event-stream',

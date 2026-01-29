@@ -8,8 +8,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { useAIConversations } from '@/hooks/useAIConversations';
+import { useAIConversations, ToolCallEvent } from '@/hooks/useAIConversations';
 import { ChatHistorySidebar } from './ChatHistorySidebar';
+import { 
+  ToolExecutionStatus, 
+  ToolExecution, 
+  createToolExecution, 
+  advanceToolStep, 
+  completeToolExecution 
+} from './ToolExecutionStatus';
 
 const suggestedQuestions = [
   "Quais apólices vencem nos próximos 30 dias?",
@@ -26,6 +33,8 @@ export function AmorimAIFloating() {
   const [feedbackNoteId, setFeedbackNoteId] = useState<string | null>(null);
   const [feedbackNote, setFeedbackNote] = useState('');
   const [showHistory, setShowHistory] = useState(false);
+  const [toolExecutions, setToolExecutions] = useState<ToolExecution[]>([]);
+  const toolProgressTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -129,6 +138,65 @@ export function AmorimAIFloating() {
     }
   };
 
+  // Handler para eventos de tool call
+  const handleToolCall = useCallback((event: ToolCallEvent) => {
+    if (event.status === 'started') {
+      const newExecution = createToolExecution(event.toolName);
+      setToolExecutions(prev => [...prev, newExecution]);
+      
+      // Simular progresso dos steps
+      const stepCount = newExecution.steps.length;
+      const interval = 600; // ms entre cada step
+      
+      for (let i = 1; i < stepCount; i++) {
+        const timer = setTimeout(() => {
+          setToolExecutions(prev => 
+            prev.map(exec => 
+              exec.toolName === event.toolName ? advanceToolStep(exec) : exec
+            )
+          );
+        }, interval * i);
+        
+        toolProgressTimersRef.current.set(`${event.toolName}-${i}`, timer);
+      }
+    } else if (event.status === 'completed') {
+      // Limpar timers pendentes
+      toolProgressTimersRef.current.forEach((timer, key) => {
+        if (key.startsWith(event.toolName)) {
+          clearTimeout(timer);
+          toolProgressTimersRef.current.delete(key);
+        }
+      });
+      
+      // Completar a execução e remover após delay
+      setToolExecutions(prev => 
+        prev.map(exec => 
+          exec.toolName === event.toolName ? completeToolExecution(exec) : exec
+        )
+      );
+      
+      setTimeout(() => {
+        setToolExecutions(prev => 
+          prev.filter(exec => exec.toolName !== event.toolName)
+        );
+      }, 800);
+    }
+  }, []);
+
+  // Limpar tool executions quando streaming termina
+  useEffect(() => {
+    if (!isStreaming && !isLoading) {
+      // Pequeno delay para mostrar conclusão
+      const timer = setTimeout(() => {
+        setToolExecutions([]);
+        // Limpar todos os timers
+        toolProgressTimersRef.current.forEach(clearTimeout);
+        toolProgressTimersRef.current.clear();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isStreaming, isLoading]);
+
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading || isStreaming || !user) return;
 
@@ -156,9 +224,10 @@ export function AmorimAIFloating() {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+    setToolExecutions([]); // Reset tool executions
 
     try {
-      // Use streaming
+      // Use streaming with tool call handler
       await sendMessageWithStream(
         content.trim(),
         conversationId,
@@ -171,7 +240,8 @@ export function AmorimAIFloating() {
             const title = content.trim().slice(0, 50) + (content.length > 50 ? '...' : '');
             updateConversationTitle(conversationId!, title);
           }
-        }
+        },
+        handleToolCall // Pass tool call handler
       );
     } catch (error) {
       console.error('AI Assistant error:', error);
@@ -490,8 +560,20 @@ export function AmorimAIFloating() {
                     </motion.div>
                   ))}
 
+                  {/* Tool Execution Status */}
+                  {toolExecutions.length > 0 && (
+                    <div className="flex gap-3">
+                      <div className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center bg-white/10 border border-white/10">
+                        <img src="/tork_symbol_favicon.png" alt="Tork" className="w-4 h-4 object-contain" />
+                      </div>
+                      <div className="flex-1">
+                        <ToolExecutionStatus executions={toolExecutions} />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Loading indicator */}
-                  {isLoading && (
+                  {isLoading && toolExecutions.length === 0 && (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}

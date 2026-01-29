@@ -17,6 +17,11 @@ export interface AIMessage {
   conversation_id?: string;
 }
 
+export interface ToolCallEvent {
+  toolName: string;
+  status: 'started' | 'completed';
+}
+
 // Constantes de configuração (derivadas do client.ts)
 const SUPABASE_URL = "https://jaouwhckqqnaxqyfvgyq.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imphb3V3aGNrcXFuYXhxeWZ2Z3lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxNzQyNTksImV4cCI6MjA2Nzc1MDI1OX0.lQ72wQeKL9F9L9T-1kjJif5SEY_cHYFI7rM-uXN5ARc";
@@ -234,7 +239,8 @@ export function useAIConversations() {
   const sendMessageWithStream = useCallback(async (
     content: string,
     conversationId: string,
-    onComplete?: (fullContent: string) => void
+    onComplete?: (fullContent: string) => void,
+    onToolCall?: (event: ToolCallEvent) => void
   ): Promise<void> => {
     if (!user) return;
 
@@ -333,6 +339,25 @@ export function useAIConversations() {
 
           try {
             const parsed = JSON.parse(jsonStr);
+            
+            // Detect tool calls from the stream
+            const toolCalls = parsed.choices?.[0]?.delta?.tool_calls;
+            if (toolCalls && toolCalls.length > 0) {
+              for (const tc of toolCalls) {
+                const toolName = tc.function?.name;
+                if (toolName && onToolCall) {
+                  console.log('[SSE-FRONT] Tool call detected:', toolName);
+                  onToolCall({ toolName, status: 'started' });
+                }
+              }
+            }
+            
+            // Detect tool execution results (custom event from backend)
+            if (parsed.tool_result && onToolCall) {
+              console.log('[SSE-FRONT] Tool result:', parsed.tool_result.name);
+              onToolCall({ toolName: parsed.tool_result.name, status: 'completed' });
+            }
+            
             const deltaContent = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (deltaContent) {
               fullContent += deltaContent;
