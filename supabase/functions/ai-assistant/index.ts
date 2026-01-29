@@ -50,6 +50,9 @@ Você é um guru de seguros, conhecedor de normas SUSEP e práticas do mercado.
   <rule priority="5">
     **GROUNDING ABSOLUTO:** Ao exibir dados de uma ferramenta, você está ESTRITAMENTE PROIBIDO de inventar, adicionar ou inferir qualquer informação que NÃO esteja EXATAMENTE como foi retornada. Se um campo for nulo ou vazio (ex: email: null, phone: ""), você DEVE omiti-lo na resposta. NUNCA preencha campos vazios com dados fictícios como "joao.silva@example.com" ou "(11) 99999-9999". Apenas mostre os dados que EXISTEM.
   </rule>
+  <rule priority="6">
+    **RESPOSTA PARA DADOS NÃO ENCONTRADOS:** Se uma ferramenta retornar uma lista vazia ou nenhum resultado, diga claramente: "Não encontrei [item] com esses critérios no sistema." NUNCA tente sugerir dados que não existem.
+  </rule>
 </rules>
 
 <format_instruction>
@@ -196,6 +199,40 @@ async function retrieveContext(query: string, supabase: any): Promise<string> {
 
 async function buildSystemPrompt(supabase: any, userId: string, userMessage?: string): Promise<string> {
   let contextBlocks: string[] = [];
+
+  // 0. Buscar Contexto Dinâmico (KPIs do CRM)
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const [clientsResult, policiesResult, transactionsResult] = await Promise.all([
+      supabase.from('clientes').select('id, status').eq('user_id', userId),
+      supabase.from('apolices').select('id, status, premium_value').eq('user_id', userId),
+      supabase.from('transactions').select('amount, status, nature')
+        .eq('user_id', userId)
+        .gte('transaction_date', startOfMonth)
+    ]);
+
+    const totalClients = clientsResult.data?.length || 0;
+    const activeClients = clientsResult.data?.filter((c: any) => c.status?.toLowerCase().includes('ativ')).length || 0;
+    const totalPolicies = policiesResult.data?.length || 0;
+    const activePolicies = policiesResult.data?.filter((p: any) => p.status?.toLowerCase().includes('ativ') || p.status?.toLowerCase().includes('vigente')).length || 0;
+    const totalPremium = policiesResult.data?.reduce((acc: number, p: any) => acc + (Number(p.premium_value) || 0), 0) || 0;
+    
+    const income = transactionsResult.data?.filter((t: any) => t.nature === 'receita' && t.status === 'pago')
+      .reduce((acc: number, t: any) => acc + (Number(t.amount) || 0), 0) || 0;
+
+    const contextSummary = `
+**Resumo do CRM (${now.toLocaleDateString('pt-BR')})**:
+- Total de Clientes: ${totalClients} (Ativos: ${activeClients})
+- Total de Apólices: ${totalPolicies} (Ativas: ${activePolicies})
+- Prêmio Total: R$ ${totalPremium.toLocaleString('pt-BR')}
+- Receitas do Mês: R$ ${income.toLocaleString('pt-BR')}
+`;
+    contextBlocks.push(`<crm_kpis>\n${contextSummary}\n</crm_kpis>`);
+  } catch (error) {
+    console.warn('[CONTEXT-KPI] Erro ao buscar KPIs:', error);
+  }
   
   // 1. Tentar recuperar contexto RAG se houver mensagem do usuário
   if (userMessage) {

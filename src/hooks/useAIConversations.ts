@@ -258,9 +258,10 @@ export function useAIConversations() {
     apiMessages.push({ role: 'user', content });
 
     // Inject loading message immediately for instant feedback
+    // We only show "Pensando..." if no tool is executing yet
     setMessages(prev => [...prev, { 
       role: 'assistant', 
-      content: 'Pensando...', 
+      content: '', 
       conversation_id: conversationId,
       isLoading: true 
     }]);

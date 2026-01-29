@@ -476,21 +476,28 @@ export function AmorimAIFloating() {
                             ? "bg-primary text-primary-foreground rounded-br-sm" 
                             : "bg-white/10 text-foreground rounded-bl-sm"
                         )}>
-                        {message.role === 'assistant' ? (
-                            message.isLoading ? (
-                              // Loader inteligente: mostra ToolExecutionStatus se tools ativas, senão "Pensando..."
-                              toolExecutions.length > 0 ? (
-                                <ToolExecutionStatus executions={toolExecutions} />
-                              ) : (
-                                <div className="flex items-center gap-2 text-muted-foreground">
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                  <span className="text-sm">Pensando...</span>
-                                </div>
-                              )
-                            ) : (
-                              <AIResponseRenderer content={message.content} />
-                            )
-                          ) : (
+	                        {message.role === 'assistant' ? (
+	                            message.isLoading ? (
+	                              // Loader inteligente: mostra ToolExecutionStatus se tools ativas, senão "Pensando..."
+	                              toolExecutions.length > 0 ? (
+	                                <ToolExecutionStatus executions={toolExecutions} />
+	                              ) : (
+	                                <div className="flex items-center gap-2 text-muted-foreground">
+	                                  <Loader2 className="w-4 h-4 animate-spin" />
+	                                  <span className="text-sm">Pensando...</span>
+	                                </div>
+	                              )
+	                            ) : (
+	                              <>
+	                                <AIResponseRenderer content={message.content} />
+	                                {isStreaming && toolExecutions.length > 0 && (
+	                                  <div className="mt-2 pt-2 border-t border-white/5">
+	                                    <ToolExecutionStatus executions={toolExecutions} />
+	                                  </div>
+	                                )}
+	                              </>
+	                            )
+	                          ) : (
                             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                           )}
                         </div>
@@ -570,20 +577,8 @@ export function AmorimAIFloating() {
                     </motion.div>
                   ))}
 
-                  {/* Tool Execution Status */}
-                  {toolExecutions.length > 0 && (
-                    <div className="flex gap-3">
-                      <div className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center bg-white/10 border border-white/10">
-                        <img src="/tork_symbol_favicon.png" alt="Tork" className="w-4 h-4 object-contain" />
-                      </div>
-                      <div className="flex-1">
-                        <ToolExecutionStatus executions={toolExecutions} />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Loading indicator */}
-                  {isLoading && toolExecutions.length === 0 && (
+	                  {/* Loading indicator */}
+	                  {isLoading && toolExecutions.length === 0 && !isStreaming && (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}

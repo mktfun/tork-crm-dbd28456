@@ -114,12 +114,14 @@ export const PolicyListCard: React.FC<PolicyListCardProps> = ({
           )}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0 space-y-1">
-                {/* Número e Status */}
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                  <span className="text-sm font-medium truncate">{policyNumber}</span>
-                  {getStatusBadge(policy.status)}
-                </div>
+	                {/* Número e Status */}
+	                <div className="flex items-center gap-2 min-w-0 flex-wrap">
+	                  <div className="flex items-center gap-2 min-w-0">
+	                    <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+	                    <span className="text-sm font-medium truncate">{policyNumber}</span>
+	                  </div>
+	                  {getStatusBadge(policy.status)}
+	                </div>
                 
                 {/* Cliente */}
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">

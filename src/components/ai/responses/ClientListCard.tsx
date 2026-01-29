@@ -201,12 +201,12 @@ export const ClientListCard: React.FC<ClientListCardProps> = ({
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
-                {getStatusBadge(client.status)}
-                {hasValidId && (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
-                )}
-              </div>
+	              <div className="flex items-center gap-2 flex-shrink-0">
+	                {getStatusBadge(client.status)}
+	                {hasValidId && (
+	                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+	                )}
+	              </div>
             </div>
           </GlassCard>
         );
