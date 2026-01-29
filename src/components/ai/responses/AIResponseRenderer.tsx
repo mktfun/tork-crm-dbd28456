@@ -187,8 +187,8 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
   const markdownComponents = {
     // FASE P5.1: Premium Table Styling with internal scroll containment
     table: ({ children }: any) => (
-      <div className="w-full overflow-x-auto my-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-1">
-        <table className="w-full border-collapse text-sm table-fixed">
+      <div className="w-full overflow-x-auto my-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-1 scrollbar-thin scrollbar-thumb-white/10">
+        <table className="w-full border-collapse text-sm table-auto min-w-full">
           {children}
         </table>
       </div>
@@ -209,7 +209,7 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
       </th>
     ),
     td: ({ children }: any) => (
-      <td className="p-3 text-sm border-b border-white/5 text-foreground/90 break-words min-w-[100px]">
+      <td className="p-3 text-sm border-b border-white/5 text-foreground/90 whitespace-normal break-words min-w-[120px]">
         {children}
       </td>
     ),
