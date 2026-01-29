@@ -263,9 +263,25 @@ async function retrieveContext(query: string, supabase: any): Promise<string> {
 async function buildSystemPrompt(supabase: any, userId: string, userMessage?: string): Promise<string> {
   let contextBlocks: string[] = [];
 
-  // 0. Buscar Contexto Dinâmico (KPIs do CRM)
+  // 0. CONTEXTO TEMPORAL DINÂMICO (FASE P3.2)
+  const now = new Date();
+  const dateOptions: Intl.DateTimeFormatOptions = { 
+    weekday: 'long',
+    day: '2-digit', 
+    month: 'long', 
+    year: 'numeric' 
+  };
+  const formattedDate = now.toLocaleDateString('pt-BR', dateOptions);
+  
+  contextBlocks.push(`<contexto_temporal>
+CONTEXTO TEMPORAL: Hoje é ${formattedDate}. 
+Use esta data como referência ABSOLUTA para calcular renovações, vencimentos e prazos.
+Sempre que mencionar datas, use o formato brasileiro (DD/MM/AAAA).
+</contexto_temporal>`);
+  console.log(`[CONTEXT-TEMPORAL] Data injetada: ${formattedDate}`);
+
+  // 0.5. Buscar Contexto Dinâmico (KPIs do CRM)
   try {
-    const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
     const [clientsResult, policiesResult, transactionsResult] = await Promise.all([
