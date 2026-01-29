@@ -278,7 +278,7 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
     ),
     // Paragraphs with proper spacing
     p: ({ children }: any) => (
-      <p className="text-sm leading-relaxed mb-3 text-foreground/90">
+      <p className="text-sm leading-relaxed mb-3 text-foreground/90 break-words whitespace-pre-wrap">
         {children}
       </p>
     ),
@@ -290,7 +290,7 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
 
   return (
     // FASE P5.1: Contenção raiz com break-words e max-w-full
-    <div className="space-y-3 w-full max-w-full break-words">
+    <div className="space-y-3 w-full max-w-full break-words overflow-x-auto scrollbar-none">
       {/* Texto em Markdown com styling premium + GFM */}
       {textContent && (
         <div className="prose prose-sm prose-invert max-w-none w-full">
