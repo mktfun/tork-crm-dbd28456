@@ -170,14 +170,14 @@ function KpiSection({ summary, pendingThisMonth, totalPending, isLoading }: KpiS
       value: summary?.totalIncome ?? 0,
       icon: TrendingUp,
       variant: 'success' as const,
-      tooltip: 'Receitas confirmadas (status = completed) no mês selecionado',
+      tooltip: 'Receitas confirmadas no período selecionado. Apenas transações com status "completed" são contabilizadas.',
     },
     {
       title: 'Despesas do Mês',
       value: summary?.totalExpense ?? 0,
       icon: TrendingDown,
       variant: 'danger' as const,
-      tooltip: 'Despesas confirmadas (status = completed) no mês selecionado',
+      tooltip: 'Despesas confirmadas no período selecionado. Apenas transações com status "completed" são contabilizadas.',
     },
     {
       title: 'Vencendo este Mês',
@@ -185,7 +185,7 @@ function KpiSection({ summary, pendingThisMonth, totalPending, isLoading }: KpiS
       icon: CalendarClock,
       variant: 'warning' as const,
       subtitle: pendingThisMonth?.pending_count ? `${pendingThisMonth.pending_count} parcelas` : undefined,
-      tooltip: 'Receitas pendentes com vencimento no mês atual',
+      tooltip: 'Receitas pendentes (a receber) com vencimento no mês atual. Baseado na data de vencimento (due_date).',
     },
     {
       title: 'Total Geral a Receber',
@@ -193,7 +193,7 @@ function KpiSection({ summary, pendingThisMonth, totalPending, isLoading }: KpiS
       icon: Clock,
       variant: 'info' as const,
       subtitle: totalPending?.pending_count ? `${totalPending.pending_count} parcelas` : undefined,
-      tooltip: 'TODAS as receitas pendentes de todas as datas (sem filtro)',
+      tooltip: 'Total histórico de receitas pendentes (a receber), independente da data. Não é filtrado pelo período selecionado.',
     },
   ];
 

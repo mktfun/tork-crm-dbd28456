@@ -194,15 +194,43 @@ export interface CashFlowDataPoint {
 
 /**
  * Resumo financeiro para KPIs
+ * 
+ * @description Interface que representa o resumo financeiro de um período específico.
+ * Os valores são calculados pela função SQL `get_financial_summary(start_date, end_date)`.
  */
 export interface FinancialSummary {
+  /** Receitas confirmadas no período selecionado */
   totalIncome: number;
+  
+  /** Despesas confirmadas no período selecionado */
   totalExpense: number;
+  
+  /** Resultado líquido (receitas - despesas) no período */
   netResult: number;
+  
+  /** Receitas pendentes com vencimento no período (usa due_date) */
   pendingIncome: number;
+  
+  /** Despesas pendentes com vencimento no período (usa due_date) */
   pendingExpense: number;
+  
+  /** Quantidade de transações confirmadas no período */
+  completedTransactionCount?: number;
+  
+  /** Quantidade de transações pendentes no período */
+  pendingTransactionCount?: number;
+  
+  /** Total de transações (confirmadas + pendentes) no período */
   transactionCount: number;
-  cashBalance: number; // Saldo acumulado em contas de ativo (bancos)
+  
+  /** Saldo atual total em caixa (não filtrado por período) */
+  cashBalance: number;
+  
+  /** Data inicial do período (para referência) */
+  periodStart?: string;
+  
+  /** Data final do período (para referência) */
+  periodEnd?: string;
 }
 
 // ============ TIPOS PARA DRE (FASE 4) ============
