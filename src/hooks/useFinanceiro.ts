@@ -617,3 +617,178 @@ export function usePayableReceivableTransactions(
     },
   });
 }
+
+// ============ HOOKS PARA METAS FINANCEIRAS ============
+
+export interface FinancialGoal {
+  goalId: string;
+  goalAmount: number;
+  year: number;
+  month: number;
+  description: string | null;
+  createdAt?: string;
+}
+
+export interface GoalVsActual {
+  goalAmount: number;
+  actualAmount: number;
+  difference: number;
+  percentageAchieved: number;
+  status: 'achieved' | 'near' | 'below';
+}
+
+/**
+ * Hook para buscar meta do mês atual
+ */
+export function useCurrentMonthGoal(goalType: 'revenue' | 'profit' | 'commission' = 'revenue') {
+  const supabase = useSupabaseClient();
+  const { data: session } = useSession();
+
+  return useQuery({
+    queryKey: ['current-month-goal', goalType],
+    queryFn: async () => {
+      if (!session?.user?.id) throw new Error('Não autenticado');
+
+      const { data, error } = await supabase.rpc('get_current_month_goal', {
+        p_user_id: session.user.id,
+        p_goal_type: goalType
+      });
+
+      if (error) throw error;
+      return data && data.length > 0 ? (data[0] as FinancialGoal) : null;
+    },
+    enabled: !!session?.user?.id
+  });
+}
+
+/**
+ * Hook para buscar metas de um período
+ */
+export function useGoalsByPeriod(
+  startYear: number,
+  startMonth: number,
+  endYear: number,
+  endMonth: number,
+  goalType: 'revenue' | 'profit' | 'commission' = 'revenue'
+) {
+  const supabase = useSupabaseClient();
+  const { data: session } = useSession();
+
+  return useQuery({
+    queryKey: ['goals-by-period', startYear, startMonth, endYear, endMonth, goalType],
+    queryFn: async () => {
+      if (!session?.user?.id) throw new Error('Não autenticado');
+
+      const { data, error } = await supabase.rpc('get_goals_by_period', {
+        p_user_id: session.user.id,
+        p_start_year: startYear,
+        p_start_month: startMonth,
+        p_end_year: endYear,
+        p_end_month: endMonth,
+        p_goal_type: goalType
+      });
+
+      if (error) throw error;
+      return (data || []) as FinancialGoal[];
+    },
+    enabled: !!session?.user?.id
+  });
+}
+
+/**
+ * Hook para comparar meta vs realizado
+ */
+export function useGoalVsActual(
+  year: number,
+  month: number,
+  goalType: 'revenue' | 'profit' | 'commission' = 'revenue'
+) {
+  const supabase = useSupabaseClient();
+  const { data: session } = useSession();
+
+  return useQuery({
+    queryKey: ['goal-vs-actual', year, month, goalType],
+    queryFn: async () => {
+      if (!session?.user?.id) throw new Error('Não autenticado');
+
+      const { data, error } = await supabase.rpc('get_goal_vs_actual', {
+        p_user_id: session.user.id,
+        p_year: year,
+        p_month: month,
+        p_goal_type: goalType
+      });
+
+      if (error) throw error;
+      return data && data.length > 0 ? (data[0] as GoalVsActual) : null;
+    },
+    enabled: !!session?.user?.id
+  });
+}
+
+/**
+ * Hook para criar/atualizar meta financeira
+ */
+export function useUpsertGoal() {
+  const queryClient = useQueryClient();
+  const supabase = useSupabaseClient();
+  const { data: session } = useSession();
+
+  return useMutation({
+    mutationFn: async (params: {
+      year: number;
+      month: number;
+      goalAmount: number;
+      goalType?: 'revenue' | 'profit' | 'commission';
+      description?: string;
+    }) => {
+      if (!session?.user?.id) throw new Error('Não autenticado');
+
+      const { data, error } = await supabase
+        .from('financial_goals')
+        .upsert({
+          user_id: session.user.id,
+          year: params.year,
+          month: params.month,
+          goal_amount: params.goalAmount,
+          goal_type: params.goalType || 'revenue',
+          description: params.description || null
+        }, {
+          onConflict: 'user_id,year,month,goal_type'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['current-month-goal'] });
+      queryClient.invalidateQueries({ queryKey: ['goals-by-period'] });
+      queryClient.invalidateQueries({ queryKey: ['goal-vs-actual'] });
+    }
+  });
+}
+
+/**
+ * Hook para deletar meta financeira
+ */
+export function useDeleteGoal() {
+  const queryClient = useQueryClient();
+  const supabase = useSupabaseClient();
+
+  return useMutation({
+    mutationFn: async (goalId: string) => {
+      const { error } = await supabase
+        .from('financial_goals')
+        .delete()
+        .eq('id', goalId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['current-month-goal'] });
+      queryClient.invalidateQueries({ queryKey: ['goals-by-period'] });
+      queryClient.invalidateQueries({ queryKey: ['goal-vs-actual'] });
+    }
+  });
+}
