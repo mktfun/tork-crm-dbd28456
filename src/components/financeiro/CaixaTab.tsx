@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { DateRange } from "react-day-picker";
-import { Landmark, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Landmark } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BankAccountCard } from "./bancos/BankAccountCard";
 import { ConsolidatedBalanceCard } from "./bancos/ConsolidatedBalanceCard";
-import { ReconciliationProgressBar } from "./bancos/ReconciliationProgressBar";
-import { BankTransactionsTable } from "./bancos/BankTransactionsTable";
-import { mockBankTransactions, getReconciliationProgress } from "@/data/mocks/financeiroMocks";
+import { UnbankedTransactionsAlert } from "./bancos/UnbankedTransactionsAlert";
+import { AddBankAccountModal } from "./bancos/AddBankAccountModal";
+import { EditBankAccountModal } from "./bancos/EditBankAccountModal";
+import { DeleteBankAccountDialog } from "./bancos/DeleteBankAccountDialog";
 import { useBankAccounts, type BankAccount } from "@/hooks/useBancos";
-import { toast } from "@/hooks/use-toast";
 
 interface CaixaTabProps {
   dateRange: DateRange | undefined;
@@ -17,34 +16,20 @@ interface CaixaTabProps {
 
 export function CaixaTab({ dateRange }: CaixaTabProps) {
   const { data: summary, isLoading } = useBankAccounts();
-  const [transactions] = useState(mockBankTransactions); // TODO: Conectar ao banco depois
+  
+  const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState<BankAccount | null>(null);
 
   const accounts = summary?.accounts?.filter(a => a.isActive) ?? [];
   const totalBalance = summary?.totalBalance ?? 0;
   const activeAccountsCount = summary?.activeAccounts ?? 0;
-  const reconciliationProgress = getReconciliationProgress();
-  const pendingCount = transactions.filter(t => t.reconciliationStatus === 'pendente').length;
-
-  const handleAddBank = () => {
-    toast({
-      title: "Em desenvolvimento",
-      description: "A funcionalidade de adicionar banco será implementada em breve.",
-    });
-  };
 
   const handleEditBank = (account: BankAccount) => {
-    toast({
-      title: "Editar banco",
-      description: `Editando ${account.bankName}`,
-    });
+    setEditingAccount(account);
   };
 
   const handleDeleteBank = (account: BankAccount) => {
-    toast({
-      title: "Excluir banco",
-      description: `Deseja realmente excluir ${account.bankName}?`,
-      variant: "destructive",
-    });
+    setDeletingAccount(account);
   };
 
   if (isLoading) {
@@ -76,23 +61,17 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
           <Landmark className="h-5 w-5 text-primary" />
           <h2 className="text-xl font-semibold">Gestão de Bancos</h2>
         </div>
-        <Button onClick={handleAddBank} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Adicionar Banco
-        </Button>
+        <AddBankAccountModal />
       </div>
 
-      {/* Cards de Resumo */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <ConsolidatedBalanceCard
-          totalBalance={totalBalance}
-          accountCount={activeAccountsCount}
-        />
-        <ReconciliationProgressBar
-          progress={reconciliationProgress}
-          pendingCount={pendingCount}
-        />
-      </div>
+      {/* Alert de Transações sem Banco */}
+      <UnbankedTransactionsAlert />
+
+      {/* Card de Saldo Consolidado */}
+      <ConsolidatedBalanceCard
+        totalBalance={totalBalance}
+        accountCount={activeAccountsCount}
+      />
 
       {/* Grid de Contas Bancárias */}
       {accounts.length === 0 ? (
@@ -102,12 +81,10 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
             Nenhuma conta bancária cadastrada
           </h3>
           <p className="text-sm text-zinc-500 mb-4 max-w-md">
-            Adicione suas contas bancárias para gerenciar saldos, movimentações e conciliação.
+            Adicione suas contas bancárias para gerenciar saldos e movimentações.
+            Você também poderá atribuir transações existentes a estas contas.
           </p>
-          <Button onClick={handleAddBank}>
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar Primeira Conta
-          </Button>
+          <AddBankAccountModal />
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -132,7 +109,8 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
                   balance: account.currentBalance,
                   label: account.accountType === 'corrente' ? 'Conta Corrente' : 
                          account.accountType === 'poupanca' ? 'Poupança' :
-                         account.accountType === 'investimento' ? 'Investimento' : 'Conta',
+                         account.accountType === 'investimento' ? 'Investimento' : 
+                         account.accountType === 'giro' ? 'Conta Giro' : 'Conta',
                   color: account.color || '#3B82F6',
                   icon: account.icon || '🏦',
                   isActive: account.isActive,
@@ -145,11 +123,18 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
         </div>
       )}
 
-      {/* Tabela de Movimentações */}
-      <div className="mt-8">
-        <h3 className="text-lg font-semibold mb-4">Movimentações Bancárias</h3>
-        <BankTransactionsTable transactions={transactions} />
-      </div>
+      {/* Modais */}
+      <EditBankAccountModal
+        account={editingAccount}
+        open={!!editingAccount}
+        onClose={() => setEditingAccount(null)}
+      />
+
+      <DeleteBankAccountDialog
+        account={deletingAccount}
+        open={!!deletingAccount}
+        onClose={() => setDeletingAccount(null)}
+      />
     </div>
   );
 }
