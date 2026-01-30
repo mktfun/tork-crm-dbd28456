@@ -2689,6 +2689,15 @@ export type Database = {
         }[]
       }
       get_admin_metrics: { Args: never; Returns: Json }
+      get_aging_report: {
+        Args: { p_reference_date?: string; p_user_id: string }
+        Returns: {
+          bucket_amount: number
+          bucket_color: string
+          bucket_count: number
+          bucket_range: string
+        }[]
+      }
       get_brokerage_by_slug: { Args: { p_slug: string }; Returns: Json }
       get_cash_flow_data: {
         Args: {
@@ -2873,6 +2882,23 @@ export type Database = {
         }[]
       }
       get_orphan_transactions: { Args: { p_user_id: string }; Returns: Json }
+      get_payable_receivable_transactions: {
+        Args: {
+          p_status?: string
+          p_transaction_type?: string
+          p_user_id: string
+        }
+        Returns: {
+          amount: number
+          days_overdue: number
+          description: string
+          due_date: string
+          entity_name: string
+          status: string
+          transaction_id: string
+          transaction_type: string
+        }[]
+      }
       get_pending_receivables_from_date: {
         Args: { p_start_date?: string }
         Returns: {
@@ -3022,6 +3048,19 @@ export type Database = {
             Args: { p_legacy_id?: string; p_transaction_id?: string }
             Returns: Json
           }
+      get_upcoming_receivables: {
+        Args: { p_days_ahead?: number; p_user_id: string }
+        Returns: {
+          amount: number
+          days_until_due: number
+          description: string
+          due_date: string
+          entity_name: string
+          related_entity_id: string
+          related_entity_type: string
+          transaction_id: string
+        }[]
+      }
       get_user_companies_with_ramos: {
         Args: never
         Returns: {
