@@ -33,10 +33,12 @@ export function FaturamentoChart({ data, isLoading }: FaturamentoChartProps) {
   };
 
   const chartData = useMemo(() => {
-    return data.map(item => ({
-      date: format(new Date(item.date), "dd/MM", { locale: ptBR }),
-      faturamento: item.income,
-    }));
+    return data
+      .filter(item => item.date && !isNaN(new Date(item.date).getTime()))
+      .map(item => ({
+        date: format(new Date(item.date), "dd/MM", { locale: ptBR }),
+        faturamento: item.income,
+      }));
   }, [data]);
 
   const totalFaturamento = useMemo(() => {
