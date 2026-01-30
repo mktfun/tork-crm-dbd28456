@@ -86,7 +86,7 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
       <div className="grid gap-6 md:grid-cols-2">
         <ConsolidatedBalanceCard
           totalBalance={totalBalance}
-          activeAccounts={activeAccountsCount}
+          accountCount={activeAccountsCount}
         />
         <ReconciliationProgressBar
           progress={reconciliationProgress}
@@ -111,23 +111,37 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {accounts.map((account) => (
-            <BankAccountCard
-              key={account.id}
-              account={{
-                id: account.id,
-                bankName: account.bankName,
-                accountNumber: account.accountNumber || '',
-                accountType: account.accountType,
-                balance: account.currentBalance,
-                lastSync: account.lastSyncDate || new Date().toISOString(),
-                isActive: account.isActive,
-                color: account.color,
-              }}
-              onEdit={() => handleEditBank(account)}
-              onDelete={() => handleDeleteBank(account)}
-            />
-          ))}
+          {accounts.map((account) => {
+            // Mapear tipo de conta para tipos aceitos pelo BankAccountCard
+            const mapAccountType = (type: string): 'corrente' | 'digital' | 'investimento' | 'poupanca' => {
+              if (type === 'giro') return 'corrente';
+              if (type === 'digital' || type === 'poupanca' || type === 'investimento' || type === 'corrente') {
+                return type;
+              }
+              return 'corrente';
+            };
+
+            return (
+              <BankAccountCard
+                key={account.id}
+                account={{
+                  id: account.id,
+                  bankName: account.bankName,
+                  accountNumber: account.accountNumber || '',
+                  accountType: mapAccountType(account.accountType),
+                  balance: account.currentBalance,
+                  label: account.accountType === 'corrente' ? 'Conta Corrente' : 
+                         account.accountType === 'poupanca' ? 'Poupança' :
+                         account.accountType === 'investimento' ? 'Investimento' : 'Conta',
+                  color: account.color || '#3B82F6',
+                  icon: account.icon || '🏦',
+                  isActive: account.isActive,
+                }}
+                onEdit={() => handleEditBank(account)}
+                onDelete={() => handleDeleteBank(account)}
+              />
+            );
+          })}
         </div>
       )}
 

@@ -1,24 +1,9 @@
-import { useState } from "react";
 import { Wallet } from "lucide-react";
 import { ReceivablesList } from "@/components/financeiro/tesouraria/ReceivablesList";
 import { AgingReportCard } from "@/components/financeiro/tesouraria/AgingReportCard";
 import { AccountsPayableReceivableTable } from "@/components/financeiro/tesouraria/AccountsPayableReceivableTable";
-import {
-  mockReceivables,
-  mockAgingReport,
-  mockAccountsPayableReceivable,
-  getTotalReceivables,
-  getTotalAging,
-} from "@/data/mocks/financeiroMocks";
 
 const Tesouraria = () => {
-  const [receivables] = useState(mockReceivables);
-  const [agingBuckets] = useState(mockAgingReport);
-  const [transactions] = useState(mockAccountsPayableReceivable);
-
-  const totalReceivables = getTotalReceivables();
-  const totalAging = getTotalAging();
-
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -36,18 +21,12 @@ const Tesouraria = () => {
 
       {/* Grid de Cards Superiores */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ReceivablesList 
-          receivables={receivables} 
-          totalAmount={totalReceivables} 
-        />
-        <AgingReportCard 
-          buckets={agingBuckets} 
-          totalAmount={totalAging} 
-        />
+        <ReceivablesList daysAhead={30} />
+        <AgingReportCard />
       </div>
 
       {/* Tabela de Contas a Pagar e Receber */}
-      <AccountsPayableReceivableTable transactions={transactions} />
+      <AccountsPayableReceivableTable />
     </div>
   );
 };

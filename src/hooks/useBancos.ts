@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 
 // ============ TIPOS ============
 
@@ -48,48 +47,99 @@ export interface UpdateBankAccountPayload {
   isActive?: boolean;
 }
 
+// ============ MOCK DATA ============
+
+const mockBankAccounts: BankAccount[] = [
+  {
+    id: '1',
+    bankName: 'Itaú',
+    accountNumber: '12345-6',
+    agency: '0001',
+    accountType: 'corrente',
+    currentBalance: 187432.50,
+    lastSyncDate: new Date().toISOString(),
+    color: '#FF6B00',
+    icon: '🏦',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: '2',
+    bankName: 'Bradesco',
+    accountNumber: '98765-4',
+    agency: '1234',
+    accountType: 'corrente',
+    currentBalance: 54321.00,
+    lastSyncDate: new Date().toISOString(),
+    color: '#CC092F',
+    icon: '🏧',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: '3',
+    bankName: 'Nubank',
+    accountNumber: '11111-1',
+    agency: '0001',
+    accountType: 'corrente',
+    currentBalance: 28750.25,
+    lastSyncDate: new Date().toISOString(),
+    color: '#8A05BE',
+    icon: '💜',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
 // ============ HOOKS ============
 
 /**
  * Hook para buscar resumo de todas as contas bancárias
+ * TODO: Conectar ao banco de dados quando tabela bank_accounts for criada
  */
 export function useBankAccounts() {
   return useQuery({
     queryKey: ['bank-accounts-summary'],
     queryFn: async (): Promise<BankAccountsSummary> => {
-      const { data, error } = await supabase.rpc('get_bank_accounts_summary');
+      // Simula delay de rede
+      await new Promise(resolve => setTimeout(resolve, 300));
       
-      if (error) throw error;
+      const activeAccounts = mockBankAccounts.filter(a => a.isActive);
+      const totalBalance = activeAccounts.reduce((sum, a) => sum + a.currentBalance, 0);
       
-      return data as BankAccountsSummary;
+      return {
+        accounts: mockBankAccounts,
+        totalBalance,
+        activeAccounts: activeAccounts.length,
+      };
     },
   });
 }
 
 /**
  * Hook para criar nova conta bancária
+ * TODO: Conectar ao banco de dados quando tabela bank_accounts for criada
  */
 export function useCreateBankAccount() {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async (payload: CreateBankAccountPayload) => {
-      const { data, error } = await supabase
-        .from('bank_accounts')
-        .insert({
-          bank_name: payload.bankName,
-          account_number: payload.accountNumber,
-          agency: payload.agency,
-          account_type: payload.accountType,
-          current_balance: payload.currentBalance,
-          color: payload.color,
-          icon: payload.icon,
-        })
-        .select()
-        .single();
+      // Simula delay de rede
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      if (error) throw error;
-      return data;
+      const newAccount: BankAccount = {
+        id: Math.random().toString(36).substring(7),
+        ...payload,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      
+      return newAccount;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
@@ -99,33 +149,17 @@ export function useCreateBankAccount() {
 
 /**
  * Hook para atualizar conta bancária
+ * TODO: Conectar ao banco de dados quando tabela bank_accounts for criada
  */
 export function useUpdateBankAccount() {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async (payload: UpdateBankAccountPayload) => {
-      const { id, ...updates } = payload;
+      // Simula delay de rede
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      const updateData: any = {};
-      if (updates.bankName !== undefined) updateData.bank_name = updates.bankName;
-      if (updates.accountNumber !== undefined) updateData.account_number = updates.accountNumber;
-      if (updates.agency !== undefined) updateData.agency = updates.agency;
-      if (updates.accountType !== undefined) updateData.account_type = updates.accountType;
-      if (updates.currentBalance !== undefined) updateData.current_balance = updates.currentBalance;
-      if (updates.color !== undefined) updateData.color = updates.color;
-      if (updates.icon !== undefined) updateData.icon = updates.icon;
-      if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
-      
-      const { data, error } = await supabase
-        .from('bank_accounts')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
+      return { ...payload, updatedAt: new Date().toISOString() };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
@@ -135,18 +169,17 @@ export function useUpdateBankAccount() {
 
 /**
  * Hook para deletar conta bancária
+ * TODO: Conectar ao banco de dados quando tabela bank_accounts for criada
  */
 export function useDeleteBankAccount() {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async (accountId: string) => {
-      const { error } = await supabase
-        .from('bank_accounts')
-        .delete()
-        .eq('id', accountId);
+      // Simula delay de rede
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      if (error) throw error;
+      return { deleted: true, accountId };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
