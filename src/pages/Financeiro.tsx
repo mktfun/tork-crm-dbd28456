@@ -1,6 +1,4 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, Wallet } from "lucide-react";
-import FinanceiroExecutivo from "./FinanceiroExecutivo";
+import { Wallet } from "lucide-react";
 import FinanceiroERP from "./FinanceiroERP";
 
 const Financeiro = () => {
@@ -19,29 +17,8 @@ const Financeiro = () => {
         </div>
       </div>
 
-      {/* Sistema de Tabs */}
-      <Tabs defaultValue="executivo" className="space-y-6">
-        <TabsList className="bg-muted/50">
-          <TabsTrigger value="executivo" className="gap-2">
-            <TrendingUp className="w-4 h-4" />
-            Dashboard Executivo
-          </TabsTrigger>
-          <TabsTrigger value="erp" className="gap-2">
-            <Wallet className="w-4 h-4" />
-            Lançamentos & ERP
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Conteúdo: Executivo */}
-        <TabsContent value="executivo">
-          <FinanceiroExecutivo />
-        </TabsContent>
-
-        {/* Conteúdo: ERP */}
-        <TabsContent value="erp">
-          <FinanceiroERP />
-        </TabsContent>
-      </Tabs>
+      {/* Conteúdo Unificado - Apenas o ERP com tabs internas */}
+      <FinanceiroERP />
     </div>
   );
 };

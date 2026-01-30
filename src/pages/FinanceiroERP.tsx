@@ -34,6 +34,9 @@ import { DespesasTab } from '@/components/financeiro/DespesasTab';
 import { CaixaTab } from '@/components/financeiro/CaixaTab';
 import { ProvisoesTab } from '@/components/financeiro/ProvisoesTab';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
+import { ModuloFaturamento } from '@/components/financeiro/dashboard/ModuloFaturamento';
+import { ModuloTesouraria } from '@/components/financeiro/dashboard/ModuloTesouraria';
+import { ModuloMultiBancos } from '@/components/financeiro/dashboard/ModuloMultiBancos';
 import { 
   useFinancialAccountsWithDefaults, 
   useRecentTransactions,
@@ -249,6 +252,25 @@ function VisaoGeral({ dateRange }: VisaoGeralProps) {
 
   return (
     <div className="space-y-6">
+      {/* Módulos do Dashboard Executivo */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Linha 1: Tesouraria (Largura Total) */}
+        <div className="col-span-1 lg:col-span-2 h-full">
+          <ModuloTesouraria />
+        </div>
+
+        {/* Linha 2: Coluna Esquerda - Faturamento */}
+        <div className="h-full">
+          <ModuloFaturamento />
+        </div>
+
+        {/* Linha 2: Coluna Direita - Bancos */}
+        <div className="h-full">
+          <ModuloMultiBancos />
+        </div>
+      </div>
+
+      {/* Gráfico de Fluxo de Caixa */}
       <CashFlowChart
         data={cashFlowData}
         isLoading={cashFlowLoading}
