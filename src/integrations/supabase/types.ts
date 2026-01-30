@@ -542,6 +542,54 @@ export type Database = {
           },
         ]
       }
+      bank_accounts: {
+        Row: {
+          account_number: string | null
+          account_type: string
+          agency: string | null
+          bank_name: string
+          color: string | null
+          created_at: string
+          current_balance: number
+          icon: string | null
+          id: string
+          is_active: boolean
+          last_sync_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_number?: string | null
+          account_type?: string
+          agency?: string | null
+          bank_name: string
+          color?: string | null
+          created_at?: string
+          current_balance?: number
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          last_sync_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_number?: string | null
+          account_type?: string
+          agency?: string | null
+          bank_name?: string
+          color?: string | null
+          created_at?: string
+          current_balance?: number
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          last_sync_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       birthday_greetings: {
         Row: {
           client_id: string
@@ -2603,6 +2651,10 @@ export type Database = {
         Args: { p_account_id: string }
         Returns: boolean
       }
+      assign_bank_to_transactions: {
+        Args: { p_bank_account_id: string; p_transaction_ids: string[] }
+        Returns: number
+      }
       audit_financial_divergence: { Args: never; Returns: Json }
       audit_ledger_integrity: {
         Args: never
@@ -2661,6 +2713,10 @@ export type Database = {
       }
       diagnose_ledger_gaps: { Args: never; Returns: Json }
       diagnose_ledger_health: { Args: never; Returns: Json }
+      distribute_transaction_to_banks: {
+        Args: { p_distributions: Json; p_transaction_id: string }
+        Returns: boolean
+      }
       ensure_default_financial_accounts: { Args: never; Returns: undefined }
       execute_sql: { Args: { query: string }; Returns: Json }
       find_unbalanced_transactions: {
@@ -2733,6 +2789,10 @@ export type Database = {
           bucket_count: number
           bucket_range: string
         }[]
+      }
+      get_bank_balance: {
+        Args: { p_bank_account_id: string; p_include_pending?: boolean }
+        Returns: number
       }
       get_brokerage_by_slug: { Args: { p_slug: string }; Returns: Json }
       get_cash_flow_data: {
@@ -3099,6 +3159,17 @@ export type Database = {
             Args: { p_legacy_id?: string; p_transaction_id?: string }
             Returns: Json
           }
+      get_unbanked_transactions: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          amount: number
+          description: string
+          status: string
+          transaction_date: string
+          transaction_id: string
+          transaction_type: string
+        }[]
+      }
       get_upcoming_receivables: {
         Args: { p_days_ahead?: number; p_user_id: string }
         Returns: {
