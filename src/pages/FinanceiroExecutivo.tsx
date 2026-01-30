@@ -18,14 +18,14 @@ const FinanceiroExecutivo = () => {
 
       {/* Container do Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Linha 1: Faturamento (Largura Total) */}
+        {/* Linha 1: Tesouraria (Largura Total) */}
         <div className="col-span-1 lg:col-span-2 h-full">
-          <ModuloFaturamento />
+          <ModuloTesouraria />
         </div>
 
-        {/* Linha 2: Coluna Esquerda - Tesouraria */}
+        {/* Linha 2: Coluna Esquerda - Faturamento */}
         <div className="h-full">
-          <ModuloTesouraria />
+          <ModuloFaturamento />
         </div>
 
         {/* Linha 2: Coluna Direita - Bancos */}
