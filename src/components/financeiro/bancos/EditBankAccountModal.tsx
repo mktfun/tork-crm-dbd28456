@@ -160,7 +160,8 @@ export function EditBankAccountModal({ account, open, onClose }: EditBankAccount
             </div>
 
             {/* Cor e Ícone */}
-            <div className="grid grid-cols-2 gap-4">.model.js"-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
                 <Label htmlFor="edit-color">Cor</Label>
                 <Select value={color} onValueChange={setColor}>
                   <SelectTrigger id="edit-color">
