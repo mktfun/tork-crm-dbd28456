@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModuloFaturamento } from "@/components/financeiro/dashboard/ModuloFaturamento";
 import { ModuloTesouraria } from "@/components/financeiro/dashboard/ModuloTesouraria";
 import { ModuloMultiBancos } from "@/components/financeiro/dashboard/ModuloMultiBancos";
+import { ModuloFluxoCaixaPreditivo } from "@/components/financeiro/dashboard/ModuloFluxoCaixaPreditivo";
 
 const FinanceiroExecutivo = () => {
   return (
@@ -28,18 +28,7 @@ const FinanceiroExecutivo = () => {
         <ModuloMultiBancos />
 
         {/* Módulo 4: Fluxo de Caixa (Bottom-Right) */}
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              🔮 Fluxo de Caixa Preditivo
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-zinc-500 text-sm">
-              Projeção de 90 dias e Análise de Tendências virão aqui (Tarefa 1.6)
-            </p>
-          </CardContent>
-        </Card>
+        <ModuloFluxoCaixaPreditivo />
       </div>
     </div>
   );
