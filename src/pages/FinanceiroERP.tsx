@@ -475,7 +475,7 @@ export default function FinanceiroERP() {
           </TabsTrigger>
           <TabsTrigger value="caixa" className="gap-2">
             <Landmark className="w-4 h-4" />
-            Caixa
+            Bancos
           </TabsTrigger>
           <TabsTrigger value="receitas" className="gap-2">
             <TrendingUp className="w-4 h-4" />
