@@ -188,8 +188,8 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
   const markdownComponents = {
     // FASE P5.1: Premium Table Styling with internal scroll containment
     table: ({ children }: any) => (
-      <div className="w-full overflow-x-auto my-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-1 scrollbar-thin scrollbar-thumb-white/10">
-        <table className="w-full border-collapse text-sm table-auto min-w-full">
+      <div className="my-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-1 scrollbar-thin scrollbar-thumb-white/10" style={{ width: '100% !important', maxWidth: '100% !important', overflowX: 'auto !important', display: 'block !important', boxSizing: 'border-box !important' }}>
+        <table className="border-collapse text-sm" style={{ tableLayout: 'auto !important', width: '100% !important', minWidth: 'max-content !important' }}>
           {children}
         </table>
       </div>
@@ -210,7 +210,7 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
       </th>
     ),
     td: ({ children }: any) => (
-      <td className="p-3 text-sm border-b border-white/5 text-foreground/90 whitespace-normal break-words min-w-[120px]">
+      <td className="p-3 text-sm border-b border-white/5 text-foreground/90" style={{ wordBreak: 'break-word !important', minWidth: '80px !important', maxWidth: 'none !important', whiteSpace: 'normal !important' }}>
         {children}
       </td>
     ),
@@ -273,13 +273,13 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
     ),
     // Code blocks with glass effect
     code: ({ children }: any) => (
-      <code className="px-1.5 py-0.5 rounded bg-white/10 text-xs font-mono text-primary">
+      <code className="px-1.5 py-0.5 rounded bg-white/10 text-xs font-mono text-primary break-all" style={{ wordBreak: 'break-all', display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {children}
       </code>
     ),
     // Paragraphs with proper spacing
     p: ({ children }: any) => (
-      <p className="text-sm leading-relaxed mb-3 text-foreground/90 break-words whitespace-pre-wrap">
+      <p className="text-sm leading-relaxed mb-3 text-foreground/90" style={{ wordBreak: 'break-word !important', whiteSpace: 'normal !important', overflowWrap: 'anywhere !important', maxWidth: '100% !important', display: 'block !important' }}>
         {children}
       </p>
     ),
@@ -291,7 +291,7 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
 
   return (
     // FASE P5.1: Contenção raiz com break-words e max-w-full
-    <div className="space-y-3 w-full max-w-full break-words overflow-x-auto scrollbar-none">
+    <div className="space-y-3" style={{ width: '100% !important', maxWidth: '100% !important', wordBreak: 'break-word !important', overflowWrap: 'anywhere !important', display: 'block !important', overflowX: 'hidden !important', boxSizing: 'border-box !important' }}>
       {/* Texto em Markdown com styling premium + GFM */}
       {textContent && (
         <div className="prose prose-sm prose-invert max-w-none w-full">
@@ -305,7 +305,9 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
       )}
       
       {/* Dados estruturados */}
-      {matches.map((data, index) => renderStructuredData(data, index))}
+      <div className="w-full overflow-hidden">
+        {matches.map((data, index) => renderStructuredData(data, index))}
+      </div>
       
       {/* Badges de Fontes Citadas (FASE P2.1) */}
       {detectedSources.length > 0 && (
