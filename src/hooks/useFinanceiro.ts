@@ -397,7 +397,7 @@ export function usePendingThisMonth() {
 
 // ============ HOOKS PARA ANÁLISE POR DIMENSÃO ============
 
-import { useSupabaseClient, useSession } from '@supabase/auth-helpers-react';
+import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 
@@ -415,12 +415,10 @@ export function useRevenueByDimension(
   dimension: 'producer' | 'type' | 'insurance_company',
   dateRange?: DateRange
 ) {
-  const supabase = useSupabaseClient();
-  const { data: session } = useSession();
-
   return useQuery({
     queryKey: ['revenue-by-dimension', dimension, dateRange],
     queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user?.id) throw new Error('Não autenticado');
 
       const startDate = dateRange?.from 
@@ -439,9 +437,15 @@ export function useRevenueByDimension(
       });
 
       if (error) throw error;
-      return (data || []) as DimensionBreakdown[];
+      
+      // Mapear campos snake_case para camelCase
+      return ((data || []) as Array<{ dimension_name: string; total_amount: number; transaction_count: number; percentage: number }>).map(item => ({
+        dimensionName: item.dimension_name,
+        totalAmount: item.total_amount,
+        transactionCount: item.transaction_count,
+        percentage: item.percentage
+      })) as DimensionBreakdown[];
     },
-    enabled: !!session?.user?.id
   });
 }
 
@@ -478,78 +482,138 @@ export interface PayableReceivableTransaction {
 
 /**
  * Hook para buscar relatório de aging (análise de vencimentos)
+ * TODO: Conectar à RPC get_aging_report quando for criada
  */
 export function useAgingReport(referenceDate?: string) {
-  const supabase = useSupabaseClient();
-  const { data: session } = useSession();
-
   return useQuery({
     queryKey: ['aging-report', referenceDate],
-    queryFn: async () => {
-      if (!session?.user?.id) throw new Error('Não autenticado');
-
-      const refDate = referenceDate || format(new Date(), 'yyyy-MM-dd');
-
-      const { data, error } = await supabase.rpc('get_aging_report', {
-        p_user_id: session.user.id,
-        p_reference_date: refDate
-      });
-
-      if (error) throw error;
-      return (data || []) as AgingBucket[];
+    queryFn: async (): Promise<AgingBucket[]> => {
+      // Simula delay de rede
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Retorna dados mock até RPC estar implementada
+      return [
+        { bucketRange: 'Até 5 dias', bucketAmount: 15000, bucketCount: 3, bucketColor: 'hsl(var(--chart-1))' },
+        { bucketRange: '6-15 dias', bucketAmount: 25000, bucketCount: 5, bucketColor: 'hsl(var(--chart-2))' },
+        { bucketRange: '16-30 dias', bucketAmount: 20000, bucketCount: 4, bucketColor: 'hsl(var(--chart-3))' },
+        { bucketRange: 'Acima de 60 dias', bucketAmount: 15000, bucketCount: 2, bucketColor: 'hsl(var(--chart-4))' },
+      ];
     },
-    enabled: !!session?.user?.id
   });
 }
 
 /**
  * Hook para buscar recebíveis próximos ao vencimento
+ * TODO: Conectar à RPC get_upcoming_receivables quando for criada
  */
 export function useUpcomingReceivables(daysAhead: number = 30) {
-  const supabase = useSupabaseClient();
-  const { data: session } = useSession();
-
   return useQuery({
     queryKey: ['upcoming-receivables', daysAhead],
-    queryFn: async () => {
-      if (!session?.user?.id) throw new Error('Não autenticado');
-
-      const { data, error } = await supabase.rpc('get_upcoming_receivables', {
-        p_user_id: session.user.id,
-        p_days_ahead: daysAhead
-      });
-
-      if (error) throw error;
-      return (data || []) as UpcomingReceivable[];
+    queryFn: async (): Promise<UpcomingReceivable[]> => {
+      // Simula delay de rede
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const today = new Date();
+      
+      // Retorna dados mock até RPC estar implementada
+      return [
+        {
+          transactionId: '1',
+          entityName: 'Bradesco Seguros',
+          description: 'Comissão Apólice #12345',
+          amount: 2500.00,
+          dueDate: new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+          daysUntilDue: 5,
+          relatedEntityType: 'apolice',
+          relatedEntityId: '12345',
+        },
+        {
+          transactionId: '2',
+          entityName: 'Porto Seguro',
+          description: 'Comissão Apólice #67890',
+          amount: 1800.00,
+          dueDate: new Date(today.getTime() + 12 * 24 * 60 * 60 * 1000).toISOString(),
+          daysUntilDue: 12,
+          relatedEntityType: 'apolice',
+          relatedEntityId: '67890',
+        },
+        {
+          transactionId: '3',
+          entityName: 'SulAmérica',
+          description: 'Comissão Renovação',
+          amount: 3200.00,
+          dueDate: new Date(today.getTime() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+          daysUntilDue: 20,
+          relatedEntityType: null,
+          relatedEntityId: null,
+        },
+      ];
     },
-    enabled: !!session?.user?.id
   });
 }
 
 /**
  * Hook para buscar transações a pagar e receber com filtros
+ * TODO: Conectar à RPC get_payable_receivable_transactions quando for criada
  */
 export function usePayableReceivableTransactions(
-  transactionType: 'all' | 'receivable' | 'payable' = 'all',
-  status: 'all' | 'overdue' | 'pending' | 'paid' = 'all'
+  transactionType: 'all' | 'receber' | 'pagar' = 'all',
+  status: 'all' | 'atrasado' | 'pendente' | 'pago' = 'all'
 ) {
-  const supabase = useSupabaseClient();
-  const { data: session } = useSession();
-
   return useQuery({
     queryKey: ['payable-receivable-transactions', transactionType, status],
-    queryFn: async () => {
-      if (!session?.user?.id) throw new Error('Não autenticado');
-
-      const { data, error } = await supabase.rpc('get_payable_receivable_transactions', {
-        p_user_id: session.user.id,
-        p_transaction_type: transactionType,
-        p_status: status
-      });
-
-      if (error) throw error;
-      return (data || []) as PayableReceivableTransaction[];
+    queryFn: async (): Promise<PayableReceivableTransaction[]> => {
+      // Simula delay de rede
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const today = new Date();
+      
+      // Dados mock base
+      const mockTransactions: PayableReceivableTransaction[] = [
+        {
+          transactionId: '1',
+          transactionType: 'receber',
+          entityName: 'Porto Seguro',
+          description: 'Comissão Apólice Auto',
+          amount: 1500.00,
+          dueDate: new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+          status: 'atrasado',
+          daysOverdue: 5,
+        },
+        {
+          transactionId: '2',
+          transactionType: 'pagar',
+          entityName: 'Aluguel Escritório',
+          description: 'Aluguel Mensal',
+          amount: 2500.00,
+          dueDate: new Date(today.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+          status: 'pendente',
+          daysOverdue: 0,
+        },
+        {
+          transactionId: '3',
+          transactionType: 'receber',
+          entityName: 'Bradesco',
+          description: 'Comissão Vida',
+          amount: 800.00,
+          dueDate: new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+          status: 'pago',
+          daysOverdue: 0,
+        },
+      ];
+      
+      // Aplicar filtros
+      let filtered = mockTransactions;
+      
+      if (transactionType !== 'all') {
+        filtered = filtered.filter(t => t.transactionType === transactionType);
+      }
+      
+      if (status !== 'all') {
+        filtered = filtered.filter(t => t.status === status);
+      }
+      
+      return filtered;
     },
-    enabled: !!session?.user?.id
   });
 }

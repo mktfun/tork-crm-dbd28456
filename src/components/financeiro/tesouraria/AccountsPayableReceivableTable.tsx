@@ -19,8 +19,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function AccountsPayableReceivableTable() {
-  const [activeTab, setActiveTab] = useState<'receivable' | 'payable'>('receivable');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'overdue' | 'pending' | 'paid'>('all');
+  const [activeTab, setActiveTab] = useState<'receber' | 'pagar'>('receber');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'atrasado' | 'pendente' | 'pago'>('all');
 
   const { data: transactions, isLoading, error } = usePayableReceivableTransactions(
     activeTab,
@@ -155,19 +155,19 @@ export function AccountsPayableReceivableTable() {
             <ToggleGroup 
               type="single" 
               value={statusFilter} 
-              onValueChange={(value) => value && setStatusFilter(value as any)}
+              onValueChange={(value) => value && setStatusFilter(value as 'all' | 'atrasado' | 'pendente' | 'pago')}
               className="gap-1"
             >
               <ToggleGroupItem value="all" size="sm" className="text-xs">
                 Todos
               </ToggleGroupItem>
-              <ToggleGroupItem value="overdue" size="sm" className="text-xs">
+              <ToggleGroupItem value="atrasado" size="sm" className="text-xs">
                 Atrasados
               </ToggleGroupItem>
-              <ToggleGroupItem value="pending" size="sm" className="text-xs">
+              <ToggleGroupItem value="pendente" size="sm" className="text-xs">
                 Pendentes
               </ToggleGroupItem>
-              <ToggleGroupItem value="paid" size="sm" className="text-xs">
+              <ToggleGroupItem value="pago" size="sm" className="text-xs">
                 Pagos
               </ToggleGroupItem>
             </ToggleGroup>
@@ -175,21 +175,21 @@ export function AccountsPayableReceivableTable() {
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'receber' | 'pagar')} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="receivable" className="gap-2">
+            <TabsTrigger value="receber" className="gap-2">
               <TrendingUp className="w-4 h-4" />
               A Receber ({receivableCount})
             </TabsTrigger>
-            <TabsTrigger value="payable" className="gap-2">
+            <TabsTrigger value="pagar" className="gap-2">
               <TrendingDown className="w-4 h-4" />
               A Pagar ({payableCount})
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="receivable" className="mt-4">
+          <TabsContent value="receber" className="mt-4">
             {renderTable()}
           </TabsContent>
-          <TabsContent value="payable" className="mt-4">
+          <TabsContent value="pagar" className="mt-4">
             {renderTable()}
           </TabsContent>
         </Tabs>
