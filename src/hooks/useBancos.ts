@@ -67,6 +67,23 @@ export interface BankDistribution {
 /**
  * Hook para buscar resumo de todas as contas bancárias
  */
+// Interface para a resposta bruta do banco
+interface BankAccountRow {
+  id: string;
+  user_id: string;
+  bank_name: string;
+  account_number: string | null;
+  agency: string | null;
+  account_type: string;
+  current_balance: string;
+  last_sync_date: string | null;
+  color: string | null;
+  icon: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export function useBankAccounts() {
   return useQuery({
     queryKey: ['bank-accounts-summary'],
@@ -74,9 +91,9 @@ export function useBankAccounts() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      // Buscar contas bancárias
+      // Buscar contas bancárias usando query tipada manualmente
       const { data: accounts, error } = await supabase
-        .from('bank_accounts')
+        .from('bank_accounts' as any)
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -84,16 +101,16 @@ export function useBankAccounts() {
       if (error) throw error;
 
       // Mapear para formato do frontend
-      const mappedAccounts: BankAccount[] = (accounts || []).map(acc => ({
+      const mappedAccounts: BankAccount[] = ((accounts || []) as unknown as BankAccountRow[]).map(acc => ({
         id: acc.id,
         bankName: acc.bank_name,
-        accountNumber: acc.account_number,
-        agency: acc.agency,
-        accountType: acc.account_type,
+        accountNumber: acc.account_number || undefined,
+        agency: acc.agency || undefined,
+        accountType: acc.account_type as BankAccountType,
         currentBalance: parseFloat(acc.current_balance || '0'),
-        lastSyncDate: acc.last_sync_date,
-        color: acc.color,
-        icon: acc.icon,
+        lastSyncDate: acc.last_sync_date || undefined,
+        color: acc.color || undefined,
+        icon: acc.icon || undefined,
         isActive: acc.is_active,
         createdAt: acc.created_at,
         updatedAt: acc.updated_at,
@@ -103,7 +120,7 @@ export function useBankAccounts() {
       const accountsWithRealBalance = await Promise.all(
         mappedAccounts.map(async (acc) => {
           const { data: balanceData, error: balanceError } = await supabase
-            .rpc('get_bank_balance', {
+            .rpc('get_bank_balance' as any, {
               p_bank_account_id: acc.id,
               p_include_pending: false
             });
@@ -115,7 +132,7 @@ export function useBankAccounts() {
 
           return {
             ...acc,
-            currentBalance: parseFloat(balanceData || '0')
+            currentBalance: parseFloat(String(balanceData) || '0')
           };
         })
       );
@@ -144,7 +161,7 @@ export function useCreateBankAccount() {
       if (!user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
-        .from('bank_accounts')
+        .from('bank_accounts' as any)
         .insert({
           user_id: user.id,
           bank_name: payload.bankName,
@@ -187,7 +204,7 @@ export function useUpdateBankAccount() {
       if (payload.isActive !== undefined) updateData.is_active = payload.isActive;
 
       const { data, error } = await supabase
-        .from('bank_accounts')
+        .from('bank_accounts' as any)
         .update(updateData)
         .eq('id', payload.id)
         .select()
@@ -211,7 +228,7 @@ export function useDeleteBankAccount() {
   return useMutation({
     mutationFn: async (accountId: string) => {
       const { error } = await supabase
-        .from('bank_accounts')
+        .from('bank_accounts' as any)
         .delete()
         .eq('id', accountId);
 
@@ -235,7 +252,7 @@ export function useUnbankedTransactions(limit: number = 100) {
       if (!user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase
-        .rpc('get_unbanked_transactions', {
+        .rpc('get_unbanked_transactions' as any, {
           p_user_id: user.id,
           p_limit: limit
         });
@@ -266,7 +283,7 @@ export function useAssignBankToTransactions() {
       bankAccountId: string 
     }) => {
       const { data, error } = await supabase
-        .rpc('assign_bank_to_transactions', {
+        .rpc('assign_bank_to_transactions' as any, {
           p_transaction_ids: transactionIds,
           p_bank_account_id: bankAccountId
         });
@@ -302,7 +319,7 @@ export function useDistributeTransactionToBanks() {
       }));
 
       const { data, error } = await supabase
-        .rpc('distribute_transaction_to_banks', {
+        .rpc('distribute_transaction_to_banks' as any, {
           p_transaction_id: transactionId,
           p_distributions: jsonbDistributions
         });
