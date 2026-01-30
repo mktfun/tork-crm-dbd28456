@@ -6,15 +6,6 @@ import { ModuloFluxoCaixaPreditivo } from "@/components/financeiro/dashboard/Mod
 const FinanceiroExecutivo = () => {
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold text-white">
-          Dashboard Financeiro Executivo
-        </h1>
-        <p className="text-zinc-400">
-          Visão consolidada de faturamento, tesouraria e fluxo de caixa.
-        </p>
-      </div>
 
       {/* Container do Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

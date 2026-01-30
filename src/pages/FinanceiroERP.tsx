@@ -431,25 +431,11 @@ export default function FinanceiroERP() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Wallet className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Financeiro</h1>
-            <p className="text-sm text-muted-foreground">
-              Controle de despesas e receitas
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <DateRangeFilter value={dateRange} onChange={setDateRange} />
-          <ImportReceiptsModal />
-          <ImportTransactionsModal />
-        </div>
+      {/* Action Bar (Header removido - agora está na página pai Financeiro.tsx) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-2">
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        <ImportReceiptsModal />
+        <ImportTransactionsModal />
       </div>
 
       {/* KPIs Fixos - 4 Cards Simples */}
