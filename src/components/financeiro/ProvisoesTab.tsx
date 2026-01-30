@@ -17,7 +17,6 @@ import {
 import { Label } from '@/components/ui/label';
 
 import { ProjectedCashFlowChart } from './ProjectedCashFlowChart';
-import { RecurringConfigsList } from './RecurringConfigsList';
 import { useProjectedCashFlow } from '@/hooks/useRecurringConfigs';
 
 interface ProvisoesTabProps {
@@ -116,8 +115,7 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
         granularity={granularity}
       />
 
-      {/* Lista de Configurações Recorrentes */}
-      <RecurringConfigsList />
+      {/* Configurações Recorrentes movidas para aba Despesas */}
     </div>
   );
 }

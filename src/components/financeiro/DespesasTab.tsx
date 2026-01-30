@@ -18,6 +18,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 import { NovaDespesaModal } from './NovaDespesaModal';
 import { TransactionDetailsSheet } from './TransactionDetailsSheet';
+import { RecurringConfigsList } from './RecurringConfigsList';
 import { useRecentTransactions } from '@/hooks/useFinanceiro';
 import { parseLocalDate } from '@/utils/dateUtils';
 
@@ -219,6 +220,9 @@ export function DespesasTab({ dateRange }: DespesasTabProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Configurações Recorrentes */}
+      <RecurringConfigsList />
 
       {/* Details Sheet */}
       <TransactionDetailsSheet 

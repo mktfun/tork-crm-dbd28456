@@ -21,7 +21,7 @@ BEGIN
       a.user_id as producer_id,
       a.type as insurance_type,
       a.insurance_company,
-      COALESCE(p.full_name, p.email) as producer_name
+      COALESCE(p.nome_completo, p.email) as producer_name
     FROM financial_transactions ft
     JOIN financial_ledger fl ON fl.transaction_id = ft.id
     JOIN financial_accounts fa ON fa.id = fl.account_id
