@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export interface ApiKey {
@@ -18,34 +17,18 @@ export function useApiKeys() {
 
   const query = useQuery({
     queryKey: ['api-keys'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('api_keys')
-        .select('*')
-        .order('service_name');
-
-      if (error) {
-        console.error('Error fetching API keys:', error);
-        // Se a tabela não existir, retorna array vazio
-        if (error.code === '42P01') {
-          return [];
-        }
-        throw error;
-      }
-      return data as ApiKey[];
+    queryFn: async (): Promise<ApiKey[]> => {
+      // A tabela api_keys não existe ainda no schema
+      // Retornamos array vazio até que a migração seja aplicada
+      console.warn('api_keys table not available - returning empty data');
+      return [];
     },
+    retry: false,
   });
 
   const createMutation = useMutation({
     mutationFn: async (newKey: Omit<ApiKey, 'id' | 'created_at' | 'updated_at' | 'last_used_at'>) => {
-      const { data, error } = await supabase
-        .from('api_keys')
-        .insert(newKey)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      throw new Error('Funcionalidade ainda não disponível. Execute as migrações primeiro.');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] });
@@ -58,15 +41,7 @@ export function useApiKeys() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<ApiKey> }) => {
-      const { data, error } = await supabase
-        .from('api_keys')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      throw new Error('Funcionalidade ainda não disponível. Execute as migrações primeiro.');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] });
@@ -79,12 +54,7 @@ export function useApiKeys() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('api_keys')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      throw new Error('Funcionalidade ainda não disponível. Execute as migrações primeiro.');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] });

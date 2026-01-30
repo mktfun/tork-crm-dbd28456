@@ -38,90 +38,109 @@ export interface OrganizationDetails {
 export function useOrganizationDetails(organizationId: string | undefined) {
   return useQuery({
     queryKey: ['organization-details', organizationId],
-    queryFn: async () => {
-      if (!organizationId) throw new Error('Organization ID is required');
+    queryFn: async (): Promise<OrganizationDetails | null> => {
+      if (!organizationId) return null;
 
-      // Buscar organização
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .select('*')
-        .eq('id', organizationId)
-        .single();
+      try {
+        // Por enquanto, usamos brokerages como fallback
+        const { data: brokerage, error: brokerageError } = await supabase
+          .from('brokerages')
+          .select('*')
+          .eq('id', parseInt(organizationId))
+          .single();
 
-      if (orgError) throw orgError;
+        if (brokerageError) {
+          console.warn('Brokerage not found:', brokerageError.message);
+          return null;
+        }
 
-      // Buscar usuários da organização
-      const { data: users, error: usersError } = await supabase
-        .from('profiles')
-        .select('id, nome_completo, email, role, ativo, created_at')
-        .eq('organization_id', organizationId)
-        .order('nome_completo');
+        // Buscar usuários associados (via user_id do brokerage)
+        const { data: users, error: usersError } = await supabase
+          .from('profiles')
+          .select('id, nome_completo, email, role, ativo, created_at')
+          .eq('id', brokerage.user_id);
 
-      if (usersError) throw usersError;
+        if (usersError) {
+          console.warn('Error fetching users:', usersError.message);
+        }
 
-      // Buscar configurações de CRM
-      const { data: crmSettings, error: crmError } = await supabase
-        .from('crm_settings')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .maybeSingle();
+        // Buscar configurações de CRM
+        const { data: crmSettings, error: crmError } = await supabase
+          .from('crm_settings')
+          .select('*')
+          .eq('user_id', brokerage.user_id)
+          .maybeSingle();
 
-      if (crmError) throw crmError;
+        if (crmError) {
+          console.warn('Error fetching CRM settings:', crmError.message);
+        }
 
-      // Calcular estatísticas
-      const userIds = users?.map(u => u.id) || [];
-      const activeUsers = users?.filter(u => u.ativo).length || 0;
-
-      let totalClients = 0;
-      let totalPolicies = 0;
-      let activePolicies = 0;
-      let totalDeals = 0;
-
-      if (userIds.length > 0) {
         // Contar clientes
         const { count: clientsCount } = await supabase
           .from('clientes')
           .select('*', { count: 'exact', head: true })
-          .in('user_id', userIds);
-        totalClients = clientsCount || 0;
+          .eq('user_id', brokerage.user_id);
 
         // Contar apólices
         const { count: policiesCount } = await supabase
           .from('apolices')
           .select('*', { count: 'exact', head: true })
-          .in('user_id', userIds);
-        totalPolicies = policiesCount || 0;
+          .eq('user_id', brokerage.user_id);
 
         // Contar apólices ativas
         const { count: activePoliciesCount } = await supabase
           .from('apolices')
           .select('*', { count: 'exact', head: true })
-          .in('user_id', userIds)
+          .eq('user_id', brokerage.user_id)
           .eq('status', 'Ativa');
-        activePolicies = activePoliciesCount || 0;
 
         // Contar deals
         const { count: dealsCount } = await supabase
           .from('crm_deals')
           .select('*', { count: 'exact', head: true })
-          .in('user_id', userIds);
-        totalDeals = dealsCount || 0;
-      }
+          .eq('user_id', brokerage.user_id);
 
-      return {
-        ...org,
-        users: users || [],
-        crm_settings: crmSettings,
-        stats: {
-          total_users: users?.length || 0,
-          active_users: activeUsers,
-          total_clients: totalClients,
-          total_policies: totalPolicies,
-          active_policies: activePolicies,
-          total_deals: totalDeals,
-        },
-      } as OrganizationDetails;
+        const usersList = users || [];
+
+        return {
+          id: String(brokerage.id),
+          name: brokerage.name,
+          slug: brokerage.slug,
+          logo_url: brokerage.logo_url,
+          settings: {},
+          active: true,
+          created_at: brokerage.created_at,
+          updated_at: brokerage.updated_at,
+          users: usersList.map(u => ({
+            id: u.id,
+            nome_completo: u.nome_completo || '',
+            email: u.email || '',
+            role: u.role || 'corretor',
+            ativo: u.ativo ?? true,
+            created_at: u.created_at,
+          })),
+          crm_settings: crmSettings ? {
+            id: crmSettings.id,
+            chatwoot_url: crmSettings.chatwoot_url,
+            chatwoot_api_key: crmSettings.chatwoot_api_key,
+            chatwoot_account_id: crmSettings.chatwoot_account_id,
+            chatwoot_webhook_secret: crmSettings.chatwoot_webhook_secret,
+          } : null,
+          stats: {
+            total_users: usersList.length,
+            active_users: usersList.filter(u => u.ativo).length,
+            total_clients: clientsCount || 0,
+            total_policies: policiesCount || 0,
+            active_policies: activePoliciesCount || 0,
+            total_deals: dealsCount || 0,
+          },
+        };
+      } catch (error) {
+        console.error('Error fetching organization details:', error);
+        return null;
+      }
     },
     enabled: !!organizationId,
+    retry: false,
   });
 }

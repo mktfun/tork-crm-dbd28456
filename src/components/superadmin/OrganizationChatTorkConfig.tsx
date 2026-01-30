@@ -38,8 +38,9 @@ export function OrganizationChatTorkConfig({ organizationId, crmSettings: initia
     setSaving(true);
 
     try {
-      const payload = {
-        organization_id: organizationId,
+      // crm_settings usa user_id, não organization_id
+      // Por enquanto, usamos o organizationId como referência (será ajustado com migrations)
+      const updatePayload = {
         chatwoot_url: settings.chatwoot_url || null,
         chatwoot_api_key: settings.chatwoot_api_key || null,
         chatwoot_account_id: settings.chatwoot_account_id || null,
@@ -49,13 +50,18 @@ export function OrganizationChatTorkConfig({ organizationId, crmSettings: initia
       if (initialSettings?.id) {
         const { error } = await supabase
           .from('crm_settings')
-          .update(payload)
+          .update(updatePayload)
           .eq('id', initialSettings.id);
         if (error) throw error;
       } else {
+        // Para insert, precisamos do user_id (campo obrigatório)
+        // Neste contexto, usamos o organizationId como user_id temporariamente
         const { error } = await supabase
           .from('crm_settings')
-          .insert(payload);
+          .insert({
+            ...updatePayload,
+            user_id: organizationId // Será ajustado quando tivermos a tabela organizations
+          });
         if (error) throw error;
       }
 

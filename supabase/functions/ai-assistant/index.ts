@@ -1673,10 +1673,6 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
     return await CRUD.delete_policy(args, supabase, userId);
   },
 
-  move_deal_to_stage: async (args, supabase, userId) => {
-    return await CRM.move_deal_to_stage(args, supabase, userId);
-  },
-
   create_deal: async (args, supabase, userId) => {
     return await CRM.create_deal(args, supabase, userId);
   },
