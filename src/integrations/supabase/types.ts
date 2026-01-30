@@ -68,6 +68,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_knowledge: {
+        Row: {
+          category: string | null
+          content: string
+          created_at: string | null
+          embedding: string | null
+          id: string
+          metadata: Json | null
+          source: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          content: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+          source: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          content?: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+          source?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       ai_knowledge_base: {
         Row: {
           content: string
