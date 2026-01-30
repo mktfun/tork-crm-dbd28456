@@ -444,3 +444,112 @@ export function useRevenueByDimension(
     enabled: !!session?.user?.id
   });
 }
+
+// ============ HOOKS PARA TESOURARIA E AGING REPORT ============
+
+export interface AgingBucket {
+  bucketRange: string;
+  bucketAmount: number;
+  bucketCount: number;
+  bucketColor: string;
+}
+
+export interface UpcomingReceivable {
+  transactionId: string;
+  dueDate: string;
+  entityName: string;
+  description: string;
+  amount: number;
+  daysUntilDue: number;
+  relatedEntityType: string | null;
+  relatedEntityId: string | null;
+}
+
+export interface PayableReceivableTransaction {
+  transactionId: string;
+  transactionType: 'receber' | 'pagar';
+  dueDate: string;
+  entityName: string;
+  description: string;
+  amount: number;
+  status: 'atrasado' | 'pendente' | 'pago';
+  daysOverdue: number;
+}
+
+/**
+ * Hook para buscar relatório de aging (análise de vencimentos)
+ */
+export function useAgingReport(referenceDate?: string) {
+  const supabase = useSupabaseClient();
+  const { data: session } = useSession();
+
+  return useQuery({
+    queryKey: ['aging-report', referenceDate],
+    queryFn: async () => {
+      if (!session?.user?.id) throw new Error('Não autenticado');
+
+      const refDate = referenceDate || format(new Date(), 'yyyy-MM-dd');
+
+      const { data, error } = await supabase.rpc('get_aging_report', {
+        p_user_id: session.user.id,
+        p_reference_date: refDate
+      });
+
+      if (error) throw error;
+      return (data || []) as AgingBucket[];
+    },
+    enabled: !!session?.user?.id
+  });
+}
+
+/**
+ * Hook para buscar recebíveis próximos ao vencimento
+ */
+export function useUpcomingReceivables(daysAhead: number = 30) {
+  const supabase = useSupabaseClient();
+  const { data: session } = useSession();
+
+  return useQuery({
+    queryKey: ['upcoming-receivables', daysAhead],
+    queryFn: async () => {
+      if (!session?.user?.id) throw new Error('Não autenticado');
+
+      const { data, error } = await supabase.rpc('get_upcoming_receivables', {
+        p_user_id: session.user.id,
+        p_days_ahead: daysAhead
+      });
+
+      if (error) throw error;
+      return (data || []) as UpcomingReceivable[];
+    },
+    enabled: !!session?.user?.id
+  });
+}
+
+/**
+ * Hook para buscar transações a pagar e receber com filtros
+ */
+export function usePayableReceivableTransactions(
+  transactionType: 'all' | 'receivable' | 'payable' = 'all',
+  status: 'all' | 'overdue' | 'pending' | 'paid' = 'all'
+) {
+  const supabase = useSupabaseClient();
+  const { data: session } = useSession();
+
+  return useQuery({
+    queryKey: ['payable-receivable-transactions', transactionType, status],
+    queryFn: async () => {
+      if (!session?.user?.id) throw new Error('Não autenticado');
+
+      const { data, error } = await supabase.rpc('get_payable_receivable_transactions', {
+        p_user_id: session.user.id,
+        p_transaction_type: transactionType,
+        p_status: status
+      });
+
+      if (error) throw error;
+      return (data || []) as PayableReceivableTransaction[];
+    },
+    enabled: !!session?.user?.id
+  });
+}

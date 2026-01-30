@@ -1,14 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { AlertTriangle } from "lucide-react";
-import { AgingBucket } from "@/data/mocks/financeiroMocks";
+import { AlertTriangle, AlertCircle } from "lucide-react";
+import { useAgingReport } from "@/hooks/useFinanceiro";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-interface AgingReportCardProps {
-  buckets: AgingBucket[];
-  totalAmount: number;
-}
+export function AgingReportCard() {
+  const { data: buckets, isLoading, error } = useAgingReport();
 
-export function AgingReportCard({ buckets, totalAmount }: AgingReportCardProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -16,15 +15,72 @@ export function AgingReportCard({ buckets, totalAmount }: AgingReportCardProps) 
     }).format(value);
   };
 
-  const getRangeLabel = (range: string) => {
-    const labels: Record<string, string> = {
-      '5': '0-5 dias',
-      '15': '6-15 dias',
-      '30': '16-30 dias',
-      '60+': '60+ dias',
-    };
-    return labels[range] || range;
-  };
+  const totalAmount = buckets?.reduce((sum, bucket) => sum + Number(bucket.bucketAmount), 0) || 0;
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <CardTitle className="text-base">Relatório de Aging</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+              <Skeleton className="h-2 w-full" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <CardTitle className="text-base">Relatório de Aging</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Erro ao carregar relatório: {error.message}
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!buckets || buckets.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <CardTitle className="text-base">Relatório de Aging</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <AlertTriangle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">Nenhuma receita em atraso</p>
+            <p className="text-xs mt-1">Parabéns! Suas contas estão em dia.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -36,21 +92,25 @@ export function AgingReportCard({ buckets, totalAmount }: AgingReportCardProps) 
       </CardHeader>
       <CardContent className="space-y-4">
         {buckets.map((bucket) => {
-          const percentage = (bucket.amount / totalAmount) * 100;
+          const percentage = totalAmount > 0 ? (Number(bucket.bucketAmount) / totalAmount) * 100 : 0;
           return (
-            <div key={bucket.range} className="space-y-2">
+            <div key={bucket.bucketRange} className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">{getRangeLabel(bucket.range)}</span>
-                <span className="font-semibold" style={{ color: bucket.color }}>
-                  {formatCurrency(bucket.amount)}
-                </span>
+                <span className="font-medium">{bucket.bucketRange}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {bucket.bucketCount} {bucket.bucketCount === 1 ? 'transação' : 'transações'}
+                  </span>
+                  <span className="font-semibold" style={{ color: bucket.bucketColor }}>
+                    {formatCurrency(Number(bucket.bucketAmount))}
+                  </span>
+                </div>
               </div>
               <Progress 
                 value={percentage} 
                 className="h-2" 
-                indicatorClassName={`bg-[${bucket.color}]`}
                 style={{ 
-                  ['--progress-background' as any]: bucket.color 
+                  ['--progress-background' as any]: bucket.bucketColor 
                 }}
               />
             </div>
