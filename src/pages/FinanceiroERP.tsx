@@ -219,9 +219,11 @@ function KpiSection({ summary, pendingThisMonth, totalPending, isLoading }: KpiS
 
 interface VisaoGeralProps {
   dateRange: DateRange | undefined;
+  onNavigate: (path: string) => void;
+  onTabChange: (tab: string) => void;
 }
 
-function VisaoGeral({ dateRange }: VisaoGeralProps) {
+function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
   const { isLoading: accountsLoading, isEnsuring } = useFinancialAccountsWithDefaults();
 
   const chartPeriod = useMemo(() => {
@@ -256,17 +258,17 @@ function VisaoGeral({ dateRange }: VisaoGeralProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Linha 1: Tesouraria (Largura Total) */}
         <div className="col-span-1 lg:col-span-2 h-full">
-          <ModuloTesouraria onClick={() => navigate('/dashboard/tesouraria')} />
+          <ModuloTesouraria onClick={() => onNavigate('/dashboard/tesouraria')} />
         </div>
 
         {/* Linha 2: Coluna Esquerda - Faturamento */}
         <div className="h-full">
-          <ModuloFaturamento onClick={() => setActiveTab('receitas')} />
+          <ModuloFaturamento onClick={() => onTabChange('receitas')} />
         </div>
 
         {/* Linha 2: Coluna Direita - Bancos */}
         <div className="h-full">
-          <ModuloMultiBancos onClick={() => setActiveTab('caixa')} />
+          <ModuloMultiBancos onClick={() => onTabChange('caixa')} />
         </div>
       </div>
 
@@ -402,8 +404,8 @@ export default function FinanceiroERP() {
 
   // Estado para controle da aba e detalhes
   const [activeTab, setActiveTab] = useState('visao-geral');
-  const [detailsId, setDetailsId] = useState<string | null>(null);
-  const [isLegacyId, setIsLegacyId] = useState(false);
+  const [detailsTransactionId, setDetailsTransactionId] = useState<string | null>(null);
+  const [isLegacyLookup, setIsLegacyLookup] = useState(false);
   const navigate = useNavigate();
 
   // Datas normalizadas para queries
@@ -501,7 +503,11 @@ export default function FinanceiroERP() {
         </TabsList>
 
         <TabsContent value="visao-geral">
-          <VisaoGeral dateRange={dateRange} />
+          <VisaoGeral 
+            dateRange={dateRange} 
+            onNavigate={(path) => navigate(path)}
+            onTabChange={setActiveTab}
+          />
           <div className="mt-6">
             <RecentMovements onViewDetails={handleViewTransactionDetails} />
           </div>

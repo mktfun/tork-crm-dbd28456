@@ -98,8 +98,8 @@ export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
     );
   }
 
-  const faturamentoMes = summary?.confirmedIncome || 0;
-  const operacoes = summary?.confirmedIncomeCount || 0;
+  const faturamentoMes = summary?.totalIncome || 0;
+  const operacoes = summary?.transactionCount || 0;
 
   return (
     <Card 
