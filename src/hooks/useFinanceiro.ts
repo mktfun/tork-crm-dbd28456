@@ -639,30 +639,29 @@ export interface GoalVsActual {
 
 /**
  * Hook para buscar meta do mês atual
+ * Retorna dados mock já que a tabela financial_goals não existe ainda
  */
 export function useCurrentMonthGoal(goalType: 'revenue' | 'profit' | 'commission' = 'revenue') {
-  const supabase = useSupabaseClient();
-  const { data: session } = useSession();
-
   return useQuery({
     queryKey: ['current-month-goal', goalType],
-    queryFn: async () => {
-      if (!session?.user?.id) throw new Error('Não autenticado');
-
-      const { data, error } = await supabase.rpc('get_current_month_goal', {
-        p_user_id: session.user.id,
-        p_goal_type: goalType
-      });
-
-      if (error) throw error;
-      return data && data.length > 0 ? (data[0] as FinancialGoal) : null;
+    queryFn: async (): Promise<FinancialGoal | null> => {
+      // Mock data - tabela financial_goals não existe ainda
+      const now = new Date();
+      return {
+        goalId: 'mock-goal-1',
+        goalAmount: 50000,
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+        description: 'Meta mensal',
+        createdAt: now.toISOString()
+      };
     },
-    enabled: !!session?.user?.id
   });
 }
 
 /**
  * Hook para buscar metas de um período
+ * Retorna dados mock já que a tabela financial_goals não existe ainda
  */
 export function useGoalsByPeriod(
   startYear: number,
@@ -671,67 +670,63 @@ export function useGoalsByPeriod(
   endMonth: number,
   goalType: 'revenue' | 'profit' | 'commission' = 'revenue'
 ) {
-  const supabase = useSupabaseClient();
-  const { data: session } = useSession();
-
   return useQuery({
     queryKey: ['goals-by-period', startYear, startMonth, endYear, endMonth, goalType],
-    queryFn: async () => {
-      if (!session?.user?.id) throw new Error('Não autenticado');
-
-      const { data, error } = await supabase.rpc('get_goals_by_period', {
-        p_user_id: session.user.id,
-        p_start_year: startYear,
-        p_start_month: startMonth,
-        p_end_year: endYear,
-        p_end_month: endMonth,
-        p_goal_type: goalType
-      });
-
-      if (error) throw error;
-      return (data || []) as FinancialGoal[];
+    queryFn: async (): Promise<FinancialGoal[]> => {
+      // Mock data - tabela financial_goals não existe ainda
+      const goals: FinancialGoal[] = [];
+      for (let y = startYear; y <= endYear; y++) {
+        const mStart = y === startYear ? startMonth : 1;
+        const mEnd = y === endYear ? endMonth : 12;
+        for (let m = mStart; m <= mEnd; m++) {
+          goals.push({
+            goalId: `mock-goal-${y}-${m}`,
+            goalAmount: 50000 + Math.random() * 10000,
+            year: y,
+            month: m,
+            description: `Meta ${m}/${y}`,
+            createdAt: new Date().toISOString()
+          });
+        }
+      }
+      return goals;
     },
-    enabled: !!session?.user?.id
   });
 }
 
 /**
  * Hook para comparar meta vs realizado
+ * Retorna dados mock já que as funções RPC não existem ainda
  */
 export function useGoalVsActual(
   year: number,
   month: number,
   goalType: 'revenue' | 'profit' | 'commission' = 'revenue'
 ) {
-  const supabase = useSupabaseClient();
-  const { data: session } = useSession();
-
   return useQuery({
     queryKey: ['goal-vs-actual', year, month, goalType],
-    queryFn: async () => {
-      if (!session?.user?.id) throw new Error('Não autenticado');
-
-      const { data, error } = await supabase.rpc('get_goal_vs_actual', {
-        p_user_id: session.user.id,
-        p_year: year,
-        p_month: month,
-        p_goal_type: goalType
-      });
-
-      if (error) throw error;
-      return data && data.length > 0 ? (data[0] as GoalVsActual) : null;
+    queryFn: async (): Promise<GoalVsActual | null> => {
+      // Mock data
+      const goalAmount = 50000;
+      const actualAmount = 42500;
+      const percentageAchieved = (actualAmount / goalAmount) * 100;
+      return {
+        goalAmount,
+        actualAmount,
+        difference: actualAmount - goalAmount,
+        percentageAchieved,
+        status: percentageAchieved >= 100 ? 'achieved' : percentageAchieved >= 80 ? 'near' : 'below'
+      };
     },
-    enabled: !!session?.user?.id
   });
 }
 
 /**
  * Hook para criar/atualizar meta financeira
+ * Retorna mock já que a tabela financial_goals não existe ainda
  */
 export function useUpsertGoal() {
   const queryClient = useQueryClient();
-  const supabase = useSupabaseClient();
-  const { data: session } = useSession();
 
   return useMutation({
     mutationFn: async (params: {
@@ -741,25 +736,19 @@ export function useUpsertGoal() {
       goalType?: 'revenue' | 'profit' | 'commission';
       description?: string;
     }) => {
-      if (!session?.user?.id) throw new Error('Não autenticado');
-
-      const { data, error } = await supabase
-        .from('financial_goals')
-        .upsert({
-          user_id: session.user.id,
-          year: params.year,
-          month: params.month,
-          goal_amount: params.goalAmount,
-          goal_type: params.goalType || 'revenue',
-          description: params.description || null
-        }, {
-          onConflict: 'user_id,year,month,goal_type'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      // Mock - tabela financial_goals não existe ainda
+      console.log('Mock: Salvando meta', params);
+      return {
+        id: `mock-goal-${params.year}-${params.month}`,
+        user_id: 'mock-user',
+        year: params.year,
+        month: params.month,
+        goal_amount: params.goalAmount,
+        goal_type: params.goalType || 'revenue',
+        description: params.description || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['current-month-goal'] });
@@ -771,19 +760,15 @@ export function useUpsertGoal() {
 
 /**
  * Hook para deletar meta financeira
+ * Mock já que a tabela financial_goals não existe ainda
  */
 export function useDeleteGoal() {
   const queryClient = useQueryClient();
-  const supabase = useSupabaseClient();
 
   return useMutation({
     mutationFn: async (goalId: string) => {
-      const { error } = await supabase
-        .from('financial_goals')
-        .delete()
-        .eq('id', goalId);
-
-      if (error) throw error;
+      // Mock - tabela financial_goals não existe ainda
+      console.log('Mock: Deletando meta', goalId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['current-month-goal'] });
