@@ -187,10 +187,12 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
   const markdownComponents = {
     // FASE P5.1: Premium Table Styling with internal scroll containment
     table: ({ children }: any) => (
-      <div className="w-full overflow-x-auto my-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-        <table className="w-full border-collapse text-sm table-fixed">
-          {children}
-        </table>
+      <div className="w-full max-w-full overflow-x-auto my-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+        <div className="inline-block min-w-full">
+          <table className="min-w-full border-collapse text-sm" style={{ tableLayout: 'auto', maxWidth: '100%' }}>
+            {children}
+          </table>
+        </div>
       </div>
     ),
     thead: ({ children }: any) => (
@@ -204,12 +206,12 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
       </tbody>
     ),
     th: ({ children }: any) => (
-      <th className="text-left p-2 text-xs font-semibold uppercase tracking-wider text-primary whitespace-normal break-words max-w-[150px]">
+      <th className="text-left p-2 text-xs font-semibold uppercase tracking-wider text-primary" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', maxWidth: '200px' }}>
         {children}
       </th>
     ),
     td: ({ children }: any) => (
-      <td className="p-2 text-sm border-b border-white/5 text-foreground/90 whitespace-normal break-words max-w-[200px]">
+      <td className="p-2 text-sm border-b border-white/5 text-foreground/90" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', maxWidth: '250px' }}>
         {children}
       </td>
     ),
@@ -290,7 +292,7 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
 
   return (
     // FASE P5.1: Contenção raiz com break-words e max-w-full
-    <div className="space-y-3 w-full max-w-full break-words overflow-x-auto scrollbar-none">
+    <div className="space-y-3 w-full max-w-full break-words">
       {/* Texto em Markdown com styling premium + GFM */}
       {textContent && (
         <div className="prose prose-sm prose-invert max-w-none w-full">
