@@ -38,10 +38,14 @@ import {
 import { NovaReceitaModal } from './NovaReceitaModal';
 import { TransactionDetailsSheet } from './TransactionDetailsSheet';
 import { SettleTransactionModal } from './SettleTransactionModal';
+import { FaturamentoChart } from './faturamento/FaturamentoChart';
+import { FaturamentoBreakdown } from './faturamento/FaturamentoBreakdown';
+import { MetasCard } from './faturamento/MetasCard';
 import { 
   useRevenueTransactions,
   useFinancialSummary
 } from '@/hooks/useFinanceiro';
+import { useCashFlowData } from '@/hooks/useCaixaData';
 import { parseLocalDate } from '@/utils/dateUtils';
 
 function formatCurrency(value: number | null | undefined): string {
@@ -296,6 +300,9 @@ export function ReceitasTab({ dateRange }: ReceitasTabProps) {
   const { data: allHistoricalTransactions = [], isLoading: loadingAll } = useRevenueTransactions('2000-01-01', '2100-12-31');
   
   const { data: summary } = useFinancialSummary(startDate, endDate);
+  
+  // Dados para o gráfico de faturamento
+  const { data: cashFlowData = [], isLoading: loadingCashFlow } = useCashFlowData(startDate, endDate);
 
   // Transações a exibir conforme a aba selecionada
   const displayTransactions = useMemo(() => {
@@ -404,6 +411,19 @@ export function ReceitasTab({ dateRange }: ReceitasTabProps) {
           <KpiCard title="Previsão a Receber" value={kpis.aReceber} variant="warning" icon={Clock} />
         </div>
       </div>
+
+      {/* Gráfico de Evolução do Faturamento */}
+      {viewMode === 'efetivado' && (
+        <FaturamentoChart data={cashFlowData} isLoading={loadingCashFlow} />
+      )}
+
+      {/* Cards de Análise e Metas */}
+      {viewMode === 'efetivado' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <MetasCard faturamentoAtual={kpis.recebido} />
+          <FaturamentoBreakdown />
+        </div>
+      )}
 
       {/* Info sobre transações sincronizadas */}
       {syncedCount > 0 && viewMode === 'a_receber' && (

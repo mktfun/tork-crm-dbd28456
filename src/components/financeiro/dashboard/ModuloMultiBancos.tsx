@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Landmark, Building2 } from "lucide-react";
+import { Landmark, Building2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BankAccount {
@@ -71,13 +71,28 @@ const getTypeBadge = (type: BankAccount["type"]) => {
   return types[type];
 };
 
-export const ModuloMultiBancos = () => {
+interface ModuloMultiBancosProps {
+  onClick?: () => void;
+}
+
+export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
   return (
-    <Card className="h-full bg-zinc-900/50 border-zinc-800 flex flex-col">
+    <Card 
+      className={cn(
+        "h-full bg-zinc-900/50 border-zinc-800 flex flex-col transition-all duration-200",
+        onClick && "cursor-pointer hover:bg-zinc-900/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+      )}
+      onClick={onClick}
+    >
       <CardHeader className="pb-2">
-        <CardTitle className="text-white flex items-center gap-2 text-base">
-          <Landmark className="h-5 w-5 text-primary" />
-          Saldos Bancários
+        <CardTitle className="text-white flex items-center justify-between text-base">
+          <span className="flex items-center gap-2">
+            <Landmark className="h-5 w-5 text-primary" />
+            Saldos Bancários
+          </span>
+          {onClick && (
+            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col">

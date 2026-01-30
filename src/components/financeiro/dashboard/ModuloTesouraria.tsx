@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowUpCircle, ArrowDownCircle, Wallet, Calendar } from "lucide-react";
+import { ArrowUpCircle, ArrowDownCircle, Wallet, Calendar, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AgingCategory {
@@ -52,13 +52,28 @@ const AgingBar = ({ item }: { item: AgingCategory }) => (
   </div>
 );
 
-export const ModuloTesouraria = () => {
+interface ModuloTesourariaProps {
+  onClick?: () => void;
+}
+
+export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
   return (
-    <Card className="h-full bg-zinc-900/50 border-zinc-800">
+    <Card 
+      className={cn(
+        "h-full bg-zinc-900/50 border-zinc-800 transition-all duration-200",
+        onClick && "cursor-pointer hover:bg-zinc-900/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+      )}
+      onClick={onClick}
+    >
       <CardHeader className="pb-2">
-        <CardTitle className="text-white flex items-center gap-2 text-base">
-          <Wallet className="h-5 w-5 text-primary" />
-          Tesouraria & Contas
+        <CardTitle className="text-white flex items-center justify-between text-base">
+          <span className="flex items-center gap-2">
+            <Wallet className="h-5 w-5 text-primary" />
+            Tesouraria & Contas
+          </span>
+          {onClick && (
+            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>

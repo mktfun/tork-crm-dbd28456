@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   Wallet, 
   TrendingDown, 
@@ -256,17 +256,17 @@ function VisaoGeral({ dateRange }: VisaoGeralProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Linha 1: Tesouraria (Largura Total) */}
         <div className="col-span-1 lg:col-span-2 h-full">
-          <ModuloTesouraria />
+          <ModuloTesouraria onClick={() => navigate('/dashboard/tesouraria')} />
         </div>
 
         {/* Linha 2: Coluna Esquerda - Faturamento */}
         <div className="h-full">
-          <ModuloFaturamento />
+          <ModuloFaturamento onClick={() => setActiveTab('receitas')} />
         </div>
 
         {/* Linha 2: Coluna Direita - Bancos */}
         <div className="h-full">
-          <ModuloMultiBancos />
+          <ModuloMultiBancos onClick={() => setActiveTab('caixa')} />
         </div>
       </div>
 
@@ -402,8 +402,9 @@ export default function FinanceiroERP() {
 
   // Estado para controle da aba e detalhes
   const [activeTab, setActiveTab] = useState('visao-geral');
-  const [detailsTransactionId, setDetailsTransactionId] = useState<string | null>(null);
-  const [isLegacyLookup, setIsLegacyLookup] = useState(false);
+  const [detailsTransactionId,  const [detailsId, setDetailsId] = useState<string | null>(null);
+  const [isLegacyId, setIsLegacyId] = useState(false);
+  const navigate = useNavigate();
 
   // Datas normalizadas para queries
   const { startDate, endDate } = useMemo(() => {

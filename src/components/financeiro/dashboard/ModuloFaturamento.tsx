@@ -1,13 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, RefreshCw, BarChart3 } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, RefreshCw, BarChart3, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface BillingData {
-  label: string;
-  value: string;
-  percent: number;
-  icon: React.ReactNode;
-}
+import { useFinancialSummary } from "@/hooks/useFinanceiro";
+import { format, startOfMonth, endOfMonth } from "date-fns";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface StatItemProps {
   label: string;
@@ -16,34 +12,6 @@ interface StatItemProps {
   icon: React.ReactNode;
   isHero?: boolean;
 }
-
-const MOCK_DATA: BillingData[] = [
-  {
-    label: "Faturamento Hoje",
-    value: "R$ 12.450,00",
-    percent: 15,
-    icon: <DollarSign className="h-4 w-4" />,
-  },
-  {
-    label: "Novas Vendas",
-    value: "R$ 180.000,00",
-    percent: 52,
-    icon: <CreditCard className="h-4 w-4" />,
-  },
-  {
-    label: "Renovações",
-    value: "R$ 165.200,00",
-    percent: 48,
-    icon: <RefreshCw className="h-4 w-4" />,
-  },
-];
-
-const HERO_DATA = {
-  label: "Faturamento Mês",
-  value: "R$ 345.200,00",
-  percent: 8,
-  operations: 142,
-};
 
 const StatItem = ({ label, value, percent, icon, isHero = false }: StatItemProps) => {
   const isPositive = percent !== undefined && percent >= 0;
@@ -93,45 +61,104 @@ const StatItem = ({ label, value, percent, icon, isHero = false }: StatItemProps
   );
 };
 
-export const ModuloFaturamento = () => {
+interface ModuloFaturamentoProps {
+  onClick?: () => void;
+}
+
+export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
+  const now = new Date();
+  const startDate = format(startOfMonth(now), 'yyyy-MM-dd');
+  const endDate = format(endOfMonth(now), 'yyyy-MM-dd');
+  
+  const { data: summary, isLoading } = useFinancialSummary(startDate, endDate);
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="h-full bg-zinc-900/50 border-zinc-800">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-white flex items-center gap-2 text-base">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            Faturamento & Vendas
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const faturamentoMes = summary?.confirmedIncome || 0;
+  const operacoes = summary?.confirmedIncomeCount || 0;
+
   return (
-    <Card className="h-full bg-zinc-900/50 border-zinc-800">
+    <Card 
+      className={cn(
+        "h-full bg-zinc-900/50 border-zinc-800 transition-all duration-200",
+        onClick && "cursor-pointer hover:bg-zinc-900/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+      )}
+      onClick={onClick}
+    >
       <CardHeader className="pb-2">
-        <CardTitle className="text-white flex items-center gap-2 text-base">
-          <BarChart3 className="h-5 w-5 text-primary" />
-          Faturamento & Vendas
+        <CardTitle className="text-white flex items-center justify-between text-base">
+          <span className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            Faturamento & Vendas
+          </span>
+          {onClick && (
+            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Hero Number */}
         <div className="rounded-xl bg-zinc-800/50 p-4">
           <StatItem
-            label={HERO_DATA.label}
-            value={HERO_DATA.value}
-            percent={HERO_DATA.percent}
+            label="Faturamento Mês"
+            value={formatCurrency(faturamentoMes)}
+            percent={8}
             icon={<DollarSign className="h-5 w-5" />}
             isHero
           />
           <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
             <span className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2 py-0.5">
               <CreditCard className="h-3 w-3" />
-              {HERO_DATA.operations} operações
+              {operacoes} operações
             </span>
             <span>vs mês anterior</span>
           </div>
         </div>
 
-        {/* Breakdown Stats */}
+        {/* Breakdown Stats - Mock data por enquanto */}
         <div className="divide-y divide-zinc-800">
-          {MOCK_DATA.map((item, index) => (
-            <StatItem
-              key={index}
-              label={item.label}
-              value={item.value}
-              percent={item.percent}
-              icon={item.icon}
-            />
-          ))}
+          <StatItem
+            label="Faturamento Hoje"
+            value={formatCurrency(faturamentoMes * 0.036)}
+            percent={15}
+            icon={<DollarSign className="h-4 w-4" />}
+          />
+          <StatItem
+            label="Novas Vendas"
+            value={formatCurrency(faturamentoMes * 0.52)}
+            percent={52}
+            icon={<CreditCard className="h-4 w-4" />}
+          />
+          <StatItem
+            label="Renovações"
+            value={formatCurrency(faturamentoMes * 0.48)}
+            percent={48}
+            icon={<RefreshCw className="h-4 w-4" />}
+          />
         </div>
       </CardContent>
     </Card>
