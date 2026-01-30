@@ -1,7 +1,7 @@
 import { ModuloFaturamento } from "@/components/financeiro/dashboard/ModuloFaturamento";
 import { ModuloTesouraria } from "@/components/financeiro/dashboard/ModuloTesouraria";
 import { ModuloMultiBancos } from "@/components/financeiro/dashboard/ModuloMultiBancos";
-import { ModuloFluxoCaixaPreditivo } from "@/components/financeiro/dashboard/ModuloFluxoCaixaPreditivo";
+
 
 const FinanceiroExecutivo = () => {
   return (
@@ -24,10 +24,7 @@ const FinanceiroExecutivo = () => {
           <ModuloMultiBancos />
         </div>
 
-        {/* Linha 3: Fluxo de Caixa (Largura Total) */}
-        <div className="col-span-1 lg:col-span-2 h-full">
-          <ModuloFluxoCaixaPreditivo />
-        </div>
+
       </div>
     </div>
   );

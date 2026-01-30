@@ -21,6 +21,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import { AccountFormModal } from './AccountFormModal';
+import { BankAccountsSection } from './BankAccountsSection';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DeleteAccountModal } from './DeleteAccountModal';
 import { useFinancialAccountsWithDefaults } from '@/hooks/useFinanceiro';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
@@ -424,40 +426,56 @@ export function ConfiguracoesTab() {
       <div>
         <h2 className="text-lg font-semibold">Configurações Financeiras</h2>
         <p className="text-sm text-muted-foreground">
-          Gerencie seu plano de contas e automações
+          Gerencie seu plano de contas, automações e bancos
         </p>
       </div>
 
-      {/* Automação */}
-      <AutomationSection />
+      {/* Tabs */}
+      <Tabs defaultValue="automacao" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="automacao">Automação</TabsTrigger>
+          <TabsTrigger value="plano-contas">Plano de Contas</TabsTrigger>
+          <TabsTrigger value="bancos">Bancos</TabsTrigger>
+        </TabsList>
 
-      {/* Destino das Comissões */}
-      <CommissionTargetSection assetAccounts={assetAccounts} />
+        {/* Tab: Automação */}
+        <TabsContent value="automacao" className="space-y-6 mt-6">
+          <AutomationSection />
+          <CommissionTargetSection assetAccounts={assetAccounts} />
+        </TabsContent>
 
-      {/* Contas Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <AccountListSection
-          title="Contas Bancárias"
-          description="Caixas, bancos e contas de pagamento"
-          icon={Landmark}
-          accounts={assetAccounts}
-          accountType="asset"
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          isLoading={isLoading}
-        />
-        
-        <AccountListSection
-          title="Categorias"
-          description="Despesas e receitas para classificação"
-          icon={Tags}
-          accounts={categoryAccounts}
-          accountType="expense"
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          isLoading={isLoading}
-        />
-      </div>
+        {/* Tab: Plano de Contas */}
+        <TabsContent value="plano-contas" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <AccountListSection
+              title="Contas Bancárias"
+              description="Caixas, bancos e contas de pagamento"
+              icon={Landmark}
+              accounts={assetAccounts}
+              accountType="asset"
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              isLoading={isLoading}
+            />
+            
+            <AccountListSection
+              title="Categorias"
+              description="Despesas e receitas para classificação"
+              icon={Tags}
+              accounts={categoryAccounts}
+              accountType="expense"
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              isLoading={isLoading}
+            />
+          </div>
+        </TabsContent>
+
+        {/* Tab: Bancos */}
+        <TabsContent value="bancos" className="space-y-6 mt-6">
+          <BankAccountsSection />
+        </TabsContent>
+      </Tabs>
 
       {/* Edit Modal */}
       {editingAccount && (
