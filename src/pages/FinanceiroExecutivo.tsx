@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModuloFaturamento } from "@/components/financeiro/dashboard/ModuloFaturamento";
 import { ModuloTesouraria } from "@/components/financeiro/dashboard/ModuloTesouraria";
+import { ModuloMultiBancos } from "@/components/financeiro/dashboard/ModuloMultiBancos";
 
 const FinanceiroExecutivo = () => {
   return (
@@ -24,18 +25,7 @@ const FinanceiroExecutivo = () => {
         <ModuloTesouraria />
 
         {/* Módulo 3: Multi-Bancos (Bottom-Left) */}
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              🏦 Saldos Bancários
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-zinc-500 text-sm">
-              Gestão Multi-Bancos e Consolidação virão aqui (Tarefa 1.5)
-            </p>
-          </CardContent>
-        </Card>
+        <ModuloMultiBancos />
 
         {/* Módulo 4: Fluxo de Caixa (Bottom-Right) */}
         <Card className="bg-zinc-900/50 border-zinc-800">
