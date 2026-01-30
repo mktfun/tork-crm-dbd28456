@@ -24,7 +24,7 @@ BEGIN
     JOIN financial_ledger fl ON fl.transaction_id = ft.id
     JOIN financial_accounts fa ON fa.id = fl.account_id
     WHERE ft.user_id = p_user_id
-      AND fa.account_type = 'income'
+      AND fa.type = 'income'
       AND ft.status = 'pending'
       AND NOT ft.is_void
       AND fl.amount > 0
@@ -111,7 +111,7 @@ BEGIN
   JOIN financial_accounts fa ON fa.id = fl.account_id
   LEFT JOIN apolices a ON a.id = ft.related_entity_id AND ft.related_entity_type = 'policy'
   WHERE ft.user_id = p_user_id
-    AND fa.account_type = 'income'
+    AND fa.type = 'income'
     AND ft.status = 'pending'
     AND NOT ft.is_void
     AND fl.amount > 0
@@ -141,7 +141,7 @@ BEGIN
   SELECT 
     ft.id,
     CASE 
-      WHEN fa.account_type = 'income' THEN 'receber'
+      WHEN fa.type = 'income' THEN 'receber'
       ELSE 'pagar'
     END as tx_type,
     ft.due_date,
@@ -172,8 +172,8 @@ BEGIN
     AND NOT ft.is_void
     AND (
       p_transaction_type = 'all' 
-      OR (p_transaction_type = 'receivable' AND fa.account_type = 'income')
-      OR (p_transaction_type = 'payable' AND fa.account_type = 'expense')
+      OR (p_transaction_type = 'receivable' AND fa.type = 'income')
+      OR (p_transaction_type = 'payable' AND fa.type = 'expense')
     )
     AND (
       p_status = 'all'

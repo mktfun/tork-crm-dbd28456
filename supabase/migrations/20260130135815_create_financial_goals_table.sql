@@ -174,7 +174,7 @@ BEGIN
   JOIN financial_ledger fl ON fl.transaction_id = ft.id
   JOIN financial_accounts fa ON fa.id = fl.account_id
   WHERE ft.user_id = p_user_id
-    AND fa.account_type = 'income'
+    AND fa.type = 'income'
     AND ft.status = 'confirmed'
     AND NOT ft.is_void
     AND fl.amount > 0

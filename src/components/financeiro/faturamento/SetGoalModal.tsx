@@ -29,7 +29,8 @@ const MONTH_NAMES = [
 ];
 
 export function SetGoalModal({ open, onClose, year, month, currentGoal }: SetGoalModalProps) {
-  const [goalAmount, setGoalAmount] = useState<string>('');
+  // Armazena valor em centavos para evitar problemas de arredondamento
+  const [goalAmountCents, setGoalAmountCents] = useState<number>(0);
   const [description, setDescription] = useState<string>('');
   
   const upsertGoalMutation = useUpsertGoal();
@@ -37,7 +38,8 @@ export function SetGoalModal({ open, onClose, year, month, currentGoal }: SetGoa
   // Preencher valores quando modal abre
   useEffect(() => {
     if (open) {
-      setGoalAmount(currentGoal ? String(currentGoal) : '');
+      // Converter valor atual para centavos
+      setGoalAmountCents(currentGoal ? Math.round(currentGoal * 100) : 0);
       setDescription('');
     }
   }, [open, currentGoal]);
@@ -45,8 +47,10 @@ export function SetGoalModal({ open, onClose, year, month, currentGoal }: SetGoa
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const amount = parseFloat(goalAmount);
-    if (isNaN(amount) || amount <= 0) {
+    // Converter centavos para reais
+    const amount = goalAmountCents / 100;
+    
+    if (amount <= 0) {
       toast.error('Por favor, insira um valor válido');
       return;
     }
@@ -71,13 +75,8 @@ export function SetGoalModal({ open, onClose, year, month, currentGoal }: SetGoa
     }
   };
 
-  const formatCurrency = (value: string) => {
-    // Remove tudo exceto números
-    const numbers = value.replace(/\D/g, '');
-    
-    // Converte para número e formata
-    const amount = parseFloat(numbers) / 100;
-    
+  const formatCurrency = (cents: number) => {
+    const amount = cents / 100;
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
@@ -88,8 +87,8 @@ export function SetGoalModal({ open, onClose, year, month, currentGoal }: SetGoa
     const value = e.target.value;
     // Remove tudo exceto números
     const numbers = value.replace(/\D/g, '');
-    // Armazena como string de números
-    setGoalAmount(numbers ? String(parseFloat(numbers) / 100) : '');
+    // Armazena como centavos (número inteiro)
+    setGoalAmountCents(numbers ? parseInt(numbers, 10) : 0);
   };
 
   return (
@@ -114,7 +113,7 @@ export function SetGoalModal({ open, onClose, year, month, currentGoal }: SetGoa
                 id="goal-amount"
                 type="text"
                 placeholder="R$ 0,00"
-                value={goalAmount ? formatCurrency(goalAmount) : ''}
+                value={formatCurrency(goalAmountCents)}
                 onChange={handleAmountChange}
                 required
               />
@@ -148,7 +147,7 @@ export function SetGoalModal({ open, onClose, year, month, currentGoal }: SetGoa
             </Button>
             <Button 
               type="submit"
-              disabled={upsertGoalMutation.isPending || !goalAmount}
+              disabled={upsertGoalMutation.isPending || goalAmountCents === 0}
             >
               {upsertGoalMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

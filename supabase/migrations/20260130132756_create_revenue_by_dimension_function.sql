@@ -28,7 +28,7 @@ BEGIN
     LEFT JOIN apolices a ON a.id = ft.related_entity_id AND ft.related_entity_type = 'policy'
     LEFT JOIN profiles p ON p.id = a.user_id
     WHERE ft.user_id = p_user_id
-      AND fa.account_type = 'income'
+      AND fa.type = 'income'
       AND ft.transaction_date BETWEEN p_start_date AND p_end_date
       AND NOT ft.is_void
       AND fl.amount > 0
