@@ -1,181 +1,145 @@
 
-# Plano de Correção Completa - Erros de Build
+# Relatório Completo de Erros e Inconsistências - Módulo Financeiro
 
-## Diagnóstico Completo
+## PROBLEMA 1: Erro de Enum - `financial_account_type: "income"`
 
-Identifiquei **13 erros de build** distribuídos em **5 arquivos**. Vou corrigir todos eles de uma só vez.
+### Diagnóstico
+A função SQL `get_revenue_by_dimension` contém um erro crítico. Ela usa o valor `'income'` para filtrar contas de receita, mas o enum `financial_account_type` do banco de dados NÃO POSSUI esse valor.
 
----
-
-## Erros por Arquivo
-
-### 1. `src/components/financeiro/CaixaTab.tsx` (2 erros)
-
-**Erro 1:** `activeAccounts` não existe em `ConsolidatedBalanceCardProps` (deveria ser `accountCount`)
+### Valores Válidos do Enum
 ```
-Linha 89: activeAccounts={activeAccountsCount}
+asset | liability | equity | revenue | expense
 ```
 
-**Erro 2:** O tipo `BankAccountType` de `useBancos` inclui `"giro"`, mas o mock `BankAccount` só aceita `"corrente" | "digital" | "investimento" | "poupanca"`
+### Código SQL com Erro (linha dentro da função)
+```sql
+WHERE ft.user_id = p_user_id
+  AND fa.type = 'income'   -- ERRO: deveria ser 'revenue'
+```
 
-**Correção:**
-- Renomear `activeAccounts` para `accountCount`
-- Criar uma função de mapeamento para converter o tipo de conta
+### Correção Necessária
+Alterar a função RPC `get_revenue_by_dimension` no Supabase, substituindo:
+```sql
+AND fa.type = 'income'
+```
+Por:
+```sql
+AND fa.type = 'revenue'
+```
 
 ---
 
-### 2. `src/hooks/useBancos.ts` (7 erros)
+## PROBLEMA 2: Metas Financeiras com Dados Mock
 
-**Causa:** O hook tenta acessar uma tabela (`bank_accounts`) e uma RPC (`get_bank_accounts_summary`) que **não existem no banco de dados**.
+### Diagnóstico
+Os hooks de metas financeiras retornam **valores fixos hardcoded** que não correspondem aos dados reais do sistema:
 
-**Correção:**
-- Converter o hook para usar dados mock temporariamente (mesmo padrão que outros componentes usam)
-- Manter a interface para futura integração com backend
+| Campo | Valor Mock | Valor Real (Janeiro 2026) |
+|-------|-----------|---------------------------|
+| Meta Mensal | R$ 50.000 | Não existe (tabela `financial_goals` não existe) |
+| Faturamento | R$ 42.500 | ~R$ 20.322 (soma das receitas do período) |
+| Percentual | 85% | N/A |
 
----
-
-### 3. `src/hooks/useFinanceiro.ts` (1 erro)
-
-**Erro:** Importação de módulo inexistente
+### Código Problemático
+**Arquivo:** `src/hooks/useFinanceiro.ts` (linhas 701-721)
 ```typescript
-import { useSupabaseClient, useSession } from '@supabase/auth-helpers-react';
-```
-
-**Correção:**
-- Usar `supabase` diretamente do cliente já configurado
-- Obter session via `supabase.auth.getSession()`
-
----
-
-### 4. `src/pages/Tesouraria.tsx` (3 erros)
-
-**Erro:** Passando props para componentes que não as aceitam:
-- `ReceivablesList` espera apenas `daysAhead`, não `receivables` e `totalAmount`
-- `AgingReportCard` não aceita props (usa hook interno)
-- `AccountsPayableReceivableTable` não aceita props (usa hook interno)
-
-**Correção:**
-- Remover as props desnecessárias dos componentes (eles já usam hooks internamente)
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Correção |
-|---------|----------|
-| `src/components/financeiro/CaixaTab.tsx` | Corrigir nome da prop e mapeamento de tipo |
-| `src/hooks/useBancos.ts` | Usar dados mock até backend estar pronto |
-| `src/hooks/useFinanceiro.ts` | Corrigir import do Supabase |
-| `src/pages/Tesouraria.tsx` | Remover props que componentes não aceitam |
-
----
-
-## Detalhes Técnicos
-
-### CaixaTab.tsx - Correções
-
-```tsx
-// Linha 88-90: Corrigir prop name
-<ConsolidatedBalanceCard
-  totalBalance={totalBalance}
-  accountCount={activeAccountsCount}  // ← Era 'activeAccounts'
-/>
-
-// Linhas 117-127: Mapear tipos corretamente
-const mapAccountType = (type: string): 'corrente' | 'digital' | 'investimento' | 'poupanca' => {
-  if (type === 'giro') return 'corrente';
-  if (type === 'digital' || type === 'poupanca' || type === 'investimento' || type === 'corrente') {
-    return type;
-  }
-  return 'corrente';
-};
-```
-
-### useBancos.ts - Usar Mock Data
-
-O banco de dados não possui a tabela `bank_accounts` nem a função `get_bank_accounts_summary`. Vou converter para retornar dados mock:
-
-```typescript
-export function useBankAccounts() {
+export function useGoalVsActual(...) {
   return useQuery({
-    queryKey: ['bank-accounts-summary'],
-    queryFn: async (): Promise<BankAccountsSummary> => {
-      // Retorna mock data até backend estar implementado
-      const mockAccounts: BankAccount[] = [
-        {
-          id: '1',
-          bankName: 'Itaú',
-          accountNumber: '12345-6',
-          agency: '0001',
-          accountType: 'corrente',
-          currentBalance: 187432.50,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          color: '#FF6B00',
-          icon: '🏦',
-        },
-        // ... mais contas
-      ];
-      
-      return {
-        accounts: mockAccounts,
-        totalBalance: mockAccounts.reduce((sum, a) => sum + a.currentBalance, 0),
-        activeAccounts: mockAccounts.filter(a => a.isActive).length,
-      };
+    queryFn: async (): Promise<GoalVsActual | null> => {
+      // Mock data - VALORES HARDCODED
+      const goalAmount = 50000;        // Não reflete realidade
+      const actualAmount = 42500;       // Não reflete realidade
+      // ...
     },
   });
 }
 ```
 
-### useFinanceiro.ts - Corrigir Import
+### Causa Raiz
+A tabela `financial_goals` **não existe** no banco de dados. Os hooks foram implementados com dados mock temporários, mas nunca foram atualizados para usar dados reais.
 
-```typescript
-// ANTES (linha 400)
-import { useSupabaseClient, useSession } from '@supabase/auth-helpers-react';
+---
 
-// DEPOIS
-import { supabase } from '@/integrations/supabase/client';
-import { useEffect, useState } from 'react';
+## PROBLEMA 3: Outros Potenciais Erros no Schema
 
-// E nos hooks que usam isso:
-const [userId, setUserId] = useState<string | null>(null);
+### 3.1 Convenção de Nomenclatura Inconsistente
+O código mistura termos em inglês:
+- `income` (usado erroneamente para receita)
+- `revenue` (valor correto no enum)
 
-useEffect(() => {
-  supabase.auth.getSession().then(({ data }) => {
-    setUserId(data.session?.user?.id || null);
-  });
-}, []);
+Isso pode causar confusão e erros futuros.
+
+### 3.2 Hooks que Dependem de Tabelas/RPCs Inexistentes
+| Hook | Tabela/RPC Esperada | Status |
+|------|---------------------|--------|
+| `useCurrentMonthGoal` | `financial_goals` | Não existe |
+| `useGoalsByPeriod` | `financial_goals` | Não existe |
+| `useGoalVsActual` | `financial_goals` | Não existe |
+| `useUpsertGoal` | `financial_goals` | Não existe |
+| `useDeleteGoal` | `financial_goals` | Não existe |
+
+---
+
+## Resumo das Correções Necessárias
+
+### Correção Imediata (Backend/SQL)
+1. **Corrigir a função `get_revenue_by_dimension`**:
+```sql
+CREATE OR REPLACE FUNCTION get_revenue_by_dimension(
+  p_user_id UUID,
+  p_start_date DATE,
+  p_end_date DATE,
+  p_dimension TEXT
+)
+RETURNS TABLE (...) AS $$
+BEGIN
+  RETURN QUERY
+  WITH revenue_transactions AS (
+    SELECT ...
+    FROM financial_transactions ft
+    JOIN financial_ledger fl ON fl.transaction_id = ft.id
+    JOIN financial_accounts fa ON fa.id = fl.account_id
+    ...
+    WHERE ft.user_id = p_user_id
+      AND fa.type = 'revenue'  -- Corrigido de 'income' para 'revenue'
+      AND ft.transaction_date BETWEEN p_start_date AND p_end_date
+      AND NOT ft.is_void
+      AND fl.amount < 0  -- Receitas são créditos (negativos no ledger)
+  ),
+  ...
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
-### Tesouraria.tsx - Remover Props
+### Correção Imediata (Frontend)
+2. **Atualizar hooks de metas para usar dados reais** ou mostrar mensagem clara de que a funcionalidade não está implementada.
 
-```tsx
-// ANTES
-<ReceivablesList receivables={receivables} totalAmount={totalReceivables} />
-<AgingReportCard buckets={agingBuckets} totalAmount={totalAging} />
-<AccountsPayableReceivableTable transactions={transactions} />
-
-// DEPOIS
-<ReceivablesList daysAhead={30} />
-<AgingReportCard />
-<AccountsPayableReceivableTable />
+### Correção Futura
+3. **Criar tabela `financial_goals`** para persistir metas:
+```sql
+CREATE TABLE financial_goals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id),
+  year INTEGER NOT NULL,
+  month INTEGER NOT NULL,
+  goal_type TEXT DEFAULT 'revenue',
+  goal_amount DECIMAL(15,2) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, year, month, goal_type)
+);
 ```
 
 ---
 
-## Ordem de Execução
+## Dados Reais do Sistema (Janeiro 2026)
 
-1. **useFinanceiro.ts** - Corrigir import quebrado
-2. **useBancos.ts** - Converter para mock data
-3. **CaixaTab.tsx** - Corrigir props e tipos
-4. **Tesouraria.tsx** - Remover props inválidas
+| Métrica | Valor Real |
+|---------|-----------|
+| Receitas do mês | R$ 20.322,47 |
+| Despesas do mês | R$ 1.000,00 |
+| Total de transações | 60 |
+| Contas ativas | 20+ |
 
----
-
-## Resultado Esperado
-
-Após as correções:
-- Build passará sem erros
-- Funcionalidades mantidas com dados mock
-- Pronto para futura integração com backend real
+**Nota:** Os valores de "meta mensal" mostrados na UI (R$ 50.000 / R$ 42.500) são completamente fictícios e não refletem nenhum dado do banco de dados.
