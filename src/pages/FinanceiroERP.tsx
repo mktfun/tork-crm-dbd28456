@@ -32,6 +32,7 @@ import { DateRangeFilter } from '@/components/financeiro/DateRangeFilter';
 import { ReceitasTab } from '@/components/financeiro/ReceitasTab';
 import { DespesasTab } from '@/components/financeiro/DespesasTab';
 import { CaixaTab } from '@/components/financeiro/CaixaTab';
+import { TesourariaTab } from '@/components/financeiro/TesourariaTab';
 import { ProvisoesTab } from '@/components/financeiro/ProvisoesTab';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
 import { ModuloFaturamento } from '@/components/financeiro/dashboard/ModuloFaturamento';
@@ -480,6 +481,10 @@ export default function FinanceiroERP() {
             <Landmark className="w-4 h-4" />
             Bancos
           </TabsTrigger>
+          <TabsTrigger value="tesouraria" className="gap-2">
+            <Wallet className="w-4 h-4" />
+            Tesouraria
+          </TabsTrigger>
           <TabsTrigger value="receitas" className="gap-2">
             <TrendingUp className="w-4 h-4" />
             Receitas
@@ -515,6 +520,10 @@ export default function FinanceiroERP() {
 
         <TabsContent value="caixa">
           <CaixaTab dateRange={dateRange} />
+        </TabsContent>
+
+        <TabsContent value="tesouraria">
+          <TesourariaTab dateRange={dateRange} />
         </TabsContent>
 
         <TabsContent value="receitas">

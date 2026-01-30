@@ -432,10 +432,9 @@ export function ConfiguracoesTab() {
 
       {/* Tabs */}
       <Tabs defaultValue="automacao" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="automacao">Automação</TabsTrigger>
           <TabsTrigger value="plano-contas">Plano de Contas</TabsTrigger>
-          <TabsTrigger value="bancos">Bancos</TabsTrigger>
         </TabsList>
 
         {/* Tab: Automação */}
@@ -471,10 +470,7 @@ export function ConfiguracoesTab() {
           </div>
         </TabsContent>
 
-        {/* Tab: Bancos */}
-        <TabsContent value="bancos" className="space-y-6 mt-6">
-          <BankAccountsSection />
-        </TabsContent>
+
       </Tabs>
 
       {/* Edit Modal */}

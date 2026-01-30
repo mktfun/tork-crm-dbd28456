@@ -394,3 +394,53 @@ export function usePendingThisMonth() {
     queryFn: () => financialService.getPendingThisMonth()
   });
 }
+
+// ============ HOOKS PARA ANÁLISE POR DIMENSÃO ============
+
+import { useSupabaseClient, useSession } from '@supabase/auth-helpers-react';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { DateRange } from 'react-day-picker';
+
+export interface DimensionBreakdown {
+  dimensionName: string;
+  totalAmount: number;
+  transactionCount: number;
+  percentage: number;
+}
+
+/**
+ * Hook para análise de receitas por dimensão (produtor, ramo, seguradora)
+ */
+export function useRevenueByDimension(
+  dimension: 'producer' | 'type' | 'insurance_company',
+  dateRange?: DateRange
+) {
+  const supabase = useSupabaseClient();
+  const { data: session } = useSession();
+
+  return useQuery({
+    queryKey: ['revenue-by-dimension', dimension, dateRange],
+    queryFn: async () => {
+      if (!session?.user?.id) throw new Error('Não autenticado');
+
+      const startDate = dateRange?.from 
+        ? format(dateRange.from, 'yyyy-MM-dd')
+        : format(startOfMonth(new Date()), 'yyyy-MM-dd');
+      
+      const endDate = dateRange?.to
+        ? format(dateRange.to, 'yyyy-MM-dd')
+        : format(endOfMonth(new Date()), 'yyyy-MM-dd');
+
+      const { data, error } = await supabase.rpc('get_revenue_by_dimension', {
+        p_user_id: session.user.id,
+        p_start_date: startDate,
+        p_end_date: endDate,
+        p_dimension: dimension
+      });
+
+      if (error) throw error;
+      return (data || []) as DimensionBreakdown[];
+    },
+    enabled: !!session?.user?.id
+  });
+}
