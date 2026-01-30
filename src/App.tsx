@@ -16,7 +16,7 @@ import PolicyDetails from "./pages/PolicyDetails";
 import Clients from "./pages/Clients";
 import ClientDetails from "./pages/ClientDetails";
 import Appointments from "./pages/Appointments";
-import FinanceiroERP from "./pages/FinanceiroERP";
+import FinanceiroExecutivo from "./pages/FinanceiroExecutivo";
 import Tasks from "./pages/Tasks";
 import Renovacoes from "./pages/Renovacoes";
 import Sinistros from "./pages/Sinistros";
@@ -113,7 +113,7 @@ function App() {
                   <Route path="clients" element={<Clients />} />
                   <Route path="clients/:id" element={<ClientDetails />} />
                   <Route path="appointments" element={<Appointments />} />
-                  <Route path="financeiro" element={<FinanceiroERP />} />
+                  <Route path="financeiro" element={<FinanceiroExecutivo />} />
                   <Route path="tasks" element={<Tasks />} />
                   <Route path="renovacoes" element={<Renovacoes />} />
                   <Route path="sinistros" element={<Sinistros />} />
