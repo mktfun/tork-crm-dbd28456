@@ -12,13 +12,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { CashFlowDataPoint } from "@/types/financeiro";
 
 interface FaturamentoChartProps {
-  data: Array<{
-    date: string;
-    income: number;
-    expense: number;
-  }>;
+  data: CashFlowDataPoint[];
   isLoading?: boolean;
 }
 
@@ -34,15 +31,15 @@ export function FaturamentoChart({ data, isLoading }: FaturamentoChartProps) {
 
   const chartData = useMemo(() => {
     return data
-      .filter(item => item.date && !isNaN(new Date(item.date).getTime()))
+      .filter(item => item.period && !isNaN(new Date(item.period).getTime()))
       .map(item => ({
-        date: format(new Date(item.date), "dd/MM", { locale: ptBR }),
+        date: format(new Date(item.period), "dd/MM", { locale: ptBR }),
         faturamento: item.income,
       }));
   }, [data]);
 
   const totalFaturamento = useMemo(() => {
-    return data.reduce((sum, item) => sum + item.income, 0);
+    return data.reduce((sum, item) => sum + (item.income || 0), 0);
   }, [data]);
 
   if (isLoading) {
