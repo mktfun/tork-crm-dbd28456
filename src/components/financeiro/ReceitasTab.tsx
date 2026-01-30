@@ -43,9 +43,9 @@ import { FaturamentoBreakdown } from './faturamento/FaturamentoBreakdown';
 import { MetasCard } from './faturamento/MetasCard';
 import { 
   useRevenueTransactions,
-  useFinancialSummary
+  useFinancialSummary,
+  useCashFlowData
 } from '@/hooks/useFinanceiro';
-import { useCashFlowData } from '@/hooks/useCaixaData';
 import { parseLocalDate } from '@/utils/dateUtils';
 
 function formatCurrency(value: number | null | undefined): string {
