@@ -1,58 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Landmark, Building2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface BankAccount {
-  id: string;
-  name: string;
-  balance: number;
-  color: string;
-  bgColor: string;
-  lastTransaction: string;
-  type: "corrente" | "poupanca" | "investimento" | "giro";
-}
-
-const BANK_DATA: BankAccount[] = [
-  {
-    id: "1",
-    name: "Itaú Empresas",
-    balance: 45200,
-    color: "text-orange-500",
-    bgColor: "bg-orange-500/10 border-orange-500/20",
-    lastTransaction: "Entrada: R$ 2k hoje",
-    type: "corrente",
-  },
-  {
-    id: "2",
-    name: "Nubank PJ",
-    balance: 12850,
-    color: "text-purple-500",
-    bgColor: "bg-purple-500/10 border-purple-500/20",
-    lastTransaction: "Saída: R$ 800 ontem",
-    type: "giro",
-  },
-  {
-    id: "3",
-    name: "Bradesco",
-    balance: 8900,
-    color: "text-red-500",
-    bgColor: "bg-red-500/10 border-red-500/20",
-    lastTransaction: "Rendimento: R$ 45",
-    type: "poupanca",
-  },
-  {
-    id: "4",
-    name: "Caixinha Inter",
-    balance: 55000,
-    color: "text-yellow-500",
-    bgColor: "bg-yellow-500/10 border-yellow-500/20",
-    lastTransaction: "Aporte: R$ 5k",
-    type: "investimento",
-  },
-];
-
-const TOTAL_BALANCE = BANK_DATA.reduce((sum, bank) => sum + bank.balance, 0);
+import { useBankAccounts, type BankAccountType } from "@/hooks/useBancos";
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("pt-BR", {
@@ -61,7 +12,7 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-const getTypeBadge = (type: BankAccount["type"]) => {
+const getTypeBadge = (type: BankAccountType) => {
   const types = {
     corrente: { label: "Corrente", variant: "secondary" as const },
     poupanca: { label: "Poupança", variant: "outline" as const },
@@ -71,11 +22,32 @@ const getTypeBadge = (type: BankAccount["type"]) => {
   return types[type];
 };
 
+const getColorClasses = (color?: string) => {
+  // Mapear cores hex para classes Tailwind
+  const colorMap: Record<string, { text: string; bg: string }> = {
+    '#FF6B00': { text: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20' },
+    '#8A05BE': { text: 'text-purple-500', bg: 'bg-purple-500/10 border-purple-500/20' },
+    '#CC092F': { text: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20' },
+    '#FF8700': { text: 'text-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20' },
+    '#0066CC': { text: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/20' },
+  };
+  
+  return color && colorMap[color] 
+    ? colorMap[color] 
+    : { text: 'text-primary', bg: 'bg-primary/10 border-primary/20' };
+};
+
 interface ModuloMultiBancosProps {
   onClick?: () => void;
 }
 
 export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
+  const { data: summary, isLoading } = useBankAccounts();
+
+  const totalBalance = summary?.totalBalance ?? 0;
+  const activeAccounts = summary?.activeAccounts ?? 0;
+  const accounts = summary?.accounts?.filter(acc => acc.isActive) ?? [];
+
   return (
     <Card 
       className={cn(
@@ -106,52 +78,87 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
               Atualizado agora
             </Badge>
           </div>
-          <p className="text-3xl font-bold tracking-tight text-primary">
-            {formatCurrency(TOTAL_BALANCE)}
-          </p>
-          <p className="text-xs text-zinc-500 mt-1">
-            {BANK_DATA.length} contas ativas
-          </p>
+          {isLoading ? (
+            <Skeleton className="h-9 w-40 mt-1" />
+          ) : (
+            <>
+              <p className="text-3xl font-bold tracking-tight text-primary">
+                {formatCurrency(totalBalance)}
+              </p>
+              <p className="text-xs text-zinc-500 mt-1">
+                {activeAccounts} {activeAccounts === 1 ? 'conta ativa' : 'contas ativas'}
+              </p>
+            </>
+          )}
         </div>
 
         {/* Grid de Bancos */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
-          {BANK_DATA.map((bank) => {
-            const typeBadge = getTypeBadge(bank.type);
-            return (
-              <div
-                key={bank.id}
-                className={cn(
-                  "rounded-lg border p-3 transition-colors hover:bg-zinc-800/50",
-                  bank.bgColor
-                )}
-              >
-                {/* Header do Mini-Card */}
-                <div className="flex items-center gap-2 mb-2">
-                  <Building2 className={cn("h-4 w-4", bank.color)} />
-                  <span className="text-sm font-medium text-zinc-200 truncate">
-                    {bank.name}
-                  </span>
-                </div>
-
-                {/* Saldo */}
-                <p className="text-lg font-semibold text-white mb-2">
-                  {formatCurrency(bank.balance)}
-                </p>
-
-                {/* Footer */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="rounded-lg border border-zinc-800 p-3">
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-6 w-32 mb-2" />
                 <div className="flex items-center justify-between">
-                  <Badge variant={typeBadge.variant} className="text-[10px] h-5">
-                    {typeBadge.label}
-                  </Badge>
-                  <span className="text-[10px] text-zinc-500 truncate max-w-[80px]">
-                    {bank.lastTransaction}
-                  </span>
+                  <Skeleton className="h-5 w-16" />
+                  <Skeleton className="h-3 w-20" />
                 </div>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        ) : accounts.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-center p-6">
+            <div>
+              <Landmark className="h-12 w-12 text-zinc-700 mx-auto mb-3" />
+              <p className="text-sm text-zinc-400 mb-1">Nenhuma conta bancária cadastrada</p>
+              <p className="text-xs text-zinc-600">
+                Adicione suas contas para visualizar os saldos
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
+            {accounts.map((bank) => {
+              const typeBadge = getTypeBadge(bank.accountType);
+              const colors = getColorClasses(bank.color);
+              
+              return (
+                <div
+                  key={bank.id}
+                  className={cn(
+                    "rounded-lg border p-3 transition-colors hover:bg-zinc-800/50",
+                    colors.bg
+                  )}
+                >
+                  {/* Header do Mini-Card */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building2 className={cn("h-4 w-4", colors.text)} />
+                    <span className="text-sm font-medium text-zinc-200 truncate">
+                      {bank.bankName}
+                    </span>
+                  </div>
+
+                  {/* Saldo */}
+                  <p className="text-lg font-semibold text-white mb-2">
+                    {formatCurrency(bank.currentBalance)}
+                  </p>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between">
+                    <Badge variant={typeBadge.variant} className="text-[10px] h-5">
+                      {typeBadge.label}
+                    </Badge>
+                    {bank.lastSyncDate && (
+                      <span className="text-[10px] text-zinc-500 truncate max-w-[80px]">
+                        Sync: {new Date(bank.lastSyncDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
