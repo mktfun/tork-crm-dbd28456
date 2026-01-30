@@ -402,7 +402,7 @@ export default function FinanceiroERP() {
 
   // Estado para controle da aba e detalhes
   const [activeTab, setActiveTab] = useState('visao-geral');
-  const [detailsTransactionId,  const [detailsId, setDetailsId] = useState<string | null>(null);
+  const [detailsId, setDetailsId] = useState<string | null>(null);
   const [isLegacyId, setIsLegacyId] = useState(false);
   const navigate = useNavigate();
 
