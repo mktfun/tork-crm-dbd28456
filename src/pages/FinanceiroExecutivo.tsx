@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ModuloFaturamento } from "@/components/financeiro/dashboard/ModuloFaturamento";
+import { ModuloTesouraria } from "@/components/financeiro/dashboard/ModuloTesouraria";
 
 const FinanceiroExecutivo = () => {
   return (
@@ -20,18 +21,7 @@ const FinanceiroExecutivo = () => {
         <ModuloFaturamento />
 
         {/* Módulo 2: Tesouraria (Top-Right) */}
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              💰 Tesouraria & Contas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-zinc-500 text-sm">
-              Aging List e Contas a Receber/Pagar virão aqui (Tarefa 1.4)
-            </p>
-          </CardContent>
-        </Card>
+        <ModuloTesouraria />
 
         {/* Módulo 3: Multi-Bancos (Bottom-Left) */}
         <Card className="bg-zinc-900/50 border-zinc-800">
