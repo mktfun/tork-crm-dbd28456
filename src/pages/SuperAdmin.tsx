@@ -1,40 +1,47 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
+import { useOrganizations } from '@/hooks/useOrganizations';
+import { useApiKeys } from '@/hooks/useApiKeys';
+import { useAuditStats } from '@/hooks/useAuditLogs';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { KpiCard } from '@/components/policies/KpiCard';
+import { ApiKeysManager } from '@/components/superadmin/ApiKeysManager';
+import { AuditLogsViewer } from '@/components/superadmin/AuditLogsViewer';
 import { 
   LayoutDashboard, 
   Cpu, 
   Building2, 
   Settings, 
   Shield, 
-  Eye, 
-  EyeOff,
   Users,
   Activity,
-  Server,
-  Brain
+  Eye,
+  CheckCircle2,
+  XCircle,
+  Clock
 } from 'lucide-react';
 
 export default function SuperAdmin() {
   const navigate = useNavigate();
-  const { data: profile, isLoading } = useProfile();
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: organizations, isLoading: orgsLoading } = useOrganizations();
+  const { data: apiKeys, isLoading: apiKeysLoading } = useApiKeys();
+  const { data: auditStats, isLoading: auditStatsLoading } = useAuditStats();
 
   // Proteção: redireciona se não for admin
   useEffect(() => {
-    if (!isLoading && profile?.role !== 'admin') {
+    if (!profileLoading && profile?.role !== 'admin') {
       navigate('/dashboard', { replace: true });
     }
-  }, [profile, isLoading, navigate]);
+  }, [profile, profileLoading, navigate]);
 
-  if (isLoading) {
+  if (profileLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-64 bg-zinc-800" />
@@ -47,27 +54,13 @@ export default function SuperAdmin() {
     return null;
   }
 
-  // Dados mockados para KPIs
-  const mockKpis = {
-    totalBrokerages: 12,
-    onlineUsers: 47,
-    aiRequests: 1284,
-    systemStatus: 'Operacional'
-  };
+  const isLoading = orgsLoading || apiKeysLoading || auditStatsLoading;
 
-  // APIs mockadas
-  const mockApis = [
-    { name: 'OpenAI', key: 'sk-proj-****...****Xz9A', status: 'active' },
-    { name: 'Mistral', key: 'mist-****...****7pQ', status: 'active' },
-    { name: 'Stripe', key: 'sk_live_****...****mNp', status: 'inactive' },
-  ];
-
-  // Corretoras mockadas
-  const mockBrokerages = [
-    { id: 1, name: 'Seguros Brasil LTDA', users: 8, policies: 342, status: 'active' },
-    { id: 2, name: 'Corretora Premium', users: 5, policies: 189, status: 'active' },
-    { id: 3, name: 'Proteção Total Seguros', users: 12, policies: 567, status: 'active' },
-  ];
+  // Calcular KPIs reais
+  const totalOrganizations = organizations?.length || 0;
+  const totalUsers = organizations?.reduce((sum, org) => sum + (org._count?.users || 0), 0) || 0;
+  const totalPolicies = organizations?.reduce((sum, org) => sum + (org._count?.policies || 0), 0) || 0;
+  const activeApiKeys = apiKeys?.filter(key => key.status === 'active').length || 0;
 
   return (
     <div className="space-y-6">
@@ -93,18 +86,25 @@ export default function SuperAdmin() {
             Dashboard
           </TabsTrigger>
           <TabsTrigger 
+            value="organizations" 
+            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 gap-2"
+          >
+            <Building2 className="h-4 w-4" />
+            Organizações
+          </TabsTrigger>
+          <TabsTrigger 
             value="apis" 
             className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 gap-2"
           >
             <Cpu className="h-4 w-4" />
-            APIs e IA
+            API Keys
           </TabsTrigger>
           <TabsTrigger 
-            value="clients" 
+            value="audit" 
             className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 gap-2"
           >
-            <Building2 className="h-4 w-4" />
-            Clientes
+            <Activity className="h-4 w-4" />
+            Auditoria
           </TabsTrigger>
           <TabsTrigger 
             value="system" 
@@ -117,114 +117,174 @@ export default function SuperAdmin() {
 
         {/* Dashboard Tab */}
         <TabsContent value="dashboard" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard
-              title="Total de Corretoras"
-              value={mockKpis.totalBrokerages}
-              icon={Building2}
-              subtitle="Ativas no sistema"
-            />
-            <KpiCard
-              title="Usuários Online"
-              value={mockKpis.onlineUsers}
-              icon={Users}
-              subtitle="Últimas 24h"
-              variant="success"
-            />
-            <KpiCard
-              title="Requisições de IA"
-              value={mockKpis.aiRequests.toLocaleString('pt-BR')}
-              icon={Brain}
-              subtitle="Este mês"
-            />
-            <KpiCard
-              title="Status do Sistema"
-              value={mockKpis.systemStatus}
-              icon={Activity}
-              subtitle="Todos os serviços"
-              variant="success"
-            />
-          </div>
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-32 bg-zinc-800" />
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <KpiCard
+                  title="Organizações"
+                  value={totalOrganizations}
+                  icon={Building2}
+                  subtitle="Corretoras ativas"
+                />
+                <KpiCard
+                  title="Usuários"
+                  value={totalUsers}
+                  icon={Users}
+                  subtitle="Total no sistema"
+                  variant="success"
+                />
+                <KpiCard
+                  title="Apólices"
+                  value={totalPolicies.toLocaleString('pt-BR')}
+                  icon={Shield}
+                  subtitle="Total gerenciadas"
+                />
+                <KpiCard
+                  title="API Keys Ativas"
+                  value={activeApiKeys}
+                  icon={Cpu}
+                  subtitle={`de ${apiKeys?.length || 0} total`}
+                  variant="success"
+                />
+              </div>
+
+              {/* Estatísticas de Auditoria */}
+              {auditStats && (
+                <div className="mt-6">
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <Activity className="h-5 w-5" />
+                        Estatísticas de Operações da IA
+                      </CardTitle>
+                      <CardDescription>Métricas de uso do assistente inteligente</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Activity className="h-4 w-4 text-blue-400" />
+                            <span className="text-sm text-zinc-400">Total</span>
+                          </div>
+                          <p className="text-2xl font-bold text-zinc-100">{auditStats.total.toLocaleString('pt-BR')}</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                          <div className="flex items-center gap-2 mb-2">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                            <span className="text-sm text-zinc-400">Sucesso</span>
+                          </div>
+                          <p className="text-2xl font-bold text-emerald-400">{auditStats.successful.toLocaleString('pt-BR')}</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                          <div className="flex items-center gap-2 mb-2">
+                            <XCircle className="h-4 w-4 text-red-400" />
+                            <span className="text-sm text-zinc-400">Falhas</span>
+                          </div>
+                          <p className="text-2xl font-bold text-red-400">{auditStats.failed.toLocaleString('pt-BR')}</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Clock className="h-4 w-4 text-amber-400" />
+                            <span className="text-sm text-zinc-400">Últimas 24h</span>
+                          </div>
+                          <p className="text-2xl font-bold text-amber-400">{auditStats.recent24h.toLocaleString('pt-BR')}</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Activity className="h-4 w-4 text-purple-400" />
+                            <span className="text-sm text-zinc-400">Taxa de Sucesso</span>
+                          </div>
+                          <p className="text-2xl font-bold text-purple-400">{auditStats.successRate.toFixed(1)}%</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </>
+          )}
+        </TabsContent>
+
+        {/* Organizations Tab */}
+        <TabsContent value="organizations" className="mt-6">
+          <Card className="bg-zinc-900/50 border-zinc-800">
+            <CardHeader>
+              <CardTitle className="text-zinc-100">Organizações Cadastradas</CardTitle>
+              <CardDescription>Visão geral de todas as corretoras no sistema</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {orgsLoading ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => (
+                    <Skeleton key={i} className="h-16 bg-zinc-800" />
+                  ))}
+                </div>
+              ) : organizations && organizations.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-zinc-800 hover:bg-transparent">
+                      <TableHead className="text-zinc-400">Organização</TableHead>
+                      <TableHead className="text-zinc-400">Slug</TableHead>
+                      <TableHead className="text-zinc-400">Usuários</TableHead>
+                      <TableHead className="text-zinc-400">Apólices</TableHead>
+                      <TableHead className="text-zinc-400">Status</TableHead>
+                      <TableHead className="text-zinc-400">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {organizations.map((org) => (
+                      <TableRow key={org.id} className="border-zinc-800 hover:bg-zinc-800/50">
+                        <TableCell className="font-medium text-zinc-100">{org.name}</TableCell>
+                        <TableCell className="text-zinc-400 font-mono text-sm">{org.slug}</TableCell>
+                        <TableCell className="text-zinc-300">{org._count?.users || 0}</TableCell>
+                        <TableCell className="text-zinc-300">{org._count?.policies || 0}</TableCell>
+                        <TableCell>
+                          <Badge className={org.active 
+                            ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" 
+                            : "bg-zinc-700 text-zinc-400"
+                          }>
+                            {org.active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/superadmin/organizations/${org.id}`)}
+                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver Detalhes
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-zinc-400">
+                  <Building2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>Nenhuma organização cadastrada</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* APIs Tab */}
         <TabsContent value="apis" className="mt-6">
-          <Card className="bg-zinc-900/50 border-zinc-800">
-            <CardHeader>
-              <CardTitle className="text-zinc-100">Chaves de API</CardTitle>
-              <CardDescription>Gerenciamento de integrações e serviços de IA</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {mockApis.map((api) => (
-                  <div 
-                    key={api.name}
-                    className="flex items-center justify-between p-4 rounded-lg bg-zinc-800/50 border border-zinc-700"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-2 rounded-md bg-zinc-700">
-                        <Cpu className="h-5 w-5 text-zinc-300" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-zinc-100">{api.name}</p>
-                        <p className="text-sm text-zinc-500 font-mono">{api.key}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge 
-                        variant={api.status === 'active' ? 'default' : 'secondary'}
-                        className={api.status === 'active' 
-                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
-                          : 'bg-zinc-700 text-zinc-400'
-                        }
-                      >
-                        {api.status === 'active' ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                      <button className="p-2 hover:bg-zinc-700 rounded-md transition-colors">
-                        <Eye className="h-4 w-4 text-zinc-400" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <ApiKeysManager />
         </TabsContent>
 
-        {/* Clients Tab */}
-        <TabsContent value="clients" className="mt-6">
-          <Card className="bg-zinc-900/50 border-zinc-800">
-            <CardHeader>
-              <CardTitle className="text-zinc-100">Corretoras Cadastradas</CardTitle>
-              <CardDescription>Visão geral de todas as corretoras no sistema</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-zinc-800 hover:bg-transparent">
-                    <TableHead className="text-zinc-400">Corretora</TableHead>
-                    <TableHead className="text-zinc-400">Usuários</TableHead>
-                    <TableHead className="text-zinc-400">Apólices</TableHead>
-                    <TableHead className="text-zinc-400">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockBrokerages.map((brokerage) => (
-                    <TableRow key={brokerage.id} className="border-zinc-800 hover:bg-zinc-800/50">
-                      <TableCell className="font-medium text-zinc-100">{brokerage.name}</TableCell>
-                      <TableCell className="text-zinc-300">{brokerage.users}</TableCell>
-                      <TableCell className="text-zinc-300">{brokerage.policies}</TableCell>
-                      <TableCell>
-                        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
-                          Ativo
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        {/* Audit Tab */}
+        <TabsContent value="audit" className="mt-6">
+          <AuditLogsViewer />
         </TabsContent>
 
         {/* System Tab */}
@@ -232,33 +292,25 @@ export default function SuperAdmin() {
           <Card className="bg-zinc-900/50 border-zinc-800">
             <CardHeader>
               <CardTitle className="text-zinc-100">Configurações do Sistema</CardTitle>
-              <CardDescription>Controles globais de manutenção e debug</CardDescription>
+              <CardDescription>Controles globais e informações técnicas</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 rounded-md bg-amber-500/20">
-                    <Server className="h-5 w-5 text-amber-400" />
-                  </div>
-                  <div>
-                    <Label className="text-zinc-100 font-medium">Modo Manutenção</Label>
-                    <p className="text-sm text-zinc-500">Desativa o acesso de usuários ao sistema</p>
-                  </div>
+            <CardContent className="space-y-4">
+              <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                <h3 className="text-sm font-medium text-zinc-100 mb-2">Status do Sistema</h3>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-sm text-zinc-300">Operacional</span>
                 </div>
-                <Switch />
+              </div>
+              
+              <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                <h3 className="text-sm font-medium text-zinc-100 mb-2">Versão do Sistema</h3>
+                <p className="text-sm text-zinc-400">Tork CRM v2.0.0</p>
               </div>
 
-              <div className="flex items-center justify-between p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 rounded-md bg-blue-500/20">
-                    <Activity className="h-5 w-5 text-blue-400" />
-                  </div>
-                  <div>
-                    <Label className="text-zinc-100 font-medium">Log de Debug Ativo</Label>
-                    <p className="text-sm text-zinc-500">Registra logs detalhados para diagnóstico</p>
-                  </div>
-                </div>
-                <Switch />
+              <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                <h3 className="text-sm font-medium text-zinc-100 mb-2">Banco de Dados</h3>
+                <p className="text-sm text-zinc-400">Supabase PostgreSQL</p>
               </div>
             </CardContent>
           </Card>

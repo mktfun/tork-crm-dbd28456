@@ -40,6 +40,8 @@ import ChatTorkSettings from "./pages/settings/ChatTorkSettings";
 import PortalSettings from "./pages/settings/PortalSettings";
 import Documentation from "./pages/Documentation";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
+import SuperAdmin from "./pages/SuperAdmin";
+import OrganizationDetails from "./pages/OrganizationDetails";
 import { AdminDashboard, BrokeragesManagement, AIConfigPanel, SystemLogs } from "./components/superadmin";
 
 // Portal do Cliente
@@ -163,10 +165,8 @@ function App() {
                     </AdminProtectedRoute>
                   }
                 >
-                  <Route index element={<AdminDashboard />} />
-                  <Route path="brokerages" element={<BrokeragesManagement />} />
-                  <Route path="ai-config" element={<AIConfigPanel />} />
-                  <Route path="logs" element={<SystemLogs />} />
+                  <Route index element={<SuperAdmin />} />
+                  <Route path="organizations/:id" element={<OrganizationDetails />} />
                 </Route>
                 
                 <Route path="*" element={<NotFound />} />
