@@ -4,6 +4,8 @@ import { Redis } from "https://esm.sh/@upstash/redis@1.31.5";
 import { Ratelimit } from "https://esm.sh/@upstash/ratelimit@1.1.3";
 import { logger } from "../_shared/logger.ts";
 import { auditLog, createAuditTimer } from "../_shared/audit.ts";
+import * as CRUD from "./tools-crud.ts";
+import * as CRM from "./tools-crm.ts";
 
 // --- Configuração do Rate Limiter ---
 const redis = new Redis({
@@ -136,6 +138,26 @@ INSTRUÇÃO ESPECIAL: Se o tema envolver veículos 4x4, uso off-road, trilhas, g
   </rule>
   <rule priority="9">
     **FEEDBACK DE ESCRITA:** Após executar com sucesso qualquer ferramenta de escrita (create, update, delete, move), inclua um emoji de confirmação na resposta. Exemplo: "✅ Cliente João Silva criado com sucesso!" ou "✅ Lead movido para a etapa Negociação."
+  </rule>
+  
+  <!-- NOVAS REGRAS FASE P1 - AGENTE AUTÔNOMO CRUD/KANBAN -->
+  <rule priority="10">
+    **PREFERÊNCIA POR TOOLS V2:** Sempre que possível, use as tools v2 (create_client_v2, update_client_v2, etc.) pois elas possuem validações robustas e auditoria completa. As tools antigas (sem v2) são mantidas por compatibilidade.
+  </rule>
+  <rule priority="11">
+    **CONFIRMAÇÃO INTELIGENTE:** As tools v2 de deleção (delete_client_v2, delete_policy_v2, delete_deal) possuem sistema de confirmação integrado. Na primeira chamada com confirmed: false, elas retornam uma mensagem de confirmação. Apresente essa mensagem ao usuário e aguarde resposta afirmativa antes de chamar novamente com confirmed: true.
+  </rule>
+  <rule priority="12">
+    **VALIDAÇÃO DE CAMPOS OBRIGATÓRIOS:** Para create_client_v2: name, phone, email são obrigatórios. Para create_policy_v2: client_id, policy_number, insurance_company, type, premium_value, commission_rate, expiration_date são obrigatórios. Para create_deal: stage_id, title são obrigatórios. Se faltar algum campo, peça educadamente ao usuário.
+  </rule>
+  <rule priority="13">
+    **AUDITORIA TRANSPARENTE:** Todas as operações CRUD/Kanban são automaticamente auditadas na tabela ai_operations_log. Você NÃO precisa mencionar isso ao usuário, mas saiba que todas as ações ficam registradas para compliance.
+  </rule>
+  <rule priority="14">
+    **MOVIMENTAÇÃO DE DEALS:** Ao usar move_deal_to_stage, você DEVE ter o deal_id e o stage_id. Se o usuário mencionar apenas nomes ("mover o lead do João para Negociação"), use get_kanban_data para encontrar o deal_id e consulte <current_metadata> para mapear o stage_id pelo nome da etapa.
+  </rule>
+  <rule priority="15">
+    **FEEDBACK DETALHADO:** Após operações CRUD bem-sucedidas, sempre informe os dados principais do registro criado/atualizado (ex: nome, ID, status). Isso dá confiança ao usuário de que a operação foi executada corretamente.
   </rule>
 </rules>
 
@@ -309,6 +331,35 @@ O texto ANTES dos componentes deve servir apenas como:
   </tool>
   <tool name="delete_policy">
     <description>Exclui permanentemente uma apólice. REQUER CONFIRMAÇÃO EXPLÍCITA DO USUÁRIO.</description>
+  </tool>
+  
+  <!-- NOVAS FERRAMENTAS CRUD/KANBAN V2 (FASE P1) - COM AUDITORIA E VALIDAÇÕES ROBUSTAS -->
+  <tool name="create_client_v2">
+    <description>Cria um novo cliente com validações completas e auditoria. Campos obrigatórios: name, phone, email. Opcionais: cpf_cnpj, birth_date, marital_status, profession, endereço completo, observations.</description>
+  </tool>
+  <tool name="update_client_v2">
+    <description>Atualiza um cliente existente com auditoria. Requer client_id. Todos os outros campos são opcionais.</description>
+  </tool>
+  <tool name="delete_client_v2">
+    <description>Marca cliente como Inativo (soft delete). REQUER confirmed: true. Se confirmed: false, retorna mensagem de confirmação.</description>
+  </tool>
+  <tool name="create_policy_v2">
+    <description>Cria nova apólice com validações completas. Campos obrigatórios: client_id, policy_number, insurance_company, type, premium_value, commission_rate, expiration_date.</description>
+  </tool>
+  <tool name="update_policy_v2">
+    <description>Atualiza apólice existente com auditoria. Requer policy_id. Todos os outros campos são opcionais.</description>
+  </tool>
+  <tool name="delete_policy_v2">
+    <description>Exclui apólice permanentemente. REQUER confirmed: true. Se confirmed: false, retorna mensagem de confirmação.</description>
+  </tool>
+  <tool name="create_deal">
+    <description>Cria novo deal no CRM. Campos obrigatórios: stage_id, title. Opcionais: client_id, value, expected_close_date, notes.</description>
+  </tool>
+  <tool name="update_deal">
+    <description>Atualiza deal existente. Requer deal_id. Campos opcionais: title, value, expected_close_date, notes, client_id.</description>
+  </tool>
+  <tool name="delete_deal">
+    <description>Exclui deal permanentemente. REQUER confirmed: true. Se confirmed: false, retorna mensagem de confirmação.</description>
   </tool>
 </tools_guide>`;
 
@@ -1593,6 +1644,49 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
       message: `Apólice ${policy.policy_number || policy_id} excluída permanentemente`,
       deleted_id: policy_id 
     };
+  },
+
+  // ========== NOVAS TOOLS CRUD/KANBAN (FASE P1) ==========
+  // Tools com auditoria completa e validações robustas
+  
+  create_client_v2: async (args, supabase, userId) => {
+    return await CRUD.create_client(args, supabase, userId);
+  },
+
+  update_client_v2: async (args, supabase, userId) => {
+    return await CRUD.update_client(args, supabase, userId);
+  },
+
+  delete_client_v2: async (args, supabase, userId) => {
+    return await CRUD.delete_client(args, supabase, userId);
+  },
+
+  create_policy_v2: async (args, supabase, userId) => {
+    return await CRUD.create_policy(args, supabase, userId);
+  },
+
+  update_policy_v2: async (args, supabase, userId) => {
+    return await CRUD.update_policy(args, supabase, userId);
+  },
+
+  delete_policy_v2: async (args, supabase, userId) => {
+    return await CRUD.delete_policy(args, supabase, userId);
+  },
+
+  move_deal_to_stage: async (args, supabase, userId) => {
+    return await CRM.move_deal_to_stage(args, supabase, userId);
+  },
+
+  create_deal: async (args, supabase, userId) => {
+    return await CRM.create_deal(args, supabase, userId);
+  },
+
+  update_deal: async (args, supabase, userId) => {
+    return await CRM.update_deal(args, supabase, userId);
+  },
+
+  delete_deal: async (args, supabase, userId) => {
+    return await CRM.delete_deal(args, supabase, userId);
   }
 };
 
