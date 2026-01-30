@@ -2591,6 +2591,15 @@ export type Database = {
         Args: { p_transactions: Json }
         Returns: Json
       }
+      calculate_projected_cash_flow: {
+        Args: { p_days?: number }
+        Returns: {
+          date: string
+          inflows: number
+          outflows: number
+          projected_balance: number
+        }[]
+      }
       check_upcoming_appointments: { Args: never; Returns: undefined }
       count_ledger_entries_by_account: {
         Args: { p_account_id: string }
