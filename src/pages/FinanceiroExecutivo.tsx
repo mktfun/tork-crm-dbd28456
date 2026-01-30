@@ -16,19 +16,27 @@ const FinanceiroExecutivo = () => {
         </p>
       </div>
 
-      {/* Grid 2x2 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Módulo 1: Faturamento (Top-Left) */}
-        <ModuloFaturamento />
+      {/* Container do Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Linha 1: Faturamento (Largura Total) */}
+        <div className="col-span-1 lg:col-span-2 h-full">
+          <ModuloFaturamento />
+        </div>
 
-        {/* Módulo 2: Tesouraria (Top-Right) */}
-        <ModuloTesouraria />
+        {/* Linha 2: Coluna Esquerda - Tesouraria */}
+        <div className="h-full">
+          <ModuloTesouraria />
+        </div>
 
-        {/* Módulo 3: Multi-Bancos (Bottom-Left) */}
-        <ModuloMultiBancos />
+        {/* Linha 2: Coluna Direita - Bancos */}
+        <div className="h-full">
+          <ModuloMultiBancos />
+        </div>
 
-        {/* Módulo 4: Fluxo de Caixa (Bottom-Right) */}
-        <ModuloFluxoCaixaPreditivo />
+        {/* Linha 3: Fluxo de Caixa (Largura Total) */}
+        <div className="col-span-1 lg:col-span-2 h-full">
+          <ModuloFluxoCaixaPreditivo />
+        </div>
       </div>
     </div>
   );
