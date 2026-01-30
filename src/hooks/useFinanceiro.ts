@@ -66,6 +66,7 @@ export function useRegisterExpense() {
       queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
       queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
     }
   });
 }
@@ -83,6 +84,7 @@ export function useRegisterRevenue() {
       queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
       queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
     }
   });
 }

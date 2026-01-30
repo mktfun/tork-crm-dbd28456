@@ -26,6 +26,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useFinancialAccounts, useRegisterExpense } from '@/hooks/useFinanceiro';
+import { useBankAccounts } from '@/hooks/useBancos';
 import { FinancialAccount } from '@/types/financeiro';
 import { Badge } from '@/components/ui/badge';
 
@@ -35,6 +36,7 @@ interface FormData {
   transactionDate: string;
   expenseAccountId: string;
   assetAccountId: string;
+  bankAccountId?: string;
   referenceNumber: string;
 }
 
@@ -53,6 +55,9 @@ export function NovaDespesaModal() {
   
   const { data: expenseAccounts = [], isLoading: loadingExpense } = useFinancialAccounts('expense');
   const { data: assetAccounts = [], isLoading: loadingAsset } = useFinancialAccounts('asset');
+  const { data: bankSummary } = useBankAccounts();
+  
+  const banks = bankSummary?.accounts?.filter(b => b.isActive) || [];
   
   const registerExpense = useRegisterExpense();
   
@@ -63,6 +68,7 @@ export function NovaDespesaModal() {
       transactionDate: format(new Date(), 'yyyy-MM-dd'),
       expenseAccountId: '',
       assetAccountId: '',
+      bankAccountId: '',
       referenceNumber: ''
     }
   });
@@ -152,6 +158,7 @@ export function NovaDespesaModal() {
         transactionDate: data.transactionDate,
         expenseAccountId: data.expenseAccountId,
         assetAccountId: data.assetAccountId,
+        bankAccountId: data.bankAccountId || undefined,
         referenceNumber: data.referenceNumber || undefined,
         memo: attachmentUrl, // Salvamos a URL no memo por enquanto
       });
@@ -301,6 +308,30 @@ export function NovaDespesaModal() {
             {errors.assetAccountId && (
               <p className="text-sm text-destructive">{errors.assetAccountId.message}</p>
             )}
+          </div>
+
+          {/* Banco (opcional) */}
+          <div className="space-y-2">
+            <Label>Banco (opcional)</Label>
+            <Select
+              onValueChange={(value) => setValue('bankAccountId', value === 'none' ? '' : value)}
+              disabled={isLoading}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o banco" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhum banco</SelectItem>
+                {banks.map((bank) => (
+                  <SelectItem key={bank.id} value={bank.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{bank.icon}</span>
+                      <span>{bank.bankName}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Referência (opcional) */}

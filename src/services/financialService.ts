@@ -138,6 +138,7 @@ export async function registerExpense(payload: {
   transactionDate: string;
   expenseAccountId: string;
   assetAccountId: string;
+  bankAccountId?: string;
   referenceNumber?: string;
   memo?: string;
 }): Promise<string> {
@@ -152,7 +153,8 @@ export async function registerExpense(payload: {
     p_movements: movements,
     p_reference_number: payload.referenceNumber || null,
     p_related_entity_type: null,
-    p_related_entity_id: null
+    p_related_entity_id: null,
+    p_bank_account_id: payload.bankAccountId || null
   });
 
   if (error) throw error;
@@ -168,6 +170,7 @@ export async function registerRevenue(payload: {
   transactionDate: string;
   revenueAccountId: string;
   assetAccountId: string;
+  bankAccountId?: string;
   referenceNumber?: string;
   memo?: string;
 }): Promise<string> {
@@ -182,7 +185,8 @@ export async function registerRevenue(payload: {
     p_movements: movements,
     p_reference_number: payload.referenceNumber || null,
     p_related_entity_type: null,
-    p_related_entity_id: null
+    p_related_entity_id: null,
+    p_bank_account_id: payload.bankAccountId || null
   });
 
   if (error) throw error;

@@ -28,6 +28,7 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 import { useFinancialAccountsWithDefaults, useRegisterRevenue } from '@/hooks/useFinanceiro';
+import { useBankAccounts } from '@/hooks/useBancos';
 
 const revenueSchema = z.object({
   description: z.string().min(3, 'Descrição deve ter pelo menos 3 caracteres'),
@@ -35,6 +36,7 @@ const revenueSchema = z.object({
   transactionDate: z.string().min(1, 'Data é obrigatória'),
   revenueAccountId: z.string().min(1, 'Selecione uma categoria'),
   assetAccountId: z.string().min(1, 'Selecione uma conta'),
+  bankAccountId: z.string().optional(),
   referenceNumber: z.string().optional(),
   memo: z.string().optional(),
 });
@@ -48,11 +50,13 @@ interface NovaReceitaModalProps {
 export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
   const [open, setOpen] = useState(false);
   const { data: accounts = [], isLoading: loadingAccounts } = useFinancialAccountsWithDefaults();
+  const { data: bankSummary } = useBankAccounts();
   const registerRevenue = useRegisterRevenue();
 
   // Filtrar contas por tipo
   const revenueAccounts = accounts.filter(a => a.type === 'revenue');
   const assetAccounts = accounts.filter(a => a.type === 'asset');
+  const banks = bankSummary?.accounts?.filter(b => b.isActive) || [];
 
   const form = useForm<RevenueFormData>({
     resolver: zodResolver(revenueSchema),
@@ -62,6 +66,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
       transactionDate: format(new Date(), 'yyyy-MM-dd'),
       revenueAccountId: '',
       assetAccountId: '',
+      bankAccountId: '',
       referenceNumber: '',
       memo: '',
     }
@@ -75,6 +80,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
         transactionDate: data.transactionDate,
         revenueAccountId: data.revenueAccountId,
         assetAccountId: data.assetAccountId,
+        bankAccountId: data.bankAccountId || undefined,
         referenceNumber: data.referenceNumber,
         memo: data.memo,
       });
@@ -206,6 +212,36 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
                       {assetAccounts.map((account) => (
                         <SelectItem key={account.id} value={account.id}>
                           {account.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Banco (opcional) */}
+            <FormField
+              control={form.control}
+              name="bankAccountId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Banco (opcional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o banco" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum banco</SelectItem>
+                      {banks.map((bank) => (
+                        <SelectItem key={bank.id} value={bank.id}>
+                          <div className="flex items-center gap-2">
+                            <span>{bank.icon}</span>
+                            <span>{bank.bankName}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
