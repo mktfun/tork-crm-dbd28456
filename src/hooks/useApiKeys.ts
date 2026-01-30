@@ -24,7 +24,14 @@ export function useApiKeys() {
         .select('*')
         .order('service_name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching API keys:', error);
+        // Se a tabela não existir, retorna array vazio
+        if (error.code === '42P01') {
+          return [];
+        }
+        throw error;
+      }
       return data as ApiKey[];
     },
   });

@@ -25,7 +25,14 @@ export function useOrganizations() {
         .select('*')
         .order('name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching organizations:', error);
+        // Se a tabela não existir, retorna array vazio ao invés de erro
+        if (error.code === '42P01') {
+          return [];
+        }
+        throw error;
+      }
 
       // Buscar contagem de usuários e apólices para cada organização
       const orgsWithCounts = await Promise.all(

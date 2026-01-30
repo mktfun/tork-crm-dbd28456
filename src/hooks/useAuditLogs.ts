@@ -81,7 +81,14 @@ export function useAuditLogs(filters: AuditLogsFilters = {}) {
 
       const { data, error, count } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching audit logs:', error);
+        // Se a tabela não existir, retorna vazio
+        if (error.code === '42P01') {
+          return { logs: [], total: 0 };
+        }
+        throw error;
+      }
 
       return {
         logs: data as AuditLog[],
@@ -96,10 +103,23 @@ export function useAuditStats() {
   return useQuery({
     queryKey: ['audit-stats'],
     queryFn: async () => {
-      // Total de operações
-      const { count: totalOps } = await supabase
-        .from('ai_operations_log')
-        .select('*', { count: 'exact', head: true });
+      try {
+        // Total de operações
+        const { count: totalOps, error: totalError } = await supabase
+          .from('ai_operations_log')
+          .select('*', { count: 'exact', head: true });
+        
+        // Se a tabela não existir, retorna stats zeradas
+        if (totalError && totalError.code === '42P01') {
+          return {
+            total: 0,
+            successful: 0,
+            failed: 0,
+            recent24h: 0,
+            avgExecutionTimeMs: 0,
+            successRate: 0,
+          };
+        }
 
       // Operações bem-sucedidas
       const { count: successOps } = await supabase
@@ -132,14 +152,25 @@ export function useAuditStats() {
         ? avgTime.reduce((sum, log) => sum + (log.execution_time_ms || 0), 0) / avgTime.length
         : 0;
 
-      return {
-        total: totalOps || 0,
-        successful: successOps || 0,
-        failed: errorOps || 0,
-        recent24h: recentOps || 0,
-        avgExecutionTimeMs: Math.round(avgExecutionTime),
-        successRate: totalOps ? ((successOps || 0) / totalOps) * 100 : 0,
-      };
+        return {
+          total: totalOps || 0,
+          successful: successOps || 0,
+          failed: errorOps || 0,
+          recent24h: recentOps || 0,
+          avgExecutionTimeMs: Math.round(avgExecutionTime),
+          successRate: totalOps ? ((successOps || 0) / totalOps) * 100 : 0,
+        };
+      } catch (error) {
+        console.error('Error fetching audit stats:', error);
+        return {
+          total: 0,
+          successful: 0,
+          failed: 0,
+          recent24h: 0,
+          avgExecutionTimeMs: 0,
+          successRate: 0,
+        };
+      }
     },
   });
 }
