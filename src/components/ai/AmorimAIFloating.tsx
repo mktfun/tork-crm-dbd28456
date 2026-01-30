@@ -29,7 +29,7 @@ const MIN_WIDTH = 320;
 const MIN_HEIGHT = 400;
 const MAX_WIDTH = 900;
 const MAX_HEIGHT_RATIO = 0.95; // 95% of viewport height
-const DEFAULT_WIDTH = 550;
+const DEFAULT_WIDTH = 450;
 const DEFAULT_HEIGHT = 700;
 
 // FASE P5: Limite de caracteres do input

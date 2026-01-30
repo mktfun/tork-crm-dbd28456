@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.56.0";
 import { Redis } from "https://esm.sh/@upstash/redis@1.31.5";
 import { Ratelimit } from "https://esm.sh/@upstash/ratelimit@1.1.3";
+import { logger } from "../_shared/logger.ts";
+import { auditLog, createAuditTimer } from "../_shared/audit.ts";
 
 // --- Configuração do Rate Limiter ---
 const redis = new Redis({
@@ -1599,7 +1601,7 @@ async function executeToolCall(toolCall: any, supabase: any, userId: string) {
   const { name, arguments: argsStr } = toolCall.function;
   const args = JSON.parse(argsStr);
   
-  console.log(`[TOOL-EXEC-START] ${name}`, JSON.stringify(args, null, 2));
+  logger.info(`Tool execution started: ${name}`, { tool_name: name, args });
   const startTime = Date.now();
 
   try {
@@ -1611,11 +1613,11 @@ async function executeToolCall(toolCall: any, supabase: any, userId: string) {
     const result = await handler(args, supabase, userId);
     const duration = Date.now() - startTime;
     
-    console.log(`[TOOL-EXEC-SUCCESS] ${name} | Duration: ${duration}ms`);
+    logger.info(`Tool execution succeeded: ${name}`, { tool_name: name, duration_ms: duration });
     return { tool_call_id: toolCall.id, output: JSON.stringify(result) };
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    console.error(`[TOOL-EXEC-ERROR] ${name} | Duration: ${duration}ms | Error: ${error.message}`);
+    logger.error(`Tool execution failed: ${name}`, { tool_name: name, duration_ms: duration, error: error.message });
     return { tool_call_id: toolCall.id, output: JSON.stringify({ success: false, error: error.message }) };
   }
 }
@@ -1626,14 +1628,15 @@ function formatSSE(data: any): string {
 }
 
 serve(async (req) => {
-  console.log(`\n${'='.repeat(60)}`);
-  console.log(`[AI-ASSISTANT] REQUEST START`);
-  console.log(`[REQ-META] Method: ${req.method} | URL: ${req.url}`);
-  console.log(`[SSE-DEBUG] Accept Header: ${req.headers.get('accept')}`);
-  console.log(`[SSE-DEBUG] Content-Type Header: ${req.headers.get('content-type')}`);
+  logger.info('AI Assistant request received', {
+    method: req.method,
+    url: req.url,
+    accept: req.headers.get('accept'),
+    contentType: req.headers.get('content-type')
+  });
 
   if (req.method === 'OPTIONS') {
-    console.log(`[SSE-DEBUG] CORS preflight handled`);
+    logger.debug('CORS preflight handled');
     return new Response('ok', { headers: corsHeaders });
   }
 
@@ -1646,14 +1649,14 @@ serve(async (req) => {
     const rawBody = await req.text();
     const { messages, userId, conversationId, stream = false } = JSON.parse(rawBody);
     
-    console.log(`[REQ-PARSED] Request ID: ${requestId} | User: ${userId} | Stream: ${stream}`);
+    logger.info('Request parsed', { requestId, userId, stream, conversationId });
 
     // Rate Limiting
     const identifier = userId || req.headers.get("x-forwarded-for") || 'anon';
     const { success: rateLimitSuccess, remaining } = await ratelimit.limit(identifier);
 
     if (!rateLimitSuccess) {
-      console.warn(`[RATE-LIMIT-EXCEEDED] User: ${userId}`);
+      logger.warn('Rate limit exceeded', { userId, identifier });
       clearTimeout(timeoutId);
       return new Response(JSON.stringify({ 
         error: "Limite de requisições excedido. Tente novamente em alguns segundos.",
@@ -1684,7 +1687,11 @@ serve(async (req) => {
     
     // Build System Prompt with RAG context
     const systemPrompt = await buildSystemPrompt(supabase, userId, lastUserMessage);
-    console.log(`[PROMPT-BUILD] Length: ${systemPrompt.length} | Has RAG: ${systemPrompt.includes('<conhecimento_especializado>')} | Has learned: ${systemPrompt.includes('<contexto_aprendido>')}`);
+    logger.debug('System prompt built', {
+      length: systemPrompt.length,
+      hasRAG: systemPrompt.includes('<conhecimento_especializado>'),
+      hasLearned: systemPrompt.includes('<contexto_aprendido>')
+    });
 
     const aiMessages = [
       { role: 'system', content: systemPrompt },
@@ -1693,7 +1700,7 @@ serve(async (req) => {
 
     // ========== STREAMING MODE ==========
     if (stream) {
-      console.log(`[STREAM-MODE] Initiating SSE stream...`);
+      logger.info('Initiating SSE stream', { requestId, userId });
       
       // Primeiro, precisamos resolver tool calls antes de streamar
       let currentMessages = [...aiMessages];
