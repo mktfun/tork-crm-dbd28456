@@ -1376,6 +1376,42 @@ export type Database = {
           },
         ]
       }
+      financial_goals: {
+        Row: {
+          created_at: string
+          description: string | null
+          goal_amount: number
+          goal_type: string
+          id: string
+          month: number
+          updated_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          goal_amount: number
+          goal_type?: string
+          id?: string
+          month: number
+          updated_at?: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          goal_amount?: number
+          goal_type?: string
+          id?: string
+          month?: number
+          updated_at?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
       financial_ledger: {
         Row: {
           account_id: string
@@ -2865,6 +2901,22 @@ export type Database = {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: Json
       }
+      get_goal_vs_actual: {
+        Args: {
+          p_goal_type?: string
+          p_month: number
+          p_user_id: string
+          p_year: number
+        }
+        Returns: {
+          actual_amount: number
+          difference: number
+          goal_amount: number
+          goal_id: string
+          percentage_achieved: number
+          status: string
+        }[]
+      }
       get_monthly_commission_chart: {
         Args: { p_months?: number }
         Returns: {
@@ -2999,15 +3051,14 @@ export type Database = {
       }
       get_revenue_by_dimension: {
         Args: {
-          p_dimension: string
+          p_dimension?: string
           p_end_date: string
           p_start_date: string
           p_user_id: string
         }
         Returns: {
-          dimension_name: string
-          percentage: number
-          total_amount: number
+          dimension_value: string
+          total_revenue: number
           transaction_count: number
         }[]
       }
