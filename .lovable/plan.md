@@ -1,145 +1,81 @@
 
-# Relatório Completo de Erros e Inconsistências - Módulo Financeiro
+# Plano de Otimização: Chat da IA Travando em Respostas Longas
 
-## PROBLEMA 1: Erro de Enum - `financial_account_type: "income"`
+## Problema Identificado
 
-### Diagnóstico
-A função SQL `get_revenue_by_dimension` contém um erro crítico. Ela usa o valor `'income'` para filtrar contas de receita, mas o enum `financial_account_type` do banco de dados NÃO POSSUI esse valor.
+O chat do Assistente Tork trava e exige recarga da página quando:
+- Respostas são muito longas (tabelas, relatórios técnicos)
+- A conversa tem muitas mensagens
 
-### Valores Válidos do Enum
-```
-asset | liability | equity | revenue | expense
-```
+### Causas Técnicas
 
-### Código SQL com Erro (linha dentro da função)
-```sql
-WHERE ft.user_id = p_user_id
-  AND fa.type = 'income'   -- ERRO: deveria ser 'revenue'
-```
+1. **Rendering excessivo durante streaming**: O componente `AIResponseRenderer` processa Markdown completo a cada pequeno chunk de texto recebido (centenas de vezes por resposta)
 
-### Correção Necessária
-Alterar a função RPC `get_revenue_by_dimension` no Supabase, substituindo:
-```sql
-AND fa.type = 'income'
-```
-Por:
-```sql
-AND fa.type = 'revenue'
-```
+2. **Falta de virtualização**: Todas as mensagens permanecem no DOM, causando degradação progressiva de performance
 
----
+3. **Scroll agressivo**: O `scrollTo({ behavior: 'smooth' })` dispara a cada atualização de conteúdo, sobrecarregando o browser
 
-## PROBLEMA 2: Metas Financeiras com Dados Mock
+4. **ReactMarkdown sem otimização**: O parser de Markdown roda integralmente mesmo quando apenas um caractere é adicionado
 
-### Diagnóstico
-Os hooks de metas financeiras retornam **valores fixos hardcoded** que não correspondem aos dados reais do sistema:
+## Solução Proposta
 
-| Campo | Valor Mock | Valor Real (Janeiro 2026) |
-|-------|-----------|---------------------------|
-| Meta Mensal | R$ 50.000 | Não existe (tabela `financial_goals` não existe) |
-| Faturamento | R$ 42.500 | ~R$ 20.322 (soma das receitas do período) |
-| Percentual | 85% | N/A |
+### 1. Debounce do Markdown Rendering (Prioridade Alta)
 
-### Código Problemático
-**Arquivo:** `src/hooks/useFinanceiro.ts` (linhas 701-721)
-```typescript
-export function useGoalVsActual(...) {
-  return useQuery({
-    queryFn: async (): Promise<GoalVsActual | null> => {
-      // Mock data - VALORES HARDCODED
-      const goalAmount = 50000;        // Não reflete realidade
-      const actualAmount = 42500;       // Não reflete realidade
-      // ...
-    },
-  });
-}
+Durante o streaming, renderizar o texto bruto e só processar Markdown após estabilização:
+
+```text
++-------------------+     +--------------------+     +-------------------+
+| Streaming chunk   | --> | Render texto bruto | --> | Debounce 300ms    |
+| (alta frequência) |     | (rápido)           |     | sem novos chunks  |
++-------------------+     +--------------------+     +-------------------+
+                                                              |
+                                                              v
+                                                    +-------------------+
+                                                    | Render Markdown   |
+                                                    | (processamento)   |
+                                                    +-------------------+
 ```
 
-### Causa Raiz
-A tabela `financial_goals` **não existe** no banco de dados. Os hooks foram implementados com dados mock temporários, mas nunca foram atualizados para usar dados reais.
+Arquivo: `src/components/ai/responses/AIResponseRenderer.tsx`
+- Adicionar prop `isStreaming` para detectar modo de streaming
+- Durante streaming: renderizar texto com formatação mínima
+- Após streaming: processar Markdown completo
 
----
+### 2. Throttle do Auto-Scroll (Prioridade Alta)
 
-## PROBLEMA 3: Outros Potenciais Erros no Schema
+Limitar frequência do scroll automático para máximo 1x por segundo:
 
-### 3.1 Convenção de Nomenclatura Inconsistente
-O código mistura termos em inglês:
-- `income` (usado erroneamente para receita)
-- `revenue` (valor correto no enum)
+Arquivo: `src/components/ai/AmorimAIFloating.tsx`
+- Criar ref para controlar último timestamp de scroll
+- Verificar intervalo mínimo antes de executar novo scroll
 
-Isso pode causar confusão e erros futuros.
+### 3. Memoização de Mensagens Antigas (Prioridade Média)
 
-### 3.2 Hooks que Dependem de Tabelas/RPCs Inexistentes
-| Hook | Tabela/RPC Esperada | Status |
-|------|---------------------|--------|
-| `useCurrentMonthGoal` | `financial_goals` | Não existe |
-| `useGoalsByPeriod` | `financial_goals` | Não existe |
-| `useGoalVsActual` | `financial_goals` | Não existe |
-| `useUpsertGoal` | `financial_goals` | Não existe |
-| `useDeleteGoal` | `financial_goals` | Não existe |
+Evitar re-render de mensagens que não mudaram:
 
----
+Arquivo: `src/components/ai/AmorimAIFloating.tsx`
+- Extrair renderização de mensagem para componente separado
+- Aplicar `React.memo()` com comparação por ID e conteúdo
+- Mensagens concluídas nunca re-renderizam
 
-## Resumo das Correções Necessárias
+### 4. Lazy Loading do Histórico (Prioridade Baixa)
 
-### Correção Imediata (Backend/SQL)
-1. **Corrigir a função `get_revenue_by_dimension`**:
-```sql
-CREATE OR REPLACE FUNCTION get_revenue_by_dimension(
-  p_user_id UUID,
-  p_start_date DATE,
-  p_end_date DATE,
-  p_dimension TEXT
-)
-RETURNS TABLE (...) AS $$
-BEGIN
-  RETURN QUERY
-  WITH revenue_transactions AS (
-    SELECT ...
-    FROM financial_transactions ft
-    JOIN financial_ledger fl ON fl.transaction_id = ft.id
-    JOIN financial_accounts fa ON fa.id = fl.account_id
-    ...
-    WHERE ft.user_id = p_user_id
-      AND fa.type = 'revenue'  -- Corrigido de 'income' para 'revenue'
-      AND ft.transaction_date BETWEEN p_start_date AND p_end_date
-      AND NOT ft.is_void
-      AND fl.amount < 0  -- Receitas são créditos (negativos no ledger)
-  ),
-  ...
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-```
+Para conversas muito longas, carregar apenas as últimas N mensagens visíveis:
 
-### Correção Imediata (Frontend)
-2. **Atualizar hooks de metas para usar dados reais** ou mostrar mensagem clara de que a funcionalidade não está implementada.
+- Implementar paginação reversa (scroll para cima carrega mais)
+- Limite inicial de 50 mensagens
 
-### Correção Futura
-3. **Criar tabela `financial_goals`** para persistir metas:
-```sql
-CREATE TABLE financial_goals (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id),
-  year INTEGER NOT NULL,
-  month INTEGER NOT NULL,
-  goal_type TEXT DEFAULT 'revenue',
-  goal_amount DECIMAL(15,2) NOT NULL,
-  description TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, year, month, goal_type)
-);
-```
+## Arquivos a Modificar
 
----
-
-## Dados Reais do Sistema (Janeiro 2026)
-
-| Métrica | Valor Real |
+| Arquivo | Alteração |
 |---------|-----------|
-| Receitas do mês | R$ 20.322,47 |
-| Despesas do mês | R$ 1.000,00 |
-| Total de transações | 60 |
-| Contas ativas | 20+ |
+| `src/components/ai/responses/AIResponseRenderer.tsx` | Adicionar modo streaming com debounce |
+| `src/components/ai/AmorimAIFloating.tsx` | Throttle scroll, memoização de mensagens |
+| `src/hooks/useAIConversations.ts` | Passar flag `isStreaming` para mensagem atual |
 
-**Nota:** Os valores de "meta mensal" mostrados na UI (R$ 50.000 / R$ 42.500) são completamente fictícios e não refletem nenhum dado do banco de dados.
+## Resultado Esperado
+
+- Streaming suave mesmo em respostas de 10.000+ caracteres
+- Conversas com 50+ mensagens sem degradação
+- Scroll responsivo sem travar a interface
+- Formatação Markdown completa após conclusão da resposta
