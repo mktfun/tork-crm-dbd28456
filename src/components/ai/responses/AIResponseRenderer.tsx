@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { TableComponent } from './TableComponent';
@@ -6,6 +6,7 @@ import { FinancialCard } from './FinancialCard';
 import { PolicyListCard } from './PolicyListCard';
 import { ClientListCard } from './ClientListCard';
 import { Badge } from '@/components/ui/badge';
+import { useDebounce } from '@/hooks/useDebounce';
 import { 
   BookOpen, 
   Shield, 
@@ -46,6 +47,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
 
 interface AIResponseRendererProps {
   content: string;
+  isStreaming?: boolean; // OTIMIZAÇÃO: Flag para modo streaming
 }
 
 interface StructuredData {
@@ -115,76 +117,27 @@ function parseIconSyntax(text: string): React.ReactNode[] {
 }
 
 /**
- * AIResponseRenderer: Componente híbrido que separa Markdown de JSON estruturado.
- * 
- * O backend emite respostas no formato:
- * - Texto em Markdown (explicativo/conversacional)
- * - Dados estruturados encapsulados em <data_json>...</data_json>
- * 
- * Este componente extrai e renderiza cada parte apropriadamente.
- * FASE P3.6: Suporte a ícones dinâmicos, tabelas premium e estilo Tork Premium.
+ * StreamingTextRenderer: Renderização leve para streaming
+ * Durante o streaming, evita o processamento pesado do ReactMarkdown
  */
-export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content }) => {
-  const jsonRegex = /<data_json>([\s\S]*?)<\/data_json>/g;
-  
-  // Extrair todos os blocos JSON
-  const matches: StructuredData[] = [];
-  let match;
-  
-  while ((match = jsonRegex.exec(content)) !== null) {
-    try {
-      const parsed = JSON.parse(match[1].trim());
-      matches.push(parsed);
-    } catch (error) {
-      console.error('[AIResponseRenderer] Erro ao parsear JSON:', error);
-    }
-  }
-  
-  // Remover os blocos JSON do texto
-  const textContent = content.replace(/<data_json>[\s\S]*?<\/data_json>/g, '').trim();
-  
-  // Detectar fontes citadas no texto
-  const detectedSources = detectSources(textContent);
+const StreamingTextRenderer: React.FC<{ content: string }> = React.memo(({ content }) => {
+  return (
+    <div className="prose prose-sm prose-invert max-w-none w-full">
+      <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">
+        {content}
+        <span className="inline-block w-2 h-4 ml-1 bg-primary/50 animate-pulse" />
+      </div>
+    </div>
+  );
+});
+StreamingTextRenderer.displayName = 'StreamingTextRenderer';
 
-  const renderStructuredData = (structuredData: StructuredData, index: number) => {
-    const { type, data } = structuredData;
-    
-    switch (type) {
-      case 'table':
-      case 'company_list':
-      case 'ramo_list':
-        return <TableComponent key={index} data={data} type={type} />;
-      
-      case 'financial_summary':
-        return <FinancialCard key={index} summary={data} />;
-      
-      case 'policy_list':
-      case 'expiring_policies':
-        return <PolicyListCard key={index} policies={data} type={type} />;
-      
-      case 'client_list':
-      case 'client_details':
-        return <ClientListCard key={index} clients={data} type={type} />;
-      
-      default:
-        // Fallback: renderizar como tabela genérica se for array
-        if (Array.isArray(data)) {
-          return <TableComponent key={index} data={data} type="generic" />;
-        }
-        // Se for objeto, mostrar como JSON formatado
-        return (
-          <pre 
-            key={index}
-            className="mt-3 p-3 rounded-lg bg-white/5 border border-white/10 text-xs overflow-x-auto"
-          >
-            {JSON.stringify(data, null, 2)}
-          </pre>
-        );
-    }
-  };
-
+/**
+ * FullMarkdownRenderer: Renderização completa após streaming
+ */
+const FullMarkdownRenderer: React.FC<{ content: string }> = React.memo(({ content }) => {
   // Custom Markdown components for premium Glassmorphism styling (TORK PREMIUM + GFM)
-  const markdownComponents = {
+  const markdownComponents = useMemo(() => ({
     // FASE P5.1: Premium Table Styling with internal scroll containment
     table: ({ children }: any) => (
       <div className="w-full max-w-full overflow-x-auto my-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
@@ -238,8 +191,6 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
     ),
     // Headings with icon parsing support
     h3: ({ children }: any) => {
-      const textContent = typeof children === 'string' ? children : 
-        Array.isArray(children) ? children.map(c => typeof c === 'string' ? c : '').join('') : '';
       const parsedContent = typeof children === 'string' ? parseIconSyntax(children) : children;
       
       return (
@@ -288,28 +239,114 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content 
     hr: () => (
       <hr className="my-4 border-t border-white/10" />
     ),
+  }), []);
+
+  return (
+    <div className="prose prose-sm prose-invert max-w-none w-full">
+      <ReactMarkdown 
+        remarkPlugins={[remarkGfm]} 
+        components={markdownComponents}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+});
+FullMarkdownRenderer.displayName = 'FullMarkdownRenderer';
+
+/**
+ * AIResponseRenderer: Componente híbrido que separa Markdown de JSON estruturado.
+ * 
+ * O backend emite respostas no formato:
+ * - Texto em Markdown (explicativo/conversacional)
+ * - Dados estruturados encapsulados em <data_json>...</data_json>
+ * 
+ * Este componente extrai e renderiza cada parte apropriadamente.
+ * OTIMIZAÇÃO: Durante streaming, renderiza texto leve. Após conclusão, processa Markdown completo.
+ */
+export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content, isStreaming = false }) => {
+  // OTIMIZAÇÃO: Debounce do conteúdo durante streaming para reduzir renders
+  // Só processa Markdown após 300ms de estabilização
+  const debouncedContent = useDebounce(content, isStreaming ? 300 : 0);
+  
+  // Extrair todos os blocos JSON
+  const { textContent, matches, detectedSources } = useMemo(() => {
+    const jsonRegex = /<data_json>([\s\S]*?)<\/data_json>/g;
+    const extractedMatches: StructuredData[] = [];
+    let match;
+    
+    while ((match = jsonRegex.exec(debouncedContent)) !== null) {
+      try {
+        const parsed = JSON.parse(match[1].trim());
+        extractedMatches.push(parsed);
+      } catch (error) {
+        console.error('[AIResponseRenderer] Erro ao parsear JSON:', error);
+      }
+    }
+    
+    // Remover os blocos JSON do texto
+    const text = debouncedContent.replace(/<data_json>[\s\S]*?<\/data_json>/g, '').trim();
+    
+    // Detectar fontes citadas no texto
+    const sources = detectSources(text);
+    
+    return { textContent: text, matches: extractedMatches, detectedSources: sources };
+  }, [debouncedContent]);
+
+  const renderStructuredData = (structuredData: StructuredData, index: number) => {
+    const { type, data } = structuredData;
+    
+    switch (type) {
+      case 'table':
+      case 'company_list':
+      case 'ramo_list':
+        return <TableComponent key={index} data={data} type={type} />;
+      
+      case 'financial_summary':
+        return <FinancialCard key={index} summary={data} />;
+      
+      case 'policy_list':
+      case 'expiring_policies':
+        return <PolicyListCard key={index} policies={data} type={type} />;
+      
+      case 'client_list':
+      case 'client_details':
+        return <ClientListCard key={index} clients={data} type={type} />;
+      
+      default:
+        // Fallback: renderizar como tabela genérica se for array
+        if (Array.isArray(data)) {
+          return <TableComponent key={index} data={data} type="generic" />;
+        }
+        // Se for objeto, mostrar como JSON formatado
+        return (
+          <pre 
+            key={index}
+            className="mt-3 p-3 rounded-lg bg-white/5 border border-white/10 text-xs overflow-x-auto"
+          >
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        );
+    }
   };
 
   return (
     // FASE P5.1: Contenção raiz com break-words e max-w-full
     <div className="space-y-3 w-full max-w-full break-words">
-      {/* Texto em Markdown com styling premium + GFM */}
+      {/* Texto: Renderização leve durante streaming, completa após */}
       {textContent && (
-        <div className="prose prose-sm prose-invert max-w-none w-full">
-          <ReactMarkdown 
-            remarkPlugins={[remarkGfm]} 
-            components={markdownComponents}
-          >
-            {textContent}
-          </ReactMarkdown>
-        </div>
+        isStreaming ? (
+          <StreamingTextRenderer content={content.replace(/<data_json>[\s\S]*?<\/data_json>/g, '').trim()} />
+        ) : (
+          <FullMarkdownRenderer content={textContent} />
+        )
       )}
       
-      {/* Dados estruturados */}
-      {matches.map((data, index) => renderStructuredData(data, index))}
+      {/* Dados estruturados - apenas quando não streaming */}
+      {!isStreaming && matches.map((data, index) => renderStructuredData(data, index))}
       
-      {/* Badges de Fontes Citadas (FASE P2.1) */}
-      {detectedSources.length > 0 && (
+      {/* Badges de Fontes Citadas - apenas quando não streaming */}
+      {!isStreaming && detectedSources.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/10">
           <span className="text-xs text-muted-foreground">Fontes:</span>
           {detectedSources.map(({ source, icon: Icon }, idx) => (
