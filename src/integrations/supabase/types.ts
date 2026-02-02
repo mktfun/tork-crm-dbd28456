@@ -1581,6 +1581,7 @@ export type Database = {
       financial_transactions: {
         Row: {
           attachments: string[] | null
+          bank_account_id: string | null
           created_at: string
           created_by: string
           description: string
@@ -1598,6 +1599,7 @@ export type Database = {
         }
         Insert: {
           attachments?: string[] | null
+          bank_account_id?: string | null
           created_at?: string
           created_by: string
           description: string
@@ -1615,6 +1617,7 @@ export type Database = {
         }
         Update: {
           attachments?: string[] | null
+          bank_account_id?: string | null
           created_at?: string
           created_by?: string
           description?: string
@@ -1630,7 +1633,15 @@ export type Database = {
           voided_at?: string | null
           voided_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "financial_transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       migration_ramos_log: {
         Row: {
@@ -2206,6 +2217,48 @@ export type Database = {
             columns: ["policy_id"]
             isOneToOne: false
             referencedRelation: "apolices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transaction_bank_distribution: {
+        Row: {
+          amount: number
+          bank_account_id: string
+          created_at: string
+          id: string
+          percentage: number | null
+          transaction_id: string
+        }
+        Insert: {
+          amount: number
+          bank_account_id: string
+          created_at?: string
+          id?: string
+          percentage?: number | null
+          transaction_id: string
+        }
+        Update: {
+          amount?: number
+          bank_account_id?: string
+          created_at?: string
+          id?: string
+          percentage?: number | null
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_bank_distribution_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_bank_distribution_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "financial_transactions"
             referencedColumns: ["id"]
           },
         ]

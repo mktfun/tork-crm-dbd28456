@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Loader2, User, Lightbulb, ThumbsUp, ThumbsDown, Plus, History, StopCircle, Maximize2, Minimize2 } from 'lucide-react';
-import { AIResponseRenderer } from './responses/AIResponseRenderer';
+import { X, Send, Loader2, Lightbulb, Plus, History, StopCircle, Maximize2, Minimize2 } from 'lucide-react';
+import { ChatMessage } from './ChatMessage';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
@@ -97,18 +97,33 @@ export function AmorimAIFloating() {
     cancelStream
   } = useAIConversations();
 
-  // Auto-scroll with smooth behavior on content change
+  // OTIMIZAÇÃO: Throttled auto-scroll (máximo 1x por segundo)
+  const lastScrollTimeRef = useRef<number>(0);
+  const scrollThrottleMs = 1000; // 1 segundo entre scrolls
+
   useEffect(() => {
+    const now = Date.now();
+    const timeSinceLastScroll = now - lastScrollTimeRef.current;
+    
+    // Só executa scroll se passou tempo suficiente
+    if (timeSinceLastScroll < scrollThrottleMs) {
+      return;
+    }
+    
     if (scrollRef.current) {
       const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
       if (scrollContainer) {
-        scrollContainer.scrollTo({
-          top: scrollContainer.scrollHeight,
-          behavior: 'smooth'
+        lastScrollTimeRef.current = now;
+        // Usar requestAnimationFrame para suavizar
+        requestAnimationFrame(() => {
+          scrollContainer.scrollTo({
+            top: scrollContainer.scrollHeight,
+            behavior: 'smooth'
+          });
         });
       }
     }
-  }, [messages, messages[messages.length - 1]?.content]);
+  }, [messages.length, messages[messages.length - 1]?.content?.length]);
 
   // Focus input when opened
   useEffect(() => {
@@ -687,147 +702,34 @@ export function AmorimAIFloating() {
                 </div>
               ) : (
                 <div className="flex flex-col space-y-4">
-                  {messages.map((message, idx) => (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.05 }}
-                      className={cn(
-                        "group",
-                        message.role === 'user' ? 'flex flex-col items-end' : 'flex flex-col items-start'
-                      )}
-                    >
-                      <div className={cn(
-                        "flex gap-3",
-                        message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                      )}>
-                        {message.role === 'assistant' && (
-                          <div className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center bg-white/10 border border-white/10">
-                            <img src="/tork_symbol_favicon.png" alt="Tork" className="w-4 h-4 object-contain" />
-                          </div>
-                        )}
-                        
-                        {/* FASE P5.1: Contenção de layout - min-w-0 permite Flexbox encolher, max-w-full + overflow-hidden evitam estouro */}
-                        <div className={cn(
-                          "rounded-2xl px-4 py-3 min-w-0",
-                          message.role === 'user' 
-                            ? "max-w-[85%] bg-primary text-primary-foreground rounded-br-sm" 
-                            : "w-full max-w-[95%] bg-white/10 text-foreground rounded-bl-sm"
-                        )}>
-                        {message.role === 'assistant' ? (
-                            // Lógica refinada: Coexistência de Tool + Conteúdo
-                            (() => {
-                              // Get tool executions for this specific message
-                              const isCurrentMessage = idx === messages.length - 1 && (isLoading || isStreaming);
-                              const msgToolExecutions = isCurrentMessage 
-                                ? activeToolExecutions 
-                                : (messageToolExecutions.get(idx) || []);
-                              
-                              return (
-                                <div className="space-y-3 w-full max-w-full break-words">
-                                  {/* FASE P5.1: Contenção de layout aplicada */}
-                                  {/* Sempre mostrar ToolExecutionStatus se houver ferramentas */}
-                                  {msgToolExecutions.length > 0 && (
-                                    <ToolExecutionStatus executions={msgToolExecutions} />
-                                  )}
-                                  
-                                  {/* Mostrar loader apenas se não há tools e não há conteúdo */}
-                                  {msgToolExecutions.length === 0 && message.isLoading && message.content === '' && (
-                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                      <span className="text-sm">Pensando...</span>
-                                    </div>
-                                  )}
-                                  
-                                  {/* Renderizar conteúdo sempre que existir (streaming ou completo) */}
-                                  {message.content && (
-                                    <AIResponseRenderer content={message.content} />
-                                  )}
-                                </div>
-                              );
-                            })()
-                          ) : (
-                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                          )}
-                        </div>
-
-                        {message.role === 'user' && (
-                          <div className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center bg-white/5 border border-white/10">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Feedback buttons for assistant messages */}
-                      {message.role === 'assistant' && message.id && !feedbackSent.has(message.id) && (
-                        <motion.div 
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="flex gap-1 mt-2 ml-11 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <button 
-                            onClick={() => handleFeedback(message.id, 'positive')}
-                            className="p-1.5 hover:bg-green-500/20 rounded-lg border border-transparent hover:border-green-500/30 transition-all"
-                            title="Resposta útil"
-                          >
-                            <ThumbsUp className="h-3.5 w-3.5 text-muted-foreground hover:text-green-400" />
-                          </button>
-                          <button 
-                            onClick={() => handleFeedback(message.id, 'negative')}
-                            className="p-1.5 hover:bg-red-500/20 rounded-lg border border-transparent hover:border-red-500/30 transition-all"
-                            title="Resposta pode melhorar"
-                          >
-                            <ThumbsDown className="h-3.5 w-3.5 text-muted-foreground hover:text-red-400" />
-                          </button>
-                        </motion.div>
-                      )}
-
-                      {/* Feedback sent indicator */}
-                      {message.role === 'assistant' && message.id && feedbackSent.has(message.id) && (
-                        <span className="text-xs text-muted-foreground/60 ml-11 mt-1">
-                          ✓ Feedback enviado
-                        </span>
-                      )}
-
-                      {/* Feedback note input for negative feedback */}
-                      {feedbackNoteId === message.id && (
-                        <motion.div 
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="ml-11 mt-2 w-full max-w-[280px]"
-                        >
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={feedbackNote}
-                              onChange={(e) => setFeedbackNote(e.target.value)}
-                              placeholder="O que poderia melhorar?"
-                              className="flex-1 px-3 py-1.5 text-xs bg-white/5 border border-white/10 rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') submitFeedbackNote();
-                                if (e.key === 'Escape') {
-                                  setFeedbackNoteId(null);
-                                  setFeedbackNote('');
-                                }
-                              }}
-                            />
-                            <Button
-                              size="sm"
-                              onClick={submitFeedbackNote}
-                              disabled={!feedbackNote.trim()}
-                              className="h-7 px-2 text-xs"
-                            >
-                              Enviar
-                            </Button>
-                          </div>
-                        </motion.div>
-                      )}
-                    </motion.div>
-                  ))}
-
-
+                  {messages.map((message, idx) => {
+                    const isCurrentMessage = idx === messages.length - 1 && (isLoading || isStreaming);
+                    const msgToolExecutions = isCurrentMessage 
+                      ? activeToolExecutions 
+                      : (messageToolExecutions.get(idx) || []);
+                    
+                    return (
+                      <ChatMessage
+                        key={message.id || idx}
+                        message={message}
+                        index={idx}
+                        isCurrentMessage={isCurrentMessage}
+                        isLoading={isLoading}
+                        isStreaming={isStreaming}
+                        toolExecutions={msgToolExecutions}
+                        feedbackSent={feedbackSent}
+                        feedbackNoteId={feedbackNoteId}
+                        feedbackNote={feedbackNote}
+                        onFeedback={handleFeedback}
+                        onFeedbackNoteChange={setFeedbackNote}
+                        onFeedbackNoteSubmit={submitFeedbackNote}
+                        onFeedbackNoteCancel={() => {
+                          setFeedbackNoteId(null);
+                          setFeedbackNote('');
+                        }}
+                      />
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>
