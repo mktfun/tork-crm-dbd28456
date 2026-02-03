@@ -1909,47 +1909,52 @@ serve(async (req) => {
 
       // Criar um ReadableStream customizado que injeta eventos de tool antes do stream
       const encoder = new TextEncoder();
-      let hasStarted = false;
+      const reader = streamResponse.body!.getReader();
 
       const customStream = new ReadableStream({
         async start(controller) {
-          // Primeiro, emitir eventos de tool_calls executadas
-          for (const toolName of executedTools) {
-            const toolStartEvent = formatSSE({
-              choices: [{ delta: { tool_calls: [{ function: { name: toolName } }] } }]
-            });
-            controller.enqueue(encoder.encode(toolStartEvent));
-            console.log(`[SSE-DEBUG] Emitindo tool_call event:`, toolName);
-          }
-          
-          // Depois, emitir resultados das tools
-          for (const toolName of executedTools) {
-            const toolResultEvent = formatSSE({ tool_result: { name: toolName } });
-            controller.enqueue(encoder.encode(toolResultEvent));
-            console.log(`[SSE-DEBUG] Emitindo tool_result event:`, toolName);
-          }
-        },
-        async pull(controller) {
-          if (!hasStarted) {
-            hasStarted = true;
-            const reader = streamResponse.body!.getReader();
-            
-            try {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                  console.log(`[SSE-DEBUG] Stream finalizado com sinalizador [DONE]`);
-                  controller.close();
-                  break;
-                }
-                const decoded = new TextDecoder().decode(value);
-                console.log(`[SSE-DEBUG] Chunk enfileirado (${value.byteLength} bytes):`, decoded.slice(0, 150));
-                controller.enqueue(value);
-              }
-            } catch (err) {
-              console.error(`[SSE-DEBUG] Stream error:`, err);
-              controller.error(err);
+          try {
+            // Primeiro, emitir eventos de tool_calls executadas
+            for (const toolName of executedTools) {
+              const toolStartEvent = formatSSE({
+                choices: [{ delta: { tool_calls: [{ function: { name: toolName } }] } }]
+              });
+              controller.enqueue(encoder.encode(toolStartEvent));
+              console.log(`[SSE-DEBUG] Emitindo tool_call event:`, toolName);
             }
+            
+            // Depois, emitir resultados das tools
+            for (const toolName of executedTools) {
+              const toolResultEvent = formatSSE({ tool_result: { name: toolName } });
+              controller.enqueue(encoder.encode(toolResultEvent));
+              console.log(`[SSE-DEBUG] Emitindo tool_result event:`, toolName);
+            }
+
+            // Agora, processar o stream do gateway
+            console.log(`[SSE-DEBUG] Iniciando leitura do stream do gateway...`);
+            while (true) {
+              const { done, value } = await reader.read();
+              
+              if (done) {
+                console.log(`[SSE-DEBUG] Stream finalizado com sinalizador [DONE]`);
+                controller.close();
+                break;
+              }
+              
+              // Enfileirar chunk diretamente (já vem no formato SSE correto)
+              controller.enqueue(value);
+              
+              // Log apenas para debug (não decodificar todo chunk para performance)
+              if (value.byteLength < 500) {
+                const decoded = new TextDecoder().decode(value);
+                console.log(`[SSE-DEBUG] Chunk (${value.byteLength} bytes):`, decoded.slice(0, 150));
+              } else {
+                console.log(`[SSE-DEBUG] Chunk grande enfileirado: ${value.byteLength} bytes`);
+              }
+            }
+          } catch (err) {
+            console.error(`[SSE-DEBUG] Stream error:`, err);
+            controller.error(err);
           }
         }
       });
