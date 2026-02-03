@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Bot, Loader2 } from 'lucide-react';
+import { Bot, Loader2, Sparkles, Settings2, Puzzle } from 'lucide-react';
 import { useCRMPipelines } from '@/hooks/useCRMPipelines';
 import { useCRMStages } from '@/hooks/useCRMDeals';
 import { useCrmAiSettings } from '@/hooks/useCrmAiSettings';
@@ -12,36 +13,39 @@ import { NewPipelineModal } from '@/components/crm/NewPipelineModal';
 import { NewStageModal } from '@/components/crm/NewStageModal';
 import { StageEditModal } from '@/components/crm/StageEditModal';
 import { PipelineEditModal } from '@/components/crm/PipelineEditModal';
+import { PromptStudio } from './PromptStudio';
+import { IntegrationsPanel } from './IntegrationsPanel';
 import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function AIAutomationDashboard() {
   const { pipelines, isLoading: pipelinesLoading } = useCRMPipelines();
   const { config: globalConfig } = useGlobalAiConfig();
-  
+
   // Pipeline selection
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const selectedPipeline = pipelines.find(p => p.id === selectedPipelineId) || pipelines[0];
-  
+
   // Get stages for selected pipeline
   const { stages, isLoading: stagesLoading } = useCRMStages(selectedPipeline?.id);
-  
+
   // Get AI settings for selected pipeline
   const { aiSettings, upsertSetting, isLoading: aiSettingsLoading } = useCrmAiSettings(selectedPipeline?.id);
-  
+
   // Get pipeline AI defaults
   const { pipelineDefault, resetStageToDefault, isLoading: pipelineDefaultLoading } = usePipelineAiDefaults(selectedPipeline?.id || null);
-  
+
   // Selected stage for editing
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const selectedStage = stages.find(s => s.id === selectedStageId) || null;
   const selectedAiSetting = aiSettings.find(s => s.stage_id === selectedStageId) || null;
-  
+
   // Modals
   const [showNewPipeline, setShowNewPipeline] = useState(false);
   const [showNewStage, setShowNewStage] = useState(false);
   const [showPipelineDefaults, setShowPipelineDefaults] = useState(false);
   const [editingPipeline, setEditingPipeline] = useState<any>(null);
-  
+
   // Auto-select first pipeline
   useEffect(() => {
     if (pipelines.length > 0 && !selectedPipelineId) {
@@ -49,7 +53,7 @@ export function AIAutomationDashboard() {
       setSelectedPipelineId(defaultPipeline.id);
     }
   }, [pipelines, selectedPipelineId]);
-  
+
   // Auto-select first stage when pipeline changes
   useEffect(() => {
     if (stages.length > 0) {
@@ -76,7 +80,6 @@ export function AIAutomationDashboard() {
   const handleSaveStageConfig = async (data: any) => {
     try {
       await upsertSetting.mutateAsync(data);
-      // Silent save - no toast for auto-save
     } catch (error) {
       console.error('Error saving AI config:', error);
       toast.error('Erro ao salvar configuração');
@@ -128,53 +131,72 @@ export function AIAutomationDashboard() {
 
   return (
     <div className="h-full flex flex-col bg-background">
-      {/* Main Content - Split View */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 min-h-0 overflow-hidden">
-        {/* Left Side - Sales Flow Timeline (60%) */}
-        <div className="lg:col-span-3 min-h-0 overflow-hidden">
-          <SalesFlowTimeline
-            pipelines={pipelines}
-            selectedPipelineId={selectedPipelineId}
-            onSelectPipeline={setSelectedPipelineId}
-            stages={stages}
-            aiSettings={aiSettings}
-            pipelineDefault={pipelineDefault}
-            selectedStageId={selectedStageId}
-            stageConfigMap={stageConfigMap}
-            onSelectStage={setSelectedStageId}
-            onToggleAI={handleToggleAI}
-            onSaveStageConfig={handleSaveStageConfig}
-            onResetStageToDefault={handleResetStageToDefault}
-            onOpenPipelineDefaults={() => setShowPipelineDefaults(true)}
-            onEditPipeline={() => setEditingPipeline(selectedPipeline)}
-            onAddStage={() => setShowNewStage(true)}
-            onAddPipeline={() => setShowNewPipeline(true)}
-            isSaving={upsertSetting.isPending}
-          />
+      <Tabs defaultValue="flow" className="flex-1 flex flex-col h-full">
+        <div className="border-b px-6 py-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <TabsList className="grid w-full max-w-[600px] grid-cols-3">
+            <TabsTrigger value="flow" className="flex items-center gap-2">
+              <Bot className="h-4 w-4" /> Fluxo de Vendas
+            </TabsTrigger>
+            <TabsTrigger value="prompt-studio" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" /> Prompt Studio
+            </TabsTrigger>
+            <TabsTrigger value="integrations" className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4" /> Integrações
+            </TabsTrigger>
+          </TabsList>
         </div>
 
-        {/* Right Side - AI Sandbox (40%) */}
-        <div className="lg:col-span-2 min-h-0 overflow-hidden">
-          <AISandbox
-            selectedStage={selectedStage}
-            selectedPipeline={selectedPipeline}
-            aiSetting={selectedAiSetting}
-            pipelineDefault={pipelineDefault}
-          />
+        <div className="flex-1 min-h-0 overflow-auto bg-muted/10">
+          {/* TAB 1: Main Sales Flow (Existing Dashboard) */}
+          <TabsContent value="flow" className="h-full m-0 p-4 data-[state=active]:flex flex-col">
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-4 min-h-0">
+              <div className="lg:col-span-3 min-h-0 overflow-hidden">
+                <SalesFlowTimeline
+                  pipelines={pipelines}
+                  selectedPipelineId={selectedPipelineId}
+                  onSelectPipeline={setSelectedPipelineId}
+                  stages={stages}
+                  aiSettings={aiSettings}
+                  pipelineDefault={pipelineDefault}
+                  selectedStageId={selectedStageId}
+                  stageConfigMap={stageConfigMap}
+                  onSelectStage={setSelectedStageId}
+                  onToggleAI={handleToggleAI}
+                  onSaveStageConfig={handleSaveStageConfig}
+                  onResetStageToDefault={handleResetStageToDefault}
+                  onOpenPipelineDefaults={() => setShowPipelineDefaults(true)}
+                  onEditPipeline={() => setEditingPipeline(selectedPipeline)}
+                  onAddStage={() => setShowNewStage(true)}
+                  onAddPipeline={() => setShowNewPipeline(true)}
+                  isSaving={upsertSetting.isPending}
+                />
+              </div>
+              <div className="lg:col-span-2 min-h-0 overflow-hidden">
+                <AISandbox
+                  selectedStage={selectedStage}
+                  selectedPipeline={selectedPipeline}
+                  aiSetting={selectedAiSetting}
+                  pipelineDefault={pipelineDefault}
+                />
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* TAB 2: Prompt Studio (New) */}
+          <TabsContent value="prompt-studio" className="h-full m-0 p-6 overflow-auto">
+            <PromptStudio />
+          </TabsContent>
+
+          {/* TAB 3: Integrations (New) */}
+          <TabsContent value="integrations" className="h-full m-0 p-6 overflow-auto">
+            <IntegrationsPanel />
+          </TabsContent>
         </div>
-      </div>
+      </Tabs>
 
       {/* Modals */}
-      <NewPipelineModal
-        open={showNewPipeline}
-        onOpenChange={setShowNewPipeline}
-      />
-
-      <NewStageModal
-        open={showNewStage}
-        onOpenChange={setShowNewStage}
-        pipelineId={selectedPipeline?.id}
-      />
+      <NewPipelineModal open={showNewPipeline} onOpenChange={setShowNewPipeline} />
+      <NewStageModal open={showNewStage} onOpenChange={setShowNewStage} pipelineId={selectedPipeline?.id} />
 
       {selectedPipeline && (
         <PipelineAiDefaultsModal
