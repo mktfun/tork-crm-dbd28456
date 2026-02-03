@@ -50,6 +50,23 @@ function formatPhoneToE164(phone: string | null): string | undefined {
 }
 
 async function getChatwootConfig(supabase: any, userId: string): Promise<ChatwootConfig | null> {
+  // First try brokerages table (new approach - multi-tenant)
+  const { data: brokerage, error: brokerageError } = await supabase
+    .from('brokerages')
+    .select('chatwoot_url, chatwoot_token, chatwoot_account_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (brokerage?.chatwoot_url && brokerage?.chatwoot_token && brokerage?.chatwoot_account_id) {
+    console.log('Using Chat Tork config from brokerages table');
+    return {
+      chatwoot_url: brokerage.chatwoot_url,
+      chatwoot_api_key: brokerage.chatwoot_token,
+      chatwoot_account_id: brokerage.chatwoot_account_id
+    };
+  }
+
+  // Fallback to crm_settings for backwards compatibility
   const { data, error } = await supabase
     .from('crm_settings')
     .select('chatwoot_url, chatwoot_api_key, chatwoot_account_id')
@@ -185,6 +202,38 @@ serve(async (req) => {
     }
 
     switch (action) {
+      // ========== LIST INBOXES ==========
+      case 'list_inboxes': {
+        console.log('Listing Chat Tork inboxes...');
+        
+        try {
+          const response = await chatwootRequest(config, '/inboxes');
+          const inboxesPayload = response?.payload || response || [];
+          
+          const inboxes = inboxesPayload.map((inbox: any) => ({
+            id: inbox.id,
+            name: inbox.name,
+            channel_type: inbox.channel_type
+          }));
+          
+          console.log('Found inboxes:', inboxes.length);
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              inboxes
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (error: any) {
+          console.error('Error listing inboxes:', error);
+          return new Response(
+            JSON.stringify({ success: false, message: error.message }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
       // ========== VALIDATE CONNECTION ==========
       case 'validate': {
         console.log('Validating Chat Tork connection...');

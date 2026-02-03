@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Save, MessageCircle, ExternalLink, Eye, EyeOff, Loader2, RefreshCw, Wifi } from 'lucide-react';
+import { InboxAgentMapping } from '@/components/settings/InboxAgentMapping';
 
 interface CRMSettings {
   id?: string;
@@ -345,6 +346,9 @@ export default function ChatwootSettings() {
           </a>
         </Button>
       </AppCard>
+
+      {/* Inbox Agent Mapping */}
+      <InboxAgentMapping />
     </div>
   );
 }
