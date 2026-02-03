@@ -741,6 +741,54 @@ export type Database = {
         }
         Relationships: []
       }
+      chatwoot_inbox_agents: {
+        Row: {
+          agent_email: string
+          brokerage_id: number
+          created_at: string | null
+          id: string
+          inbox_id: number
+          inbox_name: string | null
+          is_default: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          agent_email: string
+          brokerage_id: number
+          created_at?: string | null
+          id?: string
+          inbox_id: number
+          inbox_name?: string | null
+          is_default?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          agent_email?: string
+          brokerage_id?: number
+          created_at?: string | null
+          id?: string
+          inbox_id?: number
+          inbox_name?: string | null
+          is_default?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chatwoot_inbox_agents_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chatwoot_inbox_agents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           address: string | null

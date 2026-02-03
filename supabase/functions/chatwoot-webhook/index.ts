@@ -6,6 +6,199 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-chatwoot-signature',
 };
 
+// ========== VENDOR RESOLUTION ==========
+interface VendorResolution {
+  user_id: string;
+  brokerage_id: number;
+  source: 'assignee_email' | 'inbox_agent' | 'existing_client' | 'brokerage_owner';
+}
+
+/**
+ * Resolve dynamically which seller (user_id) should own the conversation/deal.
+ * Priority:
+ * 1. Assignee email matches a profile
+ * 2. Inbox agent mapping (chatwoot_inbox_agents table)
+ * 3. Fallback to brokerage owner
+ */
+async function resolveVendor(
+  supabase: any,
+  brokerageId: number,
+  payload: any
+): Promise<VendorResolution | null> {
+  const assigneeEmail = payload?.meta?.assignee?.email || payload?.conversation?.meta?.assignee?.email;
+  const inboxId = payload?.inbox?.id || payload?.conversation?.inbox_id;
+
+  console.log('🔍 Resolving vendor - assignee:', assigneeEmail, 'inbox:', inboxId);
+
+  // 1. Try by assignee email → profiles.email
+  if (assigneeEmail) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', assigneeEmail)
+      .maybeSingle();
+    
+    if (profile) {
+      console.log('✅ Vendor resolved via assignee email:', profile.id);
+      return { user_id: profile.id, brokerage_id: brokerageId, source: 'assignee_email' };
+    }
+  }
+  
+  // 2. Try by inbox_id + agent mapping
+  if (inboxId) {
+    // First try exact match with agent_email, then fallback to is_default
+    let query = supabase
+      .from('chatwoot_inbox_agents')
+      .select('user_id')
+      .eq('brokerage_id', brokerageId)
+      .eq('inbox_id', inboxId);
+    
+    if (assigneeEmail) {
+      // Try exact agent match first
+      const { data: exactMatch } = await query
+        .eq('agent_email', assigneeEmail)
+        .maybeSingle();
+      
+      if (exactMatch?.user_id) {
+        console.log('✅ Vendor resolved via inbox agent exact match:', exactMatch.user_id);
+        return { user_id: exactMatch.user_id, brokerage_id: brokerageId, source: 'inbox_agent' };
+      }
+    }
+    
+    // Try default agent for inbox
+    const { data: defaultAgent } = await supabase
+      .from('chatwoot_inbox_agents')
+      .select('user_id')
+      .eq('brokerage_id', brokerageId)
+      .eq('inbox_id', inboxId)
+      .eq('is_default', true)
+      .maybeSingle();
+    
+    if (defaultAgent?.user_id) {
+      console.log('✅ Vendor resolved via inbox default agent:', defaultAgent.user_id);
+      return { user_id: defaultAgent.user_id, brokerage_id: brokerageId, source: 'inbox_agent' };
+    }
+  }
+  
+  // 3. Fallback: brokerage owner
+  const { data: brokerage } = await supabase
+    .from('brokerages')
+    .select('user_id')
+    .eq('id', brokerageId)
+    .single();
+  
+  if (brokerage) {
+    console.log('✅ Vendor resolved via brokerage owner:', brokerage.user_id);
+    return { user_id: brokerage.user_id, brokerage_id: brokerageId, source: 'brokerage_owner' };
+  }
+  
+  console.log('❌ Could not resolve vendor');
+  return null;
+}
+
+/**
+ * Find brokerage by Chatwoot account ID.
+ * Now using brokerages table instead of crm_settings.
+ */
+async function findBrokerageByAccountId(
+  supabase: any,
+  accountId: string
+): Promise<{ id: number; user_id: string } | null> {
+  // Try brokerages table first (new approach)
+  const { data: brokerage, error: brokerageError } = await supabase
+    .from('brokerages')
+    .select('id, user_id')
+    .eq('chatwoot_account_id', accountId)
+    .maybeSingle();
+  
+  if (brokerage) {
+    console.log('📦 Found brokerage by account_id:', brokerage.id);
+    return brokerage;
+  }
+
+  // Fallback to crm_settings for backwards compatibility
+  const { data: settings, error: settingsError } = await supabase
+    .from('crm_settings')
+    .select('user_id')
+    .eq('chatwoot_account_id', accountId)
+    .maybeSingle();
+
+  if (settings) {
+    // Get brokerage for this user
+    const { data: userBrokerage } = await supabase
+      .from('brokerages')
+      .select('id, user_id')
+      .eq('user_id', settings.user_id)
+      .maybeSingle();
+    
+    if (userBrokerage) {
+      console.log('📦 Found brokerage via crm_settings fallback:', userBrokerage.id);
+      return userBrokerage;
+    }
+  }
+
+  console.log('❌ No brokerage found for account_id:', accountId);
+  return null;
+}
+
+/**
+ * Find existing client by phone or email.
+ * Returns the existing client with its owner (user_id).
+ */
+async function findExistingClient(
+  supabase: any,
+  contact: any
+): Promise<{ id: string; user_id: string } | null> {
+  const email = contact?.email;
+  const phone = contact?.phone_number;
+
+  if (!email && !phone) return null;
+
+  // Try by email first
+  if (email) {
+    const { data: clientByEmail } = await supabase
+      .from('clientes')
+      .select('id, user_id')
+      .eq('email', email)
+      .maybeSingle();
+    
+    if (clientByEmail) {
+      console.log('👤 Found existing client by email:', clientByEmail.id);
+      return clientByEmail;
+    }
+  }
+
+  // Try by phone
+  if (phone) {
+    // Normalize phone for search
+    const phoneDigits = phone.replace(/\D/g, '');
+    const phoneVariants = [
+      phone,
+      phoneDigits,
+      `+55${phoneDigits}`,
+      phoneDigits.slice(-10), // Last 10 digits
+      phoneDigits.slice(-11), // Last 11 digits
+    ].filter(Boolean);
+
+    for (const variant of phoneVariants) {
+      const { data: clientByPhone } = await supabase
+        .from('clientes')
+        .select('id, user_id')
+        .ilike('phone', `%${variant}%`)
+        .limit(1)
+        .maybeSingle();
+      
+      if (clientByPhone) {
+        console.log('👤 Found existing client by phone:', clientByPhone.id);
+        return clientByPhone;
+      }
+    }
+  }
+
+  return null;
+}
+
+// ========== MAIN HANDLER ==========
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -29,23 +222,18 @@ serve(async (req) => {
       );
     }
 
-    // Find user by account_id
-    const { data: settings, error: settingsError } = await supabase
-      .from('crm_settings')
-      .select('user_id, chatwoot_webhook_secret')
-      .eq('chatwoot_account_id', account.id.toString())
-      .maybeSingle();
+    // Find brokerage by account_id (multi-tenant resolution)
+    const brokerage = await findBrokerageByAccountId(supabase, account.id.toString());
 
-    if (settingsError || !settings) {
-      console.log('No CRM settings found for account:', account.id);
+    if (!brokerage) {
+      console.log('No brokerage found for account:', account.id);
       return new Response(
-        JSON.stringify({ message: 'Account not linked' }),
+        JSON.stringify({ message: 'Account not linked to any brokerage' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const userId = settings.user_id;
-    console.log('Processing webhook for user:', userId);
+    console.log('Processing webhook for brokerage:', brokerage.id, 'default owner:', brokerage.user_id);
 
     switch (event) {
       case 'conversation_updated': {
@@ -55,7 +243,6 @@ serve(async (req) => {
         const { data: deal, error: dealError } = await supabase
           .from('crm_deals')
           .select('*, stage:crm_stages(*)')
-          .eq('user_id', userId)
           .eq('chatwoot_conversation_id', conversation.id)
           .maybeSingle();
 
@@ -73,11 +260,11 @@ serve(async (req) => {
         // Check for label changes
         const labels: string[] = conversation.labels || [];
         
-        // Get all stages for this user
+        // Get all stages for this deal's owner
         const { data: stages } = await supabase
           .from('crm_stages')
           .select('*')
-          .eq('user_id', userId);
+          .eq('user_id', deal.user_id);
 
         // Find matching stage by label
         const matchingStage = stages?.find(s => 
@@ -102,27 +289,11 @@ serve(async (req) => {
       case 'contact_created': {
         if (!contact) break;
 
-        // Check if contact already exists by email or phone
-        const email = contact.email;
-        const phone = contact.phone_number;
-
-        let query = supabase
-          .from('clientes')
-          .select('id')
-          .eq('user_id', userId);
-
-        if (email) {
-          query = query.eq('email', email);
-        } else if (phone) {
-          query = query.eq('phone', phone);
-        } else {
-          break; // Can't match without email or phone
-        }
-
-        const { data: existingClient } = await query.maybeSingle();
+        // Check if contact already exists
+        const existingClient = await findExistingClient(supabase, contact);
 
         if (existingClient) {
-          // Link existing client
+          // Link existing client to Chatwoot contact
           await supabase
             .from('clientes')
             .update({
@@ -138,19 +309,30 @@ serve(async (req) => {
       case 'conversation_created': {
         if (!conversation || !contact) break;
 
-        // Auto-create deal from new conversation
-        const { data: client } = await supabase
-          .from('clientes')
-          .select('id, name')
-          .eq('user_id', userId)
-          .eq('chatwoot_contact_id', contact.id)
-          .maybeSingle();
+        // Resolve vendor dynamically
+        const vendor = await resolveVendor(supabase, brokerage.id, body);
+        
+        if (!vendor) {
+          console.log('Could not resolve vendor for conversation');
+          break;
+        }
 
-        // Get first stage
+        // Check if client already exists - preserve ownership
+        const existingClient = await findExistingClient(supabase, contact);
+        const finalOwnerId = existingClient?.user_id || vendor.user_id;
+
+        console.log('📌 Ownership resolution:',
+          'existing_client:', existingClient?.user_id || 'none',
+          'vendor:', vendor.user_id,
+          'final:', finalOwnerId,
+          'source:', existingClient ? 'existing_client' : vendor.source
+        );
+
+        // Get first stage for the final owner
         const { data: firstStage } = await supabase
           .from('crm_stages')
           .select('id')
-          .eq('user_id', userId)
+          .eq('user_id', finalOwnerId)
           .order('position', { ascending: true })
           .limit(1)
           .maybeSingle();
@@ -160,20 +342,22 @@ serve(async (req) => {
           const { data: existingDeal } = await supabase
             .from('crm_deals')
             .select('id')
-            .eq('user_id', userId)
             .eq('chatwoot_conversation_id', conversation.id)
             .maybeSingle();
 
           if (!existingDeal) {
-            const dealTitle = client?.name 
-              ? `Nova conversa - ${client.name}`
+            const clientName = contact.name || 
+              (existingClient ? (await supabase.from('clientes').select('name').eq('id', existingClient.id).single()).data?.name : null);
+            
+            const dealTitle = clientName 
+              ? `Nova conversa - ${clientName}`
               : `Conversa #${conversation.id}`;
 
             await supabase
               .from('crm_deals')
               .insert({
-                user_id: userId,
-                client_id: client?.id || null,
+                user_id: finalOwnerId,
+                client_id: existingClient?.id || null,
                 stage_id: firstStage.id,
                 chatwoot_conversation_id: conversation.id,
                 title: dealTitle,
@@ -181,7 +365,7 @@ serve(async (req) => {
                 last_sync_source: 'chatwoot',
                 sync_token: crypto.randomUUID()
               });
-            console.log('Created deal from Tork conversation:', conversation.id);
+            console.log('Created deal from Tork conversation:', conversation.id, 'owner:', finalOwnerId);
           }
         }
         break;
