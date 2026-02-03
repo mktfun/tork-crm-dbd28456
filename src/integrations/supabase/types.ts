@@ -982,6 +982,36 @@ export type Database = {
           },
         ]
       }
+      crm_ai_config: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          model: string | null
+          temperature: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          model?: string | null
+          temperature?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          model?: string | null
+          temperature?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       crm_ai_global_config: {
         Row: {
           agent_name: string | null
@@ -1017,6 +1047,47 @@ export type Database = {
           voice_tone?: string | null
         }
         Relationships: []
+      }
+      crm_ai_prompts: {
+        Row: {
+          config_id: string
+          content: string
+          created_at: string
+          id: string
+          is_enabled: boolean | null
+          module_type: string
+          position: number | null
+          updated_at: string
+        }
+        Insert: {
+          config_id: string
+          content: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          module_type: string
+          position?: number | null
+          updated_at?: string
+        }
+        Update: {
+          config_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          module_type?: string
+          position?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_ai_prompts_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "crm_ai_config"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       crm_ai_settings: {
         Row: {
