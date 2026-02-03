@@ -1021,6 +1021,13 @@ export type Database = {
             referencedRelation: "crm_stages"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "crm_ai_settings_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: true
+            referencedRelation: "v_ai_pipeline_structure"
+            referencedColumns: ["stage_id"]
+          },
         ]
       }
       crm_deals: {
@@ -1053,7 +1060,7 @@ export type Database = {
           sync_token?: string | null
           title: string
           updated_at?: string
-          user_id: string
+          user_id?: string
           value?: number | null
         }
         Update: {
@@ -1093,6 +1100,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "crm_stages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deals_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_ai_pipeline_structure"
+            referencedColumns: ["stage_id"]
           },
         ]
       }
@@ -1146,6 +1160,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "crm_pipelines"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_pipeline_ai_defaults_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: true
+            referencedRelation: "v_ai_pipeline_structure"
+            referencedColumns: ["pipeline_id"]
           },
         ]
       }
@@ -1253,6 +1274,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "crm_pipelines"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "v_ai_pipeline_structure"
+            referencedColumns: ["pipeline_id"]
           },
         ]
       }
@@ -2635,6 +2663,16 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_ai_pipeline_structure: {
+        Row: {
+          pipeline_id: string | null
+          pipeline_name: string | null
+          position: number | null
+          stage_id: string | null
+          stage_name: string | null
+        }
+        Relationships: []
       }
       v_n8n_agent_config: {
         Row: {
