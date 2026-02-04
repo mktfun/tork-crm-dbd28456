@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useSinistros } from '@/hooks/useSinistros';
+import { useSinistros, Sinistro } from '@/hooks/useSinistros';
 import { SinistroFormModal } from '@/components/sinistros/SinistroFormModal';
 import { SinistroDetailsModal } from '@/components/sinistros/SinistroDetailsModal';
 import {
@@ -66,7 +66,7 @@ export default function Sinistros() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('Todos');
   const [selectedType, setSelectedType] = useState('Todos');
-  const [selectedSinistro, setSelectedSinistro] = useState<any>(null);
+  const [selectedSinistro, setSelectedSinistro] = useState<Sinistro | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
 
   const { data: sinistros = [], isLoading, error, refetch } = useSinistros();
@@ -302,11 +302,10 @@ export default function Sinistros() {
                       {sinistro.status}
                     </Badge>
                     {sinistro.priority && sinistro.priority !== 'Média' && (
-                      <Badge variant="outline" className={`${
-                        sinistro.priority === 'Alta' ? 'border-orange-500 text-orange-400' :
+                      <Badge variant="outline" className={`${sinistro.priority === 'Alta' ? 'border-orange-500 text-orange-400' :
                         sinistro.priority === 'Urgente' ? 'border-red-500 text-red-400' :
-                        'border-gray-500 text-gray-400'
-                      }`}>
+                          'border-gray-500 text-gray-400'
+                        }`}>
                         {sinistro.priority}
                       </Badge>
                     )}

@@ -1,3 +1,11 @@
+/**
+ * @deprecated DEMO PAGE - Remover em produção
+ * 
+ * Esta página é uma demonstração dos componentes de menu mobile.
+ * Deve ser removida ou movida para uma pasta /dev antes do deploy em produção.
+ * 
+ * Para uso interno de desenvolvimento apenas.
+ */
 import React from 'react';
 import { ModernMobileMenuDemoPage } from '@/components/ui/modern-mobile-menu-demo';
 import { ModernMobileNav, EnhancedMobileFloatingNav, CompactMobileNav } from '@/components/layout/ModernMobileNav';
@@ -36,7 +44,7 @@ export default function ModernMobileMenuDemo() {
       {/* Content */}
       <div className="p-4 pb-24">
         <div className="max-w-7xl mx-auto space-y-8">
-          
+
           {/* Mobile Status */}
           <div className="bg-slate-800/50 rounded-2xl p-6 backdrop-blur-sm border border-slate-700">
             <h2 className="text-xl font-semibold text-white mb-4">Status do Dispositivo</h2>
@@ -81,12 +89,12 @@ export default function ModernMobileMenuDemo() {
             <h2 className="text-xl font-semibold text-white mb-4">🔧 Integração</h2>
             <div className="space-y-4 text-slate-300">
               <p>
-                Para usar este componente no seu app, substitua o <code className="bg-slate-700 px-2 py-1 rounded text-sm">MobileFloatingNav</code> 
+                Para usar este componente no seu app, substitua o <code className="bg-slate-700 px-2 py-1 rounded text-sm">MobileFloatingNav</code>
                 {' '}no arquivo <code className="bg-slate-700 px-2 py-1 rounded text-sm">src/layouts/RootLayout.tsx</code>:
               </p>
               <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-600">
                 <pre className="text-sm text-green-400">
-{`// Substitua esta linha:
+                  {`// Substitua esta linha:
 {isMobile && <MobileFloatingNav />}
 
 // Por esta:
@@ -111,7 +119,7 @@ export default function ModernMobileMenuDemo() {
               </p>
             </div>
           </div>
-          
+
           {/* You can uncomment one of these to test different variants */}
           <ModernMobileNav />
           {/* <EnhancedMobileFloatingNav /> */}

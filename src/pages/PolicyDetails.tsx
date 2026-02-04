@@ -17,7 +17,7 @@ import { RenewPolicyModal } from '@/components/policies/RenewPolicyModal';
 import { PolicyFormModal } from '@/components/policies/PolicyFormModal';
 import { AutoRenewalIndicator } from '@/components/policies/AutoRenewalIndicator';
 import { PolicyRenewalSection } from '@/components/policies/PolicyRenewalSection';
-import type { Policy } from '@/types';
+import type { Policy, Client } from '@/types';
 import { CommissionExtract } from '@/components/policies/CommissionExtract';
 import { useToast } from '@/hooks/use-toast';
 import { linkCarteirinhaToPolicy } from '@/services/policyImportService';
@@ -31,7 +31,7 @@ export default function PolicyDetails() {
   const { getProducerName } = useProducerNames();
   const { toast } = useToast();
   const [policy, setPolicy] = useState<Policy | null>(null);
-  const [client, setClient] = useState<any>(null);
+  const [client, setClient] = useState<Client | null>(null);
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
   const [isEditPolicyModalOpen, setIsEditPolicyModalOpen] = useState(false);
   const [isUploadingCarteirinha, setIsUploadingCarteirinha] = useState(false);
@@ -45,7 +45,7 @@ export default function PolicyDetails() {
       const foundPolicy = policies.find(p => p.id === id);
       if (foundPolicy) {
         setPolicy(foundPolicy);
-        
+
         // Buscar cliente associado
         const associatedClient = clients.find(c => c.id === foundPolicy.clientId);
         setClient(associatedClient);
@@ -78,13 +78,13 @@ export default function PolicyDetails() {
 
       try {
         await ativarEAnexarPdf(policy.id, file);
-        
+
         // Mensagem de sucesso baseada no status atual
         const isCurrentlyActive = policy.status === 'Ativa';
         toast({
           title: 'Sucesso',
-          description: isCurrentlyActive 
-            ? 'PDF anexado com sucesso!' 
+          description: isCurrentlyActive
+            ? 'PDF anexado com sucesso!'
             : 'PDF anexado e apólice ativada com sucesso!',
           variant: 'default',
         });
@@ -114,24 +114,24 @@ export default function PolicyDetails() {
   const handleCarteirinhaUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !policy) return;
-    
+
     // Validar tipo (PDF ou imagem)
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!validTypes.includes(file.type)) {
       toast({ title: 'Erro', description: 'Formato inválido. Use PDF, JPG ou PNG.', variant: 'destructive' });
       return;
     }
-    
+
     // Validar tamanho (máximo 10MB)
     if (file.size > 10 * 1024 * 1024) {
       toast({ title: 'Erro', description: 'O arquivo deve ter no máximo 10MB.', variant: 'destructive' });
       return;
     }
-    
+
     try {
       setIsUploadingCarteirinha(true);
       const result = await linkCarteirinhaToPolicy(policy.id, file, policy.userId || '');
-      
+
       if (result.success) {
         toast({ title: 'Sucesso', description: 'Carteirinha anexada com sucesso!' });
         // Recarregar dados
@@ -186,10 +186,10 @@ export default function PolicyDetails() {
 
   // Verificar se tem PDF (base64 OU URL do Storage)
   const hasPdf = !!(policy.pdfAnexado || policy.pdfUrl);
-  
+
   // Determinar se deve mostrar o botão de upload
-  const shouldShowUpload = policy.status === 'Aguardando Apólice' || 
-                          (policy.status === 'Ativa' && !hasPdf);
+  const shouldShowUpload = policy.status === 'Aguardando Apólice' ||
+    (policy.status === 'Ativa' && !hasPdf);
 
   // Texto do botão baseado no status
   const getUploadButtonText = () => {
@@ -227,7 +227,7 @@ export default function PolicyDetails() {
               <p className="text-slate-400">{isBudget ? 'Orçamento' : 'Apólice'} {policy.policyNumber || `ORÇ-${policy.id.slice(-8)}`}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <Badge
               variant={policy.status === 'Ativa' ? 'default' : 'secondary'}
@@ -235,10 +235,10 @@ export default function PolicyDetails() {
                 policy.status === 'Ativa'
                   ? 'bg-green-600/80 text-white hover:bg-green-700/80'
                   : policy.status === 'Orçamento'
-                  ? 'bg-blue-600/80 text-white hover:bg-blue-700/80'
-                  : policy.status === 'Cancelada'
-                  ? 'bg-red-600/80 text-white hover:bg-red-700/80'
-                  : 'bg-yellow-600/80 text-white hover:bg-yellow-700/80'
+                    ? 'bg-blue-600/80 text-white hover:bg-blue-700/80'
+                    : policy.status === 'Cancelada'
+                      ? 'bg-red-600/80 text-white hover:bg-red-700/80'
+                      : 'bg-yellow-600/80 text-white hover:bg-yellow-700/80'
               }
             >
               {policy.status}
@@ -296,16 +296,16 @@ export default function PolicyDetails() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-400">Status</p>
-                    <Badge 
+                    <Badge
                       variant={policy.status === 'Ativa' ? 'default' : 'secondary'}
                       className={
-                        policy.status === 'Ativa' 
-                          ? 'bg-green-600/80 text-white hover:bg-green-700/80' 
+                        policy.status === 'Ativa'
+                          ? 'bg-green-600/80 text-white hover:bg-green-700/80'
                           : policy.status === 'Orçamento'
-                          ? 'bg-blue-600/80 text-white hover:bg-blue-700/80'
-                          : policy.status === 'Cancelada'
-                          ? 'bg-red-600/80 text-white hover:bg-red-700/80'
-                          : 'bg-yellow-600/80 text-white hover:bg-yellow-700/80'
+                            ? 'bg-blue-600/80 text-white hover:bg-blue-700/80'
+                            : policy.status === 'Cancelada'
+                              ? 'bg-red-600/80 text-white hover:bg-red-700/80'
+                              : 'bg-yellow-600/80 text-white hover:bg-yellow-700/80'
                       }
                     >
                       {policy.status}
@@ -342,7 +342,7 @@ export default function PolicyDetails() {
                   <div>
                     <p className="text-sm text-slate-400">Comissão</p>
                     <p className="font-bold text-blue-400">
-                      {policy.commissionRate}% 
+                      {policy.commissionRate}%
                       <span className="text-sm text-slate-400 ml-2">
                         ({(policy.premiumValue * policy.commissionRate / 100).toLocaleString('pt-BR', {
                           style: 'currency',
@@ -400,7 +400,7 @@ export default function PolicyDetails() {
                       </Button>
                     </Link>
                   </div>
-                  
+
                   {client.address && (
                     <div className="flex items-start gap-2 text-sm text-slate-400">
                       <MapPin className="w-4 h-4 mt-0.5" />
@@ -470,7 +470,7 @@ export default function PolicyDetails() {
                           className="hidden"
                         />
                         <p className="text-xs text-slate-400 mt-1">
-                          {policy.status === 'Aguardando Apólice' 
+                          {policy.status === 'Aguardando Apólice'
                             ? 'Anexe a apólice em PDF para ativar (máx. 10MB)'
                             : 'Anexe o PDF da apólice (máx. 10MB)'
                           }
@@ -482,9 +482,9 @@ export default function PolicyDetails() {
                     <div className="space-y-2">
                       {/* Botão Ver Apólice */}
                       {(policy.pdfAnexado || policy.pdfUrl) && (
-                        <Button 
-                          variant="outline" 
-                          className="w-full" 
+                        <Button
+                          variant="outline"
+                          className="w-full"
                           onClick={() => {
                             if (policy.pdfAnexado) {
                               handleDownloadPdf();
@@ -497,12 +497,12 @@ export default function PolicyDetails() {
                           Ver Apólice
                         </Button>
                       )}
-                      
+
                       {/* Botão Ver Carteirinha */}
                       {policy.carteirinhaUrl ? (
-                        <Button 
-                          variant="outline" 
-                          className="w-full border-teal-500/30 text-teal-400 hover:bg-teal-500/10" 
+                        <Button
+                          variant="outline"
+                          className="w-full border-teal-500/30 text-teal-400 hover:bg-teal-500/10"
                           onClick={() => window.open(policy.carteirinhaUrl, '_blank')}
                         >
                           <CreditCard className="w-4 h-4 mr-2" />
@@ -511,9 +511,9 @@ export default function PolicyDetails() {
                       ) : (
                         <div>
                           <label htmlFor="carteirinha-upload">
-                            <Button 
-                              asChild 
-                              variant="outline" 
+                            <Button
+                              asChild
+                              variant="outline"
                               className="w-full border-dashed border-slate-600"
                               disabled={isUploadingCarteirinha}
                             >
@@ -553,7 +553,7 @@ export default function PolicyDetails() {
                             <AlertDialogCancel className="bg-slate-700 text-white hover:bg-slate-600">
                               Cancelar
                             </AlertDialogCancel>
-                            <AlertDialogAction 
+                            <AlertDialogAction
                               onClick={handleCancelPolicy}
                               className="bg-red-600 text-white hover:bg-red-700"
                             >
@@ -580,7 +580,7 @@ export default function PolicyDetails() {
                     {new Date(policy.createdAt).toLocaleDateString('pt-BR')}
                   </p>
                 </div>
-                
+
                 {policy.renewalStatus && (
                   <div>
                     <p className="text-sm text-slate-400">Status da Renovação</p>

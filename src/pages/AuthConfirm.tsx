@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { EmailOtpType } from '@supabase/supabase-js';
 import { useSearchParams, Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,7 @@ export default function AuthConfirm() {
   const [confirmed, setConfirmed] = useState(false);
   const [isPasswordReset, setIsPasswordReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Estados para redefinição de senha
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -27,7 +28,7 @@ export default function AuthConfirm() {
       try {
         const token_hash = searchParams.get('token_hash');
         const type = searchParams.get('type');
-        
+
         if (!token_hash || !type) {
           setError('Link inválido ou expirado');
           setLoading(false);
@@ -36,7 +37,7 @@ export default function AuthConfirm() {
 
         const { data, error } = await supabase.auth.verifyOtp({
           token_hash,
-          type: type as any,
+          type: type as EmailOtpType,
         });
 
         if (error) {
@@ -70,7 +71,7 @@ export default function AuthConfirm() {
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!password || !confirmPassword) {
       toast.error('Preencha todos os campos');
       return;
@@ -141,7 +142,7 @@ export default function AuthConfirm() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button 
+              <Button
                 onClick={() => window.location.href = '/auth'}
                 className="w-full bg-blue-600 hover:bg-blue-700"
               >
@@ -191,7 +192,7 @@ export default function AuthConfirm() {
                 Digite sua nova senha
               </CardDescription>
             </CardHeader>
-            
+
             <CardContent>
               <form onSubmit={handlePasswordReset} className="space-y-4">
                 <div className="space-y-2">
