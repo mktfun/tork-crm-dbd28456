@@ -14,8 +14,7 @@ import {
   Landmark,
   Clock,
   Info,
-  LineChart,
-  GitCompare
+  LineChart
 } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -36,7 +35,6 @@ import { CaixaTab } from '@/components/financeiro/CaixaTab';
 import { TesourariaTab } from '@/components/financeiro/TesourariaTab';
 import { ProvisoesTab } from '@/components/financeiro/ProvisoesTab';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
-import { ReconciliationPage } from '@/components/financeiro/reconciliation';
 import { ModuloFaturamento } from '@/components/financeiro/dashboard/ModuloFaturamento';
 import { ModuloTesouraria } from '@/components/financeiro/dashboard/ModuloTesouraria';
 import { ModuloMultiBancos } from '@/components/financeiro/dashboard/ModuloMultiBancos';
@@ -503,10 +501,7 @@ export default function FinanceiroERP() {
             <FileSpreadsheet className="w-4 h-4" />
             DRE
           </TabsTrigger>
-          <TabsTrigger value="conciliacao" className="gap-2">
-            <GitCompare className="w-4 h-4" />
-            Conciliação
-          </TabsTrigger>
+
           <TabsTrigger value="config" className="gap-2">
             <Settings className="w-4 h-4" />
             Configurações
@@ -548,9 +543,7 @@ export default function FinanceiroERP() {
           <DreTab />
         </TabsContent>
 
-        <TabsContent value="conciliacao">
-          <ReconciliationPage />
-        </TabsContent>
+
 
         <TabsContent value="config">
           <ConfiguracoesTab />
