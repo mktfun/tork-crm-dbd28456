@@ -1,0 +1,433 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
+import { toast } from 'sonner';
+
+// ============ TIPOS ============
+
+export interface BankStatementEntry {
+    id: string;
+    bank_account_id: string;
+    transaction_date: string;
+    description: string;
+    amount: number;
+    reference_number: string | null;
+    reconciliation_status: 'pending' | 'matched' | 'manual_match' | 'ignored' | 'divergent';
+    matched_transaction_id: string | null;
+    matched_at: string | null;
+    match_confidence: number | null;
+    notes: string | null;
+    created_at: string;
+}
+
+export interface PendingReconciliationItem {
+    source: 'statement' | 'system';
+    id: string;
+    transaction_date: string;
+    description: string;
+    amount: number;
+    reference_number: string | null;
+    status: string;
+    matched_id: string | null;
+}
+
+export interface MatchSuggestion {
+    statement_entry_id: string;
+    system_transaction_id: string;
+    statement_description: string;
+    system_description: string;
+    statement_amount: number;
+    system_amount: number;
+    date_diff: number;
+    amount_diff: number;
+    confidence: number;
+}
+
+export interface ReconciliationDashboardItem {
+    bank_account_id: string;
+    bank_name: string;
+    account_number: string | null;
+    current_balance: number;
+    statement_entries_count: number;
+    pending_reconciliation: number;
+    already_matched: number;
+    statement_total: number;
+    system_entries_count: number;
+    unreconciled_system: number;
+    system_total: number;
+    diff_amount: number;
+    reconciliation_status: 'fully_reconciled' | 'pending' | 'no_data';
+}
+
+// ============ HOOKS ============
+
+/**
+ * Hook para buscar o dashboard de reconciliação
+ */
+export function useReconciliationDashboard() {
+    const { user } = useAuth();
+
+    return useQuery({
+        queryKey: ['reconciliation-dashboard', user?.id],
+        queryFn: async () => {
+            if (!user) return [];
+
+            const { data, error } = await supabase
+                .from('reconciliation_dashboard')
+                .select('*');
+
+            if (error) {
+                console.error('Erro ao buscar dashboard de reconciliação:', error);
+                throw error;
+            }
+
+            return (data || []) as ReconciliationDashboardItem[];
+        },
+        enabled: !!user,
+        staleTime: 60 * 1000,
+    });
+}
+
+/**
+ * Hook para buscar transações pendentes de reconciliação
+ */
+export function usePendingReconciliation(
+    bankAccountId: string | null,
+    startDate?: string,
+    endDate?: string
+) {
+    const { user } = useAuth();
+
+    return useQuery({
+        queryKey: ['pending-reconciliation', user?.id, bankAccountId, startDate, endDate],
+        queryFn: async () => {
+            if (!user || !bankAccountId) return { statement: [], system: [] };
+
+            const { data, error } = await supabase.rpc('get_pending_reconciliation', {
+                p_bank_account_id: bankAccountId,
+                p_start_date: startDate || null,
+                p_end_date: endDate || null,
+            });
+
+            if (error) {
+                console.error('Erro ao buscar pendentes:', error);
+                throw error;
+            }
+
+            const items = (data || []) as PendingReconciliationItem[];
+
+            return {
+                statement: items.filter(i => i.source === 'statement'),
+                system: items.filter(i => i.source === 'system'),
+            };
+        },
+        enabled: !!user && !!bankAccountId,
+        staleTime: 30 * 1000,
+    });
+}
+
+/**
+ * Hook para buscar sugestões de match automático
+ */
+export function useMatchSuggestions(
+    bankAccountId: string | null,
+    toleranceDays = 3,
+    toleranceAmount = 0.01
+) {
+    const { user } = useAuth();
+
+    return useQuery({
+        queryKey: ['match-suggestions', user?.id, bankAccountId, toleranceDays, toleranceAmount],
+        queryFn: async () => {
+            if (!user || !bankAccountId) return [];
+
+            const { data, error } = await supabase.rpc('suggest_reconciliation_matches', {
+                p_bank_account_id: bankAccountId,
+                p_tolerance_days: toleranceDays,
+                p_tolerance_amount: toleranceAmount,
+            });
+
+            if (error) {
+                console.error('Erro ao buscar sugestões:', error);
+                throw error;
+            }
+
+            return (data || []) as MatchSuggestion[];
+        },
+        enabled: !!user && !!bankAccountId,
+        staleTime: 60 * 1000,
+    });
+}
+
+/**
+ * Hook para buscar entradas do extrato bancário
+ */
+export function useBankStatementEntries(
+    bankAccountId: string | null,
+    status?: string
+) {
+    const { user } = useAuth();
+
+    return useQuery({
+        queryKey: ['bank-statement-entries', user?.id, bankAccountId, status],
+        queryFn: async () => {
+            if (!user || !bankAccountId) return [];
+
+            let query = supabase
+                .from('bank_statement_entries')
+                .select('*')
+                .eq('bank_account_id', bankAccountId)
+                .order('transaction_date', { ascending: false });
+
+            if (status) {
+                query = query.eq('reconciliation_status', status);
+            }
+
+            const { data, error } = await query;
+
+            if (error) {
+                console.error('Erro ao buscar entradas do extrato:', error);
+                throw error;
+            }
+
+            return (data || []) as BankStatementEntry[];
+        },
+        enabled: !!user && !!bankAccountId,
+        staleTime: 30 * 1000,
+    });
+}
+
+/**
+ * Mutation para conciliar transações manualmente
+ */
+export function useReconcileManual() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({
+            statementEntryId,
+            systemTransactionId,
+        }: {
+            statementEntryId: string;
+            systemTransactionId: string;
+        }) => {
+            const { data, error } = await supabase.rpc('reconcile_transactions', {
+                p_statement_entry_id: statementEntryId,
+                p_system_transaction_id: systemTransactionId,
+            });
+
+            if (error) throw error;
+
+            const result = data as { success: boolean; error?: string; message?: string };
+            if (!result.success) {
+                throw new Error(result.error || 'Falha ao conciliar');
+            }
+
+            return result;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['match-suggestions'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            toast.success('Transações conciliadas com sucesso!');
+        },
+        onError: (error: Error) => {
+            toast.error(`Erro ao conciliar: ${error.message}`);
+        },
+    });
+}
+
+/**
+ * Mutation para ignorar entrada do extrato
+ */
+export function useIgnoreEntry() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({
+            statementEntryId,
+            notes,
+        }: {
+            statementEntryId: string;
+            notes?: string;
+        }) => {
+            const { data, error } = await supabase.rpc('ignore_statement_entry', {
+                p_statement_entry_id: statementEntryId,
+                p_notes: notes || null,
+            });
+
+            if (error) throw error;
+
+            const result = data as { success: boolean; error?: string };
+            if (!result.success) {
+                throw new Error(result.error || 'Falha ao ignorar');
+            }
+
+            return result;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            toast.success('Entrada marcada como ignorada');
+        },
+        onError: (error: Error) => {
+            toast.error(`Erro ao ignorar: ${error.message}`);
+        },
+    });
+}
+
+/**
+ * Mutation para criar transação a partir de entrada do extrato
+ */
+export function useCreateFromStatement() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({
+            statementEntryId,
+            categoryAccountId,
+            description,
+        }: {
+            statementEntryId: string;
+            categoryAccountId: string;
+            description?: string;
+        }) => {
+            const { data, error } = await supabase.rpc('create_transaction_from_statement', {
+                p_statement_entry_id: statementEntryId,
+                p_category_account_id: categoryAccountId,
+                p_description: description || null,
+            });
+
+            if (error) throw error;
+
+            const result = data as { success: boolean; transaction_id?: string; error?: string };
+            if (!result.success) {
+                throw new Error(result.error || 'Falha ao criar transação');
+            }
+
+            return result;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['account-balances'] });
+            toast.success('Transação criada e conciliada!');
+        },
+        onError: (error: Error) => {
+            toast.error(`Erro ao criar transação: ${error.message}`);
+        },
+    });
+}
+
+/**
+ * Mutation para importar entradas do extrato
+ */
+export function useImportStatementEntries() {
+    const queryClient = useQueryClient();
+    const { user } = useAuth();
+
+    return useMutation({
+        mutationFn: async ({
+            bankAccountId,
+            entries,
+        }: {
+            bankAccountId: string;
+            entries: Array<{
+                transaction_date: string;
+                description: string;
+                amount: number;
+                reference_number?: string;
+            }>;
+        }) => {
+            if (!user) throw new Error('Usuário não autenticado');
+
+            const entriesToInsert = entries.map(entry => ({
+                user_id: user.id,
+                bank_account_id: bankAccountId,
+                transaction_date: entry.transaction_date,
+                description: entry.description,
+                amount: entry.amount,
+                reference_number: entry.reference_number || null,
+                reconciliation_status: 'pending',
+                import_batch_id: crypto.randomUUID(),
+            }));
+
+            const { data, error } = await supabase
+                .from('bank_statement_entries')
+                .insert(entriesToInsert)
+                .select();
+
+            if (error) {
+                // Verificar se é erro de duplicata
+                if (error.code === '23505') {
+                    throw new Error('Algumas transações já foram importadas anteriormente');
+                }
+                throw error;
+            }
+
+            return { imported: data?.length || 0 };
+        },
+        onSuccess: (result) => {
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            toast.success(`${result.imported} transações importadas com sucesso!`);
+        },
+        onError: (error: Error) => {
+            toast.error(`Erro na importação: ${error.message}`);
+        },
+    });
+}
+
+/**
+ * Mutation para aplicar múltiplas sugestões de match
+ */
+export function useApplyMatchSuggestions() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (suggestions: MatchSuggestion[]) => {
+            let successCount = 0;
+            const errors: string[] = [];
+
+            for (const suggestion of suggestions) {
+                try {
+                    const { data, error } = await supabase.rpc('reconcile_transactions', {
+                        p_statement_entry_id: suggestion.statement_entry_id,
+                        p_system_transaction_id: suggestion.system_transaction_id,
+                    });
+
+                    if (error) throw error;
+
+                    const result = data as { success: boolean };
+                    if (result.success) {
+                        successCount++;
+                    }
+                } catch (err) {
+                    errors.push(`Falha ao conciliar: ${(err as Error).message}`);
+                }
+            }
+
+            return { successCount, errors };
+        },
+        onSuccess: (result) => {
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['match-suggestions'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+
+            if (result.successCount > 0) {
+                toast.success(`${result.successCount} transações conciliadas automaticamente!`);
+            }
+            if (result.errors.length > 0) {
+                toast.warning(`${result.errors.length} conciliações falharam`);
+            }
+        },
+        onError: (error: Error) => {
+            toast.error(`Erro ao aplicar sugestões: ${error.message}`);
+        },
+    });
+}

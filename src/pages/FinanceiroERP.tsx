@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { 
-  Wallet, 
-  TrendingDown, 
-  TrendingUp, 
-  Loader2, 
+import {
+  Wallet,
+  TrendingDown,
+  TrendingUp,
+  Loader2,
   BarChart3,
   FileSpreadsheet,
   Settings,
@@ -14,7 +14,8 @@ import {
   Landmark,
   Clock,
   Info,
-  LineChart
+  LineChart,
+  GitCompare
 } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -35,11 +36,12 @@ import { CaixaTab } from '@/components/financeiro/CaixaTab';
 import { TesourariaTab } from '@/components/financeiro/TesourariaTab';
 import { ProvisoesTab } from '@/components/financeiro/ProvisoesTab';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
+import { ReconciliationPage } from '@/components/financeiro/reconciliation';
 import { ModuloFaturamento } from '@/components/financeiro/dashboard/ModuloFaturamento';
 import { ModuloTesouraria } from '@/components/financeiro/dashboard/ModuloTesouraria';
 import { ModuloMultiBancos } from '@/components/financeiro/dashboard/ModuloMultiBancos';
-import { 
-  useFinancialAccountsWithDefaults, 
+import {
+  useFinancialAccountsWithDefaults,
   useRecentTransactions,
   useCashFlowData,
   useFinancialSummary,
@@ -351,10 +353,10 @@ function RecentMovements({ onViewDetails }: RecentMovementsProps) {
             const txDate = parseLocalDate(String(tx.transaction_date));
             // ✅ Usar status real da RPC (não inferir por reference_number)
             const isPending = tx.status === 'pending';
-            
+
             return (
-              <div 
-                key={tx.id} 
+              <div
+                key={tx.id}
                 className={cn(
                   "p-3 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer",
                   isPending && "border-l-2 border-amber-500/50"
@@ -421,7 +423,7 @@ export default function FinanceiroERP() {
 
   // KPIs globais - apenas transações EFETIVADAS (completed)
   const { data: summary, isLoading: summaryLoading } = useFinancialSummary(startDate, endDate);
-  
+
   // KPIs adicionais - pendentes
   const { data: pendingThisMonth, isLoading: pendingThisMonthLoading } = usePendingThisMonth();
   const { data: totalPending, isLoading: totalPendingLoading } = useTotalPendingReceivables();
@@ -430,7 +432,7 @@ export default function FinanceiroERP() {
   useEffect(() => {
     const transactionId = searchParams.get('transactionId');
     const legacyId = searchParams.get('legacyId');
-    
+
     if (transactionId || legacyId) {
       setDetailsTransactionId(transactionId || legacyId);
       setIsLegacyLookup(!!legacyId && !transactionId);
@@ -442,7 +444,7 @@ export default function FinanceiroERP() {
   const handleCloseDetails = () => {
     setDetailsTransactionId(null);
     setIsLegacyLookup(false);
-    
+
     if (searchParams.has('transactionId') || searchParams.has('legacyId')) {
       searchParams.delete('transactionId');
       searchParams.delete('legacyId');
@@ -465,11 +467,11 @@ export default function FinanceiroERP() {
       </div>
 
       {/* KPIs Fixos - 4 Cards Simples */}
-      <KpiSection 
-        summary={summary} 
+      <KpiSection
+        summary={summary}
         pendingThisMonth={pendingThisMonth}
         totalPending={totalPending}
-        isLoading={summaryLoading || pendingThisMonthLoading || totalPendingLoading} 
+        isLoading={summaryLoading || pendingThisMonthLoading || totalPendingLoading}
       />
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-muted/50">
@@ -501,6 +503,10 @@ export default function FinanceiroERP() {
             <FileSpreadsheet className="w-4 h-4" />
             DRE
           </TabsTrigger>
+          <TabsTrigger value="conciliacao" className="gap-2">
+            <GitCompare className="w-4 h-4" />
+            Conciliação
+          </TabsTrigger>
           <TabsTrigger value="config" className="gap-2">
             <Settings className="w-4 h-4" />
             Configurações
@@ -508,8 +514,8 @@ export default function FinanceiroERP() {
         </TabsList>
 
         <TabsContent value="visao-geral">
-          <VisaoGeral 
-            dateRange={dateRange} 
+          <VisaoGeral
+            dateRange={dateRange}
             onNavigate={(path) => navigate(path)}
             onTabChange={setActiveTab}
           />
@@ -542,6 +548,10 @@ export default function FinanceiroERP() {
           <DreTab />
         </TabsContent>
 
+        <TabsContent value="conciliacao">
+          <ReconciliationPage />
+        </TabsContent>
+
         <TabsContent value="config">
           <ConfiguracoesTab />
         </TabsContent>
@@ -549,7 +559,7 @@ export default function FinanceiroERP() {
 
 
       {/* Deep Link Details Sheet */}
-      <TransactionDetailsSheet 
+      <TransactionDetailsSheet
         transactionId={detailsTransactionId}
         isLegacyId={isLegacyLookup}
         open={!!detailsTransactionId}
