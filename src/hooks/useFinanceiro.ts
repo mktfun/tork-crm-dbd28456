@@ -360,7 +360,8 @@ export function usePendingTotals(startDate?: string, endDate?: string) {
     queryKey: ['pending-totals', startDate, endDate],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_pending_totals', {
-        p_user_id: (await supabase.auth.getUser()).data.user?.id
+        p_start_date: startDate || undefined,
+        p_end_date: endDate || undefined
       });
 
       if (error) {

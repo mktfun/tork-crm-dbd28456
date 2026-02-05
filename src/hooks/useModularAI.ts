@@ -91,9 +91,17 @@ export function useAIPrompts(configId?: string) {
     const upsertPrompt = useMutation({
         mutationFn: async (prompt: Partial<AIPrompt>) => {
             if (!configId) throw new Error('No config ID');
+            const promptData = {
+                id: prompt.id,
+                config_id: configId,
+                module_type: prompt.module_type || 'custom',
+                content: prompt.content || '',
+                is_enabled: prompt.is_enabled ?? true,
+                position: prompt.position ?? 0,
+            };
             const { error } = await supabase
                 .from('crm_ai_prompts')
-                .upsert({ ...prompt, config_id: configId })
+                .upsert(promptData)
                 .select();
             if (error) throw error;
         },

@@ -73,7 +73,7 @@ export function useReconciliationDashboard() {
             if (!user) return [];
 
             const { data, error } = await supabase
-                .from('reconciliation_dashboard')
+                .from('reconciliation_dashboard' as any)
                 .select('*');
 
             if (error) {
@@ -81,7 +81,7 @@ export function useReconciliationDashboard() {
                 throw error;
             }
 
-            return (data || []) as ReconciliationDashboardItem[];
+            return (data || []) as unknown as ReconciliationDashboardItem[];
         },
         enabled: !!user,
         staleTime: 60 * 1000,
@@ -103,7 +103,7 @@ export function usePendingReconciliation(
         queryFn: async () => {
             if (!user || !bankAccountId) return { statement: [], system: [] };
 
-            const { data, error } = await supabase.rpc('get_pending_reconciliation', {
+            const { data, error } = await (supabase.rpc as any)('get_pending_reconciliation', {
                 p_bank_account_id: bankAccountId,
                 p_start_date: startDate || null,
                 p_end_date: endDate || null,
@@ -141,7 +141,7 @@ export function useMatchSuggestions(
         queryFn: async () => {
             if (!user || !bankAccountId) return [];
 
-            const { data, error } = await supabase.rpc('suggest_reconciliation_matches', {
+            const { data, error } = await (supabase.rpc as any)('suggest_reconciliation_matches', {
                 p_bank_account_id: bankAccountId,
                 p_tolerance_days: toleranceDays,
                 p_tolerance_amount: toleranceAmount,
@@ -173,8 +173,8 @@ export function useBankStatementEntries(
         queryFn: async () => {
             if (!user || !bankAccountId) return [];
 
-            let query = supabase
-                .from('bank_statement_entries')
+            let query = (supabase as any)
+                .from('bank_statement_entries' as any)
                 .select('*')
                 .eq('bank_account_id', bankAccountId)
                 .order('transaction_date', { ascending: false });
@@ -211,7 +211,7 @@ export function useReconcileManual() {
             statementEntryId: string;
             systemTransactionId: string;
         }) => {
-            const { data, error } = await supabase.rpc('reconcile_transactions', {
+            const { data, error } = await (supabase.rpc as any)('reconcile_transactions', {
                 p_statement_entry_id: statementEntryId,
                 p_system_transaction_id: systemTransactionId,
             });
@@ -252,7 +252,7 @@ export function useIgnoreEntry() {
             statementEntryId: string;
             notes?: string;
         }) => {
-            const { data, error } = await supabase.rpc('ignore_statement_entry', {
+            const { data, error } = await (supabase.rpc as any)('ignore_statement_entry', {
                 p_statement_entry_id: statementEntryId,
                 p_notes: notes || null,
             });
@@ -294,7 +294,7 @@ export function useCreateFromStatement() {
             categoryAccountId: string;
             description?: string;
         }) => {
-            const { data, error } = await supabase.rpc('create_transaction_from_statement', {
+            const { data, error } = await (supabase.rpc as any)('create_transaction_from_statement', {
                 p_statement_entry_id: statementEntryId,
                 p_category_account_id: categoryAccountId,
                 p_description: description || null,
@@ -355,8 +355,8 @@ export function useImportStatementEntries() {
                 import_batch_id: crypto.randomUUID(),
             }));
 
-            const { data, error } = await supabase
-                .from('bank_statement_entries')
+            const { data, error } = await (supabase as any)
+                .from('bank_statement_entries' as any)
                 .insert(entriesToInsert)
                 .select();
 
@@ -395,7 +395,7 @@ export function useApplyMatchSuggestions() {
 
             for (const suggestion of suggestions) {
                 try {
-                    const { data, error } = await supabase.rpc('reconcile_transactions', {
+                    const { data, error } = await (supabase.rpc as any)('reconcile_transactions', {
                         p_statement_entry_id: suggestion.statement_entry_id,
                         p_system_transaction_id: suggestion.system_transaction_id,
                     });

@@ -154,7 +154,7 @@ Sempre ofereça VALOR IMEDIATO antes de solicitar informações adicionais.
 ## PADRÕES DE RESPOSTA PARA CONSULTORIA PURA
 
 ### Estrutura Padrão para Cotações/Estimativas:
-```markdown
+\`\`\`markdown
 ## 📊 Análise [Tipo de Seguro] - [Veículo/Bem]
 
 ### [Emoji] Perfil do Cliente
@@ -183,10 +183,10 @@ Sempre ofereça VALOR IMEDIATO antes de solicitar informações adicionais.
 
 ### 🎯 Próximos Passos:
 Ação concreta sugerida
-```
+\`\`\`
 
 ### Estrutura Padrão para Análise de Leads/Clientes:
-```markdown
+\`\`\`markdown
 ## 👤 [Nome do Lead/Cliente]
 
 **Status Atual:** [Fase]  
@@ -201,10 +201,10 @@ Script ou estratégia sugerida
 
 ### 🎯 Próxima Ação:
 Ação concreta sugerida
-```
+\`\`\`
 
 ### Estrutura Padrão para Análise Técnica:
-```markdown
+\`\`\`markdown
 ## 📋 Análise de Coberturas [Produto]
 
 | Cobertura | Mandatória | Opcional | Observação |
@@ -222,7 +222,7 @@ Ação concreta sugerida
 
 ### 💼 Pitch de Venda (Dica de Especialista):
 "Argumento comercial diferenciador"
-```
+\`\`\`
 
 ### REGRAS DE FORMATAÇÃO:
 1. **SEMPRE use emojis** para tornar respostas mais visuais e agradáveis
