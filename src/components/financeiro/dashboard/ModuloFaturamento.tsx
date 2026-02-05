@@ -15,7 +15,7 @@ interface StatItemProps {
 
 const StatItem = ({ label, value, percent, icon, isHero = false }: StatItemProps) => {
   const isPositive = percent !== undefined && percent >= 0;
-  
+
   return (
     <div className={cn(
       "flex items-center justify-between py-2",
@@ -43,7 +43,7 @@ const StatItem = ({ label, value, percent, icon, isHero = false }: StatItemProps
           </p>
         </div>
       </div>
-      
+
       {percent !== undefined && (
         <div className={cn(
           "flex items-center gap-1 text-sm font-medium",
@@ -69,7 +69,7 @@ export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
   const now = new Date();
   const startDate = format(startOfMonth(now), 'yyyy-MM-dd');
   const endDate = format(endOfMonth(now), 'yyyy-MM-dd');
-  
+
   const { data: summary, isLoading } = useFinancialSummary(startDate, endDate);
 
   const formatCurrency = (value: number) => {
@@ -92,7 +92,6 @@ export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-16 w-full" />
         </CardContent>
       </Card>
     );
@@ -100,9 +99,10 @@ export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
 
   const faturamentoMes = summary?.totalIncome || 0;
   const operacoes = summary?.transactionCount || 0;
+  const ticketMedio = operacoes > 0 ? faturamentoMes / operacoes : 0;
 
   return (
-    <Card 
+    <Card
       className={cn(
         "h-full bg-zinc-900/50 border-zinc-800 transition-all duration-200",
         onClick && "cursor-pointer hover:bg-zinc-900/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
@@ -126,7 +126,7 @@ export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
           <StatItem
             label="Faturamento Mês"
             value={formatCurrency(faturamentoMes)}
-            percent={8}
+            // percent removido pois não tenho dado histórico real fácil aqui
             icon={<DollarSign className="h-5 w-5" />}
             isHero
           />
@@ -135,30 +135,11 @@ export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
               <CreditCard className="h-3 w-3" />
               {operacoes} operações
             </span>
-            <span>vs mês anterior</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2 py-0.5 ml-2">
+              <TrendingUp className="h-3 w-3 text-emerald-500" />
+              Ticket Médio: {formatCurrency(ticketMedio)}
+            </span>
           </div>
-        </div>
-
-        {/* Breakdown Stats - Mock data por enquanto */}
-        <div className="divide-y divide-zinc-800">
-          <StatItem
-            label="Faturamento Hoje"
-            value={formatCurrency(faturamentoMes * 0.036)}
-            percent={15}
-            icon={<DollarSign className="h-4 w-4" />}
-          />
-          <StatItem
-            label="Novas Vendas"
-            value={formatCurrency(faturamentoMes * 0.52)}
-            percent={52}
-            icon={<CreditCard className="h-4 w-4" />}
-          />
-          <StatItem
-            label="Renovações"
-            value={formatCurrency(faturamentoMes * 0.48)}
-            percent={48}
-            icon={<RefreshCw className="h-4 w-4" />}
-          />
         </div>
       </CardContent>
     </Card>
