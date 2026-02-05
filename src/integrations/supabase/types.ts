@@ -590,6 +590,91 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_statement_entries: {
+        Row: {
+          amount: number
+          bank_account_id: string
+          created_at: string | null
+          description: string
+          id: string
+          import_batch_id: string | null
+          imported_at: string | null
+          match_confidence: number | null
+          matched_at: string | null
+          matched_by: string | null
+          matched_transaction_id: string | null
+          notes: string | null
+          raw_data: Json | null
+          reconciliation_status: string | null
+          reference_number: string | null
+          transaction_date: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          bank_account_id: string
+          created_at?: string | null
+          description: string
+          id?: string
+          import_batch_id?: string | null
+          imported_at?: string | null
+          match_confidence?: number | null
+          matched_at?: string | null
+          matched_by?: string | null
+          matched_transaction_id?: string | null
+          notes?: string | null
+          raw_data?: Json | null
+          reconciliation_status?: string | null
+          reference_number?: string | null
+          transaction_date: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          bank_account_id?: string
+          created_at?: string | null
+          description?: string
+          id?: string
+          import_batch_id?: string | null
+          imported_at?: string | null
+          match_confidence?: number | null
+          matched_at?: string | null
+          matched_by?: string | null
+          matched_transaction_id?: string | null
+          notes?: string | null
+          raw_data?: Json | null
+          reconciliation_status?: string | null
+          reference_number?: string | null
+          transaction_date?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_statement_entries_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_statement_entries_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliation_dashboard"
+            referencedColumns: ["bank_account_id"]
+          },
+          {
+            foreignKeyName: "bank_statement_entries_matched_transaction_id_fkey"
+            columns: ["matched_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "financial_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       birthday_greetings: {
         Row: {
           client_id: string
@@ -1733,7 +1818,10 @@ export type Database = {
           created_by: string
           description: string
           id: string
+          is_reconciled: boolean | null
           is_void: boolean | null
+          reconciled_at: string | null
+          reconciled_statement_id: string | null
           reference_number: string | null
           related_entity_id: string | null
           related_entity_type: string | null
@@ -1751,7 +1839,10 @@ export type Database = {
           created_by: string
           description: string
           id?: string
+          is_reconciled?: boolean | null
           is_void?: boolean | null
+          reconciled_at?: string | null
+          reconciled_statement_id?: string | null
           reference_number?: string | null
           related_entity_id?: string | null
           related_entity_type?: string | null
@@ -1769,7 +1860,10 @@ export type Database = {
           created_by?: string
           description?: string
           id?: string
+          is_reconciled?: boolean | null
           is_void?: boolean | null
+          reconciled_at?: string | null
+          reconciled_statement_id?: string | null
           reference_number?: string | null
           related_entity_id?: string | null
           related_entity_type?: string | null
@@ -1786,6 +1880,20 @@ export type Database = {
             columns: ["bank_account_id"]
             isOneToOne: false
             referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliation_dashboard"
+            referencedColumns: ["bank_account_id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_reconciled_statement_id_fkey"
+            columns: ["reconciled_statement_id"]
+            isOneToOne: false
+            referencedRelation: "bank_statement_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -2402,6 +2510,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "transaction_bank_distribution_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliation_dashboard"
+            referencedColumns: ["bank_account_id"]
+          },
+          {
             foreignKeyName: "transaction_bank_distribution_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
@@ -2694,6 +2809,24 @@ export type Database = {
         }
         Relationships: []
       }
+      reconciliation_dashboard: {
+        Row: {
+          account_number: string | null
+          already_matched: number | null
+          bank_account_id: string | null
+          bank_name: string | null
+          current_balance: number | null
+          diff_amount: number | null
+          pending_reconciliation: number | null
+          reconciliation_status: string | null
+          statement_entries_count: number | null
+          statement_total: number | null
+          system_entries_count: number | null
+          system_total: number | null
+          unreconciled_system: number | null
+        }
+        Relationships: []
+      }
       sinistros_complete: {
         Row: {
           analysis_deadline: string | null
@@ -2917,6 +3050,14 @@ export type Database = {
         }
         Returns: string
       }
+      create_transaction_from_statement: {
+        Args: {
+          p_category_account_id: string
+          p_description?: string
+          p_statement_entry_id: string
+        }
+        Returns: Json
+      }
       delete_financial_account_safe: {
         Args: { p_migrate_to_account_id?: string; p_target_account_id: string }
         Returns: Json
@@ -2991,15 +3132,25 @@ export type Database = {
         }[]
       }
       get_admin_metrics: { Args: never; Returns: Json }
-      get_aging_report: {
-        Args: { p_reference_date?: string; p_user_id: string }
-        Returns: {
-          bucket_amount: number
-          bucket_color: string
-          bucket_count: number
-          bucket_range: string
-        }[]
-      }
+      get_aging_report:
+        | {
+            Args: { p_user_id: string }
+            Returns: {
+              bucket_amount: number
+              bucket_color: string
+              bucket_count: number
+              bucket_range: string
+            }[]
+          }
+        | {
+            Args: { p_reference_date?: string; p_user_id: string }
+            Returns: {
+              bucket_amount: number
+              bucket_color: string
+              bucket_count: number
+              bucket_range: string
+            }[]
+          }
       get_bank_balance: {
         Args: { p_bank_account_id: string; p_include_pending?: boolean }
         Returns: number
@@ -3168,7 +3319,7 @@ export type Database = {
         }
       }
       get_financial_summary: {
-        Args: { p_end_date?: string; p_start_date?: string }
+        Args: { p_end_date: string; p_start_date: string }
         Returns: Json
       }
       get_goal_vs_actual: {
@@ -3228,6 +3379,23 @@ export type Database = {
           total_amount: number
         }[]
       }
+      get_pending_reconciliation: {
+        Args: {
+          p_bank_account_id: string
+          p_end_date?: string
+          p_start_date?: string
+        }
+        Returns: {
+          amount: number
+          description: string
+          id: string
+          matched_id: string
+          reference_number: string
+          source: string
+          status: string
+          transaction_date: string
+        }[]
+      }
       get_pending_this_month: {
         Args: never
         Returns: {
@@ -3235,10 +3403,18 @@ export type Database = {
           total_amount: number
         }[]
       }
-      get_pending_totals: {
-        Args: { p_end_date?: string; p_start_date?: string }
-        Returns: Json
-      }
+      get_pending_totals:
+        | {
+            Args: { p_end_date?: string; p_start_date?: string }
+            Returns: Json
+          }
+        | {
+            Args: { p_user_id: string }
+            Returns: {
+              total_payables: number
+              total_receivables: number
+            }[]
+          }
       get_portal_cards_hybrid: {
         Args: {
           p_client_id: string
@@ -3321,7 +3497,7 @@ export type Database = {
       }
       get_revenue_by_dimension: {
         Args: {
-          p_dimension?: string
+          p_dimension: string
           p_end_date: string
           p_start_date: string
           p_user_id: string
@@ -3487,6 +3663,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      ignore_statement_entry: {
+        Args: { p_notes?: string; p_statement_entry_id: string }
+        Returns: Json
+      }
       is_admin: { Args: { user_id?: string }; Returns: boolean }
       link_manual_transactions: { Args: { p_user_id: string }; Returns: string }
       match_knowledge: {
@@ -3530,6 +3710,10 @@ export type Database = {
         }[]
       }
       promote_user_to_admin: { Args: { user_email: string }; Returns: boolean }
+      reconcile_transactions: {
+        Args: { p_statement_entry_id: string; p_system_transaction_id: string }
+        Returns: Json
+      }
       register_policy_commission:
         | {
             Args: {
@@ -3578,6 +3762,24 @@ export type Database = {
       settle_due_commissions_v2: { Args: never; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      suggest_reconciliation_matches: {
+        Args: {
+          p_bank_account_id: string
+          p_tolerance_amount?: number
+          p_tolerance_days?: number
+        }
+        Returns: {
+          amount_diff: number
+          confidence: number
+          date_diff: number
+          statement_amount: number
+          statement_description: string
+          statement_entry_id: string
+          system_amount: number
+          system_description: string
+          system_transaction_id: string
+        }[]
+      }
       update_financial_account: {
         Args: {
           p_account_id: string

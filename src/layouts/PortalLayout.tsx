@@ -45,6 +45,13 @@ export function PortalLayout() {
     allow_profile_edit: true,
   });
 
+  // Hook de navegação - DEVE ficar ANTES de qualquer return condicional
+  useEffect(() => {
+    if (!isLoading && !client) {
+      navigate(`/${brokerageSlug}/portal`, { replace: true });
+    }
+  }, [client, isLoading, navigate, brokerageSlug]);
+
   useEffect(() => {
     const loadData = async () => {
       const clientData = sessionStorage.getItem('portal_client');
@@ -91,13 +98,6 @@ export function PortalLayout() {
       </div>
     );
   }
-
-  // Navegação programática para evitar erro de Router context
-  useEffect(() => {
-    if (!isLoading && !client) {
-      navigate(`/${brokerageSlug}/portal`, { replace: true });
-    }
-  }, [client, isLoading, navigate, brokerageSlug]);
 
   // Navegação em progresso
   if (!client) {
