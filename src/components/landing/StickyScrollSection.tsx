@@ -1,4 +1,3 @@
-'use client';
 
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform, useSpring } from 'framer-motion';
@@ -213,8 +212,8 @@ function IPhoneMockupLight({ messages, visibleCount, isTyping, isMobile = false 
                                         exit={{ opacity: 0, scale: 0.9 }}
                                         transition={{ type: "spring", stiffness: 350, damping: 25 }}
                                         className={`flex w-full relative z-10 ${msg.from === 'client' ? 'justify-end' : // WhatsApp: Me (Client) is Right/Green
-                                                msg.from === 'bot' ? 'justify-start' : // Other (Bot) is Left/White
-                                                    'justify-center'
+                                            msg.from === 'bot' ? 'justify-start' : // Other (Bot) is Left/White
+                                                'justify-center'
                                             }`}
                                     >
                                         {/* Client (ME) -> Green, Right */}

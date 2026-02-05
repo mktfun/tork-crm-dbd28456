@@ -1,4 +1,3 @@
-'use client';
 
 import { Building2, Briefcase, Shield, TrendingUp, Users2, Wallet } from 'lucide-react';
 
@@ -54,7 +53,8 @@ export function InfiniteLogoTicker() {
                 </div>
             </div>
 
-            <style jsx>{`
+            <style dangerouslySetInnerHTML={{
+                __html: `
                 @keyframes scroll {
                     0% {
                         transform: translateX(0);
@@ -71,7 +71,7 @@ export function InfiniteLogoTicker() {
                 .animate-scroll:hover {
                     animation-play-state: paused;
                 }
-            `}</style>
+            `}} />
         </section>
     );
 }

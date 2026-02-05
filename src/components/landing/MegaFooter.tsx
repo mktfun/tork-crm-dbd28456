@@ -1,4 +1,3 @@
-"use client";
 
 import { TorkLogo } from "./TorkLogo";
 import { Twitter, Linkedin, Github, Instagram } from "lucide-react";
