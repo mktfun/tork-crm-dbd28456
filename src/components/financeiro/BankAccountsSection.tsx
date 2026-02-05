@@ -1,20 +1,13 @@
 import { useState } from "react";
-import { Landmark, Plus } from "lucide-react";
+import { Landmark } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { BankAccountCard } from "./bancos/BankAccountCard";
+import { AddBankAccountModal } from "./bancos/AddBankAccountModal";
 import { mockBankAccounts, BankAccount } from "@/data/mocks/financeiroMocks";
 import { toast } from "@/hooks/use-toast";
 
 export function BankAccountsSection() {
   const [banks] = useState(mockBankAccounts);
-
-  const handleAddBank = () => {
-    toast({
-      title: "Adicionar banco",
-      description: "Modal de cadastro de banco será implementado em breve.",
-    });
-  };
 
   const handleEditBank = (account: BankAccount) => {
     toast({
@@ -39,10 +32,7 @@ export function BankAccountsSection() {
             <Landmark className="w-5 h-5 text-muted-foreground" />
             <CardTitle className="text-lg">Bancos Cadastrados</CardTitle>
           </div>
-          <Button size="sm" variant="outline" className="gap-1" onClick={handleAddBank}>
-            <Plus className="w-4 h-4" />
-            Adicionar Banco
-          </Button>
+          <AddBankAccountModal />
         </div>
         <CardDescription>
           Gerencie as contas bancárias da sua corretora
