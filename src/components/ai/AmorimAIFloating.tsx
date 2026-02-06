@@ -809,8 +809,8 @@ export function AmorimAIFloating() {
                       const nameMatch = message.content.match(/Nome original: "(.*?)"/);
                       const fileName = nameMatch ? nameMatch[1] : "Arquivo anexado";
 
-                      // Remove system tag
-                      const cleanContent = message.content.replace(/\n\n\[SYSTEM:[\s\S]*?\]/, '').trim();
+                      // Remove system tag (More robust regex: covers optional newlines)
+                      const cleanContent = message.content.replace(/(\n\s*)?\[SYSTEM:[\s\S]*?\]/g, '').trim();
 
                       // Construct display content
                       const newContent = cleanContent

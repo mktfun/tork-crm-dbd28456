@@ -23,6 +23,10 @@ export async function inspect_document(
     logger.info('Inspector: Analyzing Document', { userId, file_path, mime_type });
 
     try {
+        if (!LOVABLE_API_KEY) {
+            throw new Error("API Key de Análise não configurada (LOVABLE_AI_API_KEY missing).");
+        }
+
         // 1. Baixar o arquivo do Storage (Bucket: 'policy-docs' ou 'chat-uploads')
         // Tentativa em buckets comuns
         // Nota: O frontend deve fazer upload primeiro e passar o path.
@@ -34,7 +38,7 @@ export async function inspect_document(
             .download(file_path);
 
         if (downloadError) {
-            throw new Error(`Erro ao baixar arquivo "${file_path}": ${downloadError.message}`);
+            throw new Error(`Erro ao baixar arquivo "${file_path}" do bucket "${bucket}": ${downloadError.message}`);
         }
 
         if (!fileData) {
@@ -110,7 +114,7 @@ export async function inspect_document(
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(`Erro na API de Análise: ${response.status} - ${errText}`);
+            throw new Error(`Erro na API de Análise (${response.status}): ${errText}`);
         }
 
         const aiResult = await response.json();
@@ -131,10 +135,12 @@ export async function inspect_document(
         }
 
     } catch (error: any) {
-        logger.error('Inspector Failed', { error: error.message });
+        logger.error('Inspector Failed', { error: error.message, userId, file_path });
         return {
             success: false,
-            error: error.message
+            error: true, // Flag explicita para a IA saber que falhou
+            message: `Falha na inspeção do documento: ${error.message}`,
+            details: "Verifique se o arquivo foi enviado corretamente e se o formato é suportado."
         };
     }
 }
