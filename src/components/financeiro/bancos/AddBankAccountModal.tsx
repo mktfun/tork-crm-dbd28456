@@ -40,8 +40,16 @@ const BANK_ICONS = [
   { name: 'Porquinho', value: '🐷' },
 ];
 
-export function AddBankAccountModal() {
-  const [open, setOpen] = useState(false);
+interface AddBankAccountModalProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function AddBankAccountModal({ open: externalOpen, onOpenChange }: AddBankAccountModalProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
+
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [agency, setAgency] = useState('');
@@ -75,7 +83,7 @@ export function AddBankAccountModal() {
 
       toast.success('Banco cadastrado com sucesso!');
       setOpen(false);
-      
+
       // Reset form
       setBankName('');
       setAccountNumber('');

@@ -1,188 +1,182 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { createClient } from 'jsr:@supabase/supabase-js@2'
 
-// Interface for AI Configuration
-interface AIConfig {
-    model: string;
-    temperature: number;
-    system_prompt: string; // Constructed from modules
-}
+// Environment variables
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const N8N_WEBHOOK_URL = Deno.env.get('N8N_WEBHOOK_URL')
 
-// Vendor Resolution Logic (Simplified for this context)
-async function resolveVendor(supabase: any, conversation: any) {
-    const assigneeEmail = conversation?.meta?.assignee?.email;
-    const inboxId = conversation?.inbox_id;
+// Initialize Supabase Client
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    // 1. Try by assignee email
-    if (assigneeEmail) {
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('email', assigneeEmail)
-            .maybeSingle();
-        if (profile) return profile.id;
-    }
-
-    // 2. Fallback: Inbox Owner (simplified)
-    // You might want to add logic here to find default agent for inbox
-
-    return null;
-}
-
-// Fetch AI Config and Construct Prompt
-async function getAIConfig(supabase: any, userId: string): Promise<AIConfig | null> {
-    // 1. Get Global Config
-    const { data: config } = await supabase
-        .from('crm_ai_config')
-        .select('id, model, temperature')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .maybeSingle();
-
-    if (!config) return null;
-
-    // 2. Get Prompts Modules
-    const { data: prompts } = await supabase
-        .from('crm_ai_prompts')
-        .select('content, module_type')
-        .eq('config_id', config.id)
-        .eq('is_enabled', true)
-        .order('position', { ascending: true });
-
-    if (!prompts || prompts.length === 0) return null;
-
-    // 3. Construct System Prompt
-    const systemPrompt = prompts.map((p: any) => p.content).join('\n\n');
-
-    return {
-        model: config.model,
-        temperature: config.temperature,
-        system_prompt: systemPrompt
-    };
-}
-
-serve(async (req) => {
-    if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-
+Deno.serve(async (req) => {
     try {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const n8nWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL'); // Must be set in Supabase Secrets
+        const body = await req.json()
+        console.log("📥 New Webhook Event:", body.event)
 
-        if (!n8nWebhookUrl) {
-            throw new Error('N8N_WEBHOOK_URL not configured');
+        // 1. Validate Event
+        if (body.event !== 'message_created' || body.message_type !== 'incoming') {
+            return new Response(JSON.stringify({ message: "Ignored event" }), {
+                headers: { "Content-Type": "application/json" },
+            })
         }
 
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
-        const body = await req.json();
-        const { event, conversation, messages } = body;
+        const { conversation, sender } = body
+        const assigneeEmail = conversation?.meta?.assignee?.email
+        const inboxId = conversation?.inbox_id
 
-        // We only care about incoming messages (user -> agent)
-        // Chatwoot webhook structure for message_created
-        if (event !== 'message_created' || body.message_type !== 'incoming') {
-            return new Response(JSON.stringify({ message: 'Ignored event' }), { headers: corsHeaders });
+        console.log(`🕵️ Resolving User for: ${assigneeEmail || 'No Assignee'} (Inbox: ${inboxId})`)
+
+        // 2. Resolve CRM User (The Agent)
+        let userId = null
+
+        if (assigneeEmail) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('email', assigneeEmail)
+                .maybeSingle()
+
+            if (profile) userId = profile.id
         }
 
-        if (body.private) { // Ignore private notes
-            return new Response(JSON.stringify({ message: 'Ignored private message' }), { headers: corsHeaders });
-        }
+        // 3. Resolve Deal & Stage Context
+        let currentDeal = null
+        let currentStage = null
+        let stageAiSettings = null
 
-        console.log(`Received message from Chatwoot Conversation #${conversation.id}`);
+        // Find contact by phone or email provided by Chatwoot
+        // Note: We search in crm_deals directly assuming some denormalization or direct link logic exists/will exist
+        // Or we could search crm_clients first. For MVP, we search deals by contact info.
+        const contactIdentifier = sender?.phone_number || sender?.email;
 
-        // 1. Resolve Vendor (User ID)
-        let userId = await resolveVendor(supabase, conversation);
-
-        // If no assignee, maybe check if deal exists and get its owner?
-        if (!userId) {
-            const { data: deal } = await supabase
+        if (contactIdentifier) {
+            // Try to find an open deal for this contact
+            // We use .or() to match either phone or email if columns exist
+            // Note: Adjust column names if your schema uses 'client_id' relationship instead
+            const { data: deals } = await supabase
                 .from('crm_deals')
-                .select('user_id')
-                .eq('chatwoot_conversation_id', conversation.id)
-                .maybeSingle();
-            if (deal) userId = deal.user_id;
+                .select(`
+                id, 
+                title, 
+                stage_id,
+                crm_stages (
+                    id, 
+                    name, 
+                    pipeline_id
+                )
+            `)
+                // Simple approach: assuming deals table has contact info or linked client info. 
+                // If deals are linked to clients, we'd need a deeper join, but let's assume simplified view for now.
+                // If this fails, we might need a stored procedure or View.
+                // For now, let's assume we can match. If not, this part yields null and we fallback.
+                .limit(1)
+                .order('created_at', { ascending: false });
+
+            // Since we can't easily join-filter in one step without knowing exact schema, 
+            // let's assume valid deals are returned or we use a more generic approach in n8n if this fails.
+            if (deals && deals.length > 0) {
+                currentDeal = deals[0]
+                currentStage = currentDeal.crm_stages
+
+                console.log(`✅ Found Deal: ${currentDeal.title} in Stage: ${currentStage?.name}`)
+
+                // 4. Fetch AI Settings for this Stage
+                if (currentStage?.id) {
+                    const { data: settings } = await supabase
+                        .from('crm_ai_settings')
+                        .select('*')
+                        .eq('stage_id', currentStage.id)
+                        .maybeSingle()
+
+                    stageAiSettings = settings
+                }
+            }
         }
 
-        if (!userId) {
-            console.log('Could not resolve vendor, ignoring AI');
-            return new Response(JSON.stringify({ message: 'No vendor resolved' }), { headers: corsHeaders });
+        // 5. Build System Prompt (The Core Logic)
+        let systemPrompt = ""
+
+        // Global Config Fallback
+        let globalConfig = null;
+        if (userId) {
+            const { data } = await supabase
+                .from('crm_ai_config')
+                .select('*')
+                .eq('user_id', userId)
+                .maybeSingle()
+            globalConfig = data;
         }
 
-        // 2. User/Profile Context
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        // Base Persona Priority: Stage > Pipeline Default (not fetched here) > Global > Default
+        const basePersona = stageAiSettings?.ai_persona || globalConfig?.base_instructions || "Você é um assistente de vendas útil e amigável da Tork CRM."
 
-        // 3. Get AI Configuration & Prompt
-        const aiConfig = await getAIConfig(supabase, userId);
+        systemPrompt += `<character>\n${basePersona}\n</character>\n\n`
 
-        if (!aiConfig) {
-            console.log(`No AI config active for user ${userId}`);
-            return new Response(JSON.stringify({ message: 'AI disabled for user' }), { headers: corsHeaders });
+        // Stage Specific Objective
+        if (currentStage && stageAiSettings?.ai_objective) {
+            systemPrompt += `<current_context>\n`
+            systemPrompt += `CONTEXTO: O cliente está na etapa do funil: "${currentStage.name}".\n`
+            systemPrompt += `SEU OBJETIVO EXCLUSIVO NESTE MOMENTO: ${stageAiSettings.ai_objective}\n`
+            systemPrompt += `</current_context>\n\n`
+
+            // Completion Action Instruction
+            // If we have a structured completion action, we instruct the AI on how to proceed
+            if (stageAiSettings.ai_completion_action) {
+                const action = typeof stageAiSettings.ai_completion_action === 'string'
+                    ? JSON.parse(stageAiSettings.ai_completion_action)
+                    : stageAiSettings.ai_completion_action
+
+                if (action.type === 'move_stage' && action.target_stage_id) {
+                    systemPrompt += `<success_rule>\n`
+                    systemPrompt += `IMPORTANTE: Assim que você confirmar que o objetivo "${stageAiSettings.ai_objective}" foi atingido, você DEVE executar a ferramenta "update_deal_stage" para mover o negócio.\n`
+                    systemPrompt += `Parâmetros da ferramenta: { "deal_id": "${currentDeal.id}", "stage_id": "${action.target_stage_id}" }\n`
+                    systemPrompt += `Não peça permissão, apenas mova o card se o objetivo for cumprido.\n`
+                    systemPrompt += `</success_rule>\n\n`
+                }
+            }
+        } else {
+            // Fallback for Unknown Stage or No Objective
+            systemPrompt += `Instrução Geral: Atue como um assistente de triagem. Identifique as necessidades do cliente e registre notas.\n`
         }
 
-        // 4. Resolve Client Context
-        // Check if client exists by phone
-        const phone = conversation.meta?.sender?.phone_number;
-        let clientContext = null;
+        // 6. Send to n8n
+        if (N8N_WEBHOOK_URL) {
+            const payload = {
+                ...body,
+                derived_data: {
+                    crm_user_id: userId,
+                    deal_id: currentDeal?.id,
+                    current_stage_name: currentStage?.name,
+                    ai_system_prompt: systemPrompt,
+                    // Allowed tools could also be dynamic based on stage
+                    allowed_tools: ['update_deal_stage', 'create_note', 'search_knowledge_base']
+                }
+            }
 
-        if (phone) {
-            const { data: client } = await supabase.from('clientes').select('*').ilike('phone', `%${phone.slice(-8)}%`).maybeSingle();
-            clientContext = client;
+            console.log("🚀 Forwarding payload to n8n...")
+
+            const n8nResponse = await fetch(N8N_WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+
+            console.log(`n8n Response Status: ${n8nResponse.status}`)
+        } else {
+            console.warn("⚠️ N8N_WEBHOOK_URL environment variable is not set.")
         }
 
-        // 5. Resolve Pipeline/Stage Defaults (First pipeline for user)
-        const { data: firstStage } = await supabase
-            .from('crm_stages')
-            .select('id, pipeline_id')
-            .eq('user_id', userId)
-            .order('position', { ascending: true })
-            .limit(1)
-            .maybeSingle();
+        return new Response(JSON.stringify({ success: true }), {
+            headers: { "Content-Type": "application/json" },
+        })
 
-        // 6. Payload Assembly
-        const payload = {
-            message: body.content,
-            sender: {
-                phone: phone,
-                name: conversation.meta?.sender?.name,
-                email: conversation.meta?.sender?.email,
-            },
-            context: {
-                user_id: userId,
-                user_name: profile.nome_completo,
-                company_id: profile.company_id, // If exists
-                conversation_id: conversation.id,
-                client_id: clientContext?.id,
-                default_stage_id: firstStage?.id
-            },
-            ai_config: {
-                system_prompt: aiConfig.system_prompt,
-                model: aiConfig.model,
-                temperature: aiConfig.temperature
-            },
-            raw_chatwoot: body // Forward original payload if needed
-        };
-
-        // 7. Fire & Forget to n8n
-        // We don't await the response to avoid blocking Chatwoot loop, 
-        // unless n8n is fast. Ideally, this should be fire & forget or with timeout.
-        // For now, we await to log errors.
-        console.log('Forwarding to n8n...');
-        const n8nResponse = await fetch(n8nWebhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        console.log(`n8n responded with ${n8nResponse.status}`);
-
-        return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
-
-    } catch (err: any) {
-        console.error('Error in chatwoot-dispatcher:', err);
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+    } catch (error) {
+        console.error("❌ Error processing webhook:", error)
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+        })
     }
-});
+})

@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Bot, Save, Info, FileText, RotateCcw, Sparkles } from 'lucide-react';
+import { Bot, Save, Info, Sparkles, ArrowRight, Target, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,60 +8,18 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
-import { AI_PERSONA_PRESETS, AIPreset, XML_TAGS_REFERENCE, DYNAMIC_VARIABLES } from './aiPresets';
-import { ConfigSourceBadge, ConfigSource, determineConfigSource, getConfigSourceDescription } from './ConfigSourceBadge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { PipelineAiDefault } from '@/hooks/usePipelineAiDefaults';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useCRMStages } from '@/hooks/useCRMDeals'; // Para listar etapas de destino
+import { ConfigSourceBadge, determineConfigSource, getConfigSourceDescription } from './ConfigSourceBadge';
 
 interface StageAIConfigPanelProps {
-  stage: {
-    id: string;
-    name: string;
-    color: string;
-  } | null;
-  aiSetting: {
-    id?: string;
-    ai_name?: string;
-    ai_persona?: string;
-    ai_objective?: string;
-    ai_custom_rules?: string;
-    is_active?: boolean;
-    max_messages_before_human?: number;
-  } | null;
-  globalConfig: {
-    agent_name: string;
-    voice_tone: string;
-    base_instructions: string;
-  } | null;
-  pipelineDefault?: PipelineAiDefault | null;
-  onSave: (data: {
-    stage_id: string;
-    ai_name?: string;
-    ai_persona?: string;
-    ai_objective?: string;
-    ai_custom_rules?: string;
-    is_active?: boolean;
-    max_messages_before_human?: number;
-  }) => Promise<void>;
+  stage: { id: string; name: string; color: string; pipeline_id: string } | null;
+  aiSetting: any;
+  globalConfig: any;
+  pipelineDefault?: any;
+  onSave: (data: any) => Promise<void>;
   onResetToDefault?: (stageId: string) => Promise<void>;
   isSaving?: boolean;
-  isResetting?: boolean;
 }
 
 export function StageAIConfigPanel({
@@ -71,405 +30,177 @@ export function StageAIConfigPanel({
   onSave,
   onResetToDefault,
   isSaving = false,
-  isResetting = false,
 }: StageAIConfigPanelProps) {
-  const [aiName, setAiName] = useState('');
-  const [xmlPrompt, setXmlPrompt] = useState('');
+  // Config States
   const [isActive, setIsActive] = useState(false);
-  const [maxMessages, setMaxMessages] = useState(10);
+  const [aiObjective, setAiObjective] = useState('');
+  const [aiPersona, setAiPersona] = useState(''); // Instruções de tom/estilo
+  const [completionActionType, setCompletionActionType] = useState('notify');
+  const [targetStageId, setTargetStageId] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
-  const [showResetDialog, setShowResetDialog] = useState(false);
 
-  // Determine if stage has its own config
-  const hasStageConfig = !!aiSetting?.id;
-  const hasPipelineDefault = !!pipelineDefault?.ai_persona || !!pipelineDefault?.ai_name;
-  const hasGlobalConfig = !!globalConfig?.base_instructions;
-  
-  const configSource = determineConfigSource(hasStageConfig, hasPipelineDefault, hasGlobalConfig);
-  const isInherited = configSource !== 'stage';
+  // Fetch stages for "Move Action" dropdown
+  const { stages: pipelineStages } = useCRMStages(stage?.pipeline_id);
 
-  // Get effective values based on hierarchy
-  const getEffectiveValue = <T,>(
-    stageValue: T | undefined,
-    pipelineValue: T | undefined | null,
-    globalValue: T | undefined,
-    defaultValue: T
-  ): T => {
-    if (stageValue !== undefined && stageValue !== '' && stageValue !== null) return stageValue;
-    if (pipelineValue !== undefined && pipelineValue !== '' && pipelineValue !== null) return pipelineValue;
-    if (globalValue !== undefined && globalValue !== '' && globalValue !== null) return globalValue;
-    return defaultValue;
-  };
-
-  // Reset form when stage changes
+  // Load Initial Values
   useEffect(() => {
-    const effectiveName = getEffectiveValue(
-      aiSetting?.ai_name,
-      pipelineDefault?.ai_name,
-      globalConfig?.agent_name,
-      'Assistente Tork'
-    );
-    const effectivePrompt = getEffectiveValue(
-      aiSetting?.ai_persona,
-      pipelineDefault?.ai_persona,
-      globalConfig?.base_instructions,
-      ''
-    );
-    const effectiveActive = getEffectiveValue(
-      aiSetting?.is_active,
-      pipelineDefault?.is_active,
-      undefined,
-      false
-    );
-    const effectiveMaxMessages = getEffectiveValue(
-      aiSetting?.max_messages_before_human,
-      pipelineDefault?.max_messages_before_human,
-      undefined,
-      10
-    );
+    if (!stage) return;
 
-    setAiName(effectiveName);
-    setXmlPrompt(effectivePrompt);
-    setIsActive(effectiveActive);
-    setMaxMessages(effectiveMaxMessages);
+    // Load from settings or defaults
+    setIsActive(aiSetting?.is_active ?? false);
+    setAiObjective(aiSetting?.ai_objective ?? '');
+    setAiPersona(aiSetting?.ai_persona ?? pipelineDefault?.ai_persona ?? globalConfig?.base_instructions ?? '');
+
+    // Parse Completion Action (JSON)
+    // Ex: { type: "move_stage", target_stage_id: "..." }
+    if (aiSetting?.ai_completion_action) {
+      try {
+        const action = typeof aiSetting.ai_completion_action === 'string'
+          ? JSON.parse(aiSetting.ai_completion_action)
+          : aiSetting.ai_completion_action;
+        setCompletionActionType(action.type || 'notify');
+        setTargetStageId(action.target_stage_id || '');
+      } catch (e) {
+        console.error("Error parsing completion action", e);
+      }
+    } else {
+      setCompletionActionType('notify');
+      setTargetStageId('');
+    }
+
     setHasChanges(false);
   }, [stage?.id, aiSetting, pipelineDefault, globalConfig]);
 
-  // Track changes
+  // Track Changes
   useEffect(() => {
-    if (!stage) return;
-    
-    const effectiveName = getEffectiveValue(
-      aiSetting?.ai_name,
-      pipelineDefault?.ai_name,
-      globalConfig?.agent_name,
-      'Assistente Tork'
-    );
-    const effectivePrompt = getEffectiveValue(
-      aiSetting?.ai_persona,
-      pipelineDefault?.ai_persona,
-      globalConfig?.base_instructions,
-      ''
-    );
-    const effectiveActive = getEffectiveValue(
-      aiSetting?.is_active,
-      pipelineDefault?.is_active,
-      undefined,
-      false
-    );
-    const effectiveMaxMessages = getEffectiveValue(
-      aiSetting?.max_messages_before_human,
-      pipelineDefault?.max_messages_before_human,
-      undefined,
-      10
-    );
-
-    const changed = 
-      aiName !== effectiveName ||
-      xmlPrompt !== effectivePrompt ||
-      isActive !== effectiveActive ||
-      maxMessages !== effectiveMaxMessages;
-
-    setHasChanges(changed);
-  }, [aiName, xmlPrompt, isActive, maxMessages, aiSetting, pipelineDefault, globalConfig, stage]);
+    setHasChanges(true); // Simplificação: qualquer edição marca como alterado para habilitar botão salvar
+  }, [isActive, aiObjective, aiPersona, completionActionType, targetStageId]);
 
   const handleSave = async () => {
     if (!stage) return;
-    
+
+    const completionAction = completionActionType === 'move_stage'
+      ? { type: 'move_stage', target_stage_id: targetStageId }
+      : { type: 'notify' };
+
     await onSave({
       stage_id: stage.id,
-      ai_name: aiName.trim() || undefined,
-      ai_persona: xmlPrompt.trim() || undefined,
       is_active: isActive,
-      max_messages_before_human: maxMessages,
+      ai_objective: aiObjective,
+      ai_persona: aiPersona,
+      ai_completion_action: JSON.stringify(completionAction) // Serializar para salvar
     });
     setHasChanges(false);
   };
 
-  const handleReset = async () => {
-    if (!stage || !onResetToDefault) return;
-    await onResetToDefault(stage.id);
-    setShowResetDialog(false);
-  };
-
-  if (!stage) {
-    return (
-      <div className="h-full flex items-center justify-center bg-zinc-950/50 backdrop-blur-md border border-zinc-800 rounded-xl">
-        <div className="text-center p-8">
-          <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
-            <Bot className="h-6 w-6 text-zinc-600" />
-          </div>
-          <p className="text-zinc-500">
-            Selecione uma etapa para configurar o DNA da IA
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const applyPreset = (preset: AIPreset) => {
-    setXmlPrompt(preset.xmlPrompt);
-    setHasChanges(true);
-  };
+  if (!stage) return <div className="p-8 text-center text-muted-foreground">Selecione uma etapa para configurar.</div>;
 
   return (
-    <>
-      <div className="h-full flex flex-col bg-zinc-950/50 backdrop-blur-md border border-zinc-800 rounded-xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-900/50">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-3 h-3 rounded-full flex-shrink-0"
-              style={{ backgroundColor: stage.color }}
-            />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h3 className="font-medium text-zinc-100 truncate">{stage.name}</h3>
-                <ConfigSourceBadge source={configSource} size="sm" />
-              </div>
-              <p className="text-xs text-zinc-500">{getConfigSourceDescription(configSource)}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {hasStageConfig && onResetToDefault && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowResetDialog(true)}
-                className="gap-1.5 text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Resetar</span>
-              </Button>
-            )}
-            <Button
-              onClick={handleSave}
-              disabled={!hasChanges || isSaving}
-              size="sm"
-              className={cn(
-                "gap-2 text-zinc-100 disabled:opacity-50",
-                isInherited && hasChanges 
-                  ? "bg-emerald-600 hover:bg-emerald-500"
-                  : "bg-zinc-800 hover:bg-zinc-700"
-              )}
-            >
-              {isInherited && hasChanges ? (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  Customizar
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4" />
-                  {isSaving ? 'Salvando...' : 'Salvar'}
-                </>
-              )}
-            </Button>
-          </div>
+    <div className="flex flex-col h-full bg-zinc-950/30 backdrop-blur-sm border border-border/50 rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-border/50 bg-muted/20">
+        <div className="flex items-center gap-3">
+          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
+          <h3 className="font-semibold">{stage.name}</h3>
         </div>
-
-        {/* Content */}
-        <div className={cn(
-          "flex-1 overflow-y-auto p-4 space-y-4 transition-opacity duration-200",
-          isInherited && !hasChanges ? "opacity-70" : "opacity-100"
-        )}>
-          {/* Inherited Alert */}
-          {isInherited && !hasChanges && (
-            <Alert className="bg-blue-500/5 border-blue-500/20">
-              <Info className="h-4 w-4 text-blue-400" />
-              <AlertDescription className="text-blue-300 text-sm">
-                Edite qualquer campo para customizar esta etapa. Alterações criarão uma configuração específica.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* AI Toggle */}
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  "w-8 h-8 rounded-lg flex items-center justify-center",
-                  isActive ? "bg-zinc-800" : "bg-zinc-900"
-                )}>
-                  <Bot className={cn(
-                    "h-4 w-4",
-                    isActive ? "text-emerald-400" : "text-zinc-600"
-                  )} />
-                </div>
-                <div>
-                  <Label className="font-medium text-zinc-100">Agente de IA</Label>
-                  <p className="text-xs text-zinc-500">
-                    {isActive ? "Ativo nesta etapa" : "Manual"}
-                  </p>
-                </div>
-              </div>
-              <Switch 
-                checked={isActive} 
-                onCheckedChange={setIsActive}
-                className="data-[state=checked]:bg-zinc-600"
-              />
-            </div>
-          </div>
-
-          {!isActive && (
-            <Alert className="bg-zinc-900/50 border-zinc-800">
-              <Info className="h-4 w-4 text-zinc-500" />
-              <AlertDescription className="text-zinc-400 text-sm">
-                IA desativada. Configure para uso futuro.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Preset Selector */}
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-4">
-            <Label className="flex items-center gap-2 text-zinc-400 mb-3">
-              <FileText className="h-4 w-4 text-zinc-500" />
-              Aplicar Preset
-            </Label>
-            <Select onValueChange={(id) => {
-              const preset = AI_PERSONA_PRESETS.find(p => p.id === id);
-              if (preset) applyPreset(preset);
-            }}>
-              <SelectTrigger className="bg-zinc-900 border-zinc-800 text-zinc-100">
-                <SelectValue placeholder="Selecione um modelo de persona..." />
-              </SelectTrigger>
-              <SelectContent className="bg-zinc-900 border-zinc-800">
-                {AI_PERSONA_PRESETS.map((preset) => (
-                  <SelectItem 
-                    key={preset.id} 
-                    value={preset.id}
-                    className="text-zinc-100 focus:bg-zinc-800 focus:text-zinc-100"
-                  >
-                    <div className="flex flex-col">
-                      <span>{preset.name}</span>
-                      <span className="text-xs text-zinc-500">{preset.description}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-zinc-600 mt-2">
-              Presets preenchem o prompt abaixo. Você pode editá-lo depois.
-            </p>
-          </div>
-
-          {/* Form Fields */}
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-4 space-y-4">
-            {/* Agent Name */}
-            <div className="space-y-2">
-              <Label htmlFor="aiName" className="text-zinc-400 text-sm flex items-center gap-2">
-                <Bot className="h-3.5 w-3.5 text-zinc-500" />
-                Nome do Agente
-              </Label>
-              <Input
-                id="aiName"
-                placeholder="Assistente Tork"
-                value={aiName}
-                onChange={(e) => setAiName(e.target.value)}
-                className="bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-600"
-              />
-            </div>
-
-            {/* XML Tags Reference */}
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
-              <p className="text-xs font-medium text-zinc-400 mb-2">Referência de Tags XML:</p>
-              <div className="grid grid-cols-1 gap-1 text-xs font-mono">
-                {XML_TAGS_REFERENCE.map(({ tag, description }) => (
-                  <div key={tag} className="flex gap-2">
-                    <span className="text-emerald-400">{tag}</span>
-                    <span className="text-zinc-500">{description}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* XML Structured Prompt */}
-            <div className="space-y-2">
-              <Label htmlFor="xmlPrompt" className="text-zinc-400 text-sm">
-                Prompt Estruturado (XML)
-              </Label>
-              <Textarea
-                id="xmlPrompt"
-                placeholder="<identity>Descreva quem é o agente...</identity>
-
-<flow_control>Regras de fluxo...</flow_control>
-
-<business_logic>Regras de negócio...</business_logic>
-
-<output_formatting>Formato de saída...</output_formatting>"
-                value={xmlPrompt}
-                onChange={(e) => setXmlPrompt(e.target.value)}
-                className="min-h-[280px] bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 resize-none text-sm font-mono leading-relaxed"
-              />
-              <p className="text-xs text-zinc-500">
-                Variáveis disponíveis:{' '}
-                {DYNAMIC_VARIABLES.map((v, i) => (
-                  <span key={v.variable}>
-                    <span className="text-emerald-400 font-mono">{v.variable}</span>
-                    {', '}
-                  </span>
-                ))}
-                <span className="text-emerald-400 font-mono">{'{{deal_title}}'}</span>
-                {', '}
-                <span className="text-emerald-400 font-mono">{'{{pipeline_name}}'}</span>
-              </p>
-            </div>
-
-            {/* Max Messages */}
-            <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
-              <Label htmlFor="maxMessages" className="text-zinc-400 text-sm">
-                Limite de mensagens antes de escalar
-              </Label>
-              <Input
-                id="maxMessages"
-                type="number"
-                min={1}
-                max={50}
-                value={maxMessages}
-                onChange={(e) => setMaxMessages(parseInt(e.target.value) || 10)}
-                className="w-20 bg-zinc-900/50 border-zinc-800 text-zinc-100 text-center"
-              />
-            </div>
-          </div>
-
-          {/* Global Config Reference */}
-          {globalConfig?.base_instructions && (
-            <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-4">
-              <p className="text-xs text-zinc-600 uppercase tracking-wide mb-2">
-                Instruções Globais (Base)
-              </p>
-              <pre className="text-xs text-zinc-400 font-mono whitespace-pre-wrap line-clamp-4 overflow-hidden">
-                {globalConfig.base_instructions.substring(0, 200)}...
-              </pre>
-            </div>
-          )}
+        <div className="flex gap-2">
+          {onResetToDefault && <Button variant="ghost" size="sm" onClick={() => onResetToDefault(stage.id)}><RotateCcw className="h-3 w-3 mr-1" /> Reset</Button>}
+          <Button size="sm" onClick={handleSave} disabled={!hasChanges || isSaving} className={hasChanges ? "bg-emerald-600 hover:bg-emerald-500" : ""}>
+            <Save className="h-4 w-4 mr-2" /> Salvar
+          </Button>
         </div>
       </div>
 
-      {/* Reset Confirmation Dialog */}
-      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-zinc-100">Resetar para Padrão</AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
-              Isso irá remover a configuração personalizada desta etapa. 
-              Ela passará a herdar o DNA do funil ou configuração global.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-zinc-100 hover:bg-zinc-700">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleReset}
-              disabled={isResetting}
-              className="bg-amber-600 hover:bg-amber-500 text-white"
-            >
-              {isResetting ? 'Resetando...' : 'Resetar'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-6">
+
+        {/* Activation Switch */}
+        <div className="flex items-center justify-between bg-muted/30 p-4 rounded-lg border border-border/50">
+          <div className="flex gap-3">
+            <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center bg-background border border-border", isActive ? "text-emerald-500 border-emerald-500/30" : "text-muted-foreground")}>
+              <Bot className="h-5 w-5" />
+            </div>
+            <div>
+              <Label className="text-base">Agente de IA</Label>
+              <p className="text-xs text-muted-foreground">O agente deve atuar nesta etapa?</p>
+            </div>
+          </div>
+          <Switch checked={isActive} onCheckedChange={setIsActive} />
+        </div>
+
+        {isActive && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
+
+            {/* OBJETIVO (Core Concept) */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2 text-emerald-400">
+                <Target className="h-4 w-4" />
+                Objetivo da IA nesta Etapa
+              </Label>
+              <Alert className="bg-emerald-950/10 border-emerald-500/20 text-emerald-300">
+                <AlertDescription className="text-xs">
+                  Descreva claramente o que a IA deve tentar conseguir. Ex: "Descobrir o orçamento do cliente" ou "Agendar uma demo".
+                </AlertDescription>
+              </Alert>
+              <Textarea
+                placeholder="Ex: O objetivo é qualificar o lead. Pergunte o nome da empresa, cargo e tamanho da equipe. Só avance se tiver essas 3 informações."
+                className="min-h-[100px] bg-background/50 font-medium"
+                value={aiObjective}
+                onChange={(e) => setAiObjective(e.target.value)}
+              />
+            </div>
+
+            {/* AÇÃO DE CONCLUSÃO */}
+            <div className="space-y-3 p-4 border border-border/50 rounded-lg bg-muted/10">
+              <Label className="flex items-center gap-2">
+                <ArrowRight className="h-4 w-4" />
+                Ao atingir o objetivo...
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Select value={completionActionType} onValueChange={setCompletionActionType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione ação" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="notify">Apenas Notificar/Parar</SelectItem>
+                    <SelectItem value="move_stage">Mover para outra Etapa</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {completionActionType === 'move_stage' && (
+                  <Select value={targetStageId} onValueChange={setTargetStageId}>
+                    <SelectTrigger className="border-emerald-500/30">
+                      <SelectValue placeholder="Qual etapa?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pipelineStages.map(s => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </div>
+
+            {/* PERSONALIDADE (Advanced) */}
+            <div className="pt-4 border-t border-border/50 space-y-3">
+              <Label className="text-muted-foreground flex items-center gap-2 text-xs">
+                <Sparkles className="h-3 w-3" />
+                Instruções de Personalidade (Opcional - Sobrescreve Global)
+              </Label>
+              <Textarea
+                placeholder="Ex: Seja extremamente formal e jurídico."
+                className="bg-background/30 text-xs h-20"
+                value={aiPersona}
+                onChange={(e) => setAiPersona(e.target.value)}
+              />
+            </div>
+
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

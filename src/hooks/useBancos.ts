@@ -154,7 +154,7 @@ export function useBankAccounts() {
  */
 export function useCreateBankAccount() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (payload: CreateBankAccountPayload) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -190,11 +190,11 @@ export function useCreateBankAccount() {
  */
 export function useUpdateBankAccount() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (payload: UpdateBankAccountPayload) => {
       const updateData: any = {};
-      
+
       if (payload.bankName !== undefined) updateData.bank_name = payload.bankName;
       if (payload.accountNumber !== undefined) updateData.account_number = payload.accountNumber;
       if (payload.agency !== undefined) updateData.agency = payload.agency;
@@ -224,7 +224,7 @@ export function useUpdateBankAccount() {
  */
 export function useDeleteBankAccount() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (accountId: string) => {
       const { error } = await supabase
@@ -276,11 +276,11 @@ export function useUnbankedTransactions(limit: number = 100) {
  */
 export function useAssignBankToTransactions() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ transactionIds, bankAccountId }: { 
-      transactionIds: string[], 
-      bankAccountId: string 
+    mutationFn: async ({ transactionIds, bankAccountId }: {
+      transactionIds: string[],
+      bankAccountId: string
     }) => {
       const { data, error } = await supabase
         .rpc('assign_bank_to_transactions' as any, {
@@ -305,11 +305,11 @@ export function useAssignBankToTransactions() {
  */
 export function useDistributeTransactionToBanks() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ transactionId, distributions }: { 
-      transactionId: string, 
-      distributions: BankDistribution[] 
+    mutationFn: async ({ transactionId, distributions }: {
+      transactionId: string,
+      distributions: BankDistribution[]
     }) => {
       // Converter para formato JSONB esperado pela função
       const jsonbDistributions = distributions.map(d => ({
@@ -333,5 +333,100 @@ export function useDistributeTransactionToBanks() {
       queryClient.invalidateQueries({ queryKey: ['revenue-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['recent-transactions'] });
     },
+  });
+}
+
+// ============ TIPOS PARA HISTÓRICO BANCÁRIO ============
+
+export interface BankTransaction {
+  transactionId: string;
+  transactionDate: string;
+  description: string;
+  amount: number;
+  accountName: string;
+  accountType: 'revenue' | 'expense' | 'income' | string;
+  bankAccountId: string | null;
+  bankName: string | null;
+  bankColor: string | null;
+  status: string;
+  isVoid: boolean;
+  relatedEntityType: string | null;
+  relatedEntityId: string | null;
+}
+
+export interface BankTransactionsResult {
+  transactions: BankTransaction[];
+  totalCount: number;
+  totalIncome: number;
+  totalExpense: number;
+  pageCount: number;
+}
+
+/**
+ * Hook para buscar transações de um banco específico (ou todos) com paginação
+ * 
+ * @param bankAccountId - ID do banco, ou null para buscar de todos os bancos
+ * @param page - Página atual (1-indexed)
+ * @param pageSize - Quantidade por página
+ */
+export function useBankTransactions(
+  bankAccountId: string | null,
+  page: number = 1,
+  pageSize: number = 20
+) {
+  return useQuery({
+    queryKey: ['bank-transactions', bankAccountId, page, pageSize],
+    queryFn: async (): Promise<BankTransactionsResult> => {
+      const { data, error } = await supabase
+        .rpc('get_bank_transactions' as any, {
+          p_bank_account_id: bankAccountId,
+          p_page: page,
+          p_page_size: pageSize
+        });
+
+      if (error) {
+        console.error('Erro ao buscar transações do banco:', error);
+        throw error;
+      }
+
+      // A função retorna um array com 1 row contendo os campos
+      const result = data?.[0] || data;
+
+      if (!result) {
+        return {
+          transactions: [],
+          totalCount: 0,
+          totalIncome: 0,
+          totalExpense: 0,
+          pageCount: 0,
+        };
+      }
+
+      // Mapear transações do formato SQL para frontend
+      const transactions: BankTransaction[] = (result.transactions || []).map((tx: any) => ({
+        transactionId: tx.f1 || tx.transaction_id,
+        transactionDate: tx.f2 || tx.transaction_date,
+        description: tx.f3 || tx.description,
+        amount: parseFloat(tx.f4 || tx.amount || '0'),
+        accountName: tx.f5 || tx.account_name || '',
+        accountType: tx.f6 || tx.account_type || '',
+        bankAccountId: tx.f7 || tx.bank_account_id || null,
+        bankName: tx.f8 || tx.bank_name || null,
+        bankColor: tx.f9 || tx.bank_color || null,
+        status: tx.f10 || tx.status || 'confirmed',
+        isVoid: tx.f11 || tx.is_void || false,
+        relatedEntityType: tx.f12 || tx.related_entity_type || null,
+        relatedEntityId: tx.f13 || tx.related_entity_id || null,
+      }));
+
+      return {
+        transactions,
+        totalCount: result.total_count || 0,
+        totalIncome: parseFloat(result.total_income || '0'),
+        totalExpense: parseFloat(result.total_expense || '0'),
+        pageCount: result.page_count || 0,
+      };
+    },
+    enabled: true, // Sempre habilitado, bankAccountId null = todos os bancos
   });
 }
