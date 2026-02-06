@@ -1,27 +1,32 @@
 import { useState } from "react";
 import { Landmark } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { BankAccountCard } from "./bancos/BankAccountCard";
 import { AddBankAccountModal } from "./bancos/AddBankAccountModal";
-import { mockBankAccounts, BankAccount } from "@/data/mocks/financeiroMocks";
-import { toast } from "@/hooks/use-toast";
+import { EditBankAccountModal } from "./bancos/EditBankAccountModal";
+import { DeleteBankAccountDialog } from "./bancos/DeleteBankAccountDialog";
+import { BankHistorySheet } from "./bancos/BankHistorySheet";
+import { useBankAccounts, type BankAccount } from "@/hooks/useBancos";
 
 export function BankAccountsSection() {
-  const [banks] = useState(mockBankAccounts);
+  const { data: summary, isLoading } = useBankAccounts();
+  const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState<BankAccount | null>(null);
+  const [selectedBank, setSelectedBank] = useState<BankAccount | null>(null);
+
+  const banks = summary?.accounts ?? [];
 
   const handleEditBank = (account: BankAccount) => {
-    toast({
-      title: "Editar banco",
-      description: `Editando ${account.bankName}`,
-    });
+    setEditingAccount(account);
   };
 
   const handleDeleteBank = (account: BankAccount) => {
-    toast({
-      title: "Excluir banco",
-      description: `Deseja realmente excluir ${account.bankName}?`,
-      variant: "destructive",
-    });
+    setDeletingAccount(account);
+  };
+
+  const handleOpenHistory = (account: BankAccount) => {
+    setSelectedBank(account);
   };
 
   return (
@@ -39,17 +44,49 @@ export function BankAccountsSection() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {banks.map((bank) => (
-            <BankAccountCard
-              key={bank.id}
-              account={bank}
-              onEdit={handleEditBank}
-              onDelete={handleDeleteBank}
-            />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+          </div>
+        ) : banks.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">
+            Nenhuma conta bancária cadastrada.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {banks.map((bank) => (
+              <BankAccountCard
+                key={bank.id}
+                account={bank}
+                onClick={handleOpenHistory}
+                onEdit={handleEditBank}
+                onDelete={handleDeleteBank}
+              />
+            ))}
+          </div>
+        )}
       </CardContent>
+
+      <EditBankAccountModal
+        account={editingAccount}
+        open={!!editingAccount}
+        onClose={() => setEditingAccount(null)}
+      />
+      <DeleteBankAccountDialog
+        account={deletingAccount}
+        open={!!deletingAccount}
+        onClose={() => setDeletingAccount(null)}
+      />
+      <BankHistorySheet
+        bankAccountId={selectedBank?.id ?? null}
+        bankName={selectedBank?.bankName ?? ''}
+        bankColor={selectedBank?.color}
+        currentBalance={selectedBank?.currentBalance}
+        isOpen={!!selectedBank}
+        onClose={() => setSelectedBank(null)}
+      />
     </Card>
   );
 }
