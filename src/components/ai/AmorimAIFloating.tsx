@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Loader2, Lightbulb, Plus, History, StopCircle, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Send, Loader2, Lightbulb, Plus, History, StopCircle, Maximize2, Minimize2, Paperclip, UploadCloud } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -11,57 +11,31 @@ import { toast } from 'sonner';
 import { useAIConversations, ToolCallEvent, AIMessage } from '@/hooks/useAIConversations';
 import { ChatHistorySidebar } from './ChatHistorySidebar';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { 
-  ToolExecutionStatus, 
-  ToolExecution, 
-  createToolExecution, 
-  advanceToolStep, 
-  completeToolExecution 
+import { FileAttachment } from './FileAttachment'; // Import novo
+import {
+  ToolExecutionStatus,
+  ToolExecution,
+  createToolExecution,
+  advanceToolStep,
+  completeToolExecution
 } from './ToolExecutionStatus';
 
-// Extended message type with tool executions attached
-interface MessageWithTools extends AIMessage {
-  toolExecutions?: ToolExecution[];
-}
-
-// Window dimension constraints
-const MIN_WIDTH = 320;
-const MIN_HEIGHT = 400;
-const MAX_WIDTH = 900;
-const MAX_HEIGHT_RATIO = 0.95; // 95% of viewport height
-const DEFAULT_WIDTH = 450;
-const DEFAULT_HEIGHT = 700;
-
-// FASE P5: Limite de caracteres do input
-const MAX_INPUT_CHARS = 4000;
-
-interface WindowDimensions {
-  width: number;
-  height: number;
-  isMaximized?: boolean; // FASE P5: Persistência de estado maximizado
-}
-
-const suggestedQuestions = [
-  "Quais apólices vencem nos próximos 30 dias?",
-  "Qual o total de comissões recebidas este mês?",
-  "Liste os 5 clientes com maior valor de prêmio",
-  "Mostre sinistros em aberto"
-];
+// ... (previous interfaces)
 
 export function AmorimAIFloating() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState<Set<string>>(new Set());
-  const [feedbackNoteId, setFeedbackNoteId] = useState<string | null>(null);
-  const [feedbackNote, setFeedbackNote] = useState('');
-  const [showHistory, setShowHistory] = useState(false);
-  const [activeToolExecutions, setActiveToolExecutions] = useState<ToolExecution[]>([]);
-  const [messageToolExecutions, setMessageToolExecutions] = useState<Map<number, ToolExecution[]>>(new Map());
-  const toolProgressTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  const currentMessageIndexRef = useRef<number>(-1);
+  // ... (existing state)
 
-  // === RESIZE STATE (FASE P4 + P5) ===
+  // === FILE UPLOAD STATE (FASE P4) ===
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ... (rest of the state props)
   const [savedDimensions, setSavedDimensions] = useLocalStorage<WindowDimensions>(
     'tork-assistant-window-dimensions',
     { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT, isMaximized: false }
@@ -71,7 +45,7 @@ export function AmorimAIFloating() {
   const [isResizing, setIsResizing] = useState(false);
   const [resizeEdge, setResizeEdge] = useState<'left' | 'top' | 'corner' | null>(null);
   const resizeStartRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
-  
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useAuth();
@@ -104,12 +78,12 @@ export function AmorimAIFloating() {
   useEffect(() => {
     const now = Date.now();
     const timeSinceLastScroll = now - lastScrollTimeRef.current;
-    
+
     // Só executa scroll se passou tempo suficiente
     if (timeSinceLastScroll < scrollThrottleMs) {
       return;
     }
-    
+
     if (scrollRef.current) {
       const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
       if (scrollContainer) {
@@ -155,7 +129,7 @@ export function AmorimAIFloating() {
       if (error) throw error;
 
       setFeedbackSent(prev => new Set([...prev, messageId]));
-      
+
       if (feedbackType === 'negative') {
         setFeedbackNoteId(messageId);
         toast.info('O que podemos melhorar?', { duration: 3000 });
@@ -192,13 +166,13 @@ export function AmorimAIFloating() {
   // Handler para eventos de tool call - now attaches to current message
   const handleToolCall = useCallback((event: ToolCallEvent) => {
     const messageIndex = currentMessageIndexRef.current;
-    
+
     if (event.status === 'started') {
       const newExecution = createToolExecution(event.toolName);
-      
+
       // Update active executions (for real-time display)
       setActiveToolExecutions(prev => [...prev, newExecution]);
-      
+
       // Also track per-message for persistence
       setMessageToolExecutions(prev => {
         const newMap = new Map(prev);
@@ -206,16 +180,16 @@ export function AmorimAIFloating() {
         newMap.set(messageIndex, [...existing, newExecution]);
         return newMap;
       });
-      
+
       // Simular progresso dos steps
       const stepCount = newExecution.steps.length;
       const interval = 600; // ms entre cada step
-      
+
       for (let i = 1; i < stepCount; i++) {
         const timer = setTimeout(() => {
-          const updateExecution = (exec: ToolExecution) => 
+          const updateExecution = (exec: ToolExecution) =>
             exec.toolName === event.toolName ? advanceToolStep(exec) : exec;
-          
+
           setActiveToolExecutions(prev => prev.map(updateExecution));
           setMessageToolExecutions(prev => {
             const newMap = new Map(prev);
@@ -224,7 +198,7 @@ export function AmorimAIFloating() {
             return newMap;
           });
         }, interval * i);
-        
+
         toolProgressTimersRef.current.set(`${event.toolName}-${i}`, timer);
       }
     } else if (event.status === 'completed') {
@@ -235,10 +209,10 @@ export function AmorimAIFloating() {
           toolProgressTimersRef.current.delete(key);
         }
       });
-      
-      const completeExecution = (exec: ToolExecution) => 
+
+      const completeExecution = (exec: ToolExecution) =>
         exec.toolName === event.toolName ? completeToolExecution(exec) : exec;
-      
+
       // Complete in both states
       setActiveToolExecutions(prev => prev.map(completeExecution));
       setMessageToolExecutions(prev => {
@@ -247,10 +221,10 @@ export function AmorimAIFloating() {
         newMap.set(messageIndex, existing.map(completeExecution));
         return newMap;
       });
-      
+
       // Remove from active after delay (but keep in message history)
       setTimeout(() => {
-        setActiveToolExecutions(prev => 
+        setActiveToolExecutions(prev =>
           prev.filter(exec => exec.toolName !== event.toolName)
         );
       }, 800);
@@ -278,7 +252,7 @@ export function AmorimAIFloating() {
     const compressedContent = content.trim().replace(/\s+/g, ' ');
 
     let conversationId = currentConversationId;
-    
+
     // Create a new conversation if none exists
     if (!conversationId) {
       conversationId = await createConversation();
@@ -290,19 +264,19 @@ export function AmorimAIFloating() {
 
     // Persist user message
     const userMessageId = await persistMessage('user', compressedContent, conversationId);
-    
-    const userMessage = { 
+
+    const userMessage = {
       id: userMessageId || undefined,
-      role: 'user' as const, 
+      role: 'user' as const,
       content: compressedContent,
       conversation_id: conversationId
     };
-    
+
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
     setActiveToolExecutions([]); // Reset active tool executions
-    
+
     // Track the index of the upcoming assistant message
     currentMessageIndexRef.current = messages.length + 1; // +1 for user message, assistant will be next
 
@@ -314,7 +288,7 @@ export function AmorimAIFloating() {
         async (fullContent) => {
           // Persist assistant message after streaming is complete
           await persistMessage('assistant', fullContent, conversationId!);
-          
+
           // Auto-name the conversation after the first exchange
           if (messages.length === 0) {
             const title = content.trim().slice(0, 50) + (content.length > 50 ? '...' : '');
@@ -326,7 +300,7 @@ export function AmorimAIFloating() {
     } catch (error) {
       console.error('AI Assistant error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      
+
       // Remove empty assistant message if exists and add error
       setMessages(prev => {
         const lastMsg = prev[prev.length - 1];
@@ -341,7 +315,7 @@ export function AmorimAIFloating() {
           content: `⚠️ ${errorMessage}`
         }];
       });
-      
+
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -367,15 +341,15 @@ export function AmorimAIFloating() {
   // Auto-resize do textarea com limite de caracteres (FASE P5)
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
-    
+
     // FASE P5: Limite de caracteres
     if (newValue.length > MAX_INPUT_CHARS) {
       toast.warning(`Limite de ${MAX_INPUT_CHARS} caracteres atingido`);
       return;
     }
-    
+
     setInput(newValue);
-    
+
     // Auto-resize: reseta altura e calcula nova altura baseada no conteúdo
     const textarea = e.target;
     textarea.style.height = 'auto';
@@ -425,7 +399,7 @@ export function AmorimAIFloating() {
 
     const { x: startX, y: startY, width: startWidth, height: startHeight } = resizeStartRef.current;
     const maxHeight = window.innerHeight * MAX_HEIGHT_RATIO;
-    
+
     let newWidth = startWidth;
     let newHeight = startHeight;
 
@@ -458,7 +432,7 @@ export function AmorimAIFloating() {
   const toggleMaximized = useCallback(() => {
     const newMaximized = !isMaximized;
     setIsMaximized(newMaximized);
-    
+
     if (newMaximized) {
       // Expandir para 90% da tela
       const maxWidth = Math.min(window.innerWidth * 0.9, 1400);
@@ -479,8 +453,8 @@ export function AmorimAIFloating() {
       window.addEventListener('mouseup', handleResizeEnd);
       // Prevent text selection during resize
       document.body.style.userSelect = 'none';
-      document.body.style.cursor = resizeEdge === 'corner' ? 'nwse-resize' : 
-                                   resizeEdge === 'left' ? 'ew-resize' : 'ns-resize';
+      document.body.style.cursor = resizeEdge === 'corner' ? 'nwse-resize' :
+        resizeEdge === 'left' ? 'ew-resize' : 'ns-resize';
     }
     return () => {
       window.removeEventListener('mousemove', handleResizeMove);
@@ -518,10 +492,10 @@ export function AmorimAIFloating() {
               "shadow-2xl transition-all duration-300"
             )}
           >
-            <img 
-              src="/tork_symbol_favicon.png" 
-              alt="Tork AI" 
-              className="w-6 h-6 object-contain" 
+            <img
+              src="/tork_symbol_favicon.png"
+              alt="Tork AI"
+              className="w-6 h-6 object-contain"
             />
           </motion.button>
         )}
@@ -560,7 +534,7 @@ export function AmorimAIFloating() {
               )}
               style={{ transform: 'translateX(-50%)' }}
             />
-            
+
             {/* Top Edge Handle */}
             <div
               onMouseDown={(e) => handleResizeStart(e, 'top')}
@@ -571,7 +545,7 @@ export function AmorimAIFloating() {
               )}
               style={{ transform: 'translateY(-50%)' }}
             />
-            
+
             {/* Corner Handle (Top-Left) */}
             <div
               onMouseDown={(e) => handleResizeStart(e, 'corner')}
@@ -616,13 +590,13 @@ export function AmorimAIFloating() {
                   <History className="h-4 w-4" />
                 </Button>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-white/10 border border-white/10">
-                  <img 
-                    src="/tork_symbol_favicon.png" 
-                    alt="Tork AI" 
-                    className="w-4 h-4 object-contain" 
+                  <img
+                    src="/tork_symbol_favicon.png"
+                    alt="Tork AI"
+                    className="w-4 h-4 object-contain"
                   />
                 </div>
                 <div>
@@ -704,10 +678,10 @@ export function AmorimAIFloating() {
                 <div className="flex flex-col space-y-4">
                   {messages.map((message, idx) => {
                     const isCurrentMessage = idx === messages.length - 1 && (isLoading || isStreaming);
-                    const msgToolExecutions = isCurrentMessage 
-                      ? activeToolExecutions 
+                    const msgToolExecutions = isCurrentMessage
+                      ? activeToolExecutions
                       : (messageToolExecutions.get(idx) || []);
-                    
+
                     return (
                       <ChatMessage
                         key={message.id || idx}
@@ -755,7 +729,7 @@ export function AmorimAIFloating() {
                     "focus:outline-none disabled:opacity-50",
                     "overflow-y-auto scrollbar-thin scrollbar-thumb-white/20"
                   )}
-                  style={{ 
+                  style={{
                     minHeight: '44px',
                     maxHeight: '120px' // 5 linhas max
                   }}
@@ -792,7 +766,7 @@ export function AmorimAIFloating() {
                   </Button>
                 )}
               </div>
-              
+
               {/* FASE P5: Contador de caracteres */}
               {input.length > 0 && (
                 <div className={cn(
@@ -802,7 +776,7 @@ export function AmorimAIFloating() {
                   <span>{input.length}/{MAX_INPUT_CHARS}</span>
                 </div>
               )}
-              
+
               {!user && (
                 <p className="text-xs text-muted-foreground mt-2 text-center">
                   Faça login para usar o assistente
