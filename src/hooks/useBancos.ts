@@ -107,7 +107,7 @@ export function useBankAccounts() {
         accountNumber: acc.account_number || undefined,
         agency: acc.agency || undefined,
         accountType: acc.account_type as BankAccountType,
-        currentBalance: parseFloat(acc.current_balance || '0'),
+        currentBalance: parseFloat(acc.current_balance) || 0,
         lastSyncDate: acc.last_sync_date || undefined,
         color: acc.color || undefined,
         icon: acc.icon || undefined,
@@ -119,21 +119,34 @@ export function useBankAccounts() {
       // Calcular saldo real de cada banco usando a função SQL
       const accountsWithRealBalance = await Promise.all(
         mappedAccounts.map(async (acc) => {
-          const { data: balanceData, error: balanceError } = await supabase
-            .rpc('get_bank_balance' as any, {
-              p_bank_account_id: acc.id,
-              p_include_pending: false
-            });
+          try {
+            const { data: balanceData, error: balanceError } = await supabase
+              .rpc('get_bank_balance' as any, {
+                p_bank_account_id: acc.id,
+                p_include_pending: false
+              });
 
-          if (balanceError) {
-            console.error('Erro ao calcular saldo:', balanceError);
-            return acc;
+            if (balanceError) {
+              console.error('Erro ao calcular saldo:', balanceError);
+              // Retornar o saldo inicial do banco se a função SQL falhar
+              return {
+                ...acc,
+                currentBalance: acc.currentBalance || 0
+              };
+            }
+
+            const parsedBalance = parseFloat(String(balanceData));
+            return {
+              ...acc,
+              currentBalance: isNaN(parsedBalance) ? (acc.currentBalance || 0) : parsedBalance
+            };
+          } catch (e) {
+            console.error('Erro inesperado ao calcular saldo:', e);
+            return {
+              ...acc,
+              currentBalance: acc.currentBalance || 0
+            };
           }
-
-          return {
-            ...acc,
-            currentBalance: parseFloat(String(balanceData) || '0')
-          };
         })
       );
 
