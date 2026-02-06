@@ -4,7 +4,7 @@ import { Landmark } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BankAccountCard } from "./bancos/BankAccountCard";
 import { ConsolidatedBalanceCard } from "./bancos/ConsolidatedBalanceCard";
-import { UnbankedTransactionsAlert } from "./bancos/UnbankedTransactionsAlert";
+// import { UnbankedTransactionsAlert } from "./bancos/UnbankedTransactionsAlert"; // Removed
 import { AddBankAccountModal } from "./bancos/AddBankAccountModal";
 import { EditBankAccountModal } from "./bancos/EditBankAccountModal";
 import { DeleteBankAccountDialog } from "./bancos/DeleteBankAccountDialog";
@@ -77,7 +77,7 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
       </div>
 
       {/* Alert de Transações sem Banco */}
-      <UnbankedTransactionsAlert />
+      {/* Alert removed as requested */}
 
       {/* Card de Saldo Consolidado - clicável */}
       <ConsolidatedBalanceCard

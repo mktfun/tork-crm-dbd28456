@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     ArrowLeft,
     TrendingUp,
@@ -33,6 +34,9 @@ function formatCurrency(value: number): string {
 
 export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
     const [page, setPage] = useState(1);
+    const navigate = useNavigate();
+
+    // Se id for "todos", é visão consolidada
     const pageSize = 20;
 
     // Se id for "todos", é visão consolidada
@@ -245,8 +249,14 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                     ) : transactionsData?.transactions.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
                             <Landmark className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                            <p className="text-lg">Nenhuma transação encontrada</p>
-                            <p className="text-sm">Este banco ainda não possui movimentações</p>
+                            <p className="text-lg font-medium text-foreground">Nenhuma transação vinculada</p>
+                            <p className="text-sm mb-4">Para visualizar transações aqui, você precisa conciliar os lançamentos.</p>
+                            <Button
+                                variant="outline"
+                                onClick={() => navigate('/dashboard/financeiro?tab=conciliacao')}
+                            >
+                                Ir para Conciliação Bancária
+                            </Button>
                         </div>
                     ) : (
                         <div className="divide-y max-h-[600px] overflow-auto">

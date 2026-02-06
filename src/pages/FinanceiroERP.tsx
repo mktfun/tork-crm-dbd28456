@@ -432,11 +432,14 @@ export default function FinanceiroERP() {
   useEffect(() => {
     const transactionId = searchParams.get('transactionId');
     const legacyId = searchParams.get('legacyId');
+    const tabParam = searchParams.get('tab');
 
     if (transactionId || legacyId) {
       setDetailsTransactionId(transactionId || legacyId);
       setIsLegacyLookup(!!legacyId && !transactionId);
       setActiveTab('receitas');
+    } else if (tabParam) {
+      setActiveTab(tabParam);
     }
   }, [searchParams]);
 
