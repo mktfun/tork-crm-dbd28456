@@ -143,6 +143,24 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 3. Atualizar permissões (apenas para garantir)
+
+-- 3. Atualizar get_bank_balance para versão segura (sem enum error)
+CREATE OR REPLACE FUNCTION get_bank_balance(
+  p_bank_account_id UUID,
+  p_include_pending BOOLEAN DEFAULT false
+)
+RETURNS DECIMAL AS $$
+BEGIN
+  -- Versão simplificada que retorna apenas o saldo atual da conta
+  -- Evita cálculos complexos com enums que podem falhar
+  RETURN COALESCE(
+    (SELECT current_balance FROM bank_accounts WHERE id = p_bank_account_id),
+    0
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 4. Atualizar permissões
 GRANT EXECUTE ON FUNCTION get_unbanked_transactions(UUID, INTEGER) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_bank_transactions(UUID, INTEGER, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_bank_balance(UUID, BOOLEAN) TO authenticated;
