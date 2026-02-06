@@ -660,6 +660,28 @@ Isso aumenta a credibilidade e rastreabilidade da resposta.
   }
 }
 
+// Parse attachments from user message with [[ATTACHMENT::...]] tags
+function parseAttachments(content: string): { cleanContent: string; attachments: any[] } {
+  const attachmentRegex = /\[\[ATTACHMENT::([^:]+)::([^:]+)::([^:]+)::([^\]]+)\]\]/g;
+  const attachments: any[] = [];
+  let match;
+
+  while ((match = attachmentRegex.exec(content)) !== null) {
+    const [fullMatch, filename, mimeType, size, base64Content] = match;
+    attachments.push({
+      filename,
+      mimeType,
+      size: parseInt(size),
+      data: base64Content
+    });
+  }
+
+  // Remove attachment tags from content
+  const cleanContent = content.replace(attachmentRegex, '').trim();
+
+  return { cleanContent, attachments };
+}
+
 async function buildSystemPrompt(supabase: any, userId: string, userMessage?: string): Promise<string> {
   let contextBlocks: string[] = [];
 
@@ -2064,11 +2086,53 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Process attachments in user messages
+    const processedMessages = messages.map((msg: any) => {
+      if (msg.role === 'user' && typeof msg.content === 'string') {
+        const { cleanContent, attachments } = parseAttachments(msg.content);
+        
+        if (attachments.length > 0) {
+          // Format message with attachments for Gemini multimodal
+          const parts: any[] = [];
+          
+          // Add text part if there's content
+          if (cleanContent) {
+            parts.push({ type: 'text', text: cleanContent });
+          }
+          
+          // Add file parts
+          attachments.forEach(att => {
+            if (att.mimeType.startsWith('image/')) {
+              parts.push({
+                type: 'image_url',
+                image_url: {
+                  url: `data:${att.mimeType};base64,${att.data}`
+                }
+              });
+            } else if (att.mimeType === 'application/pdf') {
+              // For PDFs, add as text context
+              parts.push({
+                type: 'text',
+                text: `[Arquivo PDF anexado: ${att.filename}]\n\nPor favor, analise este documento PDF que o usuário enviou.`
+              });
+            }
+          });
+          
+          return { ...msg, content: parts };
+        }
+        
+        return { ...msg, content: cleanContent || msg.content };
+      }
+      return msg;
+    });
+
     // Extract last user message for RAG context
-    const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
+    const lastUserMessage = processedMessages.filter((m: any) => m.role === 'user').pop()?.content || '';
+    const lastUserText = typeof lastUserMessage === 'string' ? lastUserMessage : 
+                        (Array.isArray(lastUserMessage) ? lastUserMessage.find((p: any) => p.type === 'text')?.text || '' : '');
 
     // Build System Prompt with RAG context
-    const systemPrompt = await buildSystemPrompt(supabase, userId, lastUserMessage);
+    const systemPrompt = await buildSystemPrompt(supabase, userId, lastUserText);
     logger.debug('System prompt built', {
       length: systemPrompt.length,
       hasRAG: systemPrompt.includes('<conhecimento_especializado>'),
@@ -2077,7 +2141,7 @@ serve(async (req) => {
 
     const aiMessages = [
       { role: 'system', content: systemPrompt },
-      ...messages
+      ...processedMessages
     ];
 
     // ========== STREAMING MODE ==========
