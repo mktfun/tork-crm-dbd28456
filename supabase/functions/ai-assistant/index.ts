@@ -43,6 +43,27 @@ IDENTIDADE: Você é o **Amorim AI**, Mentor Técnico e Estratégico de Seguros.
 Seu interlocutor é o **Dono da Corretora** (perfil sênior, decisor de negócios).
 NUNCA atue como um chatbot de autoatendimento para segurados finais.
 Sua autoridade técnica vem EXCLUSIVAMENTE do <conhecimento_especializado> injetado no seu contexto.
+
+<metacognicao_raciocinio priority="CRÍTICA">
+VOCÊ PENSA ANTES DE AGIR.
+Para TODA interação, você DEVE iniciar sua resposta estruturando seu raciocínio dentro de tags <thinking>.
+Isso é invisível para o usuário final na versão final, mas essencial para a interface de depuração "Glass Box".
+
+O que incluir no <thinking>:
+1. **Identificação da Intenção**: O que o usuário realmente quer? (Consultoria, Ação no CRM, Análise Híbrida?)
+2. **Plano de Execução**: Quais ferramentas precisarei? (Ex: search_clients -> get_policies -> analyze)
+3. **Checagem de Segurança**: Tenho os IDs necessários? Preciso confirmar algo (deleção)?
+4. **Estratégia de Resposta**: Qual modo de operação (1, 2 ou 3) vou adotar?
+
+Exemplo:
+<thinking>
+Usuario quer saber apolices vencendo.
+1. Intenção: Consulta de dados (CRM).
+2. Ferramentas: get_expiring_policies.
+3. Parametros: Padrão 30 dias se não especificado.
+4. Modo: 2 (Agente com Dados).
+</thinking>
+</metacognicao_raciocinio>
 </identidade_b2b>
 
 <missao_consultoria priority="MÁXIMA">
@@ -273,6 +294,11 @@ Ação concreta sugerida
   </rule>
   <rule priority="9">
     **FEEDBACK DE ESCRITA:** Após executar com sucesso qualquer ferramenta de escrita (create, update, delete, move), inclua um emoji de confirmação na resposta. Exemplo: "✅ Cliente João Silva criado com sucesso!" ou "✅ Lead movido para a etapa Negociação."
+  </rule>
+  <rule priority="18">
+    **ECONOMIA DE TOKENS (RATE LIMIT):**
+    Seja conciso. Evite preâmbulos desnecessários como "Entendi", "Vou processar sua solicitação". Vá direto à execução ou resposta.
+    Use output JSON estruturado <data_json> sempre que possível para listar dados, em vez de criar tabelas Markdown gigantescas que consomem muitos tokens de output.
   </rule>
   
   <!-- NOVAS REGRAS FASE P1 - AGENTE AUTÔNOMO CRUD/KANBAN -->
@@ -556,7 +582,7 @@ async function retrieveContext(query: string, supabase: any): Promise<string> {
 
     const embeddingData = await embeddingResponse.json();
     const queryEmbedding = embeddingData.embedding?.values;
-    
+
     if (!queryEmbedding || queryEmbedding.length === 0) {
       console.error('[RAG] No embedding returned from Gemini');
       return '';
@@ -582,19 +608,19 @@ async function retrieveContext(query: string, supabase: any): Promise<string> {
     }
 
     console.log(`[RAG] Found ${results.length} relevant knowledge chunks`);
-    
+
     // Format context for injection into prompt with source metadata for citation
     const contextChunks = results.map((r: any, idx: number) => {
       const source = r.metadata?.source || 'base_conhecimento';
       const category = r.metadata?.category || 'geral';
       const topic = r.metadata?.topic || '';
       const similarity = (r.similarity * 100).toFixed(0);
-      
+
       return `<context_chunk index="${idx + 1}" source="${source}" category="${category}" topic="${topic}" relevance="${similarity}%">
 ${r.content}
 </context_chunk>`;
     });
-    
+
     // Add citation instruction at the end
     const citationInstruction = `
 <instrucao_citacao>
@@ -602,7 +628,7 @@ IMPORTANTE: Quando usar informações dos chunks acima, CITE a fonte no formato:
 "De acordo com [source]/[category]: ..." ou "Conforme normas da SUSEP..."
 Isso aumenta a credibilidade e rastreabilidade da resposta.
 </instrucao_citacao>`;
-    
+
     return contextChunks.join('\n\n') + '\n\n' + citationInstruction;
   } catch (error) {
     console.error('[RAG] Error retrieving context:', error);
@@ -615,14 +641,14 @@ async function buildSystemPrompt(supabase: any, userId: string, userMessage?: st
 
   // 0. CONTEXTO TEMPORAL DINÂMICO (FASE P3.2)
   const now = new Date();
-  const dateOptions: Intl.DateTimeFormatOptions = { 
+  const dateOptions: Intl.DateTimeFormatOptions = {
     weekday: 'long',
-    day: '2-digit', 
-    month: 'long', 
-    year: 'numeric' 
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
   };
   const formattedDate = now.toLocaleDateString('pt-BR', dateOptions);
-  
+
   contextBlocks.push(`<contexto_temporal>
 CONTEXTO TEMPORAL: Hoje é ${formattedDate}. 
 Use esta data como referência ABSOLUTA para calcular renovações, vencimentos e prazos.
@@ -647,7 +673,7 @@ Sempre que mencionar datas, use o formato brasileiro (DD/MM/AAAA).
     const totalPolicies = policiesResult.data?.length || 0;
     const activePolicies = policiesResult.data?.filter((p: any) => p.status?.toLowerCase().includes('ativ') || p.status?.toLowerCase().includes('vigente')).length || 0;
     const totalPremium = policiesResult.data?.reduce((acc: number, p: any) => acc + (Number(p.premium_value) || 0), 0) || 0;
-    
+
     const income = transactionsResult.data?.filter((t: any) => t.nature === 'receita' && t.status === 'pago')
       .reduce((acc: number, t: any) => acc + (Number(t.amount) || 0), 0) || 0;
 
@@ -691,7 +717,7 @@ INSTRUÇÃO: Use esses IDs diretamente ao mover deals. Se o usuário mencionar u
   } catch (error) {
     console.warn('[CONTEXT-METADATA] Erro ao buscar metadados:', error);
   }
-  
+
   // 1. Tentar recuperar contexto RAG se houver mensagem do usuário
   if (userMessage) {
     const ragContext = await retrieveContext(userMessage, supabase);
@@ -701,7 +727,7 @@ ${ragContext}
 </conhecimento_especializado>`);
     }
   }
-  
+
   // 2. Buscar padrões aprendidos do usuário
   try {
     const { data: patterns, error } = await supabase
@@ -714,11 +740,11 @@ ${ragContext}
 
     if (!error && patterns && patterns.length > 0) {
       console.log(`[CONTEXT-BUILD] User: ${userId} | Found ${patterns.length} learned patterns`);
-      
-      const learnedContext = patterns.map((p: { pattern_type: string; pattern_data: any; confidence_score: number }) => 
+
+      const learnedContext = patterns.map((p: { pattern_type: string; pattern_data: any; confidence_score: number }) =>
         `  <${p.pattern_type}>${JSON.stringify(p.pattern_data)}</${p.pattern_type}>`
       ).join('\n');
-      
+
       contextBlocks.push(`<contexto_aprendido>
 ${learnedContext}
 </contexto_aprendido>`);
@@ -1052,7 +1078,7 @@ const TOOLS = [
 
 // ========== DISPATCHER DE HANDLERS (FASE 4B + 5 - EXACT COUNT) ==========
 const toolHandlers: Record<string, (args: any, supabase: any, userId: string) => Promise<any>> = {
-  
+
   // --- CLIENTES (COM CONTAGEM EXATA) ---
   search_clients: async (args, supabase, userId) => {
     const { query, status, limit = 10 } = args;
@@ -1076,7 +1102,7 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
 
   get_client_details: async (args, supabase, userId) => {
     const { client_id } = args;
-    
+
     const { data: client, error: clientError } = await supabase
       .from('clientes')
       .select('*')
@@ -1112,7 +1138,7 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
   // --- APÓLICES ---
   search_policies: async (args, supabase, userId) => {
     const { client_id, status, ramo, limit = 10 } = args;
-    
+
     let qb = supabase
       .from('apolices')
       .select(`
@@ -1140,7 +1166,7 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
         .ilike('nome', `%${ramo}%`)
         .eq('user_id', userId)
         .limit(1);
-      
+
       if (ramoData?.length > 0) {
         qb = qb.eq('ramo_id', ramoData[0].id);
       }
@@ -1184,7 +1210,7 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
   get_financial_summary: async (args, supabase, userId) => {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    
+
     const startDate = args.start_date || startOfMonth.toISOString().split('T')[0];
     const endDate = args.end_date || today.toISOString().split('T')[0];
 
@@ -1214,7 +1240,7 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
       t.financial_ledger?.forEach((entry: any) => {
         const accountType = entry.financial_accounts?.type;
         const amount = Number(entry.amount);
-        
+
         if (accountType === 'revenue') {
           totalIncome += Math.abs(amount);
         }
@@ -1224,8 +1250,8 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
       });
     });
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       period: { start: startDate, end: endDate },
       total_income: totalIncome,
       total_expenses: totalExpense,
@@ -1237,7 +1263,7 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
   // --- SINISTROS ---
   search_claims: async (args, supabase, userId) => {
     const { status, policy_id } = args;
-    
+
     let qb = supabase
       .from('sinistros')
       .select(`
@@ -1277,7 +1303,7 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
   // --- AGENDAMENTOS ---
   get_appointments: async (args, supabase, userId) => {
     const date = args.date || new Date().toISOString().split('T')[0];
-    
+
     const { data, count, error } = await supabase
       .from('appointments')
       .select(`
@@ -1361,7 +1387,7 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
   // --- RELATÓRIOS ---
   generate_report: async (args, supabase, userId) => {
     const { type, period, format = 'summary' } = args;
-    
+
     const today = new Date();
     let startDate: Date;
 
@@ -1378,7 +1404,7 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
 
     if (type === 'renewals') {
       const futureDate = new Date(Date.now() + 30 * 86400000);
-      
+
       const { data, error } = await supabase
         .from('apolices')
         .select(`
@@ -1408,7 +1434,7 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
     }
 
     if (type === 'financial' || type === 'commissions') {
-      const result = await toolHandlers.get_financial_summary({ 
+      const result = await toolHandlers.get_financial_summary({
         start_date: startDate.toISOString().split('T')[0],
         end_date: today.toISOString().split('T')[0]
       }, supabase, userId);
@@ -1447,10 +1473,10 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
   },
 
   // ========== FERRAMENTAS DE ESCRITA (FASE P2 - AGENTE AUTÔNOMO) ==========
-  
+
   get_kanban_data: async (args, supabase, userId) => {
     const { query, pipeline_id } = args;
-    
+
     // Buscar deals com informações de stage e cliente
     let qb = supabase
       .from('crm_deals')
@@ -1547,8 +1573,8 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
     if (updateError) throw updateError;
 
     console.log(`[TOOL] move_deal_to_stage: Deal "${deal.title}" movido para "${stage.name}"`);
-    return { 
-      success: true, 
+    return {
+      success: true,
       action: 'move_deal',
       message: `Deal "${deal.title}" movido para a etapa "${stage.name}"`,
       deal_id,
@@ -1586,11 +1612,11 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
     if (error) throw error;
 
     console.log(`[TOOL] create_client: Cliente "${name}" criado com ID ${data.id}`);
-    return { 
-      success: true, 
+    return {
+      success: true,
       action: 'create_client',
       message: `Cliente "${name}" criado com sucesso`,
-      client: data 
+      client: data
     };
   },
 
@@ -1628,11 +1654,11 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
     if (error) throw error;
 
     console.log(`[TOOL] update_client: Cliente "${data.name}" atualizado`);
-    return { 
-      success: true, 
+    return {
+      success: true,
       action: 'update_client',
       message: `Cliente "${data.name}" atualizado com sucesso`,
-      client: data 
+      client: data
     };
   },
 
@@ -1674,8 +1700,8 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
     if (error) throw error;
 
     console.log(`[TOOL] create_policy: Apólice criada para cliente "${client.name}"`);
-    return { 
-      success: true, 
+    return {
+      success: true,
       action: 'create_policy',
       message: `Apólice ${policy_number || data.id} criada para ${client.name}`,
       policy: data,
@@ -1716,11 +1742,11 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
     if (error) throw error;
 
     console.log(`[TOOL] update_policy: Apólice ${data.policy_number || policy_id} atualizada`);
-    return { 
-      success: true, 
+    return {
+      success: true,
       action: 'update_policy',
       message: `Apólice ${data.policy_number || policy_id} atualizada com sucesso`,
-      policy: data 
+      policy: data
     };
   },
 
@@ -1762,11 +1788,11 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
     if (error) throw error;
 
     console.log(`[TOOL] delete_client: Cliente "${client.name}" excluído`);
-    return { 
-      success: true, 
+    return {
+      success: true,
       action: 'delete_client',
       message: `Cliente "${client.name}" excluído permanentemente`,
-      deleted_id: client_id 
+      deleted_id: client_id
     };
   },
 
@@ -1798,17 +1824,17 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
     if (error) throw error;
 
     console.log(`[TOOL] delete_policy: Apólice ${policy.policy_number || policy_id} excluída`);
-    return { 
-      success: true, 
+    return {
+      success: true,
       action: 'delete_policy',
       message: `Apólice ${policy.policy_number || policy_id} excluída permanentemente`,
-      deleted_id: policy_id 
+      deleted_id: policy_id
     };
   },
 
   // ========== NOVAS TOOLS CRUD/KANBAN (FASE P1) ==========
   // Tools com auditoria completa e validações robustas
-  
+
   create_client_v2: async (args, supabase, userId) => {
     return await CRUD.create_client(args, supabase, userId);
   },
@@ -1850,7 +1876,7 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
 async function executeToolCall(toolCall: any, supabase: any, userId: string) {
   const { name, arguments: argsStr } = toolCall.function;
   const args = JSON.parse(argsStr);
-  
+
   logger.info(`Tool execution started: ${name}`, { tool_name: name, args });
   const startTime = Date.now();
 
@@ -1862,7 +1888,7 @@ async function executeToolCall(toolCall: any, supabase: any, userId: string) {
 
     const result = await handler(args, supabase, userId);
     const duration = Date.now() - startTime;
-    
+
     logger.info(`Tool execution succeeded: ${name}`, { tool_name: name, duration_ms: duration });
     return { tool_call_id: toolCall.id, output: JSON.stringify(result) };
   } catch (error: any) {
@@ -1898,7 +1924,7 @@ serve(async (req) => {
   try {
     const rawBody = await req.text();
     const { messages, userId, conversationId, stream = false } = JSON.parse(rawBody);
-    
+
     logger.info('Request parsed', { requestId, userId, stream, conversationId });
 
     // Rate Limiting
@@ -1908,7 +1934,7 @@ serve(async (req) => {
     if (!rateLimitSuccess) {
       logger.warn('Rate limit exceeded', { userId, identifier });
       clearTimeout(timeoutId);
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: "Limite de requisições excedido. Tente novamente em alguns segundos.",
         code: 'RATE_LIMIT_EXCEEDED'
       }), {
@@ -1934,7 +1960,7 @@ serve(async (req) => {
 
     // Extract last user message for RAG context
     const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop()?.content || '';
-    
+
     // Build System Prompt with RAG context
     const systemPrompt = await buildSystemPrompt(supabase, userId, lastUserMessage);
     logger.debug('System prompt built', {
@@ -1951,12 +1977,12 @@ serve(async (req) => {
     // ========== STREAMING MODE ==========
     if (stream) {
       logger.info('Initiating SSE stream', { requestId, userId });
-      
+
       // Primeiro, precisamos resolver tool calls antes de streamar
       let currentMessages = [...aiMessages];
       let toolIterations = 0;
       const maxToolIterations = 5;
-      
+
       // Resolve tool calls first (não é possível streamar durante tool calls)
       let response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
@@ -1977,7 +2003,7 @@ serve(async (req) => {
         const errorText = await response.text();
         console.error(`[AI-GATEWAY-ERROR] ${response.status}: ${errorText}`);
         clearTimeout(timeoutId);
-        
+
         if (response.status === 429) {
           return new Response(JSON.stringify({ error: "Rate limit da IA excedido.", code: 'AI_RATE_LIMIT' }), {
             status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -1995,12 +2021,12 @@ serve(async (req) => {
 
       // Track tool calls for streaming events
       const executedTools: string[] = [];
-      
+
       // Process tool calls
       while (result.choices[0].message.tool_calls && toolIterations < maxToolIterations) {
         toolIterations++;
         const toolCalls = result.choices[0].message.tool_calls;
-        
+
         console.log(`[TOOL-LOOP] Iteration ${toolIterations}: ${toolCalls.length} tools`);
         currentMessages.push(result.choices[0].message);
 
@@ -2039,7 +2065,7 @@ serve(async (req) => {
 
       // Agora fazemos a chamada final com streaming
       console.log(`[STREAM-MODE] Tool calls resolved, starting final stream...`);
-      
+
       const streamResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -2082,7 +2108,7 @@ serve(async (req) => {
               controller.enqueue(encoder.encode(toolStartEvent));
               console.log(`[SSE-DEBUG] Emitindo tool_call event:`, toolName);
             }
-            
+
             // Depois, emitir resultados das tools
             for (const toolName of executedTools) {
               const toolResultEvent = formatSSE({ tool_result: { name: toolName } });
@@ -2094,16 +2120,16 @@ serve(async (req) => {
             console.log(`[SSE-DEBUG] Iniciando leitura do stream do gateway...`);
             while (true) {
               const { done, value } = await reader.read();
-              
+
               if (done) {
                 console.log(`[SSE-DEBUG] Stream finalizado com sinalizador [DONE]`);
                 controller.close();
                 break;
               }
-              
+
               // Enfileirar chunk diretamente (já vem no formato SSE correto)
               controller.enqueue(value);
-              
+
               // Log apenas para debug (não decodificar todo chunk para performance)
               if (value.byteLength < 500) {
                 const decoded = new TextDecoder().decode(value);
@@ -2120,8 +2146,8 @@ serve(async (req) => {
       });
 
       return new Response(customStream, {
-        headers: { 
-          ...corsHeaders, 
+        headers: {
+          ...corsHeaders,
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive'
@@ -2131,7 +2157,7 @@ serve(async (req) => {
 
     // ========== NON-STREAMING MODE (original behavior) ==========
     console.log(`[NON-STREAM] Processing request...`);
-    
+
     let response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -2153,7 +2179,7 @@ serve(async (req) => {
       const errorText = await response.text();
       console.error(`[AI-GATEWAY-ERROR] ${response.status}: ${errorText}`);
       clearTimeout(timeoutId);
-      
+
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit excedido.", code: 'AI_RATE_LIMIT' }), {
           status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -2173,11 +2199,11 @@ serve(async (req) => {
     let toolIterations = 0;
     const maxToolIterations = 5;
     let currentMessages = [...aiMessages];
-    
+
     while (result.choices[0].message.tool_calls && toolIterations < maxToolIterations) {
       toolIterations++;
       const toolCalls = result.choices[0].message.tool_calls;
-      
+
       console.log(`[TOOL-LOOP] Iteration ${toolIterations}: ${toolCalls.length} tools`);
       currentMessages.push(result.choices[0].message);
 
@@ -2227,13 +2253,13 @@ serve(async (req) => {
   } catch (error: unknown) {
     clearTimeout(timeoutId);
     const totalDuration = Date.now() - requestStartTime;
-    
+
     console.error(`[FATAL-ERROR] Request ${requestId} | Duration: ${totalDuration}ms`);
     console.error(`[FATAL-ERROR] ${error instanceof Error ? error.message : String(error)}`);
-    
+
     if (error instanceof Error && error.name === 'AbortError') {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'Timeout de 30 segundos. Tente uma pergunta mais simples.',
           code: 'TIMEOUT_ERROR',
           requestId
@@ -2243,7 +2269,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error instanceof Error ? error.message : 'Erro no processamento',
         code: 'AI_PROCESSING_ERROR',
         requestId

@@ -7,15 +7,15 @@ import { PolicyListCard } from './PolicyListCard';
 import { ClientListCard } from './ClientListCard';
 import { Badge } from '@/components/ui/badge';
 import { useDebounce } from '@/hooks/useDebounce';
-import { 
-  BookOpen, 
-  Shield, 
-  TrendingUp, 
-  TrendingDown, 
-  AlertTriangle, 
-  CheckCircle, 
-  FileText, 
-  Users, 
+import {
+  BookOpen,
+  Shield,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  CheckCircle,
+  FileText,
+  Users,
   Calendar,
   DollarSign,
   Briefcase,
@@ -66,7 +66,7 @@ const SOURCE_PATTERNS = [
 
 function detectSources(text: string): Array<{ source: string; icon: React.ComponentType<any> }> {
   const detectedSources: Array<{ source: string; icon: React.ComponentType<any> }> = [];
-  
+
   for (const { pattern, source, icon } of SOURCE_PATTERNS) {
     if (pattern.test(text)) {
       if (!detectedSources.find(s => s.source === source)) {
@@ -74,7 +74,7 @@ function detectSources(text: string): Array<{ source: string; icon: React.Compon
       }
     }
   }
-  
+
   return detectedSources;
 }
 
@@ -90,21 +90,21 @@ function parseIconSyntax(text: string): React.ReactNode[] {
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
-    
+
     // Add the icon component
     const iconName = match[1];
     const IconComponent = ICON_MAP[iconName];
     if (IconComponent) {
       parts.push(
-        <IconComponent 
-          key={`icon-${match.index}`} 
-          className="inline-block h-4 w-4 mr-1 text-primary" 
+        <IconComponent
+          key={`icon-${match.index}`}
+          className="inline-block h-4 w-4 mr-1 text-primary"
         />
       );
     } else {
       parts.push(match[0]); // Keep original text if icon not found
     }
-    
+
     lastIndex = match.index + match[0].length;
   }
 
@@ -192,7 +192,7 @@ const FullMarkdownRenderer: React.FC<{ content: string }> = React.memo(({ conten
     // Headings with icon parsing support
     h3: ({ children }: any) => {
       const parsedContent = typeof children === 'string' ? parseIconSyntax(children) : children;
-      
+
       return (
         <h3 className="text-base font-bold mt-5 mb-3 flex items-center gap-2 text-foreground border-b border-white/10 pb-2">
           {parsedContent}
@@ -201,7 +201,7 @@ const FullMarkdownRenderer: React.FC<{ content: string }> = React.memo(({ conten
     },
     h4: ({ children }: any) => {
       const parsedContent = typeof children === 'string' ? parseIconSyntax(children) : children;
-      
+
       return (
         <h4 className="text-sm font-semibold mt-4 mb-2 text-foreground/95 flex items-center gap-1.5">
           {parsedContent}
@@ -243,8 +243,8 @@ const FullMarkdownRenderer: React.FC<{ content: string }> = React.memo(({ conten
 
   return (
     <div className="prose prose-sm prose-invert max-w-none w-full">
-      <ReactMarkdown 
-        remarkPlugins={[remarkGfm]} 
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         components={markdownComponents}
       >
         {content}
@@ -268,14 +268,23 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content,
   // OTIMIZAÇÃO: Debounce do conteúdo durante streaming para reduzir renders
   // Só processa Markdown após 300ms de estabilização
   const debouncedContent = useDebounce(content, isStreaming ? 300 : 0);
-  
-  // Extrair todos os blocos JSON
-  const { textContent, matches, detectedSources } = useMemo(() => {
+
+  // Extrair todos os blocos JSON e Thinking
+  const { textContent, matches, detectedSources, thinkingContent } = useMemo(() => {
+    // 1. Extrair Thinking
+    const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
+    let thinkingMatch = thinkingRegex.exec(debouncedContent);
+    const thinking = thinkingMatch ? thinkingMatch[1].trim() : null;
+
+    // Remover thinking do texto
+    let text = debouncedContent.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
+
+    // 2. Extrair JSON
     const jsonRegex = /<data_json>([\s\S]*?)<\/data_json>/g;
     const extractedMatches: StructuredData[] = [];
     let match;
-    
-    while ((match = jsonRegex.exec(debouncedContent)) !== null) {
+
+    while ((match = jsonRegex.exec(text)) !== null) {
       try {
         const parsed = JSON.parse(match[1].trim());
         extractedMatches.push(parsed);
@@ -283,36 +292,36 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content,
         console.error('[AIResponseRenderer] Erro ao parsear JSON:', error);
       }
     }
-    
+
     // Remover os blocos JSON do texto
-    const text = debouncedContent.replace(/<data_json>[\s\S]*?<\/data_json>/g, '').trim();
-    
-    // Detectar fontes citadas no texto
+    text = text.replace(/<data_json>[\s\S]*?<\/data_json>/g, '').trim();
+
+    // 3. Detectar fontes citadas
     const sources = detectSources(text);
-    
-    return { textContent: text, matches: extractedMatches, detectedSources: sources };
+
+    return { textContent: text, matches: extractedMatches, detectedSources: sources, thinkingContent: thinking };
   }, [debouncedContent]);
 
   const renderStructuredData = (structuredData: StructuredData, index: number) => {
     const { type, data } = structuredData;
-    
+
     switch (type) {
       case 'table':
       case 'company_list':
       case 'ramo_list':
         return <TableComponent key={index} data={data} type={type} />;
-      
+
       case 'financial_summary':
         return <FinancialCard key={index} summary={data} />;
-      
+
       case 'policy_list':
       case 'expiring_policies':
         return <PolicyListCard key={index} policies={data} type={type} />;
-      
+
       case 'client_list':
       case 'client_details':
         return <ClientListCard key={index} clients={data} type={type} />;
-      
+
       default:
         // Fallback: renderizar como tabela genérica se for array
         if (Array.isArray(data)) {
@@ -320,7 +329,7 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content,
         }
         // Se for objeto, mostrar como JSON formatado
         return (
-          <pre 
+          <pre
             key={index}
             className="mt-3 p-3 rounded-lg bg-white/5 border border-white/10 text-xs overflow-x-auto"
           >
@@ -333,26 +342,42 @@ export const AIResponseRenderer: React.FC<AIResponseRendererProps> = ({ content,
   return (
     // FASE P5.1: Contenção raiz com break-words e max-w-full
     <div className="space-y-3 w-full max-w-full break-words">
+      {/* Thinking - Apenas se existir */}
+      {thinkingContent && (
+        <details className="group mb-2">
+          <summary className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors select-none py-1">
+            <Lightbulb className="w-3 h-3 text-yellow-500/70" />
+            <span>Ver processo de raciocínio</span>
+            <div className="h-px bg-white/10 flex-1 ml-2" />
+          </summary>
+          <div className="pl-2 border-l-2 border-white/10 mt-2 ml-1.5 animate-in slide-in-from-top-2 fade-in duration-200">
+            <div className="text-xs text-muted-foreground/80 italic whitespace-pre-wrap font-mono bg-black/20 p-2 rounded">
+              {thinkingContent}
+            </div>
+          </div>
+        </details>
+      )}
+
       {/* Texto: Renderização leve durante streaming, completa após */}
       {textContent && (
         isStreaming ? (
-          <StreamingTextRenderer content={content.replace(/<data_json>[\s\S]*?<\/data_json>/g, '').trim()} />
+          <StreamingTextRenderer content={textContent} />
         ) : (
           <FullMarkdownRenderer content={textContent} />
         )
       )}
-      
+
       {/* Dados estruturados - apenas quando não streaming */}
       {!isStreaming && matches.map((data, index) => renderStructuredData(data, index))}
-      
+
       {/* Badges de Fontes Citadas - apenas quando não streaming */}
       {!isStreaming && detectedSources.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/10">
           <span className="text-xs text-muted-foreground">Fontes:</span>
           {detectedSources.map(({ source, icon: Icon }, idx) => (
-            <Badge 
-              key={idx} 
-              variant="silverOutline" 
+            <Badge
+              key={idx}
+              variant="silverOutline"
               className="text-[10px] py-0.5 gap-1"
             >
               <Icon className="h-3 w-3" />
