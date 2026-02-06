@@ -1962,7 +1962,12 @@ search_claims: async (args, supabase, userId) => {
                                                 // ========== ANALYTICS (GOD MODE) ==========
                                                 analyze_client_360: async (args, supabase, userId) => {
                                                   return await ANALYTICS.analyze_client_360(args, supabase, userId);
-                                                }
+                                                },
+
+                                                  // ========== INSPECTOR (GOD MODE) ==========
+                                                  inspect_document: async (args, supabase, userId) => {
+                                                    return await INSPECTOR.inspect_document(args, supabase, userId);
+                                                  }
 };
 
 // ========== EXECUTOR DE TOOLS ==========
