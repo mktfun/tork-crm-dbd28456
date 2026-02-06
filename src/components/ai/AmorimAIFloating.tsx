@@ -377,6 +377,37 @@ export function AmorimAIFloating() {
     toast.success('Conversa excluída');
   };
 
+  // === FILE UPLOAD HANDLERS ===
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      // Validar tamanho e tipo se necessário
+      if (file.size > 10 * 1024 * 1024) { // 10MB
+        toast.error("Arquivo muito grande (Max 10MB)");
+        return;
+      }
+      setAttachedFile(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setAttachedFile(e.dataTransfer.files[0]);
+    }
+  };
+
   // === RESIZE HANDLERS (FASE P4) ===
   const handleResizeStart = useCallback((
     e: React.MouseEvent,
