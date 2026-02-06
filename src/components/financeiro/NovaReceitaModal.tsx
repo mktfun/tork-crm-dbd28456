@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Switch } from '@/components/ui/switch';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { TrendingUp, Loader2, Calendar } from 'lucide-react';
@@ -39,6 +40,7 @@ const revenueSchema = z.object({
   bankAccountId: z.string().optional(),
   referenceNumber: z.string().optional(),
   memo: z.string().optional(),
+  isConfirmed: z.boolean().default(true),
 });
 
 type RevenueFormData = z.infer<typeof revenueSchema>;
@@ -69,6 +71,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
       bankAccountId: '',
       referenceNumber: '',
       memo: '',
+      isConfirmed: true,
     }
   });
 
@@ -92,6 +95,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
         bankAccountId: data.bankAccountId || undefined,
         referenceNumber: data.referenceNumber,
         memo: data.memo,
+        isConfirmed: data.isConfirmed,
       });
 
       toast.success('Receita registrada com sucesso!');
@@ -126,6 +130,27 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="isConfirmed"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mb-4">
+                  <div className="space-y-0.5">
+                    <FormLabel>Status: Recebido</FormLabel>
+                    <DialogDescription>
+                      A receita já entrou na conta?
+                    </DialogDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
             {/* Descrição */}
             <FormField
               control={form.control}

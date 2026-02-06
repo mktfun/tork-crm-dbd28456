@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  FinancialAccount, 
+import {
+  FinancialAccount,
   FinancialAccountType,
   CashFlowDataPoint,
   FinancialSummary,
@@ -31,9 +31,9 @@ interface RecentTransaction {
 export async function getAccountsByType(type: FinancialAccountType): Promise<FinancialAccount[]> {
   const { data, error } = await supabase
     .rpc('get_financial_accounts_by_type', { p_type: type });
-  
+
   if (error) throw error;
-  
+
   // Mapear snake_case para camelCase
   return (data || []).map((acc: any) => ({
     id: acc.id,
@@ -60,9 +60,9 @@ export async function getAllAccounts(): Promise<FinancialAccount[]> {
     .eq('status', 'active')
     .order('type')
     .order('name');
-  
+
   if (error) throw error;
-  
+
   return (data || []).map((acc: any) => ({
     id: acc.id,
     userId: acc.user_id,
@@ -109,9 +109,9 @@ export async function createAccount(account: {
     })
     .select()
     .single();
-  
+
   if (error) throw error;
-  
+
   return {
     id: data.id,
     userId: data.user_id,
@@ -170,9 +170,9 @@ export async function registerRevenue(payload: {
   transactionDate: string;
   revenueAccountId: string;
   assetAccountId: string;
-  bankAccountId?: string;
   referenceNumber?: string;
   memo?: string;
+  isConfirmed?: boolean;
 }): Promise<string> {
   const movements: Array<{ account_id: string; amount: number; memo?: string }> = [
     { account_id: payload.assetAccountId, amount: payload.amount, memo: payload.memo },
@@ -186,7 +186,9 @@ export async function registerRevenue(payload: {
     p_reference_number: payload.referenceNumber || null,
     p_related_entity_type: null,
     p_related_entity_id: null,
-    p_bank_account_id: payload.bankAccountId || null
+    // p_related_entity_id duplicado removido
+    p_bank_account_id: payload.bankAccountId || null,
+    p_is_confirmed: payload.isConfirmed ?? false
   });
 
   if (error) throw error;
@@ -227,7 +229,7 @@ export interface ReverseTransactionResult {
  * Cria lançamentos inversos no ledger e marca a transação original como void.
  */
 export async function reverseTransaction(
-  transactionId: string, 
+  transactionId: string,
   reason: string
 ): Promise<ReverseTransactionResult> {
   const { data, error } = await supabase.rpc('void_financial_transaction', {
@@ -236,7 +238,7 @@ export async function reverseTransaction(
   });
 
   if (error) throw error;
-  
+
   const result = data as any;
   return {
     success: result?.success ?? false,
@@ -277,7 +279,7 @@ export async function getCashFlowData(params: {
   });
 
   if (error) throw error;
-  
+
   return (data || []).map((row: any) => ({
     period: row.period,
     income: Number(row.income) || 0,
@@ -299,7 +301,7 @@ export async function getFinancialSummary(params: {
   });
 
   if (error) throw error;
-  
+
   // A RPC retorna JSON diretamente, não array
   const row = data as any || {};
   return {
@@ -324,7 +326,7 @@ export async function getDreData(year?: number): Promise<DreRow[]> {
   });
 
   if (error) throw error;
-  
+
   return (data || []).map((row: any) => ({
     category: row.category,
     account_type: row.account_type as 'revenue' | 'expense',
@@ -367,9 +369,9 @@ export async function bulkImportTransactions(
   });
 
   if (error) throw error;
-  
+
   const result = data as any;
-  
+
   return {
     successCount: result.success_count || 0,
     errorCount: result.error_count || 0,
@@ -396,7 +398,7 @@ export async function updateAccount(accountId: string, updates: {
   });
 
   if (error) throw error;
-  
+
   const acc = data as any;
   return {
     id: acc.id,
@@ -461,7 +463,7 @@ export async function deleteAccountSafe(
   });
 
   if (error) throw error;
-  
+
   const result = data as any;
   return {
     success: result.success,
@@ -503,7 +505,7 @@ export async function getRevenueTransactions(params: {
   });
 
   if (error) throw error;
-  
+
   return (data || []).map((row: any) => ({
     id: row.id,
     description: row.description || '',
@@ -537,7 +539,7 @@ export async function getRevenueTotals(params: {
   });
 
   if (error) throw error;
-  
+
   const row = (data as any)?.[0] || {};
   return {
     financialTotal: Number(row.financial_total) || 0,
@@ -561,9 +563,9 @@ export async function bulkConfirmReceipts(transactionIds: string[]): Promise<Bul
   const { data, error } = await supabase.rpc('bulk_confirm_receipts', {
     p_transaction_ids: transactionIds
   });
-  
+
   if (error) throw error;
-  
+
   const result = data as any;
   return {
     confirmedCount: result?.confirmed_count ?? 0,
@@ -608,7 +610,7 @@ export async function settleCommission(params: {
     console.error('📡 SERVICE - Erro RPC:', error);
     throw error;
   }
-  
+
   const result = data as any;
   return {
     success: result?.success ?? false,
@@ -665,14 +667,14 @@ export async function getTransactionDetails(
   // Fallback: Se a RPC falhar ou não existir, tenta buscar direto das tabelas
   if (error) {
     console.warn("RPC get_transaction_details falhou, tentando fallback...", error);
-    
+
     const id = transactionId || legacyId;
     if (!id) throw new Error("ID da transação não fornecido");
-    
+
     // CORREÇÃO DE SEGURANÇA: Obter user_id do contexto de auth
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Usuário não autenticado");
-    
+
     const { data: tx, error: txError } = await supabase
       .from('financial_transactions')
       .select(`
@@ -685,9 +687,9 @@ export async function getTransactionDetails(
       .eq('id', id)
       .eq('user_id', user.id)  // CORREÇÃO: Filtrar por user_id
       .single();
-    
+
     if (txError) throw txError;
-    
+
     // Formata para o mesmo padrão da RPC
     return {
       id: tx.id,
@@ -711,17 +713,17 @@ export async function getTransactionDetails(
       legacyData: null
     };
   }
-  
+
   const raw = data as any;
-  
+
   if (raw?.error) {
     throw new Error(raw.error);
   }
-  
+
   // Smart Mapper: aceita tanto camelCase (novo) quanto snake_case (legado)
   const rawMovements = raw.ledgerEntries || raw.ledger_entries || [];
   const rawLegacy = raw.legacyData || raw.legacy_data;
-  
+
   return {
     id: raw.id,
     description: raw.description,
@@ -734,7 +736,7 @@ export async function getTransactionDetails(
     voidReason: raw.voidReason || raw.void_reason,
     createdAt: raw.createdAt || raw.created_at,
     attachments: raw.attachments || [],
-    
+
     // Mapeamento profundo do Ledger (aceita ambos os formatos)
     ledgerEntries: rawMovements.map((entry: any) => ({
       id: entry.id,
@@ -744,7 +746,7 @@ export async function getTransactionDetails(
       accountName: entry.accountName || entry.account_name || 'Conta Desconhecida',
       accountType: entry.accountType || entry.account_type || 'unknown'
     })),
-    
+
     // Legacy data (aceita ambos os formatos)
     legacyData: rawLegacy ? {
       clientId: rawLegacy.clientId || rawLegacy.client_id,
@@ -853,7 +855,7 @@ export async function auditLedgerIntegrity(): Promise<LedgerIntegrityIssue[]> {
   const { data, error } = await supabase.rpc('audit_ledger_integrity');
 
   if (error) throw error;
-  
+
   return (data || []).map((row: any) => ({
     issue_type: row.issue_type,
     transaction_id: row.transaction_id,
