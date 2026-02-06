@@ -9,6 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 interface TableComponentProps {
   data: any[];
@@ -29,7 +30,7 @@ export const TableComponent: React.FC<TableComponentProps> = ({ data, type }) =>
 
   // Extrair colunas dos objetos
   const columns = Object.keys(data[0]);
-  
+
   // Mapeamento de labels amigáveis
   const labelMap: Record<string, string> = {
     name: 'Nome',
@@ -51,7 +52,7 @@ export const TableComponent: React.FC<TableComponentProps> = ({ data, type }) =>
 
   const formatValue = (value: any, key: string): string => {
     if (value === null || value === undefined) return '-';
-    
+
     // Formatar datas
     if (key.includes('date') || key.includes('_at')) {
       try {
@@ -61,7 +62,7 @@ export const TableComponent: React.FC<TableComponentProps> = ({ data, type }) =>
         return String(value);
       }
     }
-    
+
     // Formatar valores monetários
     if (key.includes('value') || key.includes('premium') || key.includes('amount')) {
       const num = Number(value);
@@ -69,7 +70,7 @@ export const TableComponent: React.FC<TableComponentProps> = ({ data, type }) =>
         return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       }
     }
-    
+
     // Formatar percentuais
     if (key.includes('rate') || key.includes('percent')) {
       const num = Number(value);
@@ -77,17 +78,17 @@ export const TableComponent: React.FC<TableComponentProps> = ({ data, type }) =>
         return `${num.toFixed(1)}%`;
       }
     }
-    
+
     // Objetos aninhados (como ramos, companies)
     if (typeof value === 'object') {
       return value.name || value.nome || JSON.stringify(value);
     }
-    
+
     return String(value);
   };
 
   // Filtrar colunas irrelevantes (como IDs longos)
-  const displayColumns = columns.filter(col => 
+  const displayColumns = columns.filter(col =>
     !col.endsWith('_id') && col !== 'id' && col !== 'user_id'
   );
 
@@ -98,7 +99,7 @@ export const TableComponent: React.FC<TableComponentProps> = ({ data, type }) =>
           <TableHeader>
             <TableRow className="border-white/10 hover:bg-transparent">
               {displayColumns.map((col) => (
-                <TableHead 
+                <TableHead
                   key={col}
                   className="text-xs font-medium text-muted-foreground whitespace-nowrap"
                 >
@@ -109,27 +110,30 @@ export const TableComponent: React.FC<TableComponentProps> = ({ data, type }) =>
           </TableHeader>
           <TableBody>
             {data.slice(0, 20).map((row, idx) => (
-              <TableRow 
+              <motion.tr
                 key={idx}
-                className="border-white/5 hover:bg-white/5"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className="border-white/5 hover:bg-white/5 transition-colors group"
               >
                 {displayColumns.map((col) => (
-                  <TableCell 
+                  <TableCell
                     key={col}
                     className={cn(
-                      "text-sm py-2",
+                      "text-sm py-2 group-hover:text-foreground transition-colors",
                       col === 'status' && getStatusColor(row[col])
                     )}
                   >
                     {formatValue(row[col], col)}
                   </TableCell>
                 ))}
-              </TableRow>
+              </motion.tr>
             ))}
           </TableBody>
         </Table>
       </div>
-      
+
       {data.length > 20 && (
         <div className="px-3 py-2 text-xs text-muted-foreground text-center border-t border-white/10">
           Mostrando 20 de {data.length} registros
