@@ -17,7 +17,7 @@ import Clients from "./pages/Clients";
 import ClientDetails from "./pages/ClientDetails";
 import Appointments from "./pages/Appointments";
 import Financeiro from "./pages/Financeiro";
-import BancoDashboard from "./pages/BancoDashboard";
+// BancoDashboard removed - integrated into CaixaTab
 import Tesouraria from "./pages/Tesouraria";
 import Conciliacao from "./pages/Conciliacao";
 import Tasks from "./pages/Tasks";
@@ -117,7 +117,7 @@ function App() {
                   <Route path="clients/:id" element={<ClientDetails />} />
                   <Route path="appointments" element={<Appointments />} />
                   <Route path="financeiro" element={<Financeiro />} />
-                  <Route path="financeiro/banco/:id" element={<BancoDashboard />} />
+                  {/* <Route path="financeiro/banco/:id" element={<BancoDashboard />} /> - removed, now inside tab */}
                   <Route path="tesouraria" element={<Tesouraria />} />
                   <Route path="conciliacao" element={<Conciliacao />} />
                   <Route path="tasks" element={<Tasks />} />

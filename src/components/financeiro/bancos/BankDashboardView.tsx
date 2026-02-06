@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft,
     TrendingUp,
@@ -20,6 +19,11 @@ import { useBankAccounts, useBankTransactions, BankAccount } from '@/hooks/useBa
 import { BankTransactionRow } from '@/components/financeiro/bancos/BankTransactionRow';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
 
+interface BankDashboardViewProps {
+    bankId: string; // 'todos' para consolidado ou UUID
+    onBack: () => void;
+}
+
 function formatCurrency(value: number): string {
     return new Intl.NumberFormat('pt-BR', {
         style: 'currency',
@@ -27,15 +31,13 @@ function formatCurrency(value: number): string {
     }).format(value);
 }
 
-export default function BancoDashboard() {
-    const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
+export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
     const [page, setPage] = useState(1);
     const pageSize = 20;
 
     // Se id for "todos", é visão consolidada
-    const isConsolidated = id === 'todos';
-    const bankAccountId = isConsolidated ? null : id || null;
+    const isConsolidated = bankId === 'todos';
+    const bankAccountId = isConsolidated ? null : bankId;
 
     // Buscar dados do banco
     const { data: bankData, isLoading: loadingAccounts, refetch: refetchAccounts } = useBankAccounts();
@@ -45,7 +47,7 @@ export default function BancoDashboard() {
     // Encontrar o banco atual
     const currentBank: BankAccount | undefined = isConsolidated
         ? undefined
-        : bankData?.accounts.find(acc => acc.id === id);
+        : bankData?.accounts.find(acc => acc.id === bankId);
 
     // State para detalhes de transação
     const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export default function BancoDashboard() {
     // Loading state
     if (loadingAccounts && !bankData) {
         return (
-            <div className="space-y-6 p-6">
+            <div className="space-y-6">
                 <Skeleton className="h-10 w-48" />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Skeleton className="h-32" />
@@ -80,9 +82,9 @@ export default function BancoDashboard() {
             <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                 <Landmark className="w-16 h-16 mb-4 opacity-30" />
                 <p className="text-lg mb-4">Banco não encontrado</p>
-                <Button variant="outline" onClick={() => navigate('/dashboard/financeiro')}>
+                <Button variant="outline" onClick={onBack}>
                     <ArrowLeft className="w-4 h-4 mr-2" />
-                    Voltar para Financeiro
+                    Voltar para lista
                 </Button>
             </div>
         );
@@ -93,14 +95,14 @@ export default function BancoDashboard() {
     const displayBalance = isConsolidated ? (bankData?.totalBalance || 0) : (currentBank?.currentBalance || 0);
 
     return (
-        <div className="space-y-6 p-6">
+        <div className="space-y-6">
             {/* Header com navegação */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => navigate('/dashboard/financeiro')}
+                        onClick={onBack}
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
@@ -247,7 +249,7 @@ export default function BancoDashboard() {
                             <p className="text-sm">Este banco ainda não possui movimentações</p>
                         </div>
                     ) : (
-                        <div className="divide-y">
+                        <div className="divide-y max-h-[600px] overflow-auto">
                             {transactionsData?.transactions.map((tx) => (
                                 <BankTransactionRow
                                     key={tx.transactionId}

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { DateRange } from "react-day-picker";
 import { Landmark } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,17 +9,18 @@ import { AddBankAccountModal } from "./bancos/AddBankAccountModal";
 import { EditBankAccountModal } from "./bancos/EditBankAccountModal";
 import { DeleteBankAccountDialog } from "./bancos/DeleteBankAccountDialog";
 import { useBankAccounts, type BankAccount } from "@/hooks/useBancos";
+import { BankDashboardView } from "./bancos/BankDashboardView";
 
 interface CaixaTabProps {
   dateRange: DateRange | undefined;
 }
 
 export function CaixaTab({ dateRange }: CaixaTabProps) {
-  const navigate = useNavigate();
   const { data: summary, isLoading } = useBankAccounts();
 
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<BankAccount | null>(null);
+  const [selectedBankId, setSelectedBankId] = useState<string | null>(null);
 
   const accounts = summary?.accounts?.filter(a => a.isActive) ?? [];
   const totalBalance = summary?.totalBalance ?? 0;
@@ -32,16 +32,6 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
 
   const handleDeleteBank = (account: BankAccount) => {
     setDeletingAccount(account);
-  };
-
-  // Navegar para página de detalhes do banco
-  const handleOpenBankDashboard = (account: BankAccount) => {
-    navigate(`/dashboard/financeiro/banco/${account.id}`);
-  };
-
-  // Navegar para visão consolidada
-  const handleOpenConsolidatedDashboard = () => {
-    navigate('/dashboard/financeiro/banco/todos');
   };
 
   if (isLoading) {
@@ -65,6 +55,16 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
     );
   }
 
+  // Se tiver banco selecionado, mostra dashboard do banco
+  if (selectedBankId) {
+    return (
+      <BankDashboardView
+        bankId={selectedBankId}
+        onBack={() => setSelectedBankId(null)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -83,7 +83,7 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
       <ConsolidatedBalanceCard
         totalBalance={totalBalance}
         accountCount={activeAccountsCount}
-        onClick={handleOpenConsolidatedDashboard}
+        onClick={() => setSelectedBankId('todos')}
       />
 
       {/* Grid de Contas Bancárias */}
@@ -105,7 +105,7 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
             <BankAccountCard
               key={account.id}
               account={account}
-              onClick={handleOpenBankDashboard}
+              onClick={() => setSelectedBankId(account.id)}
               onEdit={() => handleEditBank(account)}
               onDelete={() => handleDeleteBank(account)}
             />
