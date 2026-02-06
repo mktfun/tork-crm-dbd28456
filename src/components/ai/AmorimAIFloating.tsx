@@ -802,6 +802,24 @@ export function AmorimAIFloating() {
                       ? activeToolExecutions
                       : (messageToolExecutions.get(idx) || []);
 
+                    // === UI FIX: Hide System Prompt & Show Attachment ===
+                    let displayMessage = message;
+                    if (message.role === 'user' && message.content.includes('[SYSTEM:')) {
+                      // Extract filename
+                      const nameMatch = message.content.match(/Nome original: "(.*?)"/);
+                      const fileName = nameMatch ? nameMatch[1] : "Arquivo anexado";
+
+                      // Remove system tag
+                      const cleanContent = message.content.replace(/\n\n\[SYSTEM:[\s\S]*?\]/, '').trim();
+
+                      // Construct display content
+                      const newContent = cleanContent
+                        ? `📎 [${fileName}]\n\n${cleanContent}`
+                        : `📎 [${fileName}]`;
+
+                      displayMessage = { ...message, content: newContent };
+                    }
+
                     return (
                       <ChatMessage
                         key={message.id || idx}

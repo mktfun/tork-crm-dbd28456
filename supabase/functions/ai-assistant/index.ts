@@ -6,6 +6,8 @@ import { logger } from "../_shared/logger.ts";
 import { auditLog, createAuditTimer } from "../_shared/audit.ts";
 import * as CRUD from "./tools-crud.ts";
 import * as CRM from "./tools-crm.ts";
+import * as INSPECTOR from "./tools-inspector.ts";
+import * as ANALYTICS from "./tools-analytics.ts";
 
 // --- Configuração do Rate Limiter ---
 const redis = new Redis({
@@ -1110,6 +1112,36 @@ const TOOLS = [
         required: ["policy_id", "confirmed"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "analyze_client_360",
+      description: "SUPER TOOL: Realiza uma análise completa (360º) de um cliente. Retorna Perfil, Saúde, Risco de Churn, Apólices e Oportunidades em uma única chamada. USE SEMPRE que precisar saber 'tudo' sobre um cliente.",
+      parameters: {
+        type: "object",
+        properties: {
+          client_id: { type: "string", description: "ID do cliente a ser analisado." }
+        },
+        required: ["client_id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "inspect_document",
+      description: "SUPER CONSULTOR: Analisa documentos (Apólice, Vistoria) e gera argumentos de VENDA. Use quando o usuário pedir 'analise esta apólice', 'veja se serve', 'me ajude a vender'.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_path: { type: "string", description: "Caminho do arquivo no Storage (bucket chat-uploads)." },
+          mime_type: { type: "string", description: "Tipo MIME (application/pdf, image/png)." },
+          focus_area: { type: "string", description: "Foco (ex: 'vendas', 'gaps', 'coberturas')." }
+        },
+        required: ["file_path", "mime_type"]
+      }
+    }
   }
 ];
 
@@ -1314,47 +1346,13 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
     };
   },
 
-  // ========== TOOLS ANALYTICS (GOD MODE PHASE 3) ==========
-  {
-  type: "function",
-    function: {
-      name: "analyze_client_360",
-      description: "SUPER TOOL: Realiza uma análise completa (360º) de um cliente. Retorna Perfil, Saúde, Risco de Churn, Apólices e Oportunidades em uma única chamada. USE SEMPRE que precisar saber 'tudo' sobre um cliente.",
-      parameters: {
-        type: "object",
-        properties: {
-          client_id: { type: "string", description: "ID do cliente a ser analisado." }
-        },
-        required: ["client_id"]
-      }
-    }
-  },
 
-// ========== TOOLS INSPECTOR (GOD MODE PHASE 4) ==========
-{
-  type: "function",
-    function: {
-      name: "inspect_document",
-      description: "SUPER CONSULTOR: Analisa documentos (Apólice, Vistoria) e gera argumentos de VENDA. Use quando o usuário pedir 'analise esta apólice', 'veja se serve', 'me ajude a vender'.",
-      parameters: {
-        type: "object",
-        properties: {
-          file_path: { type: "string", description: "Caminho do arquivo no Storage (bucket chat-uploads)." },
-          mime_type: { type: "string", description: "Tipo MIME (application/pdf, image/png)." },
-          focus_area: { type: "string", description: "Foco (ex: 'vendas', 'gaps', 'coberturas')." }
-        },
-        required: ["file_path", "mime_type"]
-      }
-    }
-  },
+  search_claims: async (args, supabase, userId) => {
+    const { status, policy_id } = args;
 
-// --- SINISTROS ---
-search_claims: async (args, supabase, userId) => {
-  const { status, policy_id } = args;
-
-  let qb = supabase
-    .from('sinistros')
-    .select(`
+    let qb = supabase
+      .from('sinistros')
+      .select(`
         id, 
         claim_number, 
         status, 
@@ -1363,15 +1361,15 @@ search_claims: async (args, supabase, userId) => {
         estimated_value,
         apolices(policy_number, clientes(name))
       `, { count: 'exact' })
-    .eq('user_id', userId);
+      .eq('user_id', userId);
 
-  if (status) qb = qb.eq('status', status);
-  if (policy_id) qb = qb.eq('policy_id', policy_id);
+    if (status) qb = qb.eq('status', status);
+    if (policy_id) qb = qb.eq('policy_id', policy_id);
 
-  const { data, count, error } = await qb;
-  if (error) throw error;
-  return { success: true, total_count: count, claims: data };
-},
+    const { data, count, error } = await qb;
+    if (error) throw error;
+    return { success: true, total_count: count, claims: data };
+  },
 
   // --- TAREFAS ---
   get_tasks: async (args, supabase, userId) => {
@@ -1388,13 +1386,13 @@ search_claims: async (args, supabase, userId) => {
     return { success: true, total_count: count, tasks: data };
   },
 
-    // --- AGENDAMENTOS ---
-    get_appointments: async (args, supabase, userId) => {
-      const date = args.date || new Date().toISOString().split('T')[0];
+  // --- AGENDAMENTOS ---
+  get_appointments: async (args, supabase, userId) => {
+    const date = args.date || new Date().toISOString().split('T')[0];
 
-      const { data, count, error } = await supabase
-        .from('appointments')
-        .select(`
+    const { data, count, error } = await supabase
+      .from('appointments')
+      .select(`
         id,
         title,
         date,
@@ -1403,172 +1401,172 @@ search_claims: async (args, supabase, userId) => {
         notes,
         clientes(name, phone)
       `, { count: 'exact' })
+      .eq('user_id', userId)
+      .eq('date', date)
+      .order('time', { ascending: true });
+
+    if (error) throw error;
+    return { success: true, date, total_count: count, appointments: data };
+  },
+
+  // --- DADOS MESTRES (FASE 4C) ---
+  get_companies: async (args, supabase, userId) => {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('id, name')
+      .eq('user_id', userId)
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    console.log(`[TOOL] get_companies: Encontradas ${data?.length || 0} seguradoras`);
+    return { success: true, count: data?.length || 0, companies: data || [] };
+  },
+
+  get_ramos: async (args, supabase, userId) => {
+    const { data, error } = await supabase
+      .from('ramos')
+      .select('id, nome')
+      .eq('user_id', userId)
+      .order('nome', { ascending: true });
+
+    if (error) throw error;
+    console.log(`[TOOL] get_ramos: Encontrados ${data?.length || 0} ramos`);
+    return { success: true, count: data?.length || 0, ramos: data || [] };
+  },
+
+  create_appointment: async (args, supabase, userId) => {
+    const { client_id, title, date, time, notes } = args;
+
+    const insertData: any = {
+      user_id: userId,
+      title,
+      date,
+      time,
+      notes: notes || '',
+      status: 'Pendente'
+    };
+
+    if (client_id) {
+      const { data: clientCheck, error: clientError } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('id', client_id)
         .eq('user_id', userId)
-        .eq('date', date)
-        .order('time', { ascending: true });
+        .single();
 
-      if (error) throw error;
-      return { success: true, date, total_count: count, appointments: data };
-    },
+      if (clientError || !clientCheck) {
+        throw new Error('Cliente não encontrado ou não pertence a você');
+      }
+      insertData.client_id = client_id;
+    }
 
-      // --- DADOS MESTRES (FASE 4C) ---
-      get_companies: async (args, supabase, userId) => {
-        const { data, error } = await supabase
-          .from('companies')
-          .select('id, name')
-          .eq('user_id', userId)
-          .order('name', { ascending: true });
+    const { data, error } = await supabase
+      .from('appointments')
+      .insert(insertData)
+      .select()
+      .single();
 
-        if (error) throw error;
-        console.log(`[TOOL] get_companies: Encontradas ${data?.length || 0} seguradoras`);
-        return { success: true, count: data?.length || 0, companies: data || [] };
-      },
+    if (error) throw error;
+    return { success: true, appointment: data };
+  },
 
-        get_ramos: async (args, supabase, userId) => {
-          const { data, error } = await supabase
-            .from('ramos')
-            .select('id, nome')
-            .eq('user_id', userId)
-            .order('nome', { ascending: true });
+  // --- RELATÓRIOS ---
+  generate_report: async (args, supabase, userId) => {
+    const { type, period, format = 'summary' } = args;
 
-          if (error) throw error;
-          console.log(`[TOOL] get_ramos: Encontrados ${data?.length || 0} ramos`);
-          return { success: true, count: data?.length || 0, ramos: data || [] };
-        },
+    const today = new Date();
+    let startDate: Date;
 
-          create_appointment: async (args, supabase, userId) => {
-            const { client_id, title, date, time, notes } = args;
+    switch (period) {
+      case 'last-month':
+        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        break;
+      case 'current-year':
+        startDate = new Date(today.getFullYear(), 0, 1);
+        break;
+      default:
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    }
 
-            const insertData: any = {
-              user_id: userId,
-              title,
-              date,
-              time,
-              notes: notes || '',
-              status: 'Pendente'
-            };
+    if (type === 'renewals') {
+      const futureDate = new Date(Date.now() + 30 * 86400000);
 
-            if (client_id) {
-              const { data: clientCheck, error: clientError } = await supabase
-                .from('clientes')
-                .select('id')
-                .eq('id', client_id)
-                .eq('user_id', userId)
-                .single();
-
-              if (clientError || !clientCheck) {
-                throw new Error('Cliente não encontrado ou não pertence a você');
-              }
-              insertData.client_id = client_id;
-            }
-
-            const { data, error } = await supabase
-              .from('appointments')
-              .insert(insertData)
-              .select()
-              .single();
-
-            if (error) throw error;
-            return { success: true, appointment: data };
-          },
-
-            // --- RELATÓRIOS ---
-            generate_report: async (args, supabase, userId) => {
-              const { type, period, format = 'summary' } = args;
-
-              const today = new Date();
-              let startDate: Date;
-
-              switch (period) {
-                case 'last-month':
-                  startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-                  break;
-                case 'current-year':
-                  startDate = new Date(today.getFullYear(), 0, 1);
-                  break;
-                default:
-                  startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-              }
-
-              if (type === 'renewals') {
-                const futureDate = new Date(Date.now() + 30 * 86400000);
-
-                const { data, error } = await supabase
-                  .from('apolices')
-                  .select(`
+      const { data, error } = await supabase
+        .from('apolices')
+        .select(`
           policy_number, 
           expiration_date, 
           premium_value, 
           status,
           clientes(name, phone)
         `)
-                  .eq('user_id', userId)
-                  .eq('status', 'Ativa')
-                  .gte('expiration_date', today.toISOString())
-                  .lte('expiration_date', futureDate.toISOString())
-                  .order('expiration_date', { ascending: true });
+        .eq('user_id', userId)
+        .eq('status', 'Ativa')
+        .gte('expiration_date', today.toISOString())
+        .lte('expiration_date', futureDate.toISOString())
+        .order('expiration_date', { ascending: true });
 
-                if (error) throw error;
+      if (error) throw error;
 
-                if (format === 'summary') {
-                  const totalPremium = data.reduce((sum: number, p: any) => sum + Number(p.premium_value || 0), 0);
-                  return {
-                    success: true,
-                    type: 'renewals',
-                    summary: `Relatório de Renovações: ${data.length} apólices vencem nos próximos 30 dias. Prêmio total: R$ ${totalPremium.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`
-                  };
-                }
-                return { success: true, type: 'renewals', data };
-              }
+      if (format === 'summary') {
+        const totalPremium = data.reduce((sum: number, p: any) => sum + Number(p.premium_value || 0), 0);
+        return {
+          success: true,
+          type: 'renewals',
+          summary: `Relatório de Renovações: ${data.length} apólices vencem nos próximos 30 dias. Prêmio total: R$ ${totalPremium.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`
+        };
+      }
+      return { success: true, type: 'renewals', data };
+    }
 
-              if (type === 'financial' || type === 'commissions') {
-                const result = await toolHandlers.get_financial_summary({
-                  start_date: startDate.toISOString().split('T')[0],
-                  end_date: today.toISOString().split('T')[0]
-                }, supabase, userId);
+    if (type === 'financial' || type === 'commissions') {
+      const result = await toolHandlers.get_financial_summary({
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: today.toISOString().split('T')[0]
+      }, supabase, userId);
 
-                if (format === 'summary') {
-                  return {
-                    success: true,
-                    type: 'financial',
-                    summary: `Relatório Financeiro (${period}): Receitas: R$ ${result.total_income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}. Despesas: R$ ${result.total_expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}. Saldo: R$ ${result.net_balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`
-                  };
-                }
-                return { success: true, type: 'financial', data: result };
-              }
+      if (format === 'summary') {
+        return {
+          success: true,
+          type: 'financial',
+          summary: `Relatório Financeiro (${period}): Receitas: R$ ${result.total_income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}. Despesas: R$ ${result.total_expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}. Saldo: R$ ${result.net_balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`
+        };
+      }
+      return { success: true, type: 'financial', data: result };
+    }
 
-              if (type === 'clients') {
-                const { data, error } = await supabase
-                  .from('clientes')
-                  .select('id, name, email, phone, status, created_at', { count: 'exact' })
-                  .eq('user_id', userId)
-                  .order('created_at', { ascending: false });
+    if (type === 'clients') {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('id, name, email, phone, status, created_at', { count: 'exact' })
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-                if (error) throw error;
+      if (error) throw error;
 
-                if (format === 'summary') {
-                  const totalAtivos = data.filter((c: any) => c.status === 'Ativo').length;
-                  return {
-                    success: true,
-                    type: 'clients',
-                    summary: `Relatório de Clientes: ${data.length} cadastrados. Ativos: ${totalAtivos}. Inativos: ${data.length - totalAtivos}.`
-                  };
-                }
-                return { success: true, type: 'clients', data };
-              }
+      if (format === 'summary') {
+        const totalAtivos = data.filter((c: any) => c.status === 'Ativo').length;
+        return {
+          success: true,
+          type: 'clients',
+          summary: `Relatório de Clientes: ${data.length} cadastrados. Ativos: ${totalAtivos}. Inativos: ${data.length - totalAtivos}.`
+        };
+      }
+      return { success: true, type: 'clients', data };
+    }
 
-              return { success: false, error: `Tipo de relatório '${type}' não implementado.` };
-            },
+    return { success: false, error: `Tipo de relatório '${type}' não implementado.` };
+  },
 
-              // ========== FERRAMENTAS DE ESCRITA (FASE P2 - AGENTE AUTÔNOMO) ==========
+  // ========== FERRAMENTAS DE ESCRITA (FASE P2 - AGENTE AUTÔNOMO) ==========
 
-              get_kanban_data: async (args, supabase, userId) => {
-                const { query, pipeline_id } = args;
+  get_kanban_data: async (args, supabase, userId) => {
+    const { query, pipeline_id } = args;
 
-                // Buscar deals com informações de stage e cliente
-                let qb = supabase
-                  .from('crm_deals')
-                  .select(`
+    // Buscar deals com informações de stage e cliente
+    let qb = supabase
+      .from('crm_deals')
+      .select(`
         id,
         title,
         value,
@@ -1579,395 +1577,395 @@ search_claims: async (args, supabase, userId) => {
         crm_stages!inner(id, name, color, pipeline_id),
         clientes(id, name, phone, email)
       `)
-                  .eq('user_id', userId)
-                  .order('position', { ascending: true })
-                  .limit(20);
-
-                if (pipeline_id) {
-                  qb = qb.eq('crm_stages.pipeline_id', pipeline_id);
-                }
-
-                const { data: deals, error } = await qb;
-                if (error) throw error;
-
-                // Filtrar por query se fornecido
-                let filteredDeals = deals || [];
-                if (query) {
-                  const normalizedQuery = query.toLowerCase();
-                  filteredDeals = filteredDeals.filter((d: any) =>
-                    d.title?.toLowerCase().includes(normalizedQuery) ||
-                    d.clientes?.name?.toLowerCase().includes(normalizedQuery)
-                  );
-                }
-
-                // Buscar etapas disponíveis para contexto
-                const { data: stages } = await supabase
-                  .from('crm_stages')
-                  .select('id, name, pipeline_id')
-                  .eq('user_id', userId)
-                  .order('position', { ascending: true });
-
-                console.log(`[TOOL] get_kanban_data: Encontrados ${filteredDeals.length} deals`);
-                return {
-                  success: true,
-                  deals: filteredDeals.map((d: any) => ({
-                    id: d.id,
-                    title: d.title,
-                    value: d.value,
-                    stage_id: d.stage_id,
-                    stage_name: d.crm_stages?.name,
-                    client_id: d.client_id,
-                    client_name: d.clientes?.name
-                  })),
-                  available_stages: stages || [],
-                  total_count: filteredDeals.length
-                };
-              },
-
-                move_deal_to_stage: async (args, supabase, userId) => {
-                  const { deal_id, stage_id } = args;
-
-                  // Verificar se o deal existe e pertence ao usuário
-                  const { data: deal, error: dealError } = await supabase
-                    .from('crm_deals')
-                    .select('id, title, stage_id')
-                    .eq('id', deal_id)
-                    .eq('user_id', userId)
-                    .single();
-
-                  if (dealError || !deal) {
-                    throw new Error('Deal não encontrado ou não pertence a você');
-                  }
-
-                  // Verificar se a etapa existe
-                  const { data: stage, error: stageError } = await supabase
-                    .from('crm_stages')
-                    .select('id, name')
-                    .eq('id', stage_id)
-                    .eq('user_id', userId)
-                    .single();
-
-                  if (stageError || !stage) {
-                    throw new Error('Etapa não encontrada');
-                  }
-
-                  // Atualizar o deal
-                  const { error: updateError } = await supabase
-                    .from('crm_deals')
-                    .update({ stage_id, updated_at: new Date().toISOString() })
-                    .eq('id', deal_id)
-                    .eq('user_id', userId);
-
-                  if (updateError) throw updateError;
-
-                  console.log(`[TOOL] move_deal_to_stage: Deal "${deal.title}" movido para "${stage.name}"`);
-                  return {
-                    success: true,
-                    action: 'move_deal',
-                    message: `Deal "${deal.title}" movido para a etapa "${stage.name}"`,
-                    deal_id,
-                    new_stage_id: stage_id,
-                    new_stage_name: stage.name
-                  };
-                },
-
-                  create_client: async (args, supabase, userId) => {
-                    const { name, phone, email, cpf_cnpj, address, birth_date } = args;
-
-                    // Validação obrigatória
-                    if (!name || !phone) {
-                      throw new Error('Nome e telefone são obrigatórios para criar um cliente');
-                    }
-
-                    const insertData: any = {
-                      user_id: userId,
-                      name: name.trim(),
-                      phone: phone.trim(),
-                      email: email?.trim() || '',
-                      status: 'Ativo'
-                    };
-
-                    if (cpf_cnpj) insertData.cpf_cnpj = cpf_cnpj.trim();
-                    if (address) insertData.address = address.trim();
-                    if (birth_date) insertData.birth_date = birth_date;
-
-                    const { data, error } = await supabase
-                      .from('clientes')
-                      .insert(insertData)
-                      .select('id, name, phone, email, status')
-                      .single();
-
-                    if (error) throw error;
-
-                    console.log(`[TOOL] create_client: Cliente "${name}" criado com ID ${data.id}`);
-                    return {
-                      success: true,
-                      action: 'create_client',
-                      message: `Cliente "${name}" criado com sucesso`,
-                      client: data
-                    };
-                  },
-
-                    update_client: async (args, supabase, userId) => {
-                      const { client_id, ...updateFields } = args;
-
-                      // Verificar se o cliente existe
-                      const { data: existing, error: checkError } = await supabase
-                        .from('clientes')
-                        .select('id, name')
-                        .eq('id', client_id)
-                        .eq('user_id', userId)
-                        .single();
-
-                      if (checkError || !existing) {
-                        throw new Error('Cliente não encontrado ou não pertence a você');
-                      }
-
-                      // Montar objeto de atualização apenas com campos fornecidos
-                      const updates: any = { updated_at: new Date().toISOString() };
-                      if (updateFields.name) updates.name = updateFields.name.trim();
-                      if (updateFields.phone) updates.phone = updateFields.phone.trim();
-                      if (updateFields.email !== undefined) updates.email = updateFields.email.trim();
-                      if (updateFields.cpf_cnpj) updates.cpf_cnpj = updateFields.cpf_cnpj.trim();
-                      if (updateFields.status) updates.status = updateFields.status;
-
-                      const { data, error } = await supabase
-                        .from('clientes')
-                        .update(updates)
-                        .eq('id', client_id)
-                        .eq('user_id', userId)
-                        .select('id, name, phone, email, status')
-                        .single();
-
-                      if (error) throw error;
-
-                      console.log(`[TOOL] update_client: Cliente "${data.name}" atualizado`);
-                      return {
-                        success: true,
-                        action: 'update_client',
-                        message: `Cliente "${data.name}" atualizado com sucesso`,
-                        client: data
-                      };
-                    },
-
-                      create_policy: async (args, supabase, userId) => {
-                        const { client_id, policy_number, premium_value, start_date, expiration_date, insurance_company, ramo_id, status = 'Ativa' } = args;
-
-                        // Verificar se o cliente existe
-                        const { data: client, error: clientError } = await supabase
-                          .from('clientes')
-                          .select('id, name')
-                          .eq('id', client_id)
-                          .eq('user_id', userId)
-                          .single();
-
-                        if (clientError || !client) {
-                          throw new Error('Cliente não encontrado');
-                        }
-
-                        const insertData: any = {
-                          user_id: userId,
-                          client_id,
-                          expiration_date,
-                          status,
-                          premium_value: premium_value || 0,
-                          commission_rate: 0
-                        };
-
-                        if (policy_number) insertData.policy_number = policy_number;
-                        if (start_date) insertData.start_date = start_date;
-                        if (insurance_company) insertData.insurance_company = insurance_company;
-                        if (ramo_id) insertData.ramo_id = ramo_id;
-
-                        const { data, error } = await supabase
-                          .from('apolices')
-                          .insert(insertData)
-                          .select('id, policy_number, status, premium_value')
-                          .single();
-
-                        if (error) throw error;
-
-                        console.log(`[TOOL] create_policy: Apólice criada para cliente "${client.name}"`);
-                        return {
-                          success: true,
-                          action: 'create_policy',
-                          message: `Apólice ${policy_number || data.id} criada para ${client.name}`,
-                          policy: data,
-                          client_name: client.name
-                        };
-                      },
-
-                        update_policy: async (args, supabase, userId) => {
-                          const { policy_id, ...updateFields } = args;
-
-                          // Verificar se a apólice existe
-                          const { data: existing, error: checkError } = await supabase
-                            .from('apolices')
-                            .select('id, policy_number, clientes(name)')
-                            .eq('id', policy_id)
-                            .eq('user_id', userId)
-                            .single();
-
-                          if (checkError || !existing) {
-                            throw new Error('Apólice não encontrada ou não pertence a você');
-                          }
-
-                          // Montar objeto de atualização
-                          const updates: any = { updated_at: new Date().toISOString() };
-                          if (updateFields.policy_number) updates.policy_number = updateFields.policy_number;
-                          if (updateFields.premium_value !== undefined) updates.premium_value = updateFields.premium_value;
-                          if (updateFields.status) updates.status = updateFields.status;
-                          if (updateFields.expiration_date) updates.expiration_date = updateFields.expiration_date;
-
-                          const { data, error } = await supabase
-                            .from('apolices')
-                            .update(updates)
-                            .eq('id', policy_id)
-                            .eq('user_id', userId)
-                            .select('id, policy_number, status, premium_value')
-                            .single();
-
-                          if (error) throw error;
-
-                          console.log(`[TOOL] update_policy: Apólice ${data.policy_number || policy_id} atualizada`);
-                          return {
-                            success: true,
-                            action: 'update_policy',
-                            message: `Apólice ${data.policy_number || policy_id} atualizada com sucesso`,
-                            policy: data
-                          };
-                        },
-
-                          delete_client: async (args, supabase, userId) => {
-                            const { client_id, confirmed } = args;
-
-                            if (!confirmed) {
-                              throw new Error('A exclusão requer confirmação explícita (confirmed: true)');
-                            }
-
-                            // Verificar se o cliente existe
-                            const { data: client, error: checkError } = await supabase
-                              .from('clientes')
-                              .select('id, name')
-                              .eq('id', client_id)
-                              .eq('user_id', userId)
-                              .single();
-
-                            if (checkError || !client) {
-                              throw new Error('Cliente não encontrado ou não pertence a você');
-                            }
-
-                            // Verificar se há apólices vinculadas
-                            const { count: policyCount } = await supabase
-                              .from('apolices')
-                              .select('id', { count: 'exact', head: true })
-                              .eq('client_id', client_id);
-
-                            if (policyCount && policyCount > 0) {
-                              throw new Error(`Não é possível excluir: o cliente tem ${policyCount} apólice(s) vinculada(s)`);
-                            }
-
-                            const { error } = await supabase
-                              .from('clientes')
-                              .delete()
-                              .eq('id', client_id)
-                              .eq('user_id', userId);
-
-                            if (error) throw error;
-
-                            console.log(`[TOOL] delete_client: Cliente "${client.name}" excluído`);
-                            return {
-                              success: true,
-                              action: 'delete_client',
-                              message: `Cliente "${client.name}" excluído permanentemente`,
-                              deleted_id: client_id
-                            };
-                          },
-
-                            delete_policy: async (args, supabase, userId) => {
-                              const { policy_id, confirmed } = args;
-
-                              if (!confirmed) {
-                                throw new Error('A exclusão requer confirmação explícita (confirmed: true)');
-                              }
-
-                              // Verificar se a apólice existe
-                              const { data: policy, error: checkError } = await supabase
-                                .from('apolices')
-                                .select('id, policy_number, clientes(name)')
-                                .eq('id', policy_id)
-                                .eq('user_id', userId)
-                                .single();
-
-                              if (checkError || !policy) {
-                                throw new Error('Apólice não encontrada ou não pertence a você');
-                              }
-
-                              const { error } = await supabase
-                                .from('apolices')
-                                .delete()
-                                .eq('id', policy_id)
-                                .eq('user_id', userId);
-
-                              if (error) throw error;
-
-                              console.log(`[TOOL] delete_policy: Apólice ${policy.policy_number || policy_id} excluída`);
-                              return {
-                                success: true,
-                                action: 'delete_policy',
-                                message: `Apólice ${policy.policy_number || policy_id} excluída permanentemente`,
-                                deleted_id: policy_id
-                              };
-                            },
-
-                              // ========== NOVAS TOOLS CRUD/KANBAN (FASE P1) ==========
-                              // Tools com auditoria completa e validações robustas
-
-                              create_client_v2: async (args, supabase, userId) => {
-                                return await CRUD.create_client(args, supabase, userId);
-                              },
-
-                                update_client_v2: async (args, supabase, userId) => {
-                                  return await CRUD.update_client(args, supabase, userId);
-                                },
-
-                                  delete_client_v2: async (args, supabase, userId) => {
-                                    return await CRUD.delete_client(args, supabase, userId);
-                                  },
-
-                                    create_policy_v2: async (args, supabase, userId) => {
-                                      return await CRUD.create_policy(args, supabase, userId);
-                                    },
-
-                                      update_policy_v2: async (args, supabase, userId) => {
-                                        return await CRUD.update_policy(args, supabase, userId);
-                                      },
-
-                                        delete_policy_v2: async (args, supabase, userId) => {
-                                          return await CRUD.delete_policy(args, supabase, userId);
-                                        },
-
-                                          create_deal: async (args, supabase, userId) => {
-                                            return await CRM.create_deal(args, supabase, userId);
-                                          },
-
-                                            update_deal: async (args, supabase, userId) => {
-                                              return await CRM.update_deal(args, supabase, userId);
-                                            },
-
-                                              delete_deal: async (args, supabase, userId) => {
-                                                return await CRM.delete_deal(args, supabase, userId);
-                                              },
-
-                                                // ========== ANALYTICS (GOD MODE) ==========
-                                                analyze_client_360: async (args, supabase, userId) => {
-                                                  return await ANALYTICS.analyze_client_360(args, supabase, userId);
-                                                },
-
-                                                  // ========== INSPECTOR (GOD MODE) ==========
-                                                  inspect_document: async (args, supabase, userId) => {
-                                                    return await INSPECTOR.inspect_document(args, supabase, userId);
-                                                  }
+      .eq('user_id', userId)
+      .order('position', { ascending: true })
+      .limit(20);
+
+    if (pipeline_id) {
+      qb = qb.eq('crm_stages.pipeline_id', pipeline_id);
+    }
+
+    const { data: deals, error } = await qb;
+    if (error) throw error;
+
+    // Filtrar por query se fornecido
+    let filteredDeals = deals || [];
+    if (query) {
+      const normalizedQuery = query.toLowerCase();
+      filteredDeals = filteredDeals.filter((d: any) =>
+        d.title?.toLowerCase().includes(normalizedQuery) ||
+        d.clientes?.name?.toLowerCase().includes(normalizedQuery)
+      );
+    }
+
+    // Buscar etapas disponíveis para contexto
+    const { data: stages } = await supabase
+      .from('crm_stages')
+      .select('id, name, pipeline_id')
+      .eq('user_id', userId)
+      .order('position', { ascending: true });
+
+    console.log(`[TOOL] get_kanban_data: Encontrados ${filteredDeals.length} deals`);
+    return {
+      success: true,
+      deals: filteredDeals.map((d: any) => ({
+        id: d.id,
+        title: d.title,
+        value: d.value,
+        stage_id: d.stage_id,
+        stage_name: d.crm_stages?.name,
+        client_id: d.client_id,
+        client_name: d.clientes?.name
+      })),
+      available_stages: stages || [],
+      total_count: filteredDeals.length
+    };
+  },
+
+  move_deal_to_stage: async (args, supabase, userId) => {
+    const { deal_id, stage_id } = args;
+
+    // Verificar se o deal existe e pertence ao usuário
+    const { data: deal, error: dealError } = await supabase
+      .from('crm_deals')
+      .select('id, title, stage_id')
+      .eq('id', deal_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (dealError || !deal) {
+      throw new Error('Deal não encontrado ou não pertence a você');
+    }
+
+    // Verificar se a etapa existe
+    const { data: stage, error: stageError } = await supabase
+      .from('crm_stages')
+      .select('id, name')
+      .eq('id', stage_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (stageError || !stage) {
+      throw new Error('Etapa não encontrada');
+    }
+
+    // Atualizar o deal
+    const { error: updateError } = await supabase
+      .from('crm_deals')
+      .update({ stage_id, updated_at: new Date().toISOString() })
+      .eq('id', deal_id)
+      .eq('user_id', userId);
+
+    if (updateError) throw updateError;
+
+    console.log(`[TOOL] move_deal_to_stage: Deal "${deal.title}" movido para "${stage.name}"`);
+    return {
+      success: true,
+      action: 'move_deal',
+      message: `Deal "${deal.title}" movido para a etapa "${stage.name}"`,
+      deal_id,
+      new_stage_id: stage_id,
+      new_stage_name: stage.name
+    };
+  },
+
+  create_client: async (args, supabase, userId) => {
+    const { name, phone, email, cpf_cnpj, address, birth_date } = args;
+
+    // Validação obrigatória
+    if (!name || !phone) {
+      throw new Error('Nome e telefone são obrigatórios para criar um cliente');
+    }
+
+    const insertData: any = {
+      user_id: userId,
+      name: name.trim(),
+      phone: phone.trim(),
+      email: email?.trim() || '',
+      status: 'Ativo'
+    };
+
+    if (cpf_cnpj) insertData.cpf_cnpj = cpf_cnpj.trim();
+    if (address) insertData.address = address.trim();
+    if (birth_date) insertData.birth_date = birth_date;
+
+    const { data, error } = await supabase
+      .from('clientes')
+      .insert(insertData)
+      .select('id, name, phone, email, status')
+      .single();
+
+    if (error) throw error;
+
+    console.log(`[TOOL] create_client: Cliente "${name}" criado com ID ${data.id}`);
+    return {
+      success: true,
+      action: 'create_client',
+      message: `Cliente "${name}" criado com sucesso`,
+      client: data
+    };
+  },
+
+  update_client: async (args, supabase, userId) => {
+    const { client_id, ...updateFields } = args;
+
+    // Verificar se o cliente existe
+    const { data: existing, error: checkError } = await supabase
+      .from('clientes')
+      .select('id, name')
+      .eq('id', client_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (checkError || !existing) {
+      throw new Error('Cliente não encontrado ou não pertence a você');
+    }
+
+    // Montar objeto de atualização apenas com campos fornecidos
+    const updates: any = { updated_at: new Date().toISOString() };
+    if (updateFields.name) updates.name = updateFields.name.trim();
+    if (updateFields.phone) updates.phone = updateFields.phone.trim();
+    if (updateFields.email !== undefined) updates.email = updateFields.email.trim();
+    if (updateFields.cpf_cnpj) updates.cpf_cnpj = updateFields.cpf_cnpj.trim();
+    if (updateFields.status) updates.status = updateFields.status;
+
+    const { data, error } = await supabase
+      .from('clientes')
+      .update(updates)
+      .eq('id', client_id)
+      .eq('user_id', userId)
+      .select('id, name, phone, email, status')
+      .single();
+
+    if (error) throw error;
+
+    console.log(`[TOOL] update_client: Cliente "${data.name}" atualizado`);
+    return {
+      success: true,
+      action: 'update_client',
+      message: `Cliente "${data.name}" atualizado com sucesso`,
+      client: data
+    };
+  },
+
+  create_policy: async (args, supabase, userId) => {
+    const { client_id, policy_number, premium_value, start_date, expiration_date, insurance_company, ramo_id, status = 'Ativa' } = args;
+
+    // Verificar se o cliente existe
+    const { data: client, error: clientError } = await supabase
+      .from('clientes')
+      .select('id, name')
+      .eq('id', client_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (clientError || !client) {
+      throw new Error('Cliente não encontrado');
+    }
+
+    const insertData: any = {
+      user_id: userId,
+      client_id,
+      expiration_date,
+      status,
+      premium_value: premium_value || 0,
+      commission_rate: 0
+    };
+
+    if (policy_number) insertData.policy_number = policy_number;
+    if (start_date) insertData.start_date = start_date;
+    if (insurance_company) insertData.insurance_company = insurance_company;
+    if (ramo_id) insertData.ramo_id = ramo_id;
+
+    const { data, error } = await supabase
+      .from('apolices')
+      .insert(insertData)
+      .select('id, policy_number, status, premium_value')
+      .single();
+
+    if (error) throw error;
+
+    console.log(`[TOOL] create_policy: Apólice criada para cliente "${client.name}"`);
+    return {
+      success: true,
+      action: 'create_policy',
+      message: `Apólice ${policy_number || data.id} criada para ${client.name}`,
+      policy: data,
+      client_name: client.name
+    };
+  },
+
+  update_policy: async (args, supabase, userId) => {
+    const { policy_id, ...updateFields } = args;
+
+    // Verificar se a apólice existe
+    const { data: existing, error: checkError } = await supabase
+      .from('apolices')
+      .select('id, policy_number, clientes(name)')
+      .eq('id', policy_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (checkError || !existing) {
+      throw new Error('Apólice não encontrada ou não pertence a você');
+    }
+
+    // Montar objeto de atualização
+    const updates: any = { updated_at: new Date().toISOString() };
+    if (updateFields.policy_number) updates.policy_number = updateFields.policy_number;
+    if (updateFields.premium_value !== undefined) updates.premium_value = updateFields.premium_value;
+    if (updateFields.status) updates.status = updateFields.status;
+    if (updateFields.expiration_date) updates.expiration_date = updateFields.expiration_date;
+
+    const { data, error } = await supabase
+      .from('apolices')
+      .update(updates)
+      .eq('id', policy_id)
+      .eq('user_id', userId)
+      .select('id, policy_number, status, premium_value')
+      .single();
+
+    if (error) throw error;
+
+    console.log(`[TOOL] update_policy: Apólice ${data.policy_number || policy_id} atualizada`);
+    return {
+      success: true,
+      action: 'update_policy',
+      message: `Apólice ${data.policy_number || policy_id} atualizada com sucesso`,
+      policy: data
+    };
+  },
+
+  delete_client: async (args, supabase, userId) => {
+    const { client_id, confirmed } = args;
+
+    if (!confirmed) {
+      throw new Error('A exclusão requer confirmação explícita (confirmed: true)');
+    }
+
+    // Verificar se o cliente existe
+    const { data: client, error: checkError } = await supabase
+      .from('clientes')
+      .select('id, name')
+      .eq('id', client_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (checkError || !client) {
+      throw new Error('Cliente não encontrado ou não pertence a você');
+    }
+
+    // Verificar se há apólices vinculadas
+    const { count: policyCount } = await supabase
+      .from('apolices')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', client_id);
+
+    if (policyCount && policyCount > 0) {
+      throw new Error(`Não é possível excluir: o cliente tem ${policyCount} apólice(s) vinculada(s)`);
+    }
+
+    const { error } = await supabase
+      .from('clientes')
+      .delete()
+      .eq('id', client_id)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    console.log(`[TOOL] delete_client: Cliente "${client.name}" excluído`);
+    return {
+      success: true,
+      action: 'delete_client',
+      message: `Cliente "${client.name}" excluído permanentemente`,
+      deleted_id: client_id
+    };
+  },
+
+  delete_policy: async (args, supabase, userId) => {
+    const { policy_id, confirmed } = args;
+
+    if (!confirmed) {
+      throw new Error('A exclusão requer confirmação explícita (confirmed: true)');
+    }
+
+    // Verificar se a apólice existe
+    const { data: policy, error: checkError } = await supabase
+      .from('apolices')
+      .select('id, policy_number, clientes(name)')
+      .eq('id', policy_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (checkError || !policy) {
+      throw new Error('Apólice não encontrada ou não pertence a você');
+    }
+
+    const { error } = await supabase
+      .from('apolices')
+      .delete()
+      .eq('id', policy_id)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    console.log(`[TOOL] delete_policy: Apólice ${policy.policy_number || policy_id} excluída`);
+    return {
+      success: true,
+      action: 'delete_policy',
+      message: `Apólice ${policy.policy_number || policy_id} excluída permanentemente`,
+      deleted_id: policy_id
+    };
+  },
+
+  // ========== NOVAS TOOLS CRUD/KANBAN (FASE P1) ==========
+  // Tools com auditoria completa e validações robustas
+
+  create_client_v2: async (args, supabase, userId) => {
+    return await CRUD.create_client(args, supabase, userId);
+  },
+
+  update_client_v2: async (args, supabase, userId) => {
+    return await CRUD.update_client(args, supabase, userId);
+  },
+
+  delete_client_v2: async (args, supabase, userId) => {
+    return await CRUD.delete_client(args, supabase, userId);
+  },
+
+  create_policy_v2: async (args, supabase, userId) => {
+    return await CRUD.create_policy(args, supabase, userId);
+  },
+
+  update_policy_v2: async (args, supabase, userId) => {
+    return await CRUD.update_policy(args, supabase, userId);
+  },
+
+  delete_policy_v2: async (args, supabase, userId) => {
+    return await CRUD.delete_policy(args, supabase, userId);
+  },
+
+  create_deal: async (args, supabase, userId) => {
+    return await CRM.create_deal(args, supabase, userId);
+  },
+
+  update_deal: async (args, supabase, userId) => {
+    return await CRM.update_deal(args, supabase, userId);
+  },
+
+  delete_deal: async (args, supabase, userId) => {
+    return await CRM.delete_deal(args, supabase, userId);
+  },
+
+  // ========== ANALYTICS (GOD MODE) ==========
+  analyze_client_360: async (args, supabase, userId) => {
+    return await ANALYTICS.analyze_client_360(args, supabase, userId);
+  },
+
+  // ========== INSPECTOR (GOD MODE) ==========
+  inspect_document: async (args, supabase, userId) => {
+    return await INSPECTOR.inspect_document(args, supabase, userId);
+  }
 };
 
 // ========== EXECUTOR DE TOOLS ==========
@@ -2078,7 +2076,6 @@ serve(async (req) => {
 
       // Primeiro, precisamos resolver tool calls antes de streamar
       let currentMessages = [...aiMessages];
-      let toolIterations = 0;
       let toolIterations = 0;
       const maxToolIterations = 10; // FASE GOD MODE: Aumentado para suportar cadeias complexas
 
