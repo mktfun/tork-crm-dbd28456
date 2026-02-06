@@ -3155,6 +3155,20 @@ export type Database = {
         Args: { p_bank_account_id: string; p_include_pending?: boolean }
         Returns: number
       }
+      get_bank_transactions: {
+        Args: {
+          p_bank_account_id?: string
+          p_page?: number
+          p_page_size?: number
+        }
+        Returns: {
+          page_count: number
+          total_count: number
+          total_expense: number
+          total_income: number
+          transactions: Database["public"]["CompositeTypes"]["bank_transaction_row"][]
+        }[]
+      }
       get_brokerage_by_slug: { Args: { p_slug: string }; Returns: Json }
       get_cash_flow_data: {
         Args: {
@@ -3852,7 +3866,21 @@ export type Database = {
       user_role: "admin" | "corretor" | "assistente"
     }
     CompositeTypes: {
-      [_ in never]: never
+      bank_transaction_row: {
+        transaction_id: string | null
+        transaction_date: string | null
+        description: string | null
+        amount: number | null
+        account_name: string | null
+        account_type: string | null
+        bank_account_id: string | null
+        bank_name: string | null
+        bank_color: string | null
+        status: string | null
+        is_void: boolean | null
+        related_entity_type: string | null
+        related_entity_id: string | null
+      }
     }
   }
 }

@@ -8,6 +8,7 @@ import { UnbankedTransactionsAlert } from "./bancos/UnbankedTransactionsAlert";
 import { AddBankAccountModal } from "./bancos/AddBankAccountModal";
 import { EditBankAccountModal } from "./bancos/EditBankAccountModal";
 import { DeleteBankAccountDialog } from "./bancos/DeleteBankAccountDialog";
+import { BankHistorySheet } from "./bancos/BankHistorySheet";
 import { useBankAccounts, type BankAccount } from "@/hooks/useBancos";
 
 interface CaixaTabProps {
@@ -19,6 +20,7 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
   
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<BankAccount | null>(null);
+  const [selectedBank, setSelectedBank] = useState<BankAccount | null>(null);
 
   const accounts = summary?.accounts?.filter(a => a.isActive) ?? [];
   const totalBalance = summary?.totalBalance ?? 0;
@@ -30,6 +32,10 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
 
   const handleDeleteBank = (account: BankAccount) => {
     setDeletingAccount(account);
+  };
+
+  const handleOpenHistory = (account: BankAccount) => {
+    setSelectedBank(account);
   };
 
   if (isLoading) {
@@ -88,38 +94,15 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {accounts.map((account) => {
-            // Mapear tipo de conta para tipos aceitos pelo BankAccountCard
-            const mapAccountType = (type: string): 'corrente' | 'digital' | 'investimento' | 'poupanca' => {
-              if (type === 'giro') return 'corrente';
-              if (type === 'digital' || type === 'poupanca' || type === 'investimento' || type === 'corrente') {
-                return type;
-              }
-              return 'corrente';
-            };
-
-            return (
-              <BankAccountCard
-                key={account.id}
-                account={{
-                  id: account.id,
-                  bankName: account.bankName,
-                  accountNumber: account.accountNumber || '',
-                  accountType: mapAccountType(account.accountType),
-                  balance: account.currentBalance,
-                  label: account.accountType === 'corrente' ? 'Conta Corrente' : 
-                         account.accountType === 'poupanca' ? 'Poupança' :
-                         account.accountType === 'investimento' ? 'Investimento' : 
-                         account.accountType === 'giro' ? 'Conta Giro' : 'Conta',
-                  color: account.color || '#3B82F6',
-                  icon: account.icon || '🏦',
-                  isActive: account.isActive,
-                }}
-                onEdit={() => handleEditBank(account)}
-                onDelete={() => handleDeleteBank(account)}
-              />
-            );
-          })}
+          {accounts.map((account) => (
+            <BankAccountCard
+              key={account.id}
+              account={account}
+              onClick={handleOpenHistory}
+              onEdit={() => handleEditBank(account)}
+              onDelete={() => handleDeleteBank(account)}
+            />
+          ))}
         </div>
       )}
 
@@ -134,6 +117,15 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
         account={deletingAccount}
         open={!!deletingAccount}
         onClose={() => setDeletingAccount(null)}
+      />
+
+      <BankHistorySheet
+        bankAccountId={selectedBank?.id ?? null}
+        bankName={selectedBank?.bankName ?? ''}
+        bankColor={selectedBank?.color}
+        currentBalance={selectedBank?.currentBalance}
+        isOpen={!!selectedBank}
+        onClose={() => setSelectedBank(null)}
       />
     </div>
   );
