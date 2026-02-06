@@ -402,10 +402,10 @@ export function useBankTransactions(
         throw error;
       }
 
-      // A função retorna um array com 1 row contendo os campos
-      const result = data?.[0] || data;
+      // A função agora retorna JSONB diretamente
+      const result = data || {};
 
-      if (!result) {
+      if (!result || result.error) {
         return {
           transactions: [],
           totalCount: 0,
@@ -415,28 +415,28 @@ export function useBankTransactions(
         };
       }
 
-      // Mapear transações do formato SQL para frontend
+      // Mapear transações do formato JSONB para frontend
       const transactions: BankTransaction[] = (result.transactions || []).map((tx: any) => ({
-        transactionId: tx.f1 || tx.transaction_id,
-        transactionDate: tx.f2 || tx.transaction_date,
-        description: tx.f3 || tx.description,
-        amount: parseFloat(tx.f4 || tx.amount || '0'),
-        accountName: tx.f5 || tx.account_name || '',
-        accountType: tx.f6 || tx.account_type || '',
-        bankAccountId: tx.f7 || tx.bank_account_id || null,
-        bankName: tx.f8 || tx.bank_name || null,
-        bankColor: tx.f9 || tx.bank_color || null,
-        status: tx.f10 || tx.status || 'confirmed',
-        isVoid: tx.f11 || tx.is_void || false,
-        relatedEntityType: tx.f12 || tx.related_entity_type || null,
-        relatedEntityId: tx.f13 || tx.related_entity_id || null,
+        transactionId: tx.transaction_id,
+        transactionDate: tx.transaction_date,
+        description: tx.description,
+        amount: parseFloat(tx.amount) || 0,
+        accountName: tx.account_name || '',
+        accountType: tx.account_type || '',
+        bankAccountId: tx.bank_account_id || null,
+        bankName: tx.bank_name || null,
+        bankColor: tx.bank_color || null,
+        status: 'confirmed',
+        isVoid: tx.is_void || false,
+        relatedEntityType: tx.related_entity_type || null,
+        relatedEntityId: tx.related_entity_id || null,
       }));
 
       return {
         transactions,
         totalCount: result.total_count || 0,
-        totalIncome: parseFloat(result.total_income || '0'),
-        totalExpense: parseFloat(result.total_expense || '0'),
+        totalIncome: parseFloat(result.total_income) || 0,
+        totalExpense: parseFloat(result.total_expense) || 0,
         pageCount: result.page_count || 0,
       };
     },

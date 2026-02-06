@@ -18,6 +18,7 @@ import ClientDetails from "./pages/ClientDetails";
 import Appointments from "./pages/Appointments";
 import Financeiro from "./pages/Financeiro";
 import Bancos from "./pages/Bancos";
+import BancoDashboard from "./pages/BancoDashboard";
 import Tesouraria from "./pages/Tesouraria";
 import Conciliacao from "./pages/Conciliacao";
 import Tasks from "./pages/Tasks";
@@ -118,6 +119,7 @@ function App() {
                   <Route path="appointments" element={<Appointments />} />
                   <Route path="financeiro" element={<Financeiro />} />
                   <Route path="bancos" element={<Bancos />} />
+                  <Route path="bancos/:id" element={<BancoDashboard />} />
                   <Route path="tesouraria" element={<Tesouraria />} />
                   <Route path="conciliacao" element={<Conciliacao />} />
                   <Route path="tasks" element={<Tasks />} />
@@ -128,10 +130,10 @@ function App() {
                   <Route path="crm" element={<CRM />} />
                   <Route path="crm/automation" element={<AIAutomation />} />
                   <Route path="documentacao" element={<Documentation />} />
-                  
+
                   {/* Super Admin routes moved outside - see below */}
                   <Route path="demo/mobile-menu" element={<ModernMobileMenuDemo />} />
-                  
+
                   {/* Rotas de configurações com layout próprio */}
                   <Route path="settings" element={<SettingsLayout />}>
                     <Route index element={<Navigate to="/dashboard/settings/profile" replace />} />
@@ -150,7 +152,7 @@ function App() {
                 {/* Legacy routes redirect to portal not found */}
                 <Route path="/portal" element={<PortalNotFound />} />
                 <Route path="/portal/*" element={<PortalNotFound />} />
-                
+
                 {/* Dynamic portal routes with brokerage slug */}
                 <Route path="/:brokerageSlug/portal" element={<PortalLogin />} />
                 <Route path="/:brokerageSlug/portal/onboarding" element={<PortalOnboarding />} />
@@ -163,8 +165,8 @@ function App() {
                 </Route>
 
                 {/* Área Global de Administração - ISOLADA DO LAYOUT OPERACIONAL */}
-                <Route 
-                  path="/dashboard/super-admin" 
+                <Route
+                  path="/dashboard/super-admin"
                   element={
                     <AdminProtectedRoute>
                       <SuperAdminLayout />
@@ -174,11 +176,11 @@ function App() {
                   <Route index element={<SuperAdmin />} />
                   <Route path="organizations/:id" element={<OrganizationDetails />} />
                 </Route>
-                
+
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </div>
-            
+
             {/* Toast components */}
             <Toaster />
             <Sonner />

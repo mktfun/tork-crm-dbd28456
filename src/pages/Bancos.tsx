@@ -1,11 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Landmark, Plus, Layers, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BankAccountCard } from "@/components/financeiro/bancos/BankAccountCard";
 import { ConsolidatedBalanceCard } from "@/components/financeiro/bancos/ConsolidatedBalanceCard";
-import { BankHistorySheet } from "@/components/financeiro/bancos/BankHistorySheet";
 import { AddBankAccountModal } from "@/components/financeiro/bancos/AddBankAccountModal";
 import { EditBankAccountModal } from "@/components/financeiro/bancos/EditBankAccountModal";
 import { DeleteBankAccountDialog } from "@/components/financeiro/bancos/DeleteBankAccountDialog";
@@ -13,6 +13,8 @@ import { useBankAccounts, BankAccount } from "@/hooks/useBancos";
 import { toast } from "@/hooks/use-toast";
 
 const Bancos = () => {
+  const navigate = useNavigate();
+
   // Dados reais do Supabase
   const { data: bankData, isLoading, error, refetch } = useBankAccounts();
 
@@ -21,34 +23,14 @@ const Bancos = () => {
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<BankAccount | null>(null);
 
-  // State para sheet de histórico
-  const [selectedBank, setSelectedBank] = useState<{
-    id: string | null;
-    name: string;
-    color?: string;
-    balance?: number;
-  } | null>(null);
-
-  const handleOpenHistory = (account: BankAccount) => {
-    setSelectedBank({
-      id: account.id,
-      name: account.bankName,
-      color: account.color,
-      balance: account.currentBalance,
-    });
+  // Navegar para página de detalhes do banco
+  const handleOpenBankDashboard = (account: BankAccount) => {
+    navigate(`/dashboard/bancos/${account.id}`);
   };
 
-  const handleOpenConsolidatedHistory = () => {
-    setSelectedBank({
-      id: null,
-      name: "Todos os Bancos",
-      color: undefined,
-      balance: bankData?.totalBalance,
-    });
-  };
-
-  const handleCloseHistory = () => {
-    setSelectedBank(null);
+  // Navegar para visão consolidada
+  const handleOpenConsolidatedDashboard = () => {
+    navigate('/dashboard/bancos/todos');
   };
 
   const handleRefresh = async () => {
@@ -113,7 +95,7 @@ const Bancos = () => {
           totalBalance={bankData?.totalBalance || 0}
           accountCount={bankData?.activeAccounts || 0}
           onRefresh={handleRefresh}
-          onClick={handleOpenConsolidatedHistory}
+          onClick={handleOpenConsolidatedDashboard}
         />
       )}
 
@@ -146,7 +128,7 @@ const Bancos = () => {
             <Card
               className="relative overflow-hidden hover:shadow-lg transition-all cursor-pointer hover:scale-[1.02] group border-primary/30"
               style={{ borderLeftColor: 'hsl(var(--primary))', borderLeftWidth: '4px' }}
-              onClick={handleOpenConsolidatedHistory}
+              onClick={handleOpenConsolidatedDashboard}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
@@ -183,7 +165,7 @@ const Bancos = () => {
               <BankAccountCard
                 key={account.id}
                 account={account}
-                onClick={handleOpenHistory}
+                onClick={handleOpenBankDashboard}
                 onEdit={handleEditBank}
                 onDelete={handleDeleteBank}
               />
@@ -211,18 +193,6 @@ const Bancos = () => {
           open={!!deletingAccount}
           onClose={() => setDeletingAccount(null)}
           account={deletingAccount}
-        />
-      )}
-
-      {/* Sheet de Histórico */}
-      {selectedBank && (
-        <BankHistorySheet
-          bankAccountId={selectedBank.id}
-          bankName={selectedBank.name}
-          bankColor={selectedBank.color}
-          currentBalance={selectedBank.balance}
-          isOpen={true}
-          onClose={handleCloseHistory}
         />
       )}
     </div>
