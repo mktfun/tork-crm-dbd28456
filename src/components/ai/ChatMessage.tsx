@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { motion } from 'framer-motion';
 import { User, Loader2, ThumbsUp, ThumbsDown, FileText, Image as ImageIcon } from 'lucide-react';
 import { AIResponseRenderer } from './responses/AIResponseRenderer';
