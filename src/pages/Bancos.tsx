@@ -113,6 +113,7 @@ const Bancos = () => {
           totalBalance={bankData?.totalBalance || 0}
           accountCount={bankData?.activeAccounts || 0}
           onRefresh={handleRefresh}
+          onClick={handleOpenConsolidatedHistory}
         />
       )}
 

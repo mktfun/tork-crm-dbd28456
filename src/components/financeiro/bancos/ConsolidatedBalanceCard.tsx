@@ -7,13 +7,15 @@ interface ConsolidatedBalanceCardProps {
   accountCount: number;
   lastUpdate?: string;
   onRefresh?: () => void;
+  onClick?: () => void;
 }
 
-export function ConsolidatedBalanceCard({ 
-  totalBalance, 
-  accountCount, 
+export function ConsolidatedBalanceCard({
+  totalBalance,
+  accountCount,
   lastUpdate = "Atualizado agora",
-  onRefresh 
+  onRefresh,
+  onClick
 }: ConsolidatedBalanceCardProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -23,7 +25,11 @@ export function ConsolidatedBalanceCard({
   };
 
   return (
-    <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+    <Card
+      className={`bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 ${onClick ? 'cursor-pointer hover:shadow-lg transition-all hover:scale-[1.01]' : ''
+        }`}
+      onClick={onClick}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -36,7 +42,11 @@ export function ConsolidatedBalanceCard({
             </div>
           </div>
           {onRefresh && (
-            <Button variant="ghost" size="icon" onClick={onRefresh}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => { e.stopPropagation(); onRefresh(); }}
+            >
               <RefreshCw className="w-4 h-4" />
             </Button>
           )}
@@ -49,9 +59,11 @@ export function ConsolidatedBalanceCard({
           </p>
           <p className="text-sm text-muted-foreground">
             {accountCount} {accountCount === 1 ? 'conta ativa' : 'contas ativas'}
+            {onClick && <span className="ml-2 text-primary/70">• Clique para ver histórico</span>}
           </p>
         </div>
       </CardContent>
     </Card>
   );
 }
+
