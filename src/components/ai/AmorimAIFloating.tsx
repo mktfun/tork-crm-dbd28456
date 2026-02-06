@@ -246,10 +246,47 @@ export function AmorimAIFloating() {
   }, [isStreaming, isLoading]);
 
   const sendMessage = async (content: string) => {
-    if (!content.trim() || isLoading || isStreaming || !user) return;
+    // Permitir envio se houver arquivo, mesmo sem texto
+    if ((!content.trim() && !attachedFile) || isLoading || isStreaming || !user) return;
+
+    let finalContent = content;
+
+    // === FILE UPLOAD LOGIC ===
+    if (attachedFile) {
+      setIsUploading(true);
+      try {
+        const fileExt = attachedFile.name.split('.').pop();
+        const sanitizedName = attachedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const fileName = `${user.id}/${Date.now()}_${sanitizedName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('chat-uploads')
+          .upload(fileName, attachedFile);
+
+        if (uploadError) {
+          console.error('Supabase storage error:', uploadError);
+          throw uploadError;
+        }
+
+        // Instrução para o Agente ("The Wolf")
+        const systemInstruction = `\n\n[SYSTEM: O usuário enviou um arquivo. Caminho no storage: "${fileName}". Nome original: "${attachedFile.name}". USE a tool 'inspect_document' para ler e analisar este documento.]`;
+
+        // Se o usuário não digitou nada, coloca um texto padrão
+        finalContent = (finalContent.trim() ? finalContent : "Analise este arquivo em anexo.") + systemInstruction;
+
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        toast.error("Erro ao enviar arquivo. Tente novamente.");
+        setIsUploading(false);
+        return;
+      } finally {
+        setIsUploading(false);
+        setAttachedFile(null);
+      }
+    }
 
     // FASE P5: Compressão de espaços em branco para economia de tokens
-    const compressedContent = content.trim().replace(/\s+/g, ' ');
+    const compressedContent = finalContent.trim().replace(/\s+/g, ' ');
 
     let conversationId = currentConversationId;
 
@@ -553,7 +590,25 @@ export function AmorimAIFloating() {
               "flex flex-col",
               isResizing && "border-primary/30 shadow-[0_0_20px_rgba(var(--primary),0.15)]"
             )}
+            onDragOver={handleDragOver}
           >
+            {/* === DRAG & DROP OVERLAY === */}
+            <AnimatePresence>
+              {isDragOver && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-[60] bg-background/80 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-primary m-2"
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <UploadCloud className="w-16 h-16 text-primary mb-4 animate-bounce" />
+                  <p className="text-lg font-medium text-foreground">Solte o arquivo aqui</p>
+                  <p className="text-sm text-muted-foreground">PDFs ou Imagens para análise</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
             {/* === RESIZE HANDLES (FASE P4) === */}
             {/* Left Edge Handle */}
             <div
@@ -740,7 +795,20 @@ export function AmorimAIFloating() {
             </ScrollArea>
 
             {/* Input Area */}
-            <form onSubmit={handleSubmit} className="p-4 border-t border-white/10 bg-white/5">
+            <form onSubmit={handleSubmit} className="p-4 border-t border-white/10 bg-white/5 relative">
+              {/* File Attachment Preview */}
+              <AnimatePresence>
+                {attachedFile && (
+                  <div className="absolute bottom-full left-0 p-4 w-full">
+                    <FileAttachment
+                      file={attachedFile}
+                      onRemove={() => setAttachedFile(null)}
+                      isUploading={isUploading}
+                    />
+                  </div>
+                )}
+              </AnimatePresence>
+
               <div className={cn(
                 "flex items-end gap-2 rounded-xl",
                 "bg-white/5 border border-white/10",
@@ -765,6 +833,31 @@ export function AmorimAIFloating() {
                     maxHeight: '120px' // 5 linhas max
                   }}
                 />
+
+                {/* File Upload Button */}
+                <input
+                  type="file"
+                  id="chat-file-upload"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  accept="application/pdf,image/*,.txt"
+                  ref={fileInputRef}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-10 w-10 m-1 rounded-lg text-muted-foreground",
+                    "hover:text-foreground hover:bg-white/10",
+                    attachedFile && "text-primary bg-primary/10"
+                  )}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading || isStreaming || isUploading}
+                  title="Anexar arquivo (PDF, Imagem)"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
                 {isStreaming ? (
                   <Button
                     type="button"
