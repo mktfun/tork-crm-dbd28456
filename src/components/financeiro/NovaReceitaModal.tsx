@@ -204,31 +204,33 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               )}
             />
 
-            {/* Conta de Destino */}
-            <FormField
-              control={form.control}
-              name="assetAccountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Conta de Destino {form.watch('bankAccountId') && form.watch('bankAccountId') !== 'none' && '(Automático)'}</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Onde o dinheiro vai entrar" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {assetAccounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Conta de Destino (Ocultar se banco selecionado) */}
+            {(!form.watch('bankAccountId') || form.watch('bankAccountId') === 'none') && (
+              <FormField
+                control={form.control}
+                name="assetAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Conta de Destino</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Onde o dinheiro vai entrar" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {assetAccounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Banco (opcional) */}
             <FormField
@@ -236,7 +238,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               name="bankAccountId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Banco (opcional)</FormLabel>
+                  <FormLabel>Banco / Onde entrou o dinheiro</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
