@@ -17,7 +17,6 @@ import Clients from "./pages/Clients";
 import ClientDetails from "./pages/ClientDetails";
 import Appointments from "./pages/Appointments";
 import Financeiro from "./pages/Financeiro";
-import Bancos from "./pages/Bancos";
 import BancoDashboard from "./pages/BancoDashboard";
 import Tesouraria from "./pages/Tesouraria";
 import Conciliacao from "./pages/Conciliacao";
@@ -118,8 +117,7 @@ function App() {
                   <Route path="clients/:id" element={<ClientDetails />} />
                   <Route path="appointments" element={<Appointments />} />
                   <Route path="financeiro" element={<Financeiro />} />
-                  <Route path="bancos" element={<Bancos />} />
-                  <Route path="bancos/:id" element={<BancoDashboard />} />
+                  <Route path="financeiro/banco/:id" element={<BancoDashboard />} />
                   <Route path="tesouraria" element={<Tesouraria />} />
                   <Route path="conciliacao" element={<Conciliacao />} />
                   <Route path="tasks" element={<Tasks />} />

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { DateRange } from "react-day-picker";
 import { Landmark } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,7 +9,6 @@ import { UnbankedTransactionsAlert } from "./bancos/UnbankedTransactionsAlert";
 import { AddBankAccountModal } from "./bancos/AddBankAccountModal";
 import { EditBankAccountModal } from "./bancos/EditBankAccountModal";
 import { DeleteBankAccountDialog } from "./bancos/DeleteBankAccountDialog";
-import { BankHistorySheet } from "./bancos/BankHistorySheet";
 import { useBankAccounts, type BankAccount } from "@/hooks/useBancos";
 
 interface CaixaTabProps {
@@ -16,11 +16,11 @@ interface CaixaTabProps {
 }
 
 export function CaixaTab({ dateRange }: CaixaTabProps) {
+  const navigate = useNavigate();
   const { data: summary, isLoading } = useBankAccounts();
-  
+
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [deletingAccount, setDeletingAccount] = useState<BankAccount | null>(null);
-  const [selectedBank, setSelectedBank] = useState<BankAccount | null>(null);
 
   const accounts = summary?.accounts?.filter(a => a.isActive) ?? [];
   const totalBalance = summary?.totalBalance ?? 0;
@@ -34,8 +34,14 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
     setDeletingAccount(account);
   };
 
-  const handleOpenHistory = (account: BankAccount) => {
-    setSelectedBank(account);
+  // Navegar para página de detalhes do banco
+  const handleOpenBankDashboard = (account: BankAccount) => {
+    navigate(`/dashboard/financeiro/banco/${account.id}`);
+  };
+
+  // Navegar para visão consolidada
+  const handleOpenConsolidatedDashboard = () => {
+    navigate('/dashboard/financeiro/banco/todos');
   };
 
   if (isLoading) {
@@ -73,10 +79,11 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
       {/* Alert de Transações sem Banco */}
       <UnbankedTransactionsAlert />
 
-      {/* Card de Saldo Consolidado */}
+      {/* Card de Saldo Consolidado - clicável */}
       <ConsolidatedBalanceCard
         totalBalance={totalBalance}
         accountCount={activeAccountsCount}
+        onClick={handleOpenConsolidatedDashboard}
       />
 
       {/* Grid de Contas Bancárias */}
@@ -98,7 +105,7 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
             <BankAccountCard
               key={account.id}
               account={account}
-              onClick={handleOpenHistory}
+              onClick={handleOpenBankDashboard}
               onEdit={() => handleEditBank(account)}
               onDelete={() => handleDeleteBank(account)}
             />
@@ -118,15 +125,7 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
         open={!!deletingAccount}
         onClose={() => setDeletingAccount(null)}
       />
-
-      <BankHistorySheet
-        bankAccountId={selectedBank?.id ?? null}
-        bankName={selectedBank?.bankName ?? ''}
-        bankColor={selectedBank?.color}
-        currentBalance={selectedBank?.currentBalance}
-        isOpen={!!selectedBank}
-        onClose={() => setSelectedBank(null)}
-      />
     </div>
   );
 }
+

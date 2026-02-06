@@ -80,9 +80,9 @@ export default function BancoDashboard() {
             <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                 <Landmark className="w-16 h-16 mb-4 opacity-30" />
                 <p className="text-lg mb-4">Banco não encontrado</p>
-                <Button variant="outline" onClick={() => navigate('/dashboard/bancos')}>
+                <Button variant="outline" onClick={() => navigate('/dashboard/financeiro')}>
                     <ArrowLeft className="w-4 h-4 mr-2" />
-                    Voltar para Bancos
+                    Voltar para Financeiro
                 </Button>
             </div>
         );
@@ -100,7 +100,7 @@ export default function BancoDashboard() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => navigate('/dashboard/bancos')}
+                        onClick={() => navigate('/dashboard/financeiro')}
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
