@@ -302,8 +302,8 @@ export function AmorimAIFloating() {
           throw uploadError;
         }
 
-        // Instrução para o Agente ("The Wolf")
-        const systemInstruction = `\n\n[SYSTEM: O usuário enviou um arquivo. Caminho no storage: "${fileName}". Nome original: "${attachedFile.name}". USE a tool 'inspect_document' para ler e analisar este documento.]`;
+        // Instrução para o Agente ("The Wolf") - Usando HTML comment para ocultar da UI nativamente
+        const systemInstruction = `\n\n<!-- SYSTEM: O usuário enviou um arquivo. Caminho no storage: "${fileName}". Nome original: "${attachedFile.name}". USE a tool 'inspect_document' para ler e analisar este documento. -->`;
 
         // Se o usuário não digitou nada, coloca um texto padrão
         finalContent = (finalContent.trim() ? finalContent : "Analise este arquivo em anexo.") + systemInstruction;
@@ -804,13 +804,16 @@ export function AmorimAIFloating() {
 
                     // === UI FIX: Hide System Prompt & Show Attachment ===
                     let displayMessage = message;
-                    if (message.role === 'user' && message.content.includes('[SYSTEM:')) {
-                      // Extract filename
+
+                    // Detect custom system instruction (hidden in HTML comment)
+                    if (message.role === 'user' && message.content.includes('<!-- SYSTEM:')) {
+                      // Extract filename from the hidden comment
                       const nameMatch = message.content.match(/Nome original: "(.*?)"/);
                       const fileName = nameMatch ? nameMatch[1] : "Arquivo anexado";
 
-                      // Remove system tag (More robust regex: covers optional newlines)
-                      const cleanContent = message.content.replace(/(\n\s*)?\[SYSTEM:[\s\S]*?\]/g, '').trim();
+                      // Remove the entire HTML comment from display
+                      // Note: React/Markdown renderer might hide it automatically, but we clean it here to show the attachment clip
+                      const cleanContent = message.content.replace(/<!-- SYSTEM:[\s\S]*?-->/g, '').trim();
 
                       // Construct display content
                       const newContent = cleanContent

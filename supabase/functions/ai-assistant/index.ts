@@ -1347,6 +1347,16 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
   },
 
 
+  // ========== TOOLS ANALYTICS (GOD MODE PHASE 3) ==========
+  analyze_client_360: async (args, supabase, userId) => {
+    return await ANALYTICS.analyze_client_360(args, supabase, userId);
+  },
+
+  // ========== TOOLS INSPECTOR (GOD MODE PHASE 4) ==========
+  inspect_document: async (args, supabase, userId) => {
+    return await INSPECTOR.inspect_document(args, supabase, userId);
+  },
+
   search_claims: async (args, supabase, userId) => {
     const { status, policy_id } = args;
 
