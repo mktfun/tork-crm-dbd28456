@@ -826,7 +826,7 @@ export function AmorimAIFloating() {
                     return (
                       <ChatMessage
                         key={message.id || idx}
-                        message={message}
+                        message={displayMessage}
                         index={idx}
                         isCurrentMessage={isCurrentMessage}
                         isLoading={isLoading}
