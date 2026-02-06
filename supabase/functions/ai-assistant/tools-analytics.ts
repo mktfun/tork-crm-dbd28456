@@ -18,7 +18,7 @@ export async function analyze_client_360(
         // 1. Buscas Paralelas para velocidade máxima "God Mode"
         const [clientRes, policiesRes, dealsRes, financeRes] = await Promise.all([
             // Perfil
-            supabase.from('clientes').select('*').eq('id', client_id).single(),
+            supabase.from('clientes').select('*').eq('id', client_id).maybeSingle(),
 
             // Apólices (Vigentes e Totais)
             supabase.from('apolices')

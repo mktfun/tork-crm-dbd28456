@@ -1145,7 +1145,7 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
       .select('*')
       .eq('id', client_id)
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (clientError) throw clientError;
     if (!client) throw new Error('Cliente não encontrado');
