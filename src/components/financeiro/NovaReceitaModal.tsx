@@ -35,7 +35,7 @@ const revenueSchema = z.object({
   amount: z.number().positive('Valor deve ser positivo'),
   transactionDate: z.string().min(1, 'Data é obrigatória'),
   revenueAccountId: z.string().min(1, 'Selecione uma categoria'),
-  assetAccountId: z.string().min(1, 'Selecione uma conta'),
+  assetAccountId: z.string().optional(),
   bankAccountId: z.string().optional(),
   referenceNumber: z.string().optional(),
   memo: z.string().optional(),
@@ -79,12 +79,21 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
         amount: data.amount,
         transactionDate: data.transactionDate,
         revenueAccountId: data.revenueAccountId,
-        assetAccountId: data.assetAccountId,
+        // Lógica de fallback para assetAccountId
+        assetAccountId: (() => {
+          if (data.assetAccountId) return data.assetAccountId;
+          // Se selecionou banco mas não conta, tenta achar uma conta de ativo padrão (primeira disponível)
+          if (data.bankAccountId && data.bankAccountId !== 'none' && assetAccounts.length > 0) {
+            return assetAccounts[0].id;
+          }
+          // Se não tiver nada, throw para cair no catch
+          throw new Error('Selecione uma conta de destino ou um banco.');
+        })(),
         bankAccountId: data.bankAccountId || undefined,
         referenceNumber: data.referenceNumber,
         memo: data.memo,
       });
-      
+
       toast.success('Receita registrada com sucesso!');
       form.reset();
       setOpen(false);
@@ -141,9 +150,9 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
                   <FormItem>
                     <FormLabel>Valor (R$)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
+                      <Input
+                        type="number"
+                        step="0.01"
                         placeholder="0,00"
                         {...field}
                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
@@ -201,7 +210,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               name="assetAccountId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Conta de Destino</FormLabel>
+                  <FormLabel>Conta de Destino {form.watch('bankAccountId') && form.watch('bankAccountId') !== 'none' && '(Automático)'}</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
@@ -274,11 +283,11 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
                 <FormItem>
                   <FormLabel>Observações (opcional)</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Notas adicionais sobre esta receita"
                       className="resize-none"
                       rows={2}
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -291,8 +300,8 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="gap-2 bg-emerald-600 hover:bg-emerald-700"
                 disabled={registerRevenue.isPending || loadingAccounts}
               >
