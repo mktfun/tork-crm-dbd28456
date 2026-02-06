@@ -13,7 +13,15 @@ export function UnbankedTransactionsAlert() {
     return null;
   }
 
-  const totalAmount = unbankedTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+  const totalIncome = unbankedTransactions
+    .filter(tx => tx.transactionType === 'receita')
+    .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+
+  const totalExpense = unbankedTransactions
+    .filter(tx => tx.transactionType !== 'receita')
+    .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+
+  const formatMoney = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   return (
     <>
@@ -24,11 +32,14 @@ export function UnbankedTransactionsAlert() {
         </AlertTitle>
         <AlertDescription className="mt-2 space-y-2">
           <p>
-            Você tem <strong>{unbankedTransactions.length} transações</strong> sem banco atribuído,
-            totalizando <strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}</strong>.
+            Você tem <strong>{unbankedTransactions.length} transações</strong> pendentes de vínculo bancário.
           </p>
+          <div className="flex gap-4 text-sm">
+            <span className="text-emerald-500">Receitas: {formatMoney(totalIncome)}</span>
+            <span className="text-rose-500">Despesas: {formatMoney(totalExpense)}</span>
+          </div>
           <p className="text-sm text-muted-foreground">
-            Atribua estas transações a bancos para ter um controle mais preciso dos seus saldos bancários.
+            Atribua estas transações a bancos para conciliação correta.
           </p>
           <Button
             size="sm"

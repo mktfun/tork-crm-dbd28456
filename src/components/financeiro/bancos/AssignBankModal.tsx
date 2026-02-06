@@ -21,10 +21,10 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { 
-  useBankAccounts, 
+import {
+  useBankAccounts,
   useAssignBankToTransactions,
-  type UnbankedTransaction 
+  type UnbankedTransaction
 } from "@/hooks/useBancos";
 import { toast } from "sonner";
 import { Loader2, TrendingUp, TrendingDown } from "lucide-react";
@@ -52,10 +52,18 @@ export function AssignBankModal({ open, onClose, transactions }: AssignBankModal
   }, [transactions, filterType]);
 
   // Calcular totais
-  const selectedTotal = useMemo(() => {
-    return filteredTransactions
-      .filter(tx => selectedTransactionIds.has(tx.transactionId))
-      .reduce((sum, tx) => sum + tx.amount, 0);
+  const totals = useMemo(() => {
+    const selected = filteredTransactions.filter(tx => selectedTransactionIds.has(tx.transactionId));
+
+    const income = selected
+      .filter(tx => tx.transactionType === 'receita')
+      .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+
+    const expense = selected
+      .filter(tx => tx.transactionType !== 'receita')
+      .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+
+    return { income, expense, net: income - expense };
   }, [filteredTransactions, selectedTransactionIds]);
 
   const handleToggleTransaction = (transactionId: string) => {
@@ -168,11 +176,24 @@ export function AssignBankModal({ open, onClose, transactions }: AssignBankModal
                 onCheckedChange={handleSelectAll}
               />
               <span className="text-sm font-medium">
-                {selectedTransactionIds.size} de {filteredTransactions.length} selecionadas
+                {selectedTransactionIds.size} selecionadas
               </span>
             </div>
-            <div className="text-sm font-semibold">
-              Total: {formatCurrency(selectedTotal)}
+
+            <div className="flex gap-4 text-sm">
+              {totals.income > 0 && (
+                <span className="text-emerald-500 font-medium">
+                  +{formatCurrency(totals.income)}
+                </span>
+              )}
+              {totals.expense > 0 && (
+                <span className="text-rose-500 font-medium">
+                  -{formatCurrency(totals.expense)}
+                </span>
+              )}
+              {(totals.income === 0 && totals.expense === 0) && (
+                <span className="text-muted-foreground">R$ 0,00</span>
+              )}
             </div>
           </div>
 
@@ -194,7 +215,7 @@ export function AssignBankModal({ open, onClose, transactions }: AssignBankModal
                       checked={selectedTransactionIds.has(tx.transactionId)}
                       onCheckedChange={() => handleToggleTransaction(tx.transactionId)}
                     />
-                    
+
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-medium truncate">{tx.description}</p>
@@ -213,10 +234,9 @@ export function AssignBankModal({ open, onClose, transactions }: AssignBankModal
                       ) : (
                         <TrendingDown className="w-4 h-4 text-rose-500" />
                       )}
-                      <span className={`font-semibold ${
-                        tx.transactionType === 'receita' ? 'text-emerald-500' : 'text-rose-500'
-                      }`}>
-                        {formatCurrency(tx.amount)}
+                      <span className={`font-semibold ${tx.transactionType === 'receita' ? 'text-emerald-500' : 'text-rose-500'
+                        }`}>
+                        {formatCurrency(Math.abs(tx.amount))}
                       </span>
                     </div>
                   </div>
