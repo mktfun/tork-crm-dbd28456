@@ -1,6 +1,6 @@
-import React, { memo } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { User, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { User, Loader2, ThumbsUp, ThumbsDown, FileText, Image as ImageIcon } from 'lucide-react';
 import { AIResponseRenderer } from './responses/AIResponseRenderer';
 import { ToolExecutionStatus, ToolExecution } from './ToolExecutionStatus';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,60 @@ interface ChatMessageProps {
   onFeedbackNoteChange: (note: string) => void;
   onFeedbackNoteSubmit: () => void;
   onFeedbackNoteCancel: () => void;
+}
+
+/**
+ * Parse user message to extract and render attachments
+ * Format: [[ATTACHMENT::filename::type::size::content]]
+ */
+function parseUserMessageWithAttachments(content: string): React.ReactNode {
+  const attachmentRegex = /\[\[ATTACHMENT::([^:]+)::([^:]+)::(\d+)::([^\]]+)\]\]/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = attachmentRegex.exec(content)) !== null) {
+    // Add text before attachment
+    if (match.index > lastIndex) {
+      const textBefore = content.slice(lastIndex, match.index);
+      if (textBefore.trim()) {
+        parts.push(<span key={`text-${lastIndex}`}>{textBefore}</span>);
+      }
+    }
+
+    // Extract attachment info
+    const [, filename, type, size] = match;
+    const isImage = type.startsWith('image/');
+    const sizeKB = Math.round(parseInt(size) / 1024);
+
+    // Render attachment chip
+    parts.push(
+      <div
+        key={`attachment-${match.index}`}
+        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/20 border border-white/30 text-xs mb-2"
+      >
+        {isImage ? (
+          <ImageIcon className="h-3.5 w-3.5" />
+        ) : (
+          <FileText className="h-3.5 w-3.5" />
+        )}
+        <span className="font-medium">{filename}</span>
+        <span className="text-white/70">({sizeKB}KB)</span>
+      </div>
+    );
+
+    lastIndex = attachmentRegex.lastIndex;
+  }
+
+  // Add remaining text
+  if (lastIndex < content.length) {
+    const textAfter = content.slice(lastIndex);
+    if (textAfter.trim()) {
+      parts.push(<span key={`text-${lastIndex}`}>{textAfter}</span>);
+    }
+  }
+
+  return parts.length > 0 ? parts : content;
 }
 
 /**
@@ -98,7 +152,9 @@ export const ChatMessage = memo<ChatMessageProps>(({
               )}
             </div>
           ) : (
-            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            <div className="text-sm whitespace-pre-wrap">
+              {parseUserMessageWithAttachments(message.content)}
+            </div>
           )}
         </div>
 
