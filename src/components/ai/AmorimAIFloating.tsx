@@ -20,7 +20,28 @@ import {
   completeToolExecution
 } from './ToolExecutionStatus';
 
+interface WindowDimensions {
+  width: number;
+  height: number;
+  isMaximized: boolean;
+}
+
+const suggestedQuestions = [
+  "Como estão minhas vendas este mês?",
+  "Quais apólices vencem na próxima semana?",
+  "Resumo das comissões pendentes",
+  "Analisar desempenho do mês"
+];
+
 // ... (previous interfaces)
+
+const DEFAULT_WIDTH = 420;
+const DEFAULT_HEIGHT = 600;
+const MIN_WIDTH = 350;
+const MIN_HEIGHT = 450;
+const MAX_WIDTH = 1000;
+const MAX_HEIGHT_RATIO = 0.9;
+const MAX_INPUT_CHARS = 1000;
 
 export function AmorimAIFloating() {
   const [isOpen, setIsOpen] = useState(false);
@@ -29,11 +50,24 @@ export function AmorimAIFloating() {
   const [feedbackSent, setFeedbackSent] = useState<Set<string>>(new Set());
   // ... (existing state)
 
+  // === FEEDBACK STATE ===
+  const [feedbackNoteId, setFeedbackNoteId] = useState<string | null>(null);
+  const [feedbackNote, setFeedbackNote] = useState('');
+
   // === FILE UPLOAD STATE (FASE P4) ===
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // === TOOL EXECUTION STATE ===
+  const [activeToolExecutions, setActiveToolExecutions] = useState<ToolExecution[]>([]);
+  const [messageToolExecutions, setMessageToolExecutions] = useState<Map<number, ToolExecution[]>>(new Map());
+  const toolProgressTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const currentMessageIndexRef = useRef<number>(0);
+
+  // === UI STATE ===
+  const [showHistory, setShowHistory] = useState(false);
 
   // ... (rest of the state props)
   const [savedDimensions, setSavedDimensions] = useLocalStorage<WindowDimensions>(
@@ -483,7 +517,7 @@ export function AmorimAIFloating() {
       newHeight = Math.max(MIN_HEIGHT, Math.min(maxHeight, startHeight + deltaY));
     }
 
-    setWindowSize({ width: newWidth, height: newHeight });
+    setWindowSize({ width: newWidth, height: newHeight, isMaximized: false });
   }, [isResizing, resizeEdge]);
 
   const handleResizeEnd = useCallback(() => {
