@@ -1330,6 +1330,24 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
     }
   },
 
+// ========== TOOLS INSPECTOR (GOD MODE PHASE 4) ==========
+{
+  type: "function",
+    function: {
+      name: "inspect_document",
+      description: "SUPER CONSULTOR: Analisa documentos (Apólice, Vistoria) e gera argumentos de VENDA. Use quando o usuário pedir 'analise esta apólice', 'veja se serve', 'me ajude a vender'.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_path: { type: "string", description: "Caminho do arquivo no Storage (bucket chat-uploads)." },
+          mime_type: { type: "string", description: "Tipo MIME (application/pdf, image/png)." },
+          focus_area: { type: "string", description: "Foco (ex: 'vendas', 'gaps', 'coberturas')." }
+        },
+        required: ["file_path", "mime_type"]
+      }
+    }
+  },
+
 // --- SINISTROS ---
 search_claims: async (args, supabase, userId) => {
   const { status, policy_id } = args;
