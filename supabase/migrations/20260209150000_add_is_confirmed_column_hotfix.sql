@@ -45,4 +45,9 @@ WHERE is_confirmed = false
   AND bank_account_id IS NULL
   AND created_at < '2026-02-09'::date;
 
-RAISE NOTICE 'Backfilled is_confirmed for existing transactions';
+-- Log backfill completion
+DO $$
+BEGIN
+  RAISE NOTICE 'Backfilled is_confirmed for existing transactions';
+END
+$$;
