@@ -36,7 +36,8 @@ const revenueSchema = z.object({
   amount: z.number().positive('Valor deve ser positivo'),
   transactionDate: z.string().min(1, 'Data é obrigatória'),
   revenueAccountId: z.string().min(1, 'Selecione uma categoria'),
-  bankAccountId: z.string().min(1, 'Selecione o banco onde entrou o dinheiro'),
+  assetAccountId: z.string().min(1, 'Selecione a conta de destino'),
+  bankAccountId: z.string().optional(),
   referenceNumber: z.string().optional(),
   memo: z.string().optional(),
   isConfirmed: z.boolean(),
@@ -66,6 +67,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
       amount: 0,
       transactionDate: format(new Date(), 'yyyy-MM-dd'),
       revenueAccountId: '',
+      assetAccountId: '',
       bankAccountId: '',
       referenceNumber: '',
       memo: '',
@@ -75,22 +77,13 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
 
   const onSubmit = async (data: RevenueFormData) => {
     try {
-      // Derive assetAccountId from selected bank
-      const selectedBank = banks.find(b => b.id === data.bankAccountId);
-      const assetAccountId = selectedBank?.asset_account_id;
-
-      if (!assetAccountId) {
-        toast.error('Banco selecionado não tem conta vinculada');
-        return;
-      }
-
       await registerRevenue.mutateAsync({
         description: data.description,
         amount: data.amount,
         transactionDate: data.transactionDate,
         revenueAccountId: data.revenueAccountId,
-        assetAccountId,
-        bankAccountId: data.bankAccountId,
+        assetAccountId: data.assetAccountId,
+        bankAccountId: data.bankAccountId === 'none' ? undefined : data.bankAccountId,
         referenceNumber: data.referenceNumber,
         memo: data.memo,
         isConfirmed: data.isConfirmed,
@@ -227,13 +220,39 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               )}
             />
 
-            {/* Banco (obrigatório) */}
+            {/* Conta de Destino */}
+            <FormField
+              control={form.control}
+              name="assetAccountId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Conta de Destino *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Onde o dinheiro vai entrar" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {assetAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Banco (opcional) */}
             <FormField
               control={form.control}
               name="bankAccountId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Banco / Onde entrou o dinheiro *</FormLabel>
+                  <FormLabel>Banco (opcional)</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
@@ -241,6 +260,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="none">Nenhum banco</SelectItem>
                       {banks.map((bank) => (
                         <SelectItem key={bank.id} value={bank.id}>
                           <div className="flex items-center gap-2">

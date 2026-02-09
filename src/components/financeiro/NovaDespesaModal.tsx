@@ -35,7 +35,8 @@ interface FormData {
   amount: string;
   transactionDate: string;
   expenseAccountId: string;
-  bankAccountId: string;
+  assetAccountId: string;
+  bankAccountId?: string;
   referenceNumber: string;
 }
 
@@ -66,6 +67,7 @@ export function NovaDespesaModal() {
       amount: '',
       transactionDate: format(new Date(), 'yyyy-MM-dd'),
       expenseAccountId: '',
+      assetAccountId: '',
       bankAccountId: '',
       referenceNumber: ''
     }
@@ -150,22 +152,13 @@ export function NovaDespesaModal() {
         }
       }
 
-      // Derive assetAccountId from selected bank
-      const selectedBank = banks.find(b => b.id === data.bankAccountId);
-      const assetAccountId = selectedBank?.asset_account_id;
-
-      if (!assetAccountId) {
-        toast.error('Banco selecionado não tem conta vinculada');
-        return;
-      }
-
       await registerExpense.mutateAsync({
         description: data.description,
         amount,
         transactionDate: data.transactionDate,
         expenseAccountId: data.expenseAccountId,
-        assetAccountId,
-        bankAccountId: data.bankAccountId,
+        assetAccountId: data.assetAccountId,
+        bankAccountId: data.bankAccountId === 'none' ? undefined : data.bankAccountId,
         referenceNumber: data.referenceNumber || undefined,
         isConfirmed: isPaid,
         memo: attachmentUrl,
@@ -294,17 +287,42 @@ export function NovaDespesaModal() {
             )}
           </div>
 
-          {/* Banco (obrigatório) */}
+          {/* Conta de Saída (Ativo) */}
           <div className="space-y-2">
             <Label>De onde saiu o dinheiro? *</Label>
             <Select
-              onValueChange={(value) => setValue('bankAccountId', value)}
+              onValueChange={(value) => setValue('assetAccountId', value)}
+              disabled={isLoading}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a conta" />
+              </SelectTrigger>
+              <SelectContent>
+                {assetAccounts.map((acc) => (
+                  <SelectItem key={acc.id} value={acc.id}>
+                    {acc.code ? `${acc.code} - ${acc.name}` : acc.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <input type="hidden" {...register('assetAccountId', { required: 'Selecione uma conta' })} />
+            {errors.assetAccountId && (
+              <p className="text-sm text-destructive">{errors.assetAccountId.message}</p>
+            )}
+          </div>
+
+          {/* Banco (opcional) */}
+          <div className="space-y-2">
+            <Label>Banco (opcional)</Label>
+            <Select
+              onValueChange={(value) => setValue('bankAccountId', value === 'none' ? '' : value)}
               disabled={isLoading}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o banco" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">Nenhum banco</SelectItem>
                 {banks.map((bank) => (
                   <SelectItem key={bank.id} value={bank.id}>
                     <div className="flex items-center gap-2">
@@ -315,10 +333,6 @@ export function NovaDespesaModal() {
                 ))}
               </SelectContent>
             </Select>
-            <input type="hidden" {...register('bankAccountId', { required: 'Selecione o banco' })} />
-            {errors.bankAccountId && (
-              <p className="text-sm text-destructive">{errors.bankAccountId.message}</p>
-            )}
           </div>
 
           {/* Referência (opcional) */}
