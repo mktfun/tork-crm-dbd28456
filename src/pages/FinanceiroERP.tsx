@@ -30,8 +30,7 @@ import { ImportTransactionsModal } from '@/components/financeiro/ImportTransacti
 import { ImportReceiptsModal } from '@/components/financeiro/ImportReceiptsModal';
 import { ConfiguracoesTab } from '@/components/financeiro/ConfiguracoesTab';
 import { DateRangeFilter } from '@/components/financeiro/DateRangeFilter';
-import { ReceitasTab } from '@/components/financeiro/ReceitasTab';
-import { DespesasTab } from '@/components/financeiro/DespesasTab';
+import { TransacoesTab } from '@/components/financeiro/TransacoesTab';
 import { CaixaTab } from '@/components/financeiro/CaixaTab';
 import { TesourariaTab } from '@/components/financeiro/TesourariaTab';
 import { ProvisoesTab } from '@/components/financeiro/ProvisoesTab';
@@ -490,13 +489,9 @@ export default function FinanceiroERP() {
             <Wallet className="w-4 h-4" />
             Tesouraria
           </TabsTrigger>
-          <TabsTrigger value="receitas" className="gap-2">
-            <TrendingUp className="w-4 h-4" />
-            Receitas
-          </TabsTrigger>
-          <TabsTrigger value="despesas" className="gap-2">
-            <TrendingDown className="w-4 h-4" />
-            Despesas
+          <TabsTrigger value="transacoes" className="gap-2">
+            <Wallet className="w-4 h-4" />
+            Transações
           </TabsTrigger>
           <TabsTrigger value="provisoes" className="gap-2">
             <LineChart className="w-4 h-4" />
@@ -536,12 +531,8 @@ export default function FinanceiroERP() {
           <TesourariaTab dateRange={dateRange} />
         </TabsContent>
 
-        <TabsContent value="receitas">
-          <ReceitasTab dateRange={dateRange} />
-        </TabsContent>
-
-        <TabsContent value="despesas">
-          <DespesasTab dateRange={dateRange} />
+        <TabsContent value="transacoes">
+          <TransacoesTab dateRange={dateRange} />
         </TabsContent>
 
         <TabsContent value="provisoes">
