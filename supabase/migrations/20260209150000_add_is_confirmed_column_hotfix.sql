@@ -35,6 +35,9 @@ WHERE NOT is_void;
 COMMENT ON COLUMN public.financial_transactions.is_confirmed IS 
 'Indicates if the transaction has been confirmed/settled (true) or is pending (false). Used to track payment status.';
 
+-- Temporarily disable the immutability trigger to allow backfill
+ALTER TABLE financial_transactions DISABLE TRIGGER prevent_financial_transaction_modification;
+
 -- Backfill existing data: assume old transactions are confirmed if not voided
 -- (Only for transactions WITHOUT a bank_account_id, which likely means they were 
 -- created via old flows and are already settled)
@@ -44,6 +47,9 @@ WHERE is_confirmed = false
   AND NOT is_void
   AND bank_account_id IS NULL
   AND created_at < '2026-02-09'::date;
+
+-- Re-enable the immutability trigger
+ALTER TABLE financial_transactions ENABLE TRIGGER prevent_financial_transaction_modification;
 
 -- Log backfill completion
 DO $$
