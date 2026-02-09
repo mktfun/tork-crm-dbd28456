@@ -141,6 +141,7 @@ export async function registerExpense(payload: {
   bankAccountId?: string;
   referenceNumber?: string;
   memo?: string;
+  isConfirmed?: boolean; // v1.2: Added to track if expense is paid or pending
 }): Promise<string> {
   const movements: Array<{ account_id: string; amount: number; memo?: string }> = [
     { account_id: payload.expenseAccountId, amount: payload.amount, memo: payload.memo },
@@ -154,7 +155,8 @@ export async function registerExpense(payload: {
     p_reference_number: payload.referenceNumber || null,
     p_related_entity_type: null,
     p_related_entity_id: null,
-    p_bank_account_id: payload.bankAccountId || null
+    p_bank_account_id: payload.bankAccountId || null,
+    p_is_confirmed: payload.isConfirmed ?? false // v1.2: Forward to RPC (defaults to false if not provided)
   });
 
   if (error) throw error;

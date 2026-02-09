@@ -52,15 +52,15 @@ export function NovaDespesaModal() {
   const [isUploading, setIsUploading] = useState(false);
   const [isPaid, setIsPaid] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const { data: expenseAccounts = [], isLoading: loadingExpense } = useFinancialAccounts('expense');
   const { data: assetAccounts = [], isLoading: loadingAsset } = useFinancialAccounts('asset');
   const { data: bankSummary } = useBankAccounts();
-  
+
   const banks = bankSummary?.accounts?.filter(b => b.isActive) || [];
-  
+
   const registerExpense = useRegisterExpense();
-  
+
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       description: '',
@@ -84,7 +84,7 @@ export function NovaDespesaModal() {
     }
 
     setAttachmentFile(file);
-    
+
     // Preview para imagens
     if (file.type.startsWith('image/')) {
       setAttachmentPreview(URL.createObjectURL(file));
@@ -114,7 +114,7 @@ export function NovaDespesaModal() {
   const onSubmit = async (data: FormData) => {
     try {
       const amount = parseFloat(data.amount.replace(',', '.'));
-      
+
       if (isNaN(amount) || amount <= 0) {
         toast.error('Valor inválido');
         return;
@@ -131,7 +131,7 @@ export function NovaDespesaModal() {
 
           const ext = attachmentFile.name.split('.').pop() || 'jpg';
           const fileName = `${user.id}/${generateId()}.${ext}`;
-          
+
           const { error: uploadError } = await supabase.storage
             .from('comprovantes')
             .upload(fileName, attachmentFile, { contentType: attachmentFile.type });
@@ -160,6 +160,7 @@ export function NovaDespesaModal() {
         assetAccountId: data.assetAccountId,
         bankAccountId: data.bankAccountId || undefined,
         referenceNumber: data.referenceNumber || undefined,
+        isConfirmed: isPaid, // v1.1: Pass isPaid state to service
         memo: attachmentUrl, // Salvamos a URL no memo por enquanto
       });
 
@@ -187,7 +188,7 @@ export function NovaDespesaModal() {
         <DialogHeader>
           <DialogTitle>Registrar Despesa</DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
           {/* Descrição */}
           <div className="space-y-2">
@@ -245,9 +246,9 @@ export function NovaDespesaModal() {
 
           {/* Checkbox: Já paga? */}
           <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30 border border-border/50">
-            <Checkbox 
-              id="isPaid" 
-              checked={isPaid} 
+            <Checkbox
+              id="isPaid"
+              checked={isPaid}
               onCheckedChange={(checked) => setIsPaid(!!checked)}
             />
             <div className="flex-1">
@@ -350,7 +351,7 @@ export function NovaDespesaModal() {
               <Paperclip className="w-4 h-4" />
               Anexar Comprovante (opcional)
             </Label>
-            
+
             {!attachmentFile ? (
               <div
                 className="border-2 border-dashed border-border/50 rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer"
@@ -371,9 +372,9 @@ export function NovaDespesaModal() {
             ) : (
               <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border border-border/30">
                 {attachmentPreview ? (
-                  <img 
-                    src={attachmentPreview} 
-                    alt="Preview" 
+                  <img
+                    src={attachmentPreview}
+                    alt="Preview"
                     className="w-12 h-12 rounded object-cover"
                   />
                 ) : (

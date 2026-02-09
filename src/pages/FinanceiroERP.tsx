@@ -261,7 +261,7 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Linha 1: Tesouraria (Largura Total) */}
         <div className="col-span-1 lg:col-span-2 h-full">
-          <ModuloTesouraria onClick={() => onNavigate('/dashboard/tesouraria')} />
+          <ModuloTesouraria onClick={() => onTabChange('tesouraria')} />
         </div>
 
         {/* Linha 2: Coluna Esquerda - Faturamento */}

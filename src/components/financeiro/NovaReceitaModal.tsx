@@ -40,7 +40,7 @@ const revenueSchema = z.object({
   bankAccountId: z.string().optional(),
   referenceNumber: z.string().optional(),
   memo: z.string().optional(),
-  isConfirmed: z.boolean().default(true),
+  isConfirmed: z.boolean(), // v0.1: Removed .default() - handled by form defaultValues
 });
 
 type RevenueFormData = z.infer<typeof revenueSchema>;
