@@ -74,12 +74,6 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
   });
 
   const onSubmit = async (data: RevenueFormData) => {
-    // Validação: se confirmado, banco é obrigatório
-    if (data.isConfirmed && (!data.bankAccountId || data.bankAccountId === 'none')) {
-      toast.error('Selecione um banco para receitas confirmadas');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       // Buscar conta padrão de "Comissões a Receber" para provisões
@@ -120,7 +114,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
         {trigger || (
           <Button variant="outline" className="gap-2">
             <TrendingUp className="w-4 h-4" />
-            Nova Receita
+            Receita
           </Button>
         )}
       </DialogTrigger>
@@ -128,7 +122,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-emerald-500" />
-            Nova Receita Manual
+            Receita
           </DialogTitle>
           <DialogDescription>
             Registre uma receita avulsa no sistema financeiro
@@ -244,7 +238,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               name="bankAccountId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Banco {form.watch('isConfirmed') && '*'}</FormLabel>
+                  <FormLabel>Banco (Opcional)</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
@@ -321,7 +315,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
                 ) : (
                   <>
                     <TrendingUp className="w-4 h-4" />
-                    Registrar Receita
+                    Adicionar
                   </>
                 )}
               </Button>

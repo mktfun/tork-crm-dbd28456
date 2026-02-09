@@ -118,11 +118,7 @@ export function NovaDespesaModal() {
         return;
       }
 
-      // Validação: se pago, banco é obrigatório
-      if (isPaid && (!data.bankAccountId || data.bankAccountId === 'none')) {
-        toast.error('Selecione um banco para despesas já pagas');
-        return;
-      }
+
 
       // Usa conta de ativo padrão para ledger
       const defaultAssetAccount = assetAccounts.find(a =>
@@ -190,12 +186,12 @@ export function NovaDespesaModal() {
       <DialogTrigger asChild>
         <Button className="gap-2">
           <Plus className="w-4 h-4" />
-          Nova Despesa
+          Despesa
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Registrar Despesa</DialogTitle>
+          <DialogTitle>Despesa</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
@@ -298,7 +294,7 @@ export function NovaDespesaModal() {
 
           {/* Banco */}
           <div className="space-y-2">
-            <Label>Banco {isPaid && '*'}</Label>
+            <Label>Banco (Opcional)</Label>
             <Select
               onValueChange={(value) => setValue('bankAccountId', value === 'none' ? '' : value)}
               disabled={isLoading}
@@ -405,7 +401,7 @@ export function NovaDespesaModal() {
                   {isUploading ? 'Anexando...' : 'Salvando...'}
                 </>
               ) : (
-                'Salvar Despesa'
+                'Adicionar'
               )}
             </Button>
           </div>
