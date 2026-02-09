@@ -1018,8 +1018,11 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           const friendlyMsg = getFriendlyErrorMessage(result.error);
           collectedErrors.push({
             fileName: item.fileName,
-            error: friendlyMsg,
+            errorMessage: friendlyMsg,
             errorCode: result.errorCode || 'UNKNOWN',
+            itemId: item.id,
+            clientName: item.clientName || '',
+            stage: 'apolice' as const,
           });
           console.error(`❌ [IMPORT] ${item.fileName}: ${friendlyMsg}`);
         }
