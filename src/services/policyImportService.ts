@@ -456,7 +456,7 @@ export async function matchRamo(
 
   const { data, error } = await supabase
     .from('ramos')
-    .select('id, nome, company_id')
+    .select('id, nome, company_ramos(company_id)')
     .eq('user_id', userId);
 
   if (error || !data || data.length === 0) {
@@ -496,7 +496,7 @@ export async function matchRamo(
   const scored = data.map(ramo => ({
     id: ramo.id,
     nome: ramo.nome,
-    company_id: ramo.company_id,
+    company_id: (ramo as any).company_ramos?.[0]?.company_id || null,
     score: similarity(nome, ramo.nome)
   }));
 
@@ -512,7 +512,7 @@ export async function matchRamo(
   if (seguradoraId) {
     console.log(`🔍 [SMART v7.0] Buscando ramos da seguradora ${seguradoraId}...`);
 
-    const seguradoraRamos = data.filter(r => r.company_id === seguradoraId);
+    const seguradoraRamos = scored.filter(r => r.company_id === seguradoraId);
 
     if (seguradoraRamos.length > 0) {
       // Score ramos da seguradora

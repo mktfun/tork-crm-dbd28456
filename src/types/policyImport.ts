@@ -119,6 +119,7 @@ export interface PolicyImportItem {
   isProcessing?: boolean;
   isProcessed?: boolean;
   processError?: string;
+  confidenceScore?: number;
   
   // NOVOS CAMPOS - Carteirinha
   isCarteirinha?: boolean;
