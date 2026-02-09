@@ -565,7 +565,6 @@ export function useUpcomingReceivables(daysAhead: number = 30) {
 
 /**
  * Hook para buscar transações a pagar e receber com filtros
- * TODO: Conectar à RPC get_payable_receivable_transactions quando for criada
  */
 export function usePayableReceivableTransactions(
   transactionType: 'all' | 'receber' | 'pagar' = 'all',
@@ -573,59 +572,7 @@ export function usePayableReceivableTransactions(
 ) {
   return useQuery({
     queryKey: ['payable-receivable-transactions', transactionType, status],
-    queryFn: async (): Promise<PayableReceivableTransaction[]> => {
-      // Simula delay de rede
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const today = new Date();
-
-      // Dados mock base
-      const mockTransactions: PayableReceivableTransaction[] = [
-        {
-          transactionId: '1',
-          transactionType: 'receber',
-          entityName: 'Porto Seguro',
-          description: 'Comissão Apólice Auto',
-          amount: 1500.00,
-          dueDate: new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'atrasado',
-          daysOverdue: 5,
-        },
-        {
-          transactionId: '2',
-          transactionType: 'pagar',
-          entityName: 'Aluguel Escritório',
-          description: 'Aluguel Mensal',
-          amount: 2500.00,
-          dueDate: new Date(today.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'pendente',
-          daysOverdue: 0,
-        },
-        {
-          transactionId: '3',
-          transactionType: 'receber',
-          entityName: 'Bradesco',
-          description: 'Comissão Vida',
-          amount: 800.00,
-          dueDate: new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'pago',
-          daysOverdue: 0,
-        },
-      ];
-
-      // Aplicar filtros
-      let filtered = mockTransactions;
-
-      if (transactionType !== 'all') {
-        filtered = filtered.filter(t => t.transactionType === transactionType);
-      }
-
-      if (status !== 'all') {
-        filtered = filtered.filter(t => t.status === status);
-      }
-
-      return filtered;
-    },
+    queryFn: () => financialService.getPayableReceivableTransactions(transactionType, status),
   });
 }
 

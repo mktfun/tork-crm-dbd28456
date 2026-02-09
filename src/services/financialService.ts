@@ -867,3 +867,98 @@ export async function auditLedgerIntegrity(): Promise<LedgerIntegrityIssue[]> {
     amount: Number(row.amount) || 0
   }));
 }
+
+// ============ CONTAS A PAGAR E RECEBER ============
+
+export interface PayableReceivableTransaction {
+  transactionId: string;
+  transactionType: 'receber' | 'pagar';
+  dueDate: string;
+  entityName: string;
+  description: string;
+  amount: number;
+  status: 'atrasado' | 'pendente' | 'pago';
+  daysOverdue: number;
+}
+
+/**
+ * Busca transações a pagar e receber
+ * Nota: Schema não tem due_date, usando transaction_date como proxy
+ */
+export async function getPayableReceivableTransactions(
+  transactionType: 'all' | 'receber' | 'pagar' = 'all',
+  statusFilter: 'all' | 'atrasado' | 'pendente' | 'pago' = 'all'
+): Promise\u003cPayableReceivableTransaction[]\u003e {
+  const { data: user } = await supabase.auth.getUser();
+  if (!user?.user) throw new Error('Usuário não autenticado');
+
+  let query = supabase
+    .from('financial_transactions')
+    .select(
+      id,
+      description,
+      transaction_date,
+      is_confirmed,
+      is_void,
+      financial_ledger!inner(
+        amount,
+        financial_accounts!inner(
+          type,
+          name
+        )
+      )
+    )
+    .eq('user_id', user.user.id)
+    .eq('is_void', false)
+    .order('transaction_date', { ascending: false });
+
+  const { data, error } = await query;
+
+  if (error) throw error;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const transactions: PayableReceivableTransaction[] = (data || []).map((tx: any) =\u003e {
+    const ledgerEntry = tx.financial_ledger[0];
+    const account = ledgerEntry?.financial_accounts;
+    const txDate = new Date(tx.transaction_date);
+    txDate.setHours(0, 0, 0, 0);
+    
+    const daysDiff = Math.floor((today.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    let status: 'atrasado' | 'pendente' | 'pago';
+    if (tx.is_confirmed) {
+      status = 'pago';
+    } else if (daysDiff \u003e 0) {
+      status = 'atrasado';
+    } else {
+      status = 'pendente';
+    }
+
+    const type = account?.type === 'revenue' || account?.type === 'income' ? 'receber' : 'pagar';
+
+    return {
+      transactionId: tx.id,
+      transactionType: type,
+      dueDate: tx.transaction_date,
+      entityName: account?.name || 'Não especificado',
+      description: tx.description,
+      amount: Math.abs(ledgerEntry?.amount || 0),
+      status,
+      daysOverdue: status === 'atrasado' ? daysDiff : 0,
+    };
+  });
+
+  let filtered = transactions;
+
+  if (transactionType !== 'all') {
+    filtered = filtered.filter(t =\u003e t.transactionType === transactionType);
+  }
+
+  if (statusFilter !== 'all') {
+    filtered = filtered.filter(t =\u003e t.status === statusFilter);
+  }
+
+  return filtered;
+}
