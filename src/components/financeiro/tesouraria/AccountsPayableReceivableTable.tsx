@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -14,18 +14,41 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { usePayableReceivableTransactions } from "@/hooks/useFinanceiro";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { TrendingDown, TrendingUp, AlertCircle, Filter } from "lucide-react";
+import { TrendingDown, TrendingUp, AlertCircle, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 export function AccountsPayableReceivableTable() {
   const [activeTab, setActiveTab] = useState<'receber' | 'pagar'>('receber');
   const [statusFilter, setStatusFilter] = useState<'all' | 'atrasado' | 'pendente' | 'pago'>('all');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const { data: transactions, isLoading, error } = usePayableReceivableTransactions(
     activeTab,
     statusFilter
   );
+
+  // Reset page when filters change
+  const handleTabChange = (tab: 'receber' | 'pagar') => {
+    setActiveTab(tab);
+    setPage(1);
+  };
+
+  const handleStatusChange = (status: 'all' | 'atrasado' | 'pendente' | 'pago') => {
+    setStatusFilter(status);
+    setPage(1);
+  };
+
+  // Pagination logic
+  const totalItems = transactions?.length || 0;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const paginatedTransactions = useMemo(() => {
+    if (!transactions) return [];
+    const start = (page - 1) * pageSize;
+    return transactions.slice(start, start + pageSize);
+  }, [transactions, page, pageSize]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -112,7 +135,7 @@ export function AccountsPayableReceivableTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transactions.map((transaction) => (
+            {paginatedTransactions.map((transaction) => (
               <TableRow key={transaction.transactionId}>
                 <TableCell className="font-medium">
                   {formatDate(transaction.dueDate)}
@@ -142,6 +165,40 @@ export function AccountsPayableReceivableTable() {
     );
   };
 
+  // Pagination controls component
+  const renderPagination = () => {
+    if (totalItems <= pageSize) return null;
+
+    return (
+      <div className="flex items-center justify-between mt-4 pt-4 border-t">
+        <span className="text-sm text-muted-foreground">
+          Mostrando {((page - 1) * pageSize) + 1}-{Math.min(page * pageSize, totalItems)} de {totalItems}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <span className="text-sm">
+            Página {page} de {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   const receivableCount = transactions?.filter(t => t.transactionType === 'receber').length || 0;
   const payableCount = transactions?.filter(t => t.transactionType === 'pagar').length || 0;
 
@@ -152,10 +209,10 @@ export function AccountsPayableReceivableTable() {
           <CardTitle className="text-base">Contas a Pagar e Receber</CardTitle>
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-muted-foreground" />
-            <ToggleGroup 
-              type="single" 
-              value={statusFilter} 
-              onValueChange={(value) => value && setStatusFilter(value as 'all' | 'atrasado' | 'pendente' | 'pago')}
+            <ToggleGroup
+              type="single"
+              value={statusFilter}
+              onValueChange={(value) => value && handleStatusChange(value as 'all' | 'atrasado' | 'pendente' | 'pago')}
               className="gap-1"
             >
               <ToggleGroupItem value="all" size="sm" className="text-xs">
@@ -175,7 +232,7 @@ export function AccountsPayableReceivableTable() {
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'receber' | 'pagar')} className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as 'receber' | 'pagar')} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="receber" className="gap-2">
               <TrendingUp className="w-4 h-4" />
@@ -188,9 +245,11 @@ export function AccountsPayableReceivableTable() {
           </TabsList>
           <TabsContent value="receber" className="mt-4">
             {renderTable()}
+            {renderPagination()}
           </TabsContent>
           <TabsContent value="pagar" className="mt-4">
             {renderTable()}
+            {renderPagination()}
           </TabsContent>
         </Tabs>
       </CardContent>

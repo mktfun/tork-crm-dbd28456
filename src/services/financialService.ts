@@ -794,73 +794,24 @@ export async function getPayableReceivableTransactions(
   const { data: user } = await supabase.auth.getUser();
   if (!user?.user) throw new Error('Usuário não autenticado');
 
-  let query = supabase
-    .from('financial_transactions')
-    .select(`
-      id,
-      description,
-      transaction_date,
-      is_confirmed,
-      is_void,
-      financial_ledger!inner(
-        amount,
-        financial_accounts!inner(
-          type,
-          name
-        )
-      )
-    `)
-    .eq('user_id', user.user.id)
-    .eq('is_void', false)
-    .order('transaction_date', { ascending: false });
-
-  const { data, error } = await query;
+  // Usar a RPC que faz JOIN correto com transactions legado para pegar client_name
+  const { data, error } = await supabase.rpc('get_payable_receivable_transactions', {
+    p_user_id: user.user.id,
+    p_transaction_type: transactionType === 'all' ? null : transactionType,
+    p_status: statusFilter === 'all' ? null : statusFilter
+  });
 
   if (error) throw error;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const transactions: PayableReceivableTransaction[] = (data || []).map((tx: any) => {
-    const ledgerEntry = tx.financial_ledger[0];
-    const account = ledgerEntry?.financial_accounts;
-    const txDate = new Date(tx.transaction_date);
-    txDate.setHours(0, 0, 0, 0);
-    
-    const daysDiff = Math.floor((today.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    let status: 'atrasado' | 'pendente' | 'pago';
-    if (tx.is_confirmed) {
-      status = 'pago';
-    } else if (daysDiff > 0) {
-      status = 'atrasado';
-    } else {
-      status = 'pendente';
-    }
-
-    const type = account?.type === 'revenue' || account?.type === 'income' ? 'receber' : 'pagar';
-
-    return {
-      transactionId: tx.id,
-      transactionType: type,
-      dueDate: tx.transaction_date,
-      entityName: account?.name || 'Não especificado',
-      description: tx.description,
-      amount: Math.abs(ledgerEntry?.amount || 0),
-      status,
-      daysOverdue: status === 'atrasado' ? daysDiff : 0,
-    };
-  });
-
-  let filtered = transactions;
-
-  if (transactionType !== 'all') {
-    filtered = filtered.filter(t => t.transactionType === transactionType);
-  }
-
-  if (statusFilter !== 'all') {
-    filtered = filtered.filter(t => t.status === statusFilter);
-  }
-
-  return filtered;
+  return (data || []).map((row: any) => ({
+    transactionId: row.transaction_id,
+    transactionType: row.transaction_type as 'receber' | 'pagar',
+    dueDate: row.due_date,
+    entityName: row.entity_name || 'Não especificado',
+    description: row.description || '',
+    amount: Math.abs(Number(row.amount) || 0),
+    status: row.status as 'atrasado' | 'pendente' | 'pago',
+    daysOverdue: Number(row.days_overdue) || 0,
+  }));
 }
+
