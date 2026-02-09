@@ -170,6 +170,7 @@ export async function registerRevenue(payload: {
   transactionDate: string;
   revenueAccountId: string;
   assetAccountId: string;
+  bankAccountId?: string;
   referenceNumber?: string;
   memo?: string;
   isConfirmed?: boolean;

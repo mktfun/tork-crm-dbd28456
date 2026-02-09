@@ -27,18 +27,18 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useAllClients } from '@/hooks/useAllClients';
 import { cn } from '@/lib/utils';
 import { PDFDocument } from 'pdf-lib';
-import { 
-  ExtractedPolicyData, 
-  PolicyImportItem, 
+import {
+  ExtractedPolicyData,
+  PolicyImportItem,
   BulkOCRExtractedPolicy,
   BulkOCRResponse,
   DocumentType,
   ImportError
 } from '@/types/policyImport';
-import { 
-  reconcileClient, 
-  matchSeguradora, 
-  matchRamo, 
+import {
+  reconcileClient,
+  matchSeguradora,
+  matchRamo,
   createClient,
   createClientFromEdited,
   uploadPolicyPdf,
@@ -51,6 +51,8 @@ import {
   executePolicyImport,
   PolicyImportResult
 } from '@/services/policyImportService';
+import { getFriendlyErrorMessage, getValidationErrors } from '@/services/errorMessages';
+import { calculateConfidenceScore, getConfidenceBadge } from '@/services/confidenceScore';
 import { useAppStore } from '@/store';
 // v11.0: Mistral Intelligence - OCR + LLM Pipeline
 import { useQueryClient } from '@tanstack/react-query';
@@ -107,36 +109,36 @@ const isDataComplete = (data: any): DataCompletenessResult => {
     'data_inicio',      // Início da vigência
     'data_fim'          // Fim da vigência
   ];
-  
+
   const missing: string[] = [];
-  
+
   for (const field of REQUIRED_FIELDS) {
     const value = data?.[field];
     if (value === null || value === undefined || value === '' || value === 'N/A') {
       missing.push(field);
     }
   }
-  
+
   // CPF/CNPJ: deve ter 11 ou 14 dígitos se presente
   const cpf = data?.cpf_cnpj;
   if (!cpf || (cpf.length !== 11 && cpf.length !== 14)) {
     missing.push('cpf_cnpj');
   }
-  
+
   // Prêmio: pelo menos um dos dois deve ter valor > 0
   const hasValidPremium = (data?.premio_liquido > 0) || (data?.premio_total > 0);
   if (!hasValidPremium) {
     missing.push('premio');
   }
-  
+
   // v12.3: Log de diagnóstico com número de página
   if (missing.length > 0) {
     console.log(`📊 [COMPLETENESS v12.3] Faltando ${missing.length}: ${missing.join(', ')}`);
   }
-  
-  return { 
-    complete: missing.length === 0, 
-    missing 
+
+  return {
+    complete: missing.length === 0,
+    missing
   };
 };
 
@@ -197,12 +199,12 @@ const PremiumStepper = ({ phase }: StepperProps) => {
                 {step.label}
               </span>
             </div>
-            
+
             {idx < steps.length - 1 && (
               <div className={cn(
                 "w-12 h-0.5 mx-3 transition-all duration-500",
-                getStepStatus(steps[idx + 1].id) !== 'pending' 
-                  ? "bg-gradient-to-r from-zinc-400 to-zinc-300" 
+                getStepStatus(steps[idx + 1].id) !== 'pending'
+                  ? "bg-gradient-to-r from-zinc-400 to-zinc-300"
                   : "bg-zinc-800"
               )} />
             )}
@@ -224,10 +226,10 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
   const setActiveBrokerage = useAppStore(state => state.setActiveBrokerage);
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
-  
+
   // v5.5: Hook para busca de clientes
   const { allClients, loading: loadingClients } = useAllClients();
-  
+
   useEffect(() => {
     if (!activeBrokerageId && brokerages.length > 0 && open) {
       console.log('🏢 [AUTO] Selecionando primeira corretora:', brokerages[0].id);
@@ -235,7 +237,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       toast.info(`Corretora "${brokerages[0].name}" selecionada automaticamente`);
     }
   }, [activeBrokerageId, brokerages, setActiveBrokerage, open]);
-  
+
   const [step, setStep] = useState<Step>('upload');
   const [files, setFiles] = useState<File[]>([]);
   const [items, setItems] = useState<PolicyImportItem[]>([]);
@@ -243,46 +245,46 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
   const [importResults, setImportResults] = useState({ success: 0, errors: 0 });
   const [importErrors, setImportErrors] = useState<ImportError[]>([]);
   const [processingStatus, setProcessingStatus] = useState<Map<number, FileProcessingStatus>>(new Map());
-  
+
   const [batchProducerId, setBatchProducerId] = useState<string>('');
   const [batchCommissionRate, setBatchCommissionRate] = useState<string>('');
-  
+
   const [bulkPhase, setBulkPhase] = useState<BulkProcessingPhase>('ocr');
   const [ocrProgress, setOcrProgress] = useState(0);
-  
+
   const [processingMetrics, setProcessingMetrics] = useState<ProcessingMetrics | null>(null);
-  
+
   // Split View: Selected item for PDF preview
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const selectedItem = useMemo(() => 
-    items.find(i => i.id === selectedItemId) || items[0], 
+  const selectedItem = useMemo(() =>
+    items.find(i => i.id === selectedItemId) || items[0],
     [items, selectedItemId]
   );
-  
+
   // Mobile: Drawer for PDF preview
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
-  
+
   const [editedFields, setEditedFields] = useState<Map<string, Set<string>>>(new Map());
-  
+
   // v5.5: Estado para busca de cliente no popover
   const [showClientSearchFor, setShowClientSearchFor] = useState<string | null>(null);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // v5.5: Handler para trocar cliente vinculado
   const handleClientChange = useCallback((itemId: string, newClientId: string) => {
     const selectedClient = allClients.find(c => c.id === newClientId);
     if (selectedClient) {
-      setItems(prev => prev.map(item => 
-        item.id === itemId 
-          ? { 
-              ...item, 
-              clientId: selectedClient.id,
-              clientName: selectedClient.name,
-              clientCpfCnpj: selectedClient.cpfCnpj || item.clientCpfCnpj,
-              clientStatus: 'matched',
-              matchedBy: 'cpf_cnpj'
-            }
+      setItems(prev => prev.map(item =>
+        item.id === itemId
+          ? {
+            ...item,
+            clientId: selectedClient.id,
+            clientName: selectedClient.name,
+            clientCpfCnpj: selectedClient.cpfCnpj || item.clientCpfCnpj,
+            clientStatus: 'matched',
+            matchedBy: 'cpf_cnpj'
+          }
           : item
       ));
       markFieldEdited(itemId, 'clientName');
@@ -293,14 +295,14 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
 
   // v5.5: Handler para desvincular cliente
   const handleUnlinkClient = useCallback((itemId: string) => {
-    setItems(prev => prev.map(item => 
-      item.id === itemId 
-        ? { 
-            ...item, 
-            clientId: undefined,
-            clientStatus: 'new',
-            matchedBy: undefined
-          }
+    setItems(prev => prev.map(item =>
+      item.id === itemId
+        ? {
+          ...item,
+          clientId: undefined,
+          clientStatus: 'new',
+          matchedBy: undefined
+        }
         : item
     ));
     toast.info('Cliente desvinculado');
@@ -360,7 +362,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     markFieldEdited(itemId, 'premioLiquido');
     const item = items.find(i => i.id === itemId);
     if (item) {
-      updateItem(itemId, { 
+      updateItem(itemId, {
         premioLiquido: numValue,
         estimatedCommission: numValue * (item.commissionRate / 100)
       });
@@ -370,7 +372,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
     const MAX_SIZE = 5 * 1024 * 1024;
-    
+
     const validFiles = selectedFiles.filter(file => {
       if (file.size > MAX_SIZE) {
         toast.warning(`${file.name} ignorado: maior que 5MB`);
@@ -382,21 +384,21 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       }
       return true;
     });
-    
+
     setFiles(prev => [...prev, ...validFiles]);
   };
 
   const handleDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     const droppedFiles = Array.from(event.dataTransfer.files);
-    const validFiles = droppedFiles.filter(file => 
+    const validFiles = droppedFiles.filter(file =>
       file.type === 'application/pdf' || file.type.startsWith('image/')
     );
-    
+
     if (validFiles.length !== droppedFiles.length) {
       toast.warning('Alguns arquivos foram ignorados. Apenas PDFs e imagens são aceitos.');
     }
-    
+
     setFiles(prev => [...prev, ...validFiles]);
   }, []);
 
@@ -432,7 +434,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       const newBuffer = new ArrayBuffer(bytes.length);
       const newView = new Uint8Array(newBuffer);
       newView.set(bytes);
-      
+
       const blob = new Blob([newBuffer], { type: 'application/pdf' });
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -451,50 +453,50 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
    * Retorna: { sliceBase64, totalPages, hasMore }
    */
   const slicePdfPages = async (
-    file: File, 
-    startPage: number, 
+    file: File,
+    startPage: number,
     endPage: number
-  ): Promise<{ 
-    sliceBase64: string; 
-    totalPages: number; 
+  ): Promise<{
+    sliceBase64: string;
+    totalPages: number;
     hasMore: boolean;
     actualStart: number;
     actualEnd: number;
   }> => {
     // 1. Lê arquivo como ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
-    
+
     // 2. Carrega PDF
     const pdfDoc = await PDFDocument.load(arrayBuffer);
     const totalPages = pdfDoc.getPageCount();
-    
+
     // 3. Ajusta range
     const actualStart = Math.max(1, startPage);
     const actualEnd = Math.min(endPage, totalPages);
-    
+
     if (actualStart > totalPages) {
-      return { 
-        sliceBase64: '', 
-        totalPages, 
+      return {
+        sliceBase64: '',
+        totalPages,
         hasMore: false,
         actualStart,
         actualEnd: 0
       };
     }
-    
+
     // 4. Cria novo PDF com apenas as páginas solicitadas
     const newDoc = await PDFDocument.create();
     for (let i = actualStart - 1; i < actualEnd; i++) {
       const [page] = await newDoc.copyPages(pdfDoc, [i]);
       newDoc.addPage(page);
     }
-    
+
     // 5. Converte para Base64 de forma SEGURA (sem stack overflow!)
     const pdfBytes = await newDoc.save();
     const sliceBase64 = await bytesToBase64Safe(pdfBytes);
-    
+
     console.log(`✂️ [SLICER v6.1] Páginas ${actualStart}-${actualEnd} de ${totalPages} (${(sliceBase64.length / 1024).toFixed(0)}KB)`);
-    
+
     return {
       sliceBase64,
       totalPages,
@@ -504,17 +506,17 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     };
   };
 
-// ========== v12.3: MISTRAL INTELLIGENCE PIPELINE ==========
+  // ========== v12.3: MISTRAL INTELLIGENCE PIPELINE ==========
   // Fluxo: PDF → Mistral OCR → Markdown → Mistral LLM → JSON
   // Frontend fatia 2 em 2 páginas para evitar timeouts
   // v12.3: REMOVIDO limite de chunks - processa até encontrar dados ou fim do PDF
-  
+
   const PAGES_PER_CHUNK = 2;
   const MAX_CHUNKS = 999; // v12.3: Sem limite artificial - processa o PDF inteiro se necessário
-  
+
   // Estado de descrição da etapa atual
   const [processingLabel, setProcessingLabel] = useState<string>('');
-  
+
   /**
    * Merge de resultados parciais de múltiplos chunks
    * Prioriza valores não-nulos e mais completos
@@ -522,7 +524,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
   const mergeChunkResults = (chunks: any[]): any => {
     if (chunks.length === 0) return null;
     if (chunks.length === 1) return chunks[0];
-    
+
     const merged: any = {};
     const fields = [
       'nome_cliente', 'cpf_cnpj', 'email', 'telefone', 'endereco_completo',
@@ -530,7 +532,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       'data_inicio', 'data_fim', 'objeto_segurado', 'placa',
       'premio_liquido', 'premio_total'
     ];
-    
+
     for (const field of fields) {
       // Para cada campo, pega o primeiro valor não-nulo/não-vazio
       for (const chunk of chunks) {
@@ -547,65 +549,65 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         }
       }
     }
-    
+
     console.log(`🔀 [MERGE] ${chunks.length} chunks consolidados`);
     return merged;
   };
-  
+
   const processFilesWithMistral = async () => {
     if (!user || files.length === 0) return;
-    
+
     setStep('processing');
     setBulkPhase('ocr');
     setOcrProgress(0);
     setProcessingMetrics(null);
-    
+
     const fileMap = new Map<string, File>();
     files.forEach(f => fileMap.set(f.name, f));
-    
+
     const initialStatus = new Map<number, FileProcessingStatus>();
     files.forEach((_, i) => initialStatus.set(i, 'pending'));
     setProcessingStatus(initialStatus);
-    
+
     const startTime = performance.now();
     const results: BulkOCRExtractedPolicy[] = [];
     const errors: { fileName: string; error: string }[] = [];
-    
+
     // v11.0: Process each file via MISTRAL OCR + LLM pipeline
     for (let idx = 0; idx < files.length; idx++) {
       const file = files[idx];
       setProcessingStatus(prev => new Map(prev).set(idx, 'processing'));
       setOcrProgress(idx);
-      
+
       try {
         console.log(`📄 [${idx + 1}/${files.length}] Processando: ${file.name}`);
         setProcessingLabel(`Lendo ${file.name}...`);
-        
+
         const isImage = file.type.startsWith('image/');
         let finalExtracted: any;
-        
+
         if (isImage) {
           // Imagens: envio direto para Mistral
           setBulkPhase('ocr');
           setProcessingLabel('Processando imagem com OCR Mistral...');
-          
+
           const sliceBase64 = await fileToBase64(file);
-          
+
           const { data, error } = await supabase.functions.invoke('analyze-policy-mistral', {
-            body: { 
+            body: {
               base64: sliceBase64,
               fileName: file.name,
               mimeType: file.type,
             }
           });
-          
+
           if (error || !data?.success) {
             throw new Error(data?.error || error?.message || 'Extração falhou');
           }
-          
+
           finalExtracted = data.data;
           console.log(`✅ [MISTRAL] Imagem processada em ${data.durationMs}ms`);
-          
+
         } else {
           // PDFs: Chunking de 2 em 2 páginas com limite de 3 tentativas
           const chunkResults: any[] = [];
@@ -615,57 +617,57 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           let earlyStopTriggered = false;
           let pagesProcessed = 0;
           let chunkCount = 0;
-          
+
           while (hasMore && chunkCount < MAX_CHUNKS) {
             const endPage = currentPage + PAGES_PER_CHUNK - 1;
-            
+
             setBulkPhase('ocr');
             setProcessingLabel(`Lendo páginas ${currentPage}-${endPage}...`);
-            
+
             const slice = await slicePdfPages(file, currentPage, endPage);
             totalPages = slice.totalPages;
             hasMore = slice.hasMore;
-            
+
             if (!slice.sliceBase64) {
               console.log(`⚠️ [CHUNK] Sem conteúdo para páginas ${currentPage}-${endPage}`);
               currentPage = endPage + 1;
               continue;
             }
-            
+
             setBulkPhase('ai');
             setProcessingLabel(`Extraindo dados págs ${slice.actualStart}-${slice.actualEnd}...`);
-            
+
             console.log(`🔄 [MISTRAL v11] Páginas ${slice.actualStart}-${slice.actualEnd} de ${totalPages}`);
-            
+
             const { data, error } = await supabase.functions.invoke('analyze-policy-mistral', {
-              body: { 
+              body: {
                 base64: slice.sliceBase64,
                 fileName: `${file.name}_p${currentPage}-${endPage}`,
                 mimeType: 'application/pdf',
               }
             });
-            
+
             if (error) {
               console.warn(`⚠️ [CHUNK] Erro págs ${currentPage}-${endPage}:`, error.message);
             } else if (data?.success && data.data) {
               chunkResults.push(data.data);
               pagesProcessed = slice.actualEnd;
               chunkCount++;
-              
+
               const ocrMs = data.metrics?.ocrMs || 0;
               const llmMs = data.metrics?.llmMs || 0;
               console.log(`✅ [MISTRAL] Págs ${currentPage}-${endPage}: OCR ${ocrMs}ms + LLM ${llmMs}ms = ${data.durationMs}ms`);
-              
+
               // v12.3: EARLY-STOP CHECK - NUNCA confiar apenas no status do LLM
               const currentMerged = mergeChunkResults(chunkResults);
               const completeness = isDataComplete(currentMerged);
               const isComplete = completeness.complete; // Ignora data.data.status
-              
+
               // Log de trust issue se LLM mentir
               if (data.data.status === 'COMPLETO' && !completeness.complete) {
                 console.warn(`⚠️ [TRUST ISSUE v12.3] LLM disse COMPLETO mas faltam: ${completeness.missing.join(', ')}`);
               }
-              
+
               if (isComplete) {
                 const pagesSkipped = totalPages - slice.actualEnd;
                 earlyStopTriggered = true;
@@ -678,30 +680,30 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                 console.log(`⏳ [CONTINUE v12.3] Pág ${slice.actualEnd}/${totalPages} - Faltando: ${completeness.missing.join(', ')}`);
               }
             }
-            
+
             currentPage = endPage + 1;
           }
-          
+
           if (chunkResults.length === 0) {
             throw new Error('Nenhum chunk extraído com sucesso');
           }
-          
+
           // Merge dos resultados de todos os chunks
           finalExtracted = mergeChunkResults(chunkResults);
-          
+
           // Log final
           const statusLabel = earlyStopTriggered ? '⚡ EARLY-STOP' : '📄 COMPLETO';
           console.log(`✅ [MISTRAL v12.3] ${file.name}: ${pagesProcessed}/${totalPages} págs em ${chunkResults.length} chunk(s) [${statusLabel}]`);
         }
-        
+
         // v11.0: Fase de reconciliação/enrichment
         setBulkPhase('reconciling');
         setProcessingLabel('Enriquecendo dados do cliente...');
-        
+
         // Se tem documento válido, faz upsert automático de cliente
         let autoClientId: string | undefined;
         let autoClientName: string | undefined;
-        
+
         if (finalExtracted.cpf_cnpj) {
           const upsertResult = await upsertClientByDocument(
             finalExtracted.cpf_cnpj,
@@ -717,11 +719,11 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
             console.log(`✅ [UPSERT] Cliente: ${autoClientName} (${upsertResult.created ? 'criado' : 'existente'})`);
           }
         }
-        
+
         // Converte para formato BulkOCRExtractedPolicy
         // v9.0: Detecta tipo de documento (APOLICE ou CARTEIRINHA)
         const tipoDocumento = finalExtracted.tipo_documento || 'APOLICE';
-        
+
         const bulkPolicy: BulkOCRExtractedPolicy = {
           nome_cliente: autoClientName || finalExtracted.nome_cliente || 'Cliente Não Identificado',
           cpf_cnpj: finalExtracted.cpf_cnpj,
@@ -749,10 +751,10 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           operadora: finalExtracted.operadora || null,
           validade_cartao: finalExtracted.validade_cartao || null,
         };
-        
+
         results.push(bulkPolicy);
         setProcessingStatus(prev => new Map(prev).set(idx, 'success'));
-        
+
       } catch (err: any) {
         console.error(`❌ [FAIL] ${file.name}:`, err.message);
         errors.push({ fileName: file.name, error: err.message });
@@ -760,16 +762,16 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         // Continue with next files (don't break the loop)
       }
     }
-    
+
     setOcrProgress(files.length);
-    
+
     const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
     setProcessingMetrics({
       totalDurationSec: totalDuration,
       filesProcessed: files.length,
       policiesExtracted: results.length,
     });
-    
+
     if (results.length === 0) {
       toast.error('Nenhum arquivo processado com sucesso');
       if (errors.length > 0) {
@@ -778,21 +780,21 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       setStep('upload');
       return;
     }
-    
+
     // Show toast with stats
     if (errors.length > 0) {
       toast.warning(`${results.length} processados, ${errors.length} com erro`);
     } else {
       toast.success(`${results.length} arquivo(s) processados com sucesso!`);
     }
-    
+
     // ========== RECONCILIATION PHASE ==========
     setBulkPhase('reconciling');
-    
+
     const processedItems: PolicyImportItem[] = await Promise.all(
       results.map(async (policy) => {
         const file = fileMap.get(policy.arquivo_origem) || files[0];
-        
+
         const extracted: ExtractedPolicyData = {
           cliente: {
             nome_completo: policy.nome_cliente,
@@ -816,22 +818,22 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
             premio_total: sanitizePremio(policy.premio_total),
           },
         };
-        
+
         const clientResult = await reconcileClient(extracted, user.id);
         const seguradoraMatch = await matchSeguradora(policy.nome_seguradora, user.id);
-        const ramoMatch = await matchRamo(policy.ramo_seguro, user.id);
-        
+        const ramoMatch = await matchRamo(policy.ramo_seguro, user.id, seguradoraMatch?.id);
+
         // v5.1: Use directly the objeto_segurado formatted by the parser
         // Avoid duplicating plate info since parser already includes it
         const objetoCompleto = policy.objeto_segurado || policy.descricao_bem || '';
-        
+
         // v5.2: Prioriza nome do banco quando cliente já existe
         const clientNameToUse = clientResult.clientName || policy.nome_cliente || 'Cliente Não Identificado';
-        
+
         // v5.2: Fallback de prêmio líquido se vier zerado
         const premioLiquidoFinal = sanitizePremio(policy.premio_liquido) || sanitizePremio(policy.premio_total) || 0;
         const premioTotalFinal = sanitizePremio(policy.premio_total) || premioLiquidoFinal;
-        
+
         const item: PolicyImportItem = {
           id: crypto.randomUUID(),
           file,
@@ -866,39 +868,42 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           isProcessing: false,
           isProcessed: true,
         };
-        
+
         item.validationErrors = validateImportItem(item);
         item.isValid = item.validationErrors.length === 0;
-        
+
+        // v7.1: Calculate confidence score
+        item.confidenceScore = calculateConfidenceScore(item);
+
         return item;
       })
     );
-    
+
     setItems(processedItems);
     if (processedItems.length > 0) {
       setSelectedItemId(processedItems[0].id);
     }
-    
+
     toast.success(`${processedItems.length} apólice(s) pronta(s) para revisão!`);
     setStep('review');
   };
-  
+
   // v11.0: Mistral Intelligence Pipeline
   const processBulkOCR = processFilesWithMistral;
 
   const updateItem = (id: string, updates: Partial<PolicyImportItem>) => {
     setItems(prev => prev.map(item => {
       if (item.id !== id) return item;
-      
+
       const updated = { ...item, ...updates };
-      
+
       if ('commissionRate' in updates) {
         updated.estimatedCommission = updated.premioLiquido * (updated.commissionRate / 100);
       }
-      
+
       updated.validationErrors = validateImportItem(updated);
       updated.isValid = updated.validationErrors.length === 0;
-      
+
       return updated;
     }));
   };
@@ -921,8 +926,8 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       return;
     }
     setItems(prev => prev.map(item => {
-      const updated = { 
-        ...item, 
+      const updated = {
+        ...item,
         commissionRate: rate,
         estimatedCommission: item.premioLiquido * (rate / 100)
       };
@@ -935,7 +940,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
 
   const processImport = async () => {
     if (!user) return;
-    
+
     const validItems = items.filter(item => item.isValid);
     if (validItems.length === 0) {
       toast.error('Nenhuma apólice válida para importar');
@@ -951,14 +956,14 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
       if (name.toUpperCase().includes('NAO IDENTIFICADO')) return true;
       if (name.length > 60) return true;
       if (name.split(' ').length > 5) return true;
-      
+
       const upper = name.toUpperCase();
       const suspiciousTerms = ['AGORA', 'VOCE', 'PODE', 'PROGRAMA', 'BENEFICIO', 'REALIZAR', 'TERMOS', 'CONDICOES'];
       if (suspiciousTerms.some(t => upper.includes(t))) return true;
-      
+
       return false;
     };
-    
+
     const invalidClients = validItems.filter(item => isNameSuspicious(item.clientName));
 
     if (invalidClients.length > 0) {
@@ -977,11 +982,11 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     setStep('processing');
     setProcessingIndex(0);
     setImportErrors([]);
-    
+
     // v4.0: Fallback para produtor padrão (primeiro da lista)
     const defaultProducerId = batchProducerId || producers[0]?.id || null;
     console.log(`🔧 [IMPORT] Produtor padrão: ${defaultProducerId || 'N/A'}`);
-    
+
     let success = 0;
     let errors = 0;
     const collectedErrors: ImportError[] = [];
@@ -1001,7 +1006,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
 
         if (result.success) {
           success++;
-          
+
           // Log de comissão (informativo)
           if (result.commissionCreated) {
             console.log(`💰 [IMPORT] Comissão criada para: ${item.numeroApolice}`);
@@ -1009,32 +1014,18 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
             console.warn(`⚠️ [IMPORT] Comissão falhou (apólice OK): ${result.commissionError}`);
           }
         } else {
-          // Classificar e coletar erro
-          const importError: ImportError = {
-            itemId: item.id,
-            fileName: item.fileName,
-            clientName: item.clientName,
-            stage: result.errorCode === 'CLIENT_CREATION_FAILED' ? 'cliente' 
-                 : result.errorCode === 'UPLOAD_FAILED' ? 'upload' 
-                 : 'apolice',
-            errorCode: result.errorCode || 'UNKNOWN',
-            errorMessage: result.error || 'Erro desconhecido'
-          };
-          collectedErrors.push(importError);
-          
-          console.table([{
-            arquivo: item.fileName,
-            cliente: item.clientName,
-            etapa: importError.stage,
-            codigo: importError.errorCode,
-            mensagem: importError.errorMessage
-          }]);
-          
           errors++;
+          const friendlyMsg = getFriendlyErrorMessage(result.error);
+          collectedErrors.push({
+            fileName: item.fileName,
+            error: friendlyMsg,
+            errorCode: result.errorCode || 'UNKNOWN',
+          });
+          console.error(`❌ [IMPORT] ${item.fileName}: ${friendlyMsg}`);
         }
       } catch (error: any) {
         console.error('❌ [ERROR] Falha inesperada ao importar:', item.fileName, error);
-        
+
         const importError = classifyImportError(error, item);
         collectedErrors.push(importError);
         errors++;
@@ -1124,12 +1115,12 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
   // REVIEW TABLE ROW COMPONENT - BLACK & SILVER
   // =====================================================
   const ReviewTableRow = ({ item, isSelected }: { item: PolicyImportItem; isSelected: boolean }) => (
-    <TableRow 
+    <TableRow
       onClick={() => setSelectedItemId(item.id)}
       className={cn(
         "border-b border-white/5 transition-all cursor-pointer group",
-        isSelected 
-          ? "bg-white/5 border-l-2 border-l-zinc-400" 
+        isSelected
+          ? "bg-white/5 border-l-2 border-l-zinc-400"
           : "hover:bg-white/[0.02]"
       )}
     >
@@ -1139,15 +1130,15 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
           <div className="space-y-1.5">
             {(() => {
               // v5.4: Validação visual rigorosa de nome
-              const isNameInvalid = !item.clientName?.trim() || 
+              const isNameInvalid = !item.clientName?.trim() ||
                 item.clientName === 'Cliente Não Identificado' ||
                 item.clientName === 'Não Identificado' ||
                 item.clientName.length > 60 ||
                 item.clientName.split(' ').length > 5 ||
-                ['AGORA', 'VOCE', 'PODE', 'PROGRAMA', 'BENEFICIO', 'REALIZAR'].some(t => 
+                ['AGORA', 'VOCE', 'PODE', 'PROGRAMA', 'BENEFICIO', 'REALIZAR'].some(t =>
                   item.clientName?.toUpperCase().includes(t)
                 );
-              
+
               return (
                 <Input
                   value={isNameInvalid && !isFieldEdited(item.id, 'clientName') ? '' : item.clientName}
@@ -1177,7 +1168,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                     onChange={(e) => {
                       const onlyDigits = e.target.value.replace(/\D/g, '');
                       markFieldEdited(item.id, 'clientCpfCnpj');
-                      updateItem(item.id, { 
+                      updateItem(item.id, {
                         clientCpfCnpj: onlyDigits,
                         clientStatus: 'new'
                       });
@@ -1217,7 +1208,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                         </Badge>
                       </div>
                     </div>
-                    
+
                     {/* Dados do Cliente */}
                     <div className="p-3 space-y-2 text-xs">
                       {(() => {
@@ -1231,12 +1222,12 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                             <div className="flex justify-between items-center">
                               <span className="text-zinc-500">CPF/CNPJ:</span>
                               <span className="text-zinc-300 font-mono text-[11px]">
-                                {item.clientCpfCnpj 
+                                {item.clientCpfCnpj
                                   ? item.clientCpfCnpj.length === 11
-                                    ? `${item.clientCpfCnpj.slice(0,3)}.${item.clientCpfCnpj.slice(3,6)}.${item.clientCpfCnpj.slice(6,9)}-${item.clientCpfCnpj.slice(9)}`
+                                    ? `${item.clientCpfCnpj.slice(0, 3)}.${item.clientCpfCnpj.slice(3, 6)}.${item.clientCpfCnpj.slice(6, 9)}-${item.clientCpfCnpj.slice(9)}`
                                     : item.clientCpfCnpj.length === 14
-                                    ? `${item.clientCpfCnpj.slice(0,2)}.${item.clientCpfCnpj.slice(2,5)}.${item.clientCpfCnpj.slice(5,8)}/${item.clientCpfCnpj.slice(8,12)}-${item.clientCpfCnpj.slice(12)}`
-                                    : item.clientCpfCnpj
+                                      ? `${item.clientCpfCnpj.slice(0, 2)}.${item.clientCpfCnpj.slice(2, 5)}.${item.clientCpfCnpj.slice(5, 8)}/${item.clientCpfCnpj.slice(8, 12)}-${item.clientCpfCnpj.slice(12)}`
+                                      : item.clientCpfCnpj
                                   : 'Não informado'}
                               </span>
                             </div>
@@ -1256,7 +1247,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                         );
                       })()}
                     </div>
-                    
+
                     {/* Busca de Cliente (v5.5) */}
                     <div className="p-3 border-t border-zinc-700/50 space-y-2">
                       <p className="text-zinc-500 text-[10px]">Trocar cliente vinculado:</p>
@@ -1273,12 +1264,12 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                         placeholder="Buscar cliente..."
                       />
                     </div>
-                    
+
                     {/* Ações */}
                     <div className="p-2 border-t border-zinc-700/50 flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
+                      <Button
+                        size="sm"
+                        variant="ghost"
                         className="flex-1 h-7 text-xs text-zinc-400 hover:text-red-400"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1329,7 +1320,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                 </Badge>
               )}
             </div>
-            
+
             <Input
               value={item.numeroApolice}
               onChange={(e) => {
@@ -1344,7 +1335,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
               )}
               placeholder="Nº Apólice"
             />
-            
+
             <div className="flex items-center gap-1">
               <span className="text-zinc-600 text-xs">R$</span>
               <Input
@@ -1422,8 +1413,8 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                     className={cn(
                       "h-7 bg-transparent border-zinc-700/50 text-sm transition-all",
                       "focus:bg-zinc-900/50 focus:border-zinc-400",
-                      !item.objetoSegurado && item.ramoNome?.toUpperCase().includes('AUTO') 
-                        && "border-red-500/50 bg-red-900/10 animate-pulse",
+                      !item.objetoSegurado && item.ramoNome?.toUpperCase().includes('AUTO')
+                      && "border-red-500/50 bg-red-900/10 animate-pulse",
                       isFieldEdited(item.id, 'objetoSegurado') && "text-zinc-300 border-zinc-500/50"
                     )}
                     placeholder="VW Golf GTI 2024"
@@ -1433,7 +1424,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                   <p>Veículo, imóvel ou bem segurado</p>
                 </TooltipContent>
               </Tooltip>
-              
+
               <div className="flex items-center gap-1">
                 <Car className="w-3 h-3 text-zinc-600" />
                 <Input
@@ -1587,7 +1578,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent 
+      <DialogContent
         className="max-w-7xl h-[90vh] flex flex-col bg-black/85 backdrop-blur-2xl border border-white/[0.06] p-0 gap-0"
         style={{
           boxShadow: `
@@ -1684,9 +1675,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
             )}
 
             <div className="flex justify-end gap-3 pt-4">
-              <Button 
-                variant="outline" 
-                onClick={handleClose} 
+              <Button
+                variant="outline"
+                onClick={handleClose}
                 className="border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white"
               >
                 Cancelar
@@ -1707,7 +1698,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         {step === 'processing' && items.length === 0 && (
           <div className="flex-1 overflow-auto flex flex-col">
             <PremiumStepper phase={bulkPhase} />
-            
+
             <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6">
               <div className="relative">
                 <div className="w-20 h-20 rounded-full bg-zinc-800/50 flex items-center justify-center border border-zinc-700/50">
@@ -1715,7 +1706,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                 </div>
                 <div className="absolute inset-0 rounded-full border-2 border-zinc-500/30 animate-ping" />
               </div>
-              
+
               <div className="text-center">
                 <p className="text-white font-medium text-lg">{getPhaseLabel()}</p>
                 <p className="text-zinc-500 text-sm mt-1">
@@ -1729,9 +1720,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                   )}
                 </p>
               </div>
-              
+
               <Progress value={getProgressValue()} className="w-full max-w-sm h-2" />
-              
+
               <ScrollArea className="h-40 w-full max-w-md border border-zinc-700/50 rounded-xl bg-zinc-900/30">
                 <div className="p-3 space-y-2">
                   {files.map((file, index) => {
@@ -1760,7 +1751,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
             <div className="w-20 h-20 rounded-full bg-zinc-800/50 flex items-center justify-center border border-zinc-700/50">
               <Loader2 className="w-10 h-10 text-zinc-300 animate-spin" />
             </div>
-            
+
             <div className="text-center">
               <p className="text-white font-medium text-lg">
                 Salvando {processingIndex + 1} de {items.filter(i => i.isValid).length}...
@@ -1769,10 +1760,10 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                 Criando clientes e apólices
               </p>
             </div>
-            
-            <Progress 
-              value={(processingIndex + 1) / items.filter(i => i.isValid).length * 100} 
-              className="w-full max-w-sm h-2" 
+
+            <Progress
+              value={(processingIndex + 1) / items.filter(i => i.isValid).length * 100}
+              className="w-full max-w-sm h-2"
             />
           </div>
         )}
@@ -1784,7 +1775,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
             <div className="flex-shrink-0 px-4 py-3 border-b border-white/5 bg-zinc-900/30">
               <div className="flex flex-wrap items-center gap-4">
                 <span className="text-zinc-500 text-sm font-medium">Aplicar a todos:</span>
-                
+
                 <div className="flex items-center gap-2">
                   <Select value={batchProducerId} onValueChange={setBatchProducerId}>
                     <SelectTrigger className="w-40 h-8 bg-transparent border-zinc-700/50 text-sm">
@@ -1796,11 +1787,11 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={applyBatchProducer} 
-                    disabled={!batchProducerId} 
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={applyBatchProducer}
+                    disabled={!batchProducerId}
                     className="h-8 border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white"
                   >
                     Aplicar
@@ -1815,11 +1806,11 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                     onChange={(e) => setBatchCommissionRate(e.target.value)}
                     className="w-24 h-8 bg-transparent border-zinc-700/50 text-sm"
                   />
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={applyBatchCommission} 
-                    disabled={!batchCommissionRate} 
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={applyBatchCommission}
+                    disabled={!batchCommissionRate}
                     className="h-8 border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white"
                   >
                     Aplicar
@@ -1849,7 +1840,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                     <TooltipProvider>
                       <Table>
                         <TableHeader className="sticky top-0 z-10 bg-zinc-900/95 backdrop-blur-sm">
-                        <TableRow className="border-b border-white/5 hover:bg-transparent">
+                          <TableRow className="border-b border-white/5 hover:bg-transparent">
                             <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Cliente</TableHead>
                             <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Apólice</TableHead>
                             <TableHead className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Vigência</TableHead>
@@ -1863,9 +1854,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                         </TableHeader>
                         <TableBody>
                           {items.map((item) => (
-                            <ReviewTableRow 
-                              key={item.id} 
-                              item={item} 
+                            <ReviewTableRow
+                              key={item.id}
+                              item={item}
                               isSelected={selectedItemId === item.id}
                             />
                           ))}
@@ -1873,11 +1864,11 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                       </Table>
                     </TooltipProvider>
                   </ScrollArea>
-                  
+
                   {/* Mobile PDF Preview Drawer */}
                   <Drawer open={mobilePreviewOpen} onOpenChange={setMobilePreviewOpen}>
                     <DrawerTrigger asChild>
-                      <Button 
+                      <Button
                         className="fixed bottom-24 right-4 rounded-full w-14 h-14 shadow-xl bg-zinc-700 hover:bg-zinc-600 border border-zinc-600"
                       >
                         <Eye className="w-6 h-6" />
@@ -1921,9 +1912,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                           </TableHeader>
                           <TableBody>
                             {items.map((item) => (
-                              <ReviewTableRow 
-                                key={item.id} 
-                                item={item} 
+                              <ReviewTableRow
+                                key={item.id}
+                                item={item}
                                 isSelected={selectedItemId === item.id}
                               />
                             ))}
@@ -1939,14 +1930,14 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
             {/* Footer Actions - BLACK & SILVER */}
             <div className="flex-shrink-0 px-4 py-3 border-t border-white/5 bg-zinc-900/50 flex justify-between items-center">
               <div className="flex items-center gap-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setStep('upload')} 
+                <Button
+                  variant="outline"
+                  onClick={() => setStep('upload')}
                   className="border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white"
                 >
                   ← Voltar
                 </Button>
-                
+
                 {processingMetrics && (
                   <Badge variant="outline" className="bg-zinc-900/50 text-zinc-400 border-zinc-700">
                     <Zap className="w-3 h-3 mr-1 text-zinc-400" />
@@ -1956,11 +1947,11 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                   </Badge>
                 )}
               </div>
-              
+
               <div className="flex gap-3">
-                <Button 
-                  variant="outline" 
-                  onClick={handleClose} 
+                <Button
+                  variant="outline"
+                  onClick={handleClose}
                   className="border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white"
                 >
                   Cancelar
@@ -1987,7 +1978,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
             <div className="w-20 h-20 rounded-full bg-zinc-800/50 flex items-center justify-center border border-zinc-600/50 shadow-lg shadow-zinc-500/10">
               <Check className="w-10 h-10 text-zinc-200" />
             </div>
-            
+
             <div className="text-center">
               <h3 className="text-2xl font-semibold text-white">Importação Concluída!</h3>
               <p className="text-zinc-500 mt-2">
@@ -2046,8 +2037,8 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
               </Collapsible>
             )}
 
-            <Button 
-              onClick={handleClose} 
+            <Button
+              onClick={handleClose}
               className="bg-zinc-100 hover:bg-white text-zinc-950 font-semibold shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] px-8"
             >
               Fechar
