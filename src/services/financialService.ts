@@ -20,21 +20,17 @@ interface RecentTransaction {
   is_void: boolean;
   total_amount: number;
   account_names: string;
-  status: string; // ✅ Campo adicionado pela migration
+  status: string;
 }
 
 // ============ CONTAS ============
 
-/**
- * Busca contas financeiras por tipo via RPC
- */
 export async function getAccountsByType(type: FinancialAccountType): Promise<FinancialAccount[]> {
   const { data, error } = await supabase
     .rpc('get_financial_accounts_by_type', { p_type: type });
 
   if (error) throw error;
 
-  // Mapear snake_case para camelCase
   return (data || []).map((acc: any) => ({
     id: acc.id,
     userId: acc.user_id,
@@ -50,9 +46,6 @@ export async function getAccountsByType(type: FinancialAccountType): Promise<Fin
   }));
 }
 
-/**
- * Busca todas as contas ativas do usuário
- */
 export async function getAllAccounts(): Promise<FinancialAccount[]> {
   const { data, error } = await supabase
     .from('financial_accounts')
@@ -78,17 +71,11 @@ export async function getAllAccounts(): Promise<FinancialAccount[]> {
   }));
 }
 
-/**
- * Garante que existam contas padrão para o usuário
- */
 export async function ensureDefaultAccounts(): Promise<void> {
   const { error } = await supabase.rpc('ensure_default_financial_accounts');
   if (error) throw error;
 }
 
-/**
- * Cria uma nova conta financeira
- */
 export async function createAccount(account: {
   name: string;
   type: FinancialAccountType;
@@ -129,9 +116,6 @@ export async function createAccount(account: {
 
 // ============ TRANSAÇÕES ============
 
-/**
- * Registra uma despesa (Conta Ativo → Conta Despesa)
- */
 export async function registerExpense(payload: {
   description: string;
   amount: number;
@@ -141,7 +125,7 @@ export async function registerExpense(payload: {
   bankAccountId?: string;
   referenceNumber?: string;
   memo?: string;
-  isConfirmed?: boolean; // v1.2: Added to track if expense is paid or pending
+  isConfirmed?: boolean;
 }): Promise<string> {
   const movements: Array<{ account_id: string; amount: number; memo?: string }> = [
     { account_id: payload.expenseAccountId, amount: payload.amount, memo: payload.memo },
@@ -156,16 +140,13 @@ export async function registerExpense(payload: {
     p_related_entity_type: null,
     p_related_entity_id: null,
     p_bank_account_id: payload.bankAccountId || null,
-    p_is_confirmed: payload.isConfirmed ?? false // v1.2: Forward to RPC (defaults to false if not provided)
+    p_is_confirmed: payload.isConfirmed ?? false
   });
 
   if (error) throw error;
   return data;
 }
 
-/**
- * Registra uma receita (Conta Ativo ← Conta Receita)
- */
 export async function registerRevenue(payload: {
   description: string;
   amount: number;
@@ -189,7 +170,6 @@ export async function registerRevenue(payload: {
     p_reference_number: payload.referenceNumber || null,
     p_related_entity_type: null,
     p_related_entity_id: null,
-    // p_related_entity_id duplicado removido
     p_bank_account_id: payload.bankAccountId || null,
     p_is_confirmed: payload.isConfirmed ?? false
   });
@@ -198,9 +178,6 @@ export async function registerRevenue(payload: {
   return data;
 }
 
-/**
- * Busca transações recentes
- */
 export async function getRecentTransactions(params?: {
   limit?: number;
   offset?: number;
@@ -227,10 +204,6 @@ export interface ReverseTransactionResult {
   message?: string;
 }
 
-/**
- * Estorna uma transação usando a RPC void_financial_transaction.
- * Cria lançamentos inversos no ledger e marca a transação original como void.
- */
 export async function reverseTransaction(
   transactionId: string,
   reason: string
@@ -254,11 +227,9 @@ export async function reverseTransaction(
 }
 
 /**
- * @deprecated Use reverseTransaction instead - mantido para compatibilidade
- * Anula uma transação (soft delete) - Esta função não funciona mais devido aos triggers de imutabilidade
+ * @deprecated Use reverseTransaction instead
  */
 export async function voidTransaction(transactionId: string, reason: string): Promise<void> {
-  // Redirecionar para a nova função de estorno
   const result = await reverseTransaction(transactionId, reason);
   if (!result.success) {
     throw new Error(result.error || 'Falha ao estornar transação');
@@ -267,9 +238,6 @@ export async function voidTransaction(transactionId: string, reason: string): Pr
 
 // ============ FLUXO DE CAIXA ============
 
-/**
- * Busca dados de fluxo de caixa para o gráfico
- */
 export async function getCashFlowData(params: {
   startDate: string;
   endDate: string;
@@ -291,9 +259,6 @@ export async function getCashFlowData(params: {
   }));
 }
 
-/**
- * Busca resumo financeiro para KPIs
- */
 export async function getFinancialSummary(params: {
   startDate: string;
   endDate: string;
@@ -305,7 +270,6 @@ export async function getFinancialSummary(params: {
 
   if (error) throw error;
 
-  // A RPC retorna JSON diretamente, não array
   const row = data as any || {};
   return {
     totalIncome: Number(row.totalIncome) || 0,
@@ -320,9 +284,6 @@ export async function getFinancialSummary(params: {
 
 // ============ DRE ============
 
-/**
- * Busca dados do DRE para um ano específico
- */
 export async function getDreData(year?: number): Promise<DreRow[]> {
   const { data, error } = await supabase.rpc('get_dre_data', {
     p_year: year || new Date().getFullYear()
@@ -351,9 +312,6 @@ export async function getDreData(year?: number): Promise<DreRow[]> {
 
 // ============ IMPORTAÇÃO EM MASSA ============
 
-/**
- * Importa múltiplas transações de forma atômica
- */
 export async function bulkImportTransactions(
   payload: BulkImportPayload
 ): Promise<BulkImportResult> {
@@ -385,9 +343,6 @@ export async function bulkImportTransactions(
 
 // ============ GESTÃO DE CONTAS ============
 
-/**
- * Atualiza uma conta financeira
- */
 export async function updateAccount(accountId: string, updates: {
   name: string;
   code?: string;
@@ -418,9 +373,6 @@ export async function updateAccount(accountId: string, updates: {
   };
 }
 
-/**
- * Arquiva uma conta financeira (soft delete)
- */
 export async function archiveAccount(accountId: string): Promise<boolean> {
   const { data, error } = await supabase.rpc('archive_financial_account', {
     p_account_id: accountId
@@ -441,9 +393,6 @@ interface SafeDeleteResult {
   message?: string;
 }
 
-/**
- * Conta lançamentos de uma conta no ledger
- */
 export async function countLedgerEntriesByAccount(accountId: string): Promise<number> {
   const { data, error } = await supabase.rpc('count_ledger_entries_by_account', {
     p_account_id: accountId
@@ -453,9 +402,6 @@ export async function countLedgerEntriesByAccount(accountId: string): Promise<nu
   return data || 0;
 }
 
-/**
- * Exclusão segura de conta com migração opcional
- */
 export async function deleteAccountSafe(
   targetAccountId: string,
   migrateToAccountId?: string
@@ -478,7 +424,6 @@ export async function deleteAccountSafe(
   };
 }
 
-// Interface para transações de receita
 export interface RevenueTransaction {
   id: string;
   description: string;
@@ -493,9 +438,6 @@ export interface RevenueTransaction {
   related_entity_type: string | null;
 }
 
-/**
- * Busca transações de receita com filtro de data
- */
 export async function getRevenueTransactions(params: {
   startDate: string;
   endDate: string;
@@ -529,9 +471,6 @@ interface RevenueTotals {
   legacyTotal: number;
 }
 
-/**
- * Busca totais de receita
- */
 export async function getRevenueTotals(params: {
   startDate: string;
   endDate: string;
@@ -559,9 +498,6 @@ interface BulkConfirmResult {
   message?: string;
 }
 
-/**
- * Confirma recebimento em lote de transações selecionadas.
- */
 export async function bulkConfirmReceipts(transactionIds: string[]): Promise<BulkConfirmResult> {
   const { data, error } = await supabase.rpc('bulk_confirm_receipts', {
     p_transaction_ids: transactionIds
@@ -586,12 +522,6 @@ interface SettleCommissionResult {
   message?: string;
 }
 
-/**
- * Liquida (dá baixa em) uma comissão pendente, creditando em uma conta bancária.
- * @param transactionId - ID da transação no financial_transactions
- * @param bankAccountId - ID da conta bancária (asset) onde o dinheiro entrou
- * @param settlementDate - Data da liquidação (opcional, default: hoje)
- */
 export async function settleCommission(params: {
   transactionId: string;
   bankAccountId: string;
@@ -653,11 +583,6 @@ interface TransactionDetails {
   } | null;
 }
 
-/**
- * Busca detalhes completos de uma transação
- * @param transactionId - ID da transação no financial_transactions
- * @param legacyId - ID da transação legada na tabela transactions (opcional)
- */
 export async function getTransactionDetails(
   transactionId?: string | null,
   legacyId?: string | null
@@ -667,14 +592,12 @@ export async function getTransactionDetails(
     p_legacy_id: legacyId || null
   });
 
-  // Fallback: Se a RPC falhar ou não existir, tenta buscar direto das tabelas
   if (error) {
     console.warn("RPC get_transaction_details falhou, tentando fallback...", error);
 
     const id = transactionId || legacyId;
     if (!id) throw new Error("ID da transação não fornecido");
 
-    // CORREÇÃO DE SEGURANÇA: Obter user_id do contexto de auth
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Usuário não autenticado");
 
@@ -688,12 +611,11 @@ export async function getTransactionDetails(
         )
       `)
       .eq('id', id)
-      .eq('user_id', user.id)  // CORREÇÃO: Filtrar por user_id
+      .eq('user_id', user.id)
       .single();
 
     if (txError) throw txError;
 
-    // Formata para o mesmo padrão da RPC
     return {
       id: tx.id,
       description: tx.description || '',
@@ -723,14 +645,12 @@ export async function getTransactionDetails(
     throw new Error(raw.error);
   }
 
-  // Smart Mapper: aceita tanto camelCase (novo) quanto snake_case (legado)
   const rawMovements = raw.ledgerEntries || raw.ledger_entries || [];
   const rawLegacy = raw.legacyData || raw.legacy_data;
 
   return {
     id: raw.id,
     description: raw.description,
-    // Tenta camelCase primeiro (novo padrão), depois snake_case (legado)
     transactionDate: raw.transactionDate || raw.transaction_date,
     referenceNumber: raw.referenceNumber || raw.reference_number,
     relatedEntityId: raw.relatedEntityId || raw.related_entity_id,
@@ -739,8 +659,6 @@ export async function getTransactionDetails(
     voidReason: raw.voidReason || raw.void_reason,
     createdAt: raw.createdAt || raw.created_at,
     attachments: raw.attachments || [],
-
-    // Mapeamento profundo do Ledger (aceita ambos os formatos)
     ledgerEntries: rawMovements.map((entry: any) => ({
       id: entry.id,
       amount: entry.amount,
@@ -749,8 +667,6 @@ export async function getTransactionDetails(
       accountName: entry.accountName || entry.account_name || 'Conta Desconhecida',
       accountType: entry.accountType || entry.account_type || 'unknown'
     })),
-
-    // Legacy data (aceita ambos os formatos)
     legacyData: rawLegacy ? {
       clientId: rawLegacy.clientId || rawLegacy.client_id,
       clientName: rawLegacy.clientName || rawLegacy.client_name,
@@ -806,9 +722,6 @@ export async function getCashFlowWithProjection(
 
 // ============ NOVOS KPIs: TOTAL GERAL E MÊS ATUAL ============
 
-/**
- * Busca total geral de receitas pendentes (TODAS as datas)
- */
 export async function getTotalPendingReceivables(): Promise<{
   total_amount: number;
   pending_count: number;
@@ -823,9 +736,6 @@ export async function getTotalPendingReceivables(): Promise<{
   };
 }
 
-/**
- * Busca total de receitas pendentes vencendo no mês atual
- */
 export async function getPendingThisMonth(): Promise<{
   total_amount: number;
   pending_count: number;
@@ -850,10 +760,6 @@ export interface LedgerIntegrityIssue {
   amount: number;
 }
 
-/**
- * Executa auditoria de integridade contábil
- * Retorna lista de problemas encontrados no ledger
- */
 export async function auditLedgerIntegrity(): Promise<LedgerIntegrityIssue[]> {
   const { data, error } = await supabase.rpc('audit_ledger_integrity');
 
@@ -881,20 +787,16 @@ export interface PayableReceivableTransaction {
   daysOverdue: number;
 }
 
-/**
- * Busca transa��es a pagar e receber
- * Nota: Schema n�o tem due_date, usando transaction_date como proxy
- */
 export async function getPayableReceivableTransactions(
   transactionType: 'all' | 'receber' | 'pagar' = 'all',
   statusFilter: 'all' | 'atrasado' | 'pendente' | 'pago' = 'all'
-): Promise\u003cPayableReceivableTransaction[]\u003e {
+): Promise<PayableReceivableTransaction[]> {
   const { data: user } = await supabase.auth.getUser();
-  if (!user?.user) throw new Error('Usu�rio n�o autenticado');
+  if (!user?.user) throw new Error('Usuário não autenticado');
 
   let query = supabase
     .from('financial_transactions')
-    .select(
+    .select(`
       id,
       description,
       transaction_date,
@@ -907,7 +809,7 @@ export async function getPayableReceivableTransactions(
           name
         )
       )
-    )
+    `)
     .eq('user_id', user.user.id)
     .eq('is_void', false)
     .order('transaction_date', { ascending: false });
@@ -919,7 +821,7 @@ export async function getPayableReceivableTransactions(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const transactions: PayableReceivableTransaction[] = (data || []).map((tx: any) =\u003e {
+  const transactions: PayableReceivableTransaction[] = (data || []).map((tx: any) => {
     const ledgerEntry = tx.financial_ledger[0];
     const account = ledgerEntry?.financial_accounts;
     const txDate = new Date(tx.transaction_date);
@@ -930,7 +832,7 @@ export async function getPayableReceivableTransactions(
     let status: 'atrasado' | 'pendente' | 'pago';
     if (tx.is_confirmed) {
       status = 'pago';
-    } else if (daysDiff \u003e 0) {
+    } else if (daysDiff > 0) {
       status = 'atrasado';
     } else {
       status = 'pendente';
@@ -942,7 +844,7 @@ export async function getPayableReceivableTransactions(
       transactionId: tx.id,
       transactionType: type,
       dueDate: tx.transaction_date,
-      entityName: account?.name || 'N�o especificado',
+      entityName: account?.name || 'Não especificado',
       description: tx.description,
       amount: Math.abs(ledgerEntry?.amount || 0),
       status,
@@ -953,11 +855,11 @@ export async function getPayableReceivableTransactions(
   let filtered = transactions;
 
   if (transactionType !== 'all') {
-    filtered = filtered.filter(t =\u003e t.transactionType === transactionType);
+    filtered = filtered.filter(t => t.transactionType === transactionType);
   }
 
   if (statusFilter !== 'all') {
-    filtered = filtered.filter(t =\u003e t.status === statusFilter);
+    filtered = filtered.filter(t => t.status === statusFilter);
   }
 
   return filtered;
