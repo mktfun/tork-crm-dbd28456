@@ -1818,6 +1818,7 @@ export type Database = {
           created_by: string
           description: string
           id: string
+          is_confirmed: boolean
           is_reconciled: boolean | null
           is_void: boolean | null
           reconciled_at: string | null
@@ -1839,6 +1840,7 @@ export type Database = {
           created_by: string
           description: string
           id?: string
+          is_confirmed?: boolean
           is_reconciled?: boolean | null
           is_void?: boolean | null
           reconciled_at?: string | null
@@ -1860,6 +1862,7 @@ export type Database = {
           created_by?: string
           description?: string
           id?: string
+          is_confirmed?: boolean
           is_reconciled?: boolean | null
           is_void?: boolean | null
           reconciled_at?: string | null
@@ -3039,17 +3042,43 @@ export type Database = {
       count_pending_legacy_transactions: { Args: never; Returns: number }
       count_problematic_descriptions: { Args: never; Returns: number }
       count_wrong_backfill_dates: { Args: never; Returns: number }
-      create_financial_movement: {
-        Args: {
-          p_description: string
-          p_movements: Json
-          p_reference_number?: string
-          p_related_entity_id?: string
-          p_related_entity_type?: string
-          p_transaction_date: string
-        }
-        Returns: string
-      }
+      create_financial_movement:
+        | {
+            Args: {
+              p_description: string
+              p_movements: Json
+              p_reference_number?: string
+              p_related_entity_id?: string
+              p_related_entity_type?: string
+              p_transaction_date: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_bank_account_id?: string
+              p_description: string
+              p_movements: Json
+              p_reference_number?: string
+              p_related_entity_id?: string
+              p_related_entity_type?: string
+              p_transaction_date: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_bank_account_id?: string
+              p_description: string
+              p_is_confirmed?: boolean
+              p_movements: Json
+              p_reference_number?: string
+              p_related_entity_id?: string
+              p_related_entity_type?: string
+              p_transaction_date: string
+            }
+            Returns: string
+          }
       create_transaction_from_statement: {
         Args: {
           p_category_account_id: string
@@ -3132,25 +3161,15 @@ export type Database = {
         }[]
       }
       get_admin_metrics: { Args: never; Returns: Json }
-      get_aging_report:
-        | {
-            Args: { p_user_id: string }
-            Returns: {
-              bucket_amount: number
-              bucket_color: string
-              bucket_count: number
-              bucket_range: string
-            }[]
-          }
-        | {
-            Args: { p_reference_date?: string; p_user_id: string }
-            Returns: {
-              bucket_amount: number
-              bucket_color: string
-              bucket_count: number
-              bucket_range: string
-            }[]
-          }
+      get_aging_report: {
+        Args: { p_reference_date?: string; p_user_id: string }
+        Returns: {
+          bucket_amount: number
+          bucket_color: string
+          bucket_count: number
+          bucket_range: string
+        }[]
+      }
       get_bank_balance: {
         Args: { p_bank_account_id: string; p_include_pending?: boolean }
         Returns: number
@@ -3161,13 +3180,7 @@ export type Database = {
           p_page?: number
           p_page_size?: number
         }
-        Returns: {
-          page_count: number
-          total_count: number
-          total_expense: number
-          total_income: number
-          transactions: Database["public"]["CompositeTypes"]["bank_transaction_row"][]
-        }[]
+        Returns: Json
       }
       get_brokerage_by_slug: { Args: { p_slug: string }; Returns: Json }
       get_cash_flow_data: {
