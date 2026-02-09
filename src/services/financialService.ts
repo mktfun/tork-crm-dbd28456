@@ -127,10 +127,17 @@ export async function registerExpense(payload: {
   memo?: string;
   isConfirmed?: boolean;
 }): Promise<string> {
-  const movements: Array<{ account_id: string; amount: number; memo?: string }> = [
-    { account_id: payload.expenseAccountId, amount: payload.amount, memo: payload.memo },
-    { account_id: payload.assetAccountId, amount: -payload.amount, memo: payload.memo }
-  ];
+  const movements: Array<{ account_id: string; amount: number; memo?: string }> = [];
+
+  // Lançamento de despesa (sempre ocorre)
+  movements.push({ account_id: payload.expenseAccountId, amount: payload.amount, memo: payload.memo });
+
+  // Contrapartida:
+  // Se tem banco E está pago => Não lança no ledger de contas (será movido no bank_accounts pela RPC)
+  // Se não tem banco OU não está pago => Lança na conta de ativo/passivo informada (ex: Caixa ou Contas a Pagar)
+  if (!payload.bankAccountId || !payload.isConfirmed) {
+    movements.push({ account_id: payload.assetAccountId, amount: -payload.amount, memo: payload.memo });
+  }
 
   const { data, error } = await supabase.rpc('create_financial_movement', {
     p_description: payload.description,
@@ -158,10 +165,17 @@ export async function registerRevenue(payload: {
   memo?: string;
   isConfirmed?: boolean;
 }): Promise<string> {
-  const movements: Array<{ account_id: string; amount: number; memo?: string }> = [
-    { account_id: payload.assetAccountId, amount: payload.amount, memo: payload.memo },
-    { account_id: payload.revenueAccountId, amount: -payload.amount, memo: payload.memo }
-  ];
+  const movements: Array<{ account_id: string; amount: number; memo?: string }> = [];
+
+  // Contrapartida:
+  // Se tem banco E está confirmado => Não lança no ledger de contas (será movido no bank_accounts pela RPC)
+  // Se não tem banco OU pendente => Lança na conta de ativo (ex: Comissões a Receber)
+  if (!payload.bankAccountId || !payload.isConfirmed) {
+    movements.push({ account_id: payload.assetAccountId, amount: payload.amount, memo: payload.memo });
+  }
+
+  // Lançamento de receita (sempre ocorre)
+  movements.push({ account_id: payload.revenueAccountId, amount: -payload.amount, memo: payload.memo });
 
   const { data, error } = await supabase.rpc('create_financial_movement', {
     p_description: payload.description,

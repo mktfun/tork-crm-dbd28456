@@ -28,19 +28,19 @@ import {
 } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
-import { useFinancialAccountsWithDefaults, useRegisterRevenue } from '@/hooks/useFinanceiro';
+import { useFinancialAccountsWithDefaults } from '@/hooks/useFinanceiro';
 import { useBankAccounts } from '@/hooks/useBancos';
+import { registerRevenue } from '@/services/financialService';
 
 const revenueSchema = z.object({
   description: z.string().min(3, 'Descrição deve ter pelo menos 3 caracteres'),
   amount: z.number().positive('Valor deve ser positivo'),
   transactionDate: z.string().min(1, 'Data é obrigatória'),
   revenueAccountId: z.string().min(1, 'Selecione uma categoria'),
-  assetAccountId: z.string().optional(),
   bankAccountId: z.string().optional(),
   referenceNumber: z.string().optional(),
   memo: z.string().optional(),
-  isConfirmed: z.boolean(), // v0.1: Removed .default() - handled by form defaultValues
+  isConfirmed: z.boolean(),
 });
 
 type RevenueFormData = z.infer<typeof revenueSchema>;
@@ -51,13 +51,12 @@ interface NovaReceitaModalProps {
 
 export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
   const [open, setOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: accounts = [], isLoading: loadingAccounts } = useFinancialAccountsWithDefaults();
   const { data: bankSummary } = useBankAccounts();
-  const registerRevenue = useRegisterRevenue();
 
-  // Filtrar contas por tipo
+  // Filtrar contas por tipo - apenas categorias de receita
   const revenueAccounts = accounts.filter(a => a.type === 'revenue');
-  const assetAccounts = accounts.filter(a => a.type === 'asset');
   const banks = bankSummary?.accounts?.filter(b => b.isActive) || [];
 
   const form = useForm<RevenueFormData>({
@@ -67,7 +66,6 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
       amount: 0,
       transactionDate: format(new Date(), 'yyyy-MM-dd'),
       revenueAccountId: '',
-      assetAccountId: '',
       bankAccountId: '',
       referenceNumber: '',
       memo: '',
@@ -76,23 +74,30 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
   });
 
   const onSubmit = async (data: RevenueFormData) => {
+    // Validação: se confirmado, banco é obrigatório
+    if (data.isConfirmed && (!data.bankAccountId || data.bankAccountId === 'none')) {
+      toast.error('Selecione um banco para receitas confirmadas');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      await registerRevenue.mutateAsync({
+      // Buscar conta padrão de "Comissões a Receber" para provisões
+      const defaultAssetAccount = accounts.find(a =>
+        a.type === 'asset' && a.name.toLowerCase().includes('comiss')
+      ) || accounts.find(a => a.type === 'asset');
+
+      if (!defaultAssetAccount) {
+        throw new Error('Conta de ativo padrão não encontrada');
+      }
+
+      await registerRevenue({
         description: data.description,
         amount: data.amount,
         transactionDate: data.transactionDate,
         revenueAccountId: data.revenueAccountId,
-        // Lógica de fallback para assetAccountId
-        assetAccountId: (() => {
-          if (data.assetAccountId) return data.assetAccountId;
-          // Se selecionou banco mas não conta, tenta achar uma conta de ativo padrão (primeira disponível)
-          if (data.bankAccountId && data.bankAccountId !== 'none' && assetAccounts.length > 0) {
-            return assetAccounts[0].id;
-          }
-          // Se não tiver nada, throw para cair no catch
-          throw new Error('Selecione uma conta de destino ou um banco.');
-        })(),
-        bankAccountId: data.bankAccountId || undefined,
+        assetAccountId: defaultAssetAccount.id, // Usa conta padrão para ledger
+        bankAccountId: data.bankAccountId && data.bankAccountId !== 'none' ? data.bankAccountId : undefined,
         referenceNumber: data.referenceNumber,
         memo: data.memo,
         isConfirmed: data.isConfirmed,
@@ -104,6 +109,8 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
     } catch (error: any) {
       console.error('Erro ao registrar receita:', error);
       toast.error(error.message || 'Erro ao registrar receita');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -229,33 +236,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               )}
             />
 
-            {/* Conta de Destino (Ocultar se banco selecionado) */}
-            {(!form.watch('bankAccountId') || form.watch('bankAccountId') === 'none') && (
-              <FormField
-                control={form.control}
-                name="assetAccountId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Conta de Destino</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Onde o dinheiro vai entrar" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {assetAccounts.map((account) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+
 
             {/* Banco (opcional) */}
             <FormField
@@ -263,7 +244,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               name="bankAccountId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Banco / Onde entrou o dinheiro</FormLabel>
+                  <FormLabel>Banco {form.watch('isConfirmed') && '*'}</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
@@ -330,9 +311,9 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               <Button
                 type="submit"
                 className="gap-2 bg-emerald-600 hover:bg-emerald-700"
-                disabled={registerRevenue.isPending || loadingAccounts}
+                disabled={isSubmitting || loadingAccounts}
               >
-                {registerRevenue.isPending ? (
+                {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Salvando...

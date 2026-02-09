@@ -35,7 +35,6 @@ interface FormData {
   amount: string;
   transactionDate: string;
   expenseAccountId: string;
-  assetAccountId: string;
   bankAccountId?: string;
   referenceNumber: string;
 }
@@ -54,7 +53,7 @@ export function NovaDespesaModal() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: expenseAccounts = [], isLoading: loadingExpense } = useFinancialAccounts('expense');
-  const { data: assetAccounts = [], isLoading: loadingAsset } = useFinancialAccounts('asset');
+  const { data: assetAccounts = [] } = useFinancialAccounts('asset'); // Para uso interno
   const { data: bankSummary } = useBankAccounts();
 
   const banks = bankSummary?.accounts?.filter(b => b.isActive) || [];
@@ -67,7 +66,6 @@ export function NovaDespesaModal() {
       amount: '',
       transactionDate: format(new Date(), 'yyyy-MM-dd'),
       expenseAccountId: '',
-      assetAccountId: '',
       bankAccountId: '',
       referenceNumber: ''
     }
@@ -120,6 +118,17 @@ export function NovaDespesaModal() {
         return;
       }
 
+      // Validação: se pago, banco é obrigatório
+      if (isPaid && (!data.bankAccountId || data.bankAccountId === 'none')) {
+        toast.error('Selecione um banco para despesas já pagas');
+        return;
+      }
+
+      // Usa conta de ativo padrão para ledger
+      const defaultAssetAccount = assetAccounts.find(a =>
+        a.name.toLowerCase().includes('caixa')
+      ) || assetAccounts[0];
+
       let attachmentUrl: string | undefined;
 
       // Upload do comprovante se houver
@@ -157,11 +166,11 @@ export function NovaDespesaModal() {
         amount,
         transactionDate: data.transactionDate,
         expenseAccountId: data.expenseAccountId,
-        assetAccountId: data.assetAccountId,
-        bankAccountId: data.bankAccountId || undefined,
+        assetAccountId: defaultAssetAccount?.id || '', // Usa conta padrão
+        bankAccountId: data.bankAccountId && data.bankAccountId !== 'none' ? data.bankAccountId : undefined,
         referenceNumber: data.referenceNumber || undefined,
-        isConfirmed: isPaid, // v1.1: Pass isPaid state to service
-        memo: attachmentUrl, // Salvamos a URL no memo por enquanto
+        isConfirmed: isPaid,
+        memo: attachmentUrl,
       });
 
       toast.success('Despesa registrada com sucesso!');
@@ -174,7 +183,7 @@ export function NovaDespesaModal() {
     }
   };
 
-  const isLoading = loadingExpense || loadingAsset;
+  const isLoading = loadingExpense;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -287,33 +296,9 @@ export function NovaDespesaModal() {
             )}
           </div>
 
-          {/* Conta de Saída (Ativo) */}
+          {/* Banco */}
           <div className="space-y-2">
-            <Label>De onde saiu o dinheiro? *</Label>
-            <Select
-              onValueChange={(value) => setValue('assetAccountId', value)}
-              disabled={isLoading}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a conta" />
-              </SelectTrigger>
-              <SelectContent>
-                {assetAccounts.map((acc) => (
-                  <SelectItem key={acc.id} value={acc.id}>
-                    {acc.code ? `${acc.code} - ${acc.name}` : acc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <input type="hidden" {...register('assetAccountId', { required: 'Selecione uma conta' })} />
-            {errors.assetAccountId && (
-              <p className="text-sm text-destructive">{errors.assetAccountId.message}</p>
-            )}
-          </div>
-
-          {/* Banco (opcional) */}
-          <div className="space-y-2">
-            <Label>Banco (opcional)</Label>
+            <Label>Banco {isPaid && '*'}</Label>
             <Select
               onValueChange={(value) => setValue('bankAccountId', value === 'none' ? '' : value)}
               disabled={isLoading}
