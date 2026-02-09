@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
-import { 
-  TrendingDown, 
+import {
+  TrendingDown,
   Clock,
   Check,
   ArrowRightLeft
@@ -72,7 +72,7 @@ function KpiCard({ title, value, variant, icon: Icon }: KpiProps) {
 export function DespesasTab({ dateRange }: DespesasTabProps) {
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'efetivado' | 'a_pagar'>('efetivado');
-  
+
   const { data: transactions = [], isLoading } = useRecentTransactions('expense');
 
   // Calcular datas normalizadas
@@ -88,9 +88,9 @@ export function DespesasTab({ dateRange }: DespesasTabProps) {
   // Filtrar transações por status
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
-      // is_void indica transação anulada, reference_number com PAID = pago
-      const isPaid = tx.reference_number?.includes('PAID') || tx.is_void === false;
-      
+      // is_confirmed vem do banco e indica se já foi compensado
+      const isPaid = tx.is_confirmed;
+
       if (viewMode === 'efetivado') {
         return isPaid;
       } else {
@@ -101,9 +101,9 @@ export function DespesasTab({ dateRange }: DespesasTabProps) {
 
   // Calcular KPIs
   const kpis = useMemo(() => {
-    const efetivadas = transactions.filter(tx => tx.reference_number?.includes('PAID') || tx.is_void === false);
-    const pendentes = transactions.filter(tx => !(tx.reference_number?.includes('PAID') || tx.is_void === false));
-    
+    const efetivadas = transactions.filter(tx => tx.is_confirmed);
+    const pendentes = transactions.filter(tx => !tx.is_confirmed);
+
     return {
       pago: efetivadas.reduce((sum, tx) => sum + Math.abs(tx.total_amount), 0),
       aPagar: pendentes.reduce((sum, tx) => sum + Math.abs(tx.total_amount), 0)
@@ -154,7 +154,7 @@ export function DespesasTab({ dateRange }: DespesasTabProps) {
             {viewMode === 'efetivado' ? 'Despesas Pagas' : 'Despesas Pendentes'}
           </CardTitle>
           <CardDescription>
-            {viewMode === 'efetivado' 
+            {viewMode === 'efetivado'
               ? 'Transações já liquidadas no período'
               : 'Previsões de pagamento'}
           </CardDescription>
@@ -170,7 +170,7 @@ export function DespesasTab({ dateRange }: DespesasTabProps) {
             <div className="text-center py-12 text-muted-foreground">
               <ArrowRightLeft className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>
-                {viewMode === 'efetivado' 
+                {viewMode === 'efetivado'
                   ? 'Nenhuma despesa paga no período.'
                   : 'Nenhuma despesa pendente.'}
               </p>
@@ -180,11 +180,11 @@ export function DespesasTab({ dateRange }: DespesasTabProps) {
               <div className="space-y-2">
                 {filteredTransactions.map((tx) => {
                   const txDate = parseLocalDate(String(tx.transaction_date));
-                  const isPending = !(tx.reference_number?.includes('PAID') || tx.is_void === false);
-                  
+                  const isPending = !tx.is_confirmed;
+
                   return (
-                    <Card 
-                      key={tx.id} 
+                    <Card
+                      key={tx.id}
                       className={cn(
                         "bg-card/30 border-border/30 cursor-pointer hover:bg-muted/50 transition-colors",
                         isPending && "border-l-2 border-l-amber-500"
@@ -225,7 +225,7 @@ export function DespesasTab({ dateRange }: DespesasTabProps) {
       <RecurringConfigsList />
 
       {/* Details Sheet */}
-      <TransactionDetailsSheet 
+      <TransactionDetailsSheet
         transactionId={detailsId}
         isLegacyId={false}
         open={!!detailsId}
