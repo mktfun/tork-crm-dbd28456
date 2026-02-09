@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-import { useAssetAccounts } from '@/hooks/useCaixaData';
+import { useBankAccounts } from '@/hooks/useBancos';
 import { useSettleCommission } from '@/hooks/useFinanceiro';
 
 interface SettleTransactionModalProps {
@@ -49,7 +49,8 @@ export function SettleTransactionModal({
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [isSettling, setIsSettling] = useState(false);
 
-  const { data: accounts = [], isLoading: accountsLoading } = useAssetAccounts();
+  const { data: bankSummary, isLoading: accountsLoading } = useBankAccounts();
+  const accounts = bankSummary?.accounts ?? [];
   const settleCommission = useSettleCommission();
 
   const handleSettle = async () => {
@@ -139,7 +140,7 @@ export function SettleTransactionModal({
 
           {/* Seleção de conta */}
           <div className="space-y-2">
-            <Label htmlFor="account">Conta de Destino *</Label>
+            <Label htmlFor="account">Em qual conta o dinheiro entrou? *</Label>
             {accountsLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -165,10 +166,13 @@ export function SettleTransactionModal({
                   {accounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-muted-foreground">
-                          {account.code}
-                        </span>
-                        <span>{account.name}</span>
+                        {account.color && (
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: account.color }}
+                          />
+                        )}
+                        <span>{account.bankName}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -178,7 +182,7 @@ export function SettleTransactionModal({
           </div>
 
           <p className="text-xs text-muted-foreground">
-            A baixa será registrada como entrada na conta selecionada e a comissão será 
+            A baixa será registrada como entrada na conta selecionada e a comissão será
             marcada como recebida.
           </p>
         </div>
