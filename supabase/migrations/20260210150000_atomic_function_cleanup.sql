@@ -1,11 +1,9 @@
 -- =====================================================
--- FAXINA ATÔMICA: Limpa TODAS as assinaturas conflitantes
--- e recria as versões definitivas.
--- Deve ser rodado como um bloco único no SQL Editor.
+-- FAXINA ATÔMICA v2: RPC "Bala de Prata" + Trigger Blindado
+-- DROP de todas as sobrecargas + recriação definitiva
 -- =====================================================
 
 -- ===== PARTE 1: get_bank_statement_detailed =====
--- DROP obrigatório: estamos mudando o RETURNS TABLE (adicionando bank_account_id)
 DROP FUNCTION IF EXISTS public.get_bank_statement_detailed(uuid, date, date);
 
 CREATE OR REPLACE FUNCTION public.get_bank_statement_detailed(
@@ -74,12 +72,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- ===== PARTE 2: manual_reconcile_transaction =====
--- Remove TODAS as sobrecargas para evitar "best candidate" 
+-- ===== PARTE 2: manual_reconcile_transaction (Bala de Prata) =====
 DROP FUNCTION IF EXISTS public.manual_reconcile_transaction(uuid);
 DROP FUNCTION IF EXISTS public.manual_reconcile_transaction(uuid, uuid);
 
--- Recria a versão DEFINITIVA com parâmetro opcional
 CREATE OR REPLACE FUNCTION public.manual_reconcile_transaction(
     p_transaction_id UUID,
     p_bank_account_id UUID DEFAULT NULL
@@ -88,38 +84,82 @@ RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
-DECLARE
-  v_user_id UUID := auth.uid();
 BEGIN
-  -- Se informou banco, vincula antes de conciliar
-  IF p_bank_account_id IS NOT NULL THEN
-    UPDATE financial_transactions
-    SET bank_account_id = p_bank_account_id
-    WHERE id = p_transaction_id
-      AND user_id = v_user_id
-      AND NOT COALESCE(is_void, false);
-  END IF;
+    -- Update atômico: vincula banco (se fornecido) e concilia em uma só operação
+    UPDATE financial_transactions 
+    SET 
+        bank_account_id = COALESCE(p_bank_account_id, bank_account_id),
+        reconciled = TRUE,
+        reconciled_at = NOW(),
+        reconciliation_method = 'manual'
+    WHERE id = p_transaction_id;
 
-  -- Valida: transação precisa ter banco para conciliar
-  IF NOT EXISTS (
-    SELECT 1 FROM financial_transactions 
-    WHERE id = p_transaction_id 
-      AND user_id = v_user_id
-      AND bank_account_id IS NOT NULL
-  ) THEN
-    RAISE EXCEPTION 'Não é possível conciliar uma transação sem conta bancária vinculada.';
-  END IF;
-
-  -- Concilia (dispara trigger de saldo)
-  UPDATE financial_transactions
-  SET reconciled = true,
-      reconciliation_method = 'manual',
-      reconciled_at = NOW()
-  WHERE id = p_transaction_id
-    AND user_id = v_user_id
-    AND NOT COALESCE(is_void, false);
+    -- Validação pós-update: garante que tem banco vinculado
+    IF NOT EXISTS (
+        SELECT 1 FROM financial_transactions 
+        WHERE id = p_transaction_id 
+          AND bank_account_id IS NOT NULL
+    ) THEN
+        RAISE EXCEPTION 'Erro: A transação precisa de uma conta bancária para ser conciliada.';
+    END IF;
 END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.manual_reconcile_transaction(uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.manual_reconcile_transaction(uuid, uuid) TO service_role;
+
+-- ===== PARTE 3: Trigger Blindado de Saldo =====
+CREATE OR REPLACE FUNCTION update_bank_balance_on_reconciliation()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_impact NUMERIC;
+BEGIN
+    IF NEW.reconciled = TRUE AND (OLD.reconciled = FALSE OR OLD.reconciled IS NULL) THEN
+        -- Fonte da Verdade: Ledger Contábil
+        SELECT SUM(CASE WHEN a.type = 'revenue' THEN ABS(l.amount) ELSE -ABS(l.amount) END)
+        INTO v_impact
+        FROM financial_ledger l
+        JOIN financial_accounts a ON l.account_id = a.id
+        WHERE l.transaction_id = NEW.id;
+
+        -- Plano B: Cabeçalho da transação
+        IF v_impact IS NULL THEN
+            v_impact := CASE WHEN NEW.type = 'revenue' THEN ABS(NEW.total_amount) ELSE -ABS(NEW.total_amount) END;
+        END IF;
+
+        -- Atualiza saldo se temos valor e conta
+        IF NEW.bank_account_id IS NOT NULL AND v_impact IS NOT NULL THEN
+            UPDATE bank_accounts 
+            SET current_balance = current_balance + v_impact
+            WHERE id = NEW.bank_account_id;
+        END IF;
+
+    ELSIF NEW.reconciled = FALSE AND OLD.reconciled = TRUE THEN
+        -- Estorno: mesma lógica invertida
+        SELECT SUM(CASE WHEN a.type = 'revenue' THEN ABS(l.amount) ELSE -ABS(l.amount) END)
+        INTO v_impact
+        FROM financial_ledger l
+        JOIN financial_accounts a ON l.account_id = a.id
+        WHERE l.transaction_id = NEW.id;
+
+        IF v_impact IS NULL THEN
+            v_impact := CASE WHEN NEW.type = 'revenue' THEN ABS(NEW.total_amount) ELSE -ABS(NEW.total_amount) END;
+        END IF;
+
+        IF OLD.bank_account_id IS NOT NULL AND v_impact IS NOT NULL THEN
+            UPDATE bank_accounts 
+            SET current_balance = current_balance - v_impact
+            WHERE id = OLD.bank_account_id;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Garante que o trigger existe na tabela
+DROP TRIGGER IF EXISTS trg_update_bank_balance_on_reconciliation ON financial_transactions;
+CREATE TRIGGER trg_update_bank_balance_on_reconciliation
+    AFTER UPDATE ON financial_transactions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_bank_balance_on_reconciliation();
