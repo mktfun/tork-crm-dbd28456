@@ -25,7 +25,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 
 import { supabase } from '@/integrations/supabase/client';
-import { useFinancialAccounts, useRegisterExpense } from '@/hooks/useFinanceiro';
+import { useFinancialAccounts, useCreateFinancialMovement } from '@/hooks/useFinanceiro';
 import { useBankAccounts } from '@/hooks/useBancos';
 import { FinancialAccount } from '@/types/financeiro';
 import { Badge } from '@/components/ui/badge';
@@ -58,7 +58,7 @@ export function NovaDespesaModal() {
 
   const banks = bankSummary?.accounts?.filter(b => b.isActive) || [];
 
-  const registerExpense = useRegisterExpense();
+  const { mutate: createMovement, isPending: isCreating } = useCreateFinancialMovement();
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
     defaultValues: {
@@ -118,13 +118,6 @@ export function NovaDespesaModal() {
         return;
       }
 
-
-
-      // Usa conta de ativo padrão para ledger
-      const defaultAssetAccount = assetAccounts.find(a =>
-        a.name.toLowerCase().includes('caixa')
-      ) || assetAccounts[0];
-
       let attachmentUrl: string | undefined;
 
       // Upload do comprovante se houver
@@ -157,25 +150,32 @@ export function NovaDespesaModal() {
         }
       }
 
-      await registerExpense.mutateAsync({
+      createMovement({
         description: data.description,
-        amount,
-        transactionDate: data.transactionDate,
-        expenseAccountId: data.expenseAccountId,
-        assetAccountId: defaultAssetAccount?.id || '', // Usa conta padrão
-        bankAccountId: data.bankAccountId && data.bankAccountId !== 'none' ? data.bankAccountId : undefined,
-        referenceNumber: data.referenceNumber || undefined,
-        isConfirmed: isPaid,
-        memo: attachmentUrl,
+        amount: amount,
+        account_id: data.expenseAccountId,
+        bank_account_id: data.bankAccountId && data.bankAccountId !== 'none' ? data.bankAccountId : undefined,
+        payment_date: data.transactionDate,
+        type: 'expense',
+        reference_number: data.referenceNumber || undefined,
+        memo: attachmentUrl, // Usando memo para a URL do anexo por enquanto, ou conforme lógica original
+        is_confirmed: isPaid
+      }, {
+        onSuccess: () => {
+          toast.success('Despesa registrada com sucesso!');
+          reset();
+          removeAttachment();
+          setOpen(false);
+        },
+        onError: (error: any) => {
+          console.error('Erro ao registrar despesa:', error);
+          toast.error(error.message || 'Erro ao registrar despesa');
+        }
       });
 
-      toast.success('Despesa registrada com sucesso!');
-      reset();
-      removeAttachment();
-      setOpen(false);
     } catch (error: any) {
-      console.error('Erro ao registrar despesa:', error);
-      toast.error(error.message || 'Erro ao registrar despesa');
+      console.error('Erro ao processar formulário:', error);
+      toast.error(error.message || 'Erro ao processar');
     }
   };
 
@@ -393,9 +393,9 @@ export function NovaDespesaModal() {
             </Button>
             <Button
               type="submit"
-              disabled={registerExpense.isPending || isUploading}
+              disabled={isCreating || isUploading}
             >
-              {(registerExpense.isPending || isUploading) ? (
+              {(isCreating || isUploading) ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   {isUploading ? 'Anexando...' : 'Salvando...'}

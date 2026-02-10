@@ -192,6 +192,67 @@ export async function registerRevenue(payload: {
   return data;
 }
 
+export async function createFinancialMovement(payload: {
+  description: string;
+  amount: number;
+  payment_date: string;
+  account_id: string; // The category (expense or revenue account id)
+  bank_account_id?: string;
+  type: 'expense' | 'revenue';
+  reference_number?: string;
+  memo?: string;
+  is_confirmed?: boolean;
+}) {
+  // Logic to find a default asset account if bank not provided
+  // We need to fetch accounts to find a default one (e.g. 'Caixa').
+  // Since this runs on client side (service), we can query supabase directly.
+
+  let assetAccountId = '';
+
+  // Try to find a default asset account (e.g. Caixa)
+  const { data: accounts } = await supabase
+    .from('financial_accounts')
+    .select('id, name, type')
+    .eq('status', 'active')
+    .eq('type', 'asset');
+
+  if (accounts && accounts.length > 0) {
+    const caixa = accounts.find(a => a.name.toLowerCase().includes('caixa'));
+    assetAccountId = caixa ? caixa.id : accounts[0].id;
+  } else {
+    // If no asset account exists, we might fail or let the specific function fail.
+    // For now, let's assume one exists or the specific function handles it (it requires it).
+    // Warning: registerExpense/Revenue Require 'assetAccountId'.
+    console.warn('No asset account found for default counterpart');
+  }
+
+  if (payload.type === 'expense') {
+    return registerExpense({
+      description: payload.description,
+      amount: payload.amount,
+      transactionDate: payload.payment_date,
+      expenseAccountId: payload.account_id,
+      assetAccountId: assetAccountId,
+      bankAccountId: payload.bank_account_id,
+      referenceNumber: payload.reference_number,
+      memo: payload.memo,
+      isConfirmed: payload.is_confirmed ?? true
+    });
+  } else {
+    return registerRevenue({
+      description: payload.description,
+      amount: payload.amount,
+      transactionDate: payload.payment_date,
+      revenueAccountId: payload.account_id,
+      assetAccountId: assetAccountId,
+      bankAccountId: payload.bank_account_id,
+      referenceNumber: payload.reference_number,
+      memo: payload.memo,
+      isConfirmed: payload.is_confirmed ?? true
+    });
+  }
+}
+
 export async function getRecentTransactions(params?: {
   limit?: number;
   offset?: number;

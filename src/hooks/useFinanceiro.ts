@@ -104,6 +104,25 @@ export function useCreateAccount() {
 }
 
 /**
+ * Hook universal para criar movimentação financeira (Receita ou Despesa)
+ */
+export function useCreateFinancialMovement() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: financialService.createFinancialMovement,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['revenue-transactions'] });
+    }
+  });
+}
+
+/**
  * Hook para anular transação (deprecated - use useReverseTransaction)
  */
 export function useVoidTransaction() {

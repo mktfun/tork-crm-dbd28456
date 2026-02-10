@@ -20,6 +20,7 @@ export interface BankStatementEntry {
     created_at: string;
 }
 
+// ...
 export interface PendingReconciliationItem {
     source: 'statement' | 'system';
     id: string;
@@ -29,7 +30,11 @@ export interface PendingReconciliationItem {
     reference_number: string | null;
     status: string;
     matched_id: string | null;
+    type: 'revenue' | 'expense' | 'receita' | 'despesa'; // Allow both for now
 }
+// ...
+
+
 
 export interface MatchSuggestion {
     statement_entry_id: string;
@@ -135,6 +140,7 @@ export function usePendingReconciliation(
             }
 
             // Mapear Sistema (nomes simplificados)
+            // Mapear Sistema (nomes simplificados)
             const systemItems: PendingReconciliationItem[] = (systemResult.data || []).map((item: any) => ({
                 source: 'system',
                 id: item.id,
@@ -143,7 +149,8 @@ export function usePendingReconciliation(
                 amount: item.amount,
                 reference_number: null,
                 status: 'pending', // Status visual na lista
-                matched_id: null
+                matched_id: null,
+                type: item.type || (item.amount < 0 ? 'expense' : 'revenue') // Fallback if type missing
             }));
 
             // Mapear Extrato
