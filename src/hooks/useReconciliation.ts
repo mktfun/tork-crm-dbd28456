@@ -326,6 +326,40 @@ export function useReconcileTransactionDirectly() {
 }
 
 /**
+ * Mutation para desfazer conciliação (Estorno)
+ */
+export function useUnreconcileTransaction() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (systemTransactionId: string) => {
+            const { data, error } = await (supabase.rpc as any)('unreconcile_transaction', {
+                p_transaction_id: systemTransactionId,
+            });
+
+            if (error) throw error;
+
+            return { success: true };
+        },
+        onSuccess: () => {
+            // Invalida tudo para garantir consistência
+            queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard-financial-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['account-balances'] });
+
+            toast.success('Conciliação desfeita com sucesso!');
+        },
+        onError: (error: Error) => {
+            toast.error(`Erro ao desfazer conciliação: ${error.message}`);
+        },
+    });
+}
+
+/**
  * Mutation para ignorar entrada do extrato
  */
 export function useIgnoreEntry() {
