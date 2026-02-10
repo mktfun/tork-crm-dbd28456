@@ -27,6 +27,7 @@ import {
     usePendingReconciliation,
     useMatchSuggestions,
     useReconcileManual,
+    useReconcileTransactionDirectly,
     useIgnoreEntry,
     useReconciliationDashboard
 } from '@/hooks/useReconciliation';
@@ -58,6 +59,7 @@ export function ReconciliationPage() {
 
     // Mutations
     const reconcileMutation = useReconcileManual();
+    const reconcileDirectlyMutation = useReconcileTransactionDirectly();
     const ignoreMutation = useIgnoreEntry();
 
     // Dados do dashboard para a conta selecionada
@@ -383,18 +385,18 @@ export function ReconciliationPage() {
                                     {pendingData.system.map((item) => (
                                         <AppCard
                                             key={item.id}
-                                            className={`p-3 cursor-pointer transition-all ${selectedSystemIds.includes(item.id)
+                                            className={`p-3 transition-all ${selectedSystemIds.includes(item.id)
                                                 ? 'ring-2 ring-primary bg-primary/5'
                                                 : 'hover:bg-muted/50'
                                                 }`}
-                                            onClick={() => handleSelectSystemItem(item.id)}
                                         >
                                             <div className="flex items-center gap-3">
                                                 <Checkbox
                                                     checked={selectedSystemIds.includes(item.id)}
                                                     onCheckedChange={() => handleSelectSystemItem(item.id)}
+                                                    onClick={(e) => e.stopPropagation()}
                                                 />
-                                                <div className="flex-1 min-w-0">
+                                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleSelectSystemItem(item.id)}>
                                                     <p className="font-medium text-sm truncate">{item.description}</p>
                                                     <p className="text-xs text-muted-foreground">
                                                         {formatDate(item.transaction_date)}
@@ -404,6 +406,19 @@ export function ReconciliationPage() {
                                                     }`}>
                                                     {formatCurrency(item.amount)}
                                                 </p>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        reconcileDirectlyMutation.mutate(item.id);
+                                                    }}
+                                                    disabled={reconcileDirectlyMutation.isPending}
+                                                    className="gap-2 ml-2 flex-shrink-0"
+                                                >
+                                                    <CheckCircle2 className="w-3 h-3" />
+                                                    Conciliar
+                                                </Button>
                                             </div>
                                         </AppCard>
                                     ))}

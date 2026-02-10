@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { format, isValid, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  Calendar, 
-  FileText, 
-  User, 
-  FileCheck, 
+import {
+  Calendar,
+  FileText,
+  User,
+  FileCheck,
   ArrowUpDown,
   ExternalLink,
   Loader2,
@@ -73,7 +73,7 @@ import { parseDateOnly } from '@/lib/utils';
 // Helper seguro para formatar datas - evita "Invalid time value"
 function safeFormatDate(dateValue: string | null | undefined, formatStr: string, fallback: string = '---'): string {
   if (!dateValue) return fallback;
-  
+
   try {
     // Usa parseDateOnly para evitar o bug do dia anterior
     const parsed = parseDateOnly(dateValue);
@@ -101,7 +101,7 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
   const reverseTransaction = useReverseTransaction();
   const settleCommission = useSettleCommission();
   const { data: assetAccounts = [] } = useFinancialAccounts('asset');
-  
+
   const [showReverseDialog, setShowReverseDialog] = useState(false);
   const [reverseReason, setReverseReason] = useState('');
   const [showSettlementDialog, setShowSettlementDialog] = useState(false);
@@ -110,19 +110,26 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
   // Debug: Ver dados recebidos
   console.log('🔍 DADOS RECEBIDOS NA GAVETA:', transaction);
 
-  // Calcular valor total (soma dos valores positivos) - com fallback para array vazio
+  // Calcular valor total baseado no TIPO DA CONTA (não no sinal)
+  // Isso garante compatibilidade entre o modelo legado (pares) e o moderno (single-entry)
   const entries = transaction?.ledgerEntries ?? [];
-  const totalAmount = entries
-    .filter(e => e.amount > 0)
-    .reduce((sum, e) => sum + e.amount, 0);
+
+  const totalAmount = entries.reduce((acc, entry) => {
+    // Contas de resultado (revenue/expense) = SEMPRE usar valor absoluto
+    if (entry.accountType === 'revenue' || entry.accountType === 'expense') {
+      return acc + Math.abs(entry.amount);
+    }
+    // Contas patrimoniais (asset/liability) = ignorar no cálculo do "valor da transação"
+    return acc;
+  }, 0);
 
   // Verificar se é transação sincronizada (não pode ser editada manualmente)
-  const isSynchronized = transaction?.relatedEntityType === 'legacy_transaction' || 
-                         transaction?.relatedEntityType === 'policy';
-  
+  const isSynchronized = transaction?.relatedEntityType === 'legacy_transaction' ||
+    transaction?.relatedEntityType === 'policy';
+
   // Verificar se já foi anulada
   const isVoid = transaction?.isVoid ?? false;
-  
+
   // Verificar se é um estorno
   const isReversal = transaction?.relatedEntityType === 'reversal';
 
@@ -132,10 +139,10 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
   // ✅ CORREÇÃO: Verificar se é uma provisão pendente de baixa
   // Agora considera TANTO legacy_transaction QUANTO policy com status 'pending'
   const transactionStatus = (transaction as any)?.status || transaction?.legacyData?.originalStatus;
-  const isPendingSettlement = !isVoid && !isReversal && 
+  const isPendingSettlement = !isVoid && !isReversal &&
     (transaction?.relatedEntityType === 'legacy_transaction' || transaction?.relatedEntityType === 'policy') &&
     (transactionStatus === 'pending' || transaction?.legacyData?.originalStatus === 'PENDENTE');
-  
+
   // Verificar se é origem de apólice (para exibição correta)
   const isFromPolicy = transaction?.relatedEntityType === 'policy';
 
@@ -217,9 +224,9 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                   <Skeleton className="h-5 w-20" />
                 </div>
               </div>
-              
+
               <Skeleton className="h-px w-full" />
-              
+
               {/* Skeleton dos metadados */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -231,9 +238,9 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                   <Skeleton className="h-5 w-28" />
                 </div>
               </div>
-              
+
               <Skeleton className="h-px w-full" />
-              
+
               {/* Skeleton dos links */}
               <div className="space-y-3">
                 <Skeleton className="h-4 w-24" />
@@ -242,9 +249,9 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                   <Skeleton className="h-9 w-32" />
                 </div>
               </div>
-              
+
               <Skeleton className="h-px w-full" />
-              
+
               {/* Skeleton dos movimentos */}
               <div className="space-y-3">
                 <Skeleton className="h-4 w-36" />
@@ -272,7 +279,7 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                   <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                     {transaction.description}
                   </p>
-                  
+
                   {/* Badges de Status */}
                   <div className="flex flex-wrap justify-center gap-2 mt-3">
                     {isVoid && (
@@ -376,24 +383,24 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                           <Button asChild variant="outline" size="sm" className="gap-2">
                             <Link to={`/dashboard/policies/${transaction.legacyData.policyId}`}>
                               <FileCheck className="w-4 h-4" />
-                              {transaction.legacyData.policyNumber 
+                              {transaction.legacyData.policyNumber
                                 ? `Apólice #${transaction.legacyData.policyNumber.slice(0, 10)}`
                                 : 'Ver Apólice'}
                             </Link>
                           </Button>
                         )}
-                        
+
                         {/* Link direto via relatedEntityType (quando não há legacyData) */}
-                        {!transaction.legacyData?.policyId && 
-                         transaction.relatedEntityType === 'policy' && 
-                         transaction.relatedEntityId && (
-                          <Button asChild variant="outline" size="sm" className="gap-2">
-                            <Link to={`/dashboard/policies/${transaction.relatedEntityId}`}>
-                              <FileWarning className="w-4 h-4" />
-                              Ver Apólice Relacionada
-                            </Link>
-                          </Button>
-                        )}
+                        {!transaction.legacyData?.policyId &&
+                          transaction.relatedEntityType === 'policy' &&
+                          transaction.relatedEntityId && (
+                            <Button asChild variant="outline" size="sm" className="gap-2">
+                              <Link to={`/dashboard/policies/${transaction.relatedEntityId}`}>
+                                <FileWarning className="w-4 h-4" />
+                                Ver Apólice Relacionada
+                              </Link>
+                            </Button>
+                          )}
                       </div>
 
                       {/* Dados Adicionais do Legado */}
@@ -425,25 +432,33 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                     Movimentos Contábeis
                   </h4>
                   <div className="space-y-2">
-                    {transaction.ledgerEntries.map((entry) => (
-                      <div 
-                        key={entry.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Badge 
-                            variant={entry.amount > 0 ? "default" : "secondary"}
-                            className="text-xs font-mono"
-                          >
-                            {entry.amount > 0 ? 'D' : 'C'}
-                          </Badge>
-                          <span className="text-sm">{entry.accountName}</span>
+                    {transaction.ledgerEntries.map((entry) => {
+                      // Contas de resultado: mostrar valor absoluto, sem sinal negativo
+                      const isResultAccount = entry.accountType === 'revenue' || entry.accountType === 'expense';
+                      const displayAmount = isResultAccount ? Math.abs(entry.amount) : entry.amount;
+                      const isRevenue = entry.accountType === 'revenue';
+                      const isExpense = entry.accountType === 'expense';
+
+                      return (
+                        <div
+                          key={entry.id}
+                          className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant={isRevenue ? "default" : isExpense ? "destructive" : entry.amount > 0 ? "default" : "secondary"}
+                              className="text-xs font-mono"
+                            >
+                              {isRevenue ? 'R' : isExpense ? 'D' : entry.amount > 0 ? 'D' : 'C'}
+                            </Badge>
+                            <span className="text-sm">{entry.accountName}</span>
+                          </div>
+                          <span className={`font-medium ${isRevenue ? 'text-emerald-500' : isExpense ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {isRevenue ? '+' : isExpense ? '-' : ''}{formatCurrency(displayAmount)}
+                          </span>
                         </div>
-                        <span className={`font-medium ${entry.amount > 0 ? 'text-emerald-500' : 'text-muted-foreground'}`}>
-                          {entry.amount > 0 ? '+' : ''}{formatCurrency(entry.amount)}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -458,11 +473,11 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                       </h4>
                       <div className="flex flex-wrap gap-2">
                         {transaction.attachments.map((url, idx) => (
-                          <Button 
-                            key={idx} 
-                            asChild 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            key={idx}
+                            asChild
+                            variant="outline"
+                            size="sm"
                             className="gap-2"
                           >
                             <a href={url} target="_blank" rel="noopener noreferrer">
@@ -511,9 +526,9 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
                       <Info className="w-4 h-4 flex-shrink-0" />
                       <span>
-                        {isVoid 
-                          ? 'Esta transação já foi anulada.' 
-                          : isReversal 
+                        {isVoid
+                          ? 'Esta transação já foi anulada.'
+                          : isReversal
                             ? 'Estornos não podem ser estornados novamente.'
                             : 'Esta transação não pode ser estornada.'}
                       </span>
@@ -547,7 +562,7 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4">
               <p>
-                Sistemas contábeis não permitem exclusão de lançamentos. 
+                Sistemas contábeis não permitem exclusão de lançamentos.
                 O estorno criará uma nova transação com valores inversos, zerando o saldo.
               </p>
               <div className="space-y-2">

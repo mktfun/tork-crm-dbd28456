@@ -239,6 +239,36 @@ export function useReconcileManual() {
 }
 
 /**
+ * Mutation para conciliar transação diretamente (SEM match com extrato)
+ */
+export function useReconcileTransactionDirectly() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (systemTransactionId: string) => {
+            const { data, error } = await (supabase.rpc as any)('manual_reconcile_transaction', {
+                p_transaction_id: systemTransactionId,
+            });
+
+            if (error) throw error;
+
+            return { success: true };
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['account-balances'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+            toast.success('Transação conciliada manualmente!');
+        },
+        onError: (error: Error) => {
+            toast.error(`Erro ao conciliar: ${error.message}`);
+        },
+    });
+}
+
+/**
  * Mutation para ignorar entrada do extrato
  */
 export function useIgnoreEntry() {
