@@ -134,7 +134,7 @@ export function usePendingReconciliation(
                 throw statementResult.error;
             }
 
-            // Mapear Sistema
+            // Mapear Sistema (nomes simplificados)
             const systemItems: PendingReconciliationItem[] = (systemResult.data || []).map((item: any) => ({
                 source: 'system',
                 id: item.id,
@@ -152,8 +152,7 @@ export function usePendingReconciliation(
                 id: item.id,
                 transaction_date: item.transaction_date,
                 description: item.description,
-                amount: item.amount, // Valor absoluto ou real? Extrato geralmente vem com sinal. 
-                // Assumindo que a UI trata. Se for entrada é positivo, saida negativo.
+                amount: item.amount,
                 reference_number: item.reference_number,
                 status: item.reconciliation_status,
                 matched_id: item.matched_transaction_id
@@ -289,6 +288,7 @@ export function useReconcileTransactionDirectly() {
 
     return useMutation({
         mutationFn: async (systemTransactionId: string) => {
+            // Usa o nome exato do parâmetro SQL: p_transaction_id
             const { data, error } = await (supabase.rpc as any)('manual_reconcile_transaction', {
                 p_transaction_id: systemTransactionId,
             });
@@ -298,15 +298,19 @@ export function useReconcileTransactionDirectly() {
             return { success: true };
         },
         onSuccess: () => {
+            // Invalida a lista de conciliação e outras dependentes
+            queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['transactions-reconciliation'] });
+
+            // Invalidações adicionais para garantir consistência total na UI
             queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard-financial-kpis'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['account-balances'] });
-            queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
-            queryClient.invalidateQueries({ queryKey: ['financial-transactions'] }); // Atualiza a lista geral
-            queryClient.invalidateQueries({ queryKey: ['dashboard-financial-kpis'] }); // Atualiza KPIs
-            // Adicione outras chaves se necessário
-            toast.success('Transação conciliada manualmente!');
+
+            toast.success('Transação conciliada e saldo bancário atualizado!');
         },
         onError: (error: Error) => {
             toast.error(`Erro ao conciliar: ${error.message}`);
