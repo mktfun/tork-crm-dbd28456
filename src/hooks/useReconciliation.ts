@@ -103,22 +103,65 @@ export function usePendingReconciliation(
         queryFn: async () => {
             if (!user || !bankAccountId) return { statement: [], system: [] };
 
-            const { data, error } = await (supabase.rpc as any)('get_pending_reconciliation', {
-                p_bank_account_id: bankAccountId,
-                p_start_date: startDate || null,
-                p_end_date: endDate || null,
+            // 1. Buscar transações do sistema (RPC nova)
+            const systemPromise = (supabase.rpc as any)('get_transactions_for_reconciliation', {
+                p_bank_account_id: bankAccountId
             });
 
-            if (error) {
-                console.error('Erro ao buscar pendentes:', error);
-                throw error;
+            // 2. Buscar entradas do extrato (Tabela direta)
+            let statementQuery = supabase
+                .from('bank_statement_entries')
+                .select('*')
+                .eq('bank_account_id', bankAccountId)
+                .eq('reconciliation_status', 'pending');
+
+            if (startDate && endDate) {
+                statementQuery = statementQuery
+                    .gte('transaction_date', startDate)
+                    .lte('transaction_date', endDate);
             }
 
-            const items = (data || []) as PendingReconciliationItem[];
+            const statementPromise = statementQuery;
+
+            const [systemResult, statementResult] = await Promise.all([systemPromise, statementPromise]);
+
+            if (systemResult.error) {
+                console.error('Erro ao buscar sistema:', systemResult.error);
+                throw systemResult.error;
+            }
+            if (statementResult.error) {
+                console.error('Erro ao buscar extrato:', statementResult.error);
+                throw statementResult.error;
+            }
+
+            // Mapear Sistema
+            const systemItems: PendingReconciliationItem[] = (systemResult.data || []).map((item: any) => ({
+                source: 'system',
+                id: item.id,
+                transaction_date: item.transaction_date,
+                description: item.description,
+                amount: item.amount,
+                reference_number: null,
+                status: 'pending', // Status visual na lista
+                matched_id: null
+            }));
+
+            // Mapear Extrato
+            const statementItems: PendingReconciliationItem[] = (statementResult.data || []).map((item: any) => ({
+                source: 'statement',
+                id: item.id,
+                transaction_date: item.transaction_date,
+                description: item.description,
+                amount: item.amount, // Valor absoluto ou real? Extrato geralmente vem com sinal. 
+                // Assumindo que a UI trata. Se for entrada é positivo, saida negativo.
+                reference_number: item.reference_number,
+                status: item.reconciliation_status,
+                matched_id: item.matched_transaction_id
+            }));
 
             return {
-                statement: items.filter(i => i.source === 'statement'),
-                system: items.filter(i => i.source === 'system'),
+                statement: statementItems,
+                system: systemItems,
             };
         },
         enabled: !!user && !!bankAccountId,
@@ -260,6 +303,9 @@ export function useReconcileTransactionDirectly() {
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['account-balances'] });
             queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['financial-transactions'] }); // Atualiza a lista geral
+            queryClient.invalidateQueries({ queryKey: ['dashboard-financial-kpis'] }); // Atualiza KPIs
+            // Adicione outras chaves se necessário
             toast.success('Transação conciliada manualmente!');
         },
         onError: (error: Error) => {
