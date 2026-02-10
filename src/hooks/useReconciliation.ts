@@ -247,6 +247,53 @@ export function useBankStatementEntries(
 }
 
 /**
+ * Hook para buscar extrato detalhado com auditoria e saldo progressivo
+ */
+export interface DetailedStatementItem {
+    id: string;
+    payment_date: string;
+    document_number: string | null;
+    description: string;
+    category_name: string;
+    revenue_amount: number;
+    expense_amount: number;
+    running_balance: number;
+    status: string;
+    reconciled: boolean;
+    method: string;
+}
+
+export function useBankStatementDetailed(
+    bankAccountId: string | null,
+    startDate: string,
+    endDate: string
+) {
+    const { user } = useAuth();
+
+    return useQuery({
+        queryKey: ['bank-statement-detailed', user?.id, bankAccountId, startDate, endDate],
+        queryFn: async () => {
+            if (!user) return [];
+
+            const { data, error } = await (supabase.rpc as any)('get_bank_statement_detailed', {
+                p_bank_account_id: bankAccountId,
+                p_start_date: startDate,
+                p_end_date: endDate
+            });
+
+            if (error) {
+                console.error('Erro ao buscar extrato detalhado:', error);
+                throw error;
+            }
+
+            return (data || []) as DetailedStatementItem[];
+        },
+        enabled: !!user && !!startDate && !!endDate,
+        staleTime: 30 * 1000,
+    });
+}
+
+/**
  * Mutation para conciliar transações manualmente
  */
 export function useReconcileManual() {
