@@ -107,19 +107,12 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
   const [showSettlementDialog, setShowSettlementDialog] = useState(false);
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>('');
 
-  // Debug: Ver dados recebidos
-  console.log('🔍 DADOS RECEBIDOS NA GAVETA:', transaction);
-
-  // Calcular valor total baseado no TIPO DA CONTA (não no sinal)
-  // Isso garante compatibilidade entre o modelo legado (pares) e o moderno (single-entry)
+  // Calcular valor total - Prioriza total_amount da transação (agora confiável)
   const entries = transaction?.ledgerEntries ?? [];
-
-  const totalAmount = entries.reduce((acc, entry) => {
-    // Contas de resultado (revenue/expense) = SEMPRE usar valor absoluto
+  const headerAmount = transaction?.amount || entries.reduce((acc, entry) => {
     if (entry.accountType === 'revenue' || entry.accountType === 'expense') {
       return acc + Math.abs(entry.amount);
     }
-    // Contas patrimoniais (asset/liability) = ignorar no cálculo do "valor da transação"
     return acc;
   }, 0);
 
@@ -274,7 +267,7 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                 {/* Valor em Destaque */}
                 <div className="text-center p-6 rounded-lg bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20">
                   <p className={`text-3xl font-bold ${isVoid ? 'text-muted-foreground line-through' : 'text-emerald-500'}`}>
-                    {formatCurrency(totalAmount)}
+                    {formatCurrency(headerAmount)}
                   </p>
                   <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                     {transaction.description}
@@ -611,7 +604,7 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
             <AlertDialogDescription asChild>
               <div className="space-y-4">
                 <p>
-                  Confirme que o valor de <strong className="text-foreground">{formatCurrency(totalAmount)}</strong> foi recebido.
+                  Confirme que o valor de <strong className="text-foreground">{formatCurrency(headerAmount)}</strong> foi recebido.
                   Selecione a conta bancária onde o dinheiro entrou.
                 </p>
                 <div className="space-y-2">
