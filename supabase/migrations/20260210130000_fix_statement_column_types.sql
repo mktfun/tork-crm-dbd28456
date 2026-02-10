@@ -5,6 +5,9 @@
 --   2. "operator does not exist: text = uuid" → missing ::uuid cast on bank_account_id comparison
 -- =====================================================
 
+-- Must DROP first because we're changing the return type (adding bank_account_id)
+DROP FUNCTION IF EXISTS get_bank_statement_detailed(UUID, DATE, DATE);
+
 CREATE OR REPLACE FUNCTION get_bank_statement_detailed(
     p_bank_account_id UUID,
     p_start_date DATE,
