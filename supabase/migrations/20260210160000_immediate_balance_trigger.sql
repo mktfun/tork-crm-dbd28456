@@ -4,10 +4,11 @@
 -- Reconciliação passa a ser apenas flag visual/auditoria.
 -- =====================================================
 
--- 1. Remove gatilhos antigos de conciliação
+-- 1. Remove TODOS os gatilhos antigos de conciliação (todas as variações de nome)
 DROP TRIGGER IF EXISTS trg_update_bank_balance_on_reconciliation ON financial_transactions;
+DROP TRIGGER IF EXISTS trg_update_bank_balance_on_reconcile ON financial_transactions;
 DROP TRIGGER IF EXISTS trg_update_bank_balance_reconciled ON financial_transactions;
-DROP FUNCTION IF EXISTS update_bank_balance_on_reconciliation();
+DROP FUNCTION IF EXISTS update_bank_balance_on_reconciliation() CASCADE;
 
 -- 2. Cria função de saldo IMEDIATO
 CREATE OR REPLACE FUNCTION public.update_bank_balance_immediately()
