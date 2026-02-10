@@ -4,15 +4,15 @@ import { ptBR } from 'date-fns/locale';
 import {
     GitCompare,
     RefreshCw,
-    Filter,
     Calendar as CalendarIcon,
-    Search,
     CheckCircle2,
     Undo2,
     AlertCircle,
     Upload,
     AlertTriangle,
-    Landmark
+    Landmark,
+    ArrowUpCircle,
+    ArrowDownCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -40,15 +40,18 @@ import {
     DialogTitle,
     DialogFooter,
 } from '@/components/ui/dialog';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useBankAccounts } from '@/hooks/useBancos';
 import {
-    useBankStatementDetailed,
+    useBankStatementPaginated,
     useReconcileTransactionDirectly,
     useUnreconcileTransaction,
-    type DetailedStatementItem
+    type PaginatedStatementItem
 } from '@/hooks/useReconciliation';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { StatementImporter } from './StatementImporter';
+
+const PAGE_SIZE = 20;
 
 export function ReconciliationPage() {
     // State
@@ -58,37 +61,44 @@ export function ReconciliationPage() {
         end: endOfMonth(new Date())
     });
     const [showImporter, setShowImporter] = useState(false);
+    const [page, setPage] = useState(1);
 
     // State for bank selection dialog (late binding)
-    const [bankBindingTarget, setBankBindingTarget] = useState<DetailedStatementItem | null>(null);
+    const [bankBindingTarget, setBankBindingTarget] = useState<PaginatedStatementItem | null>(null);
     const [selectedBankForBinding, setSelectedBankForBinding] = useState<string>('');
+
+    const isConsolidated = !selectedBankAccountId || selectedBankAccountId === 'all';
 
     // Queries
     const { data: bankAccounts, isLoading: isLoadingAccounts } = useBankAccounts();
 
     const {
-        data: statementItems,
+        data: statementData,
         isLoading: isLoadingStatement,
         refetch
-    } = useBankStatementDetailed(
-        selectedBankAccountId === 'all' ? null : selectedBankAccountId,
+    } = useBankStatementPaginated(
+        selectedBankAccountId,
         format(dateRange.start, 'yyyy-MM-dd'),
-        format(dateRange.end, 'yyyy-MM-dd')
+        format(dateRange.end, 'yyyy-MM-dd'),
+        page,
+        PAGE_SIZE
     );
+
+    const items = statementData?.items || [];
+    const totalCount = statementData?.totalCount || 0;
+    const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
     // Mutations
     const reconcileMutation = useReconcileTransactionDirectly();
     const unreconcileMutation = useUnreconcileTransaction();
 
     // Handlers
-    const handleReconcile = (item: DetailedStatementItem) => {
+    const handleReconcile = (item: PaginatedStatementItem) => {
         if (!item.bank_account_id) {
-            // Transaction has no bank → open dialog to select one
             setBankBindingTarget(item);
             setSelectedBankForBinding('');
             return;
         }
-        // Transaction already has a bank → reconcile directly
         reconcileMutation.mutate({ transactionId: item.id });
     };
 
@@ -104,6 +114,11 @@ export function ReconciliationPage() {
 
     const handleUnreconcile = async (id: string) => {
         await unreconcileMutation.mutateAsync(id);
+    };
+
+    const handleBankChange = (value: string) => {
+        setSelectedBankAccountId(value);
+        setPage(1); // Reset to page 1 on bank change
     };
 
     return (
@@ -128,7 +143,7 @@ export function ReconciliationPage() {
                     ) : (
                         <Select
                             value={selectedBankAccountId || ""}
-                            onValueChange={setSelectedBankAccountId}
+                            onValueChange={handleBankChange}
                         >
                             <SelectTrigger className="w-[240px]">
                                 <SelectValue placeholder="Selecione o Banco..." />
@@ -144,7 +159,7 @@ export function ReconciliationPage() {
                         </Select>
                     )}
 
-                    {selectedBankAccountId && selectedBankAccountId !== 'all' && (
+                    {!isConsolidated && (
                         <Button
                             variant="outline"
                             size="sm"
@@ -171,6 +186,9 @@ export function ReconciliationPage() {
                             {format(dateRange.start, "dd 'de' MMM", { locale: ptBR })} - {format(dateRange.end, "dd 'de' MMM, yyyy", { locale: ptBR })}
                         </span>
                     </div>
+                    <span className="text-xs text-muted-foreground">
+                        {totalCount} movimentações
+                    </span>
                 </div>
 
                 <div className="relative overflow-x-auto">
@@ -178,12 +196,13 @@ export function ReconciliationPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Data</TableHead>
-                                <TableHead>Documento</TableHead>
-                                <TableHead>Descrição / Categoria</TableHead>
-                                <TableHead className="text-right text-emerald-600">Receitas</TableHead>
-                                <TableHead className="text-right text-red-600">Despesas</TableHead>
-                                <TableHead className="text-right font-bold">Saldo</TableHead>
-                                <TableHead className="text-center">Status</TableHead>
+                                {isConsolidated && <TableHead>Banco</TableHead>}
+                                <TableHead>Tipo</TableHead>
+                                <TableHead>Descrição</TableHead>
+                                <TableHead>Categoria</TableHead>
+                                <TableHead className="text-right">Valor</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-center">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -191,20 +210,18 @@ export function ReconciliationPage() {
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <TableRow key={i}>
                                         <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                        {isConsolidated && <TableCell><Skeleton className="h-4 w-24" /></TableCell>}
+                                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                                        <TableCell>
-                                            <Skeleton className="h-4 w-40 mb-1" />
-                                            <Skeleton className="h-3 w-20" />
-                                        </TableCell>
                                         <TableCell><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                                         <TableCell><Skeleton className="h-8 w-24 mx-auto" /></TableCell>
                                     </TableRow>
                                 ))
-                            ) : statementItems?.length === 0 ? (
+                            ) : items.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                                    <TableCell colSpan={isConsolidated ? 8 : 7} className="h-32 text-center text-muted-foreground">
                                         <div className="flex flex-col items-center gap-2">
                                             <AlertCircle className="w-8 h-8 opacity-50" />
                                             <p>Nenhuma movimentação encontrada neste período.</p>
@@ -212,72 +229,75 @@ export function ReconciliationPage() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                statementItems?.map((item) => (
+                                items.map((item) => (
                                     <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
                                         <TableCell className="whitespace-nowrap font-medium text-muted-foreground">
-                                            {format(new Date(item.payment_date), 'dd/MM/yyyy')}
+                                            {format(new Date(item.transaction_date), 'dd/MM/yyyy')}
                                         </TableCell>
-                                        <TableCell className="text-xs text-muted-foreground">
-                                            {item.document_number || '-'}
-                                        </TableCell>
+                                        {isConsolidated && (
+                                            <TableCell className="text-sm text-muted-foreground">
+                                                {item.bank_name}
+                                            </TableCell>
+                                        )}
                                         <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="font-medium text-foreground">{item.description}</span>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-xs text-muted-foreground">{item.category_name}</span>
-                                                    {!item.bank_account_id && (
-                                                        <TooltipProvider>
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <AlertTriangle className="w-3 h-3 text-amber-500" />
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>
-                                                                    <p>Sem banco vinculado</p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                        </TooltipProvider>
-                                                    )}
-                                                </div>
+                                            <div className="flex items-center gap-1">
+                                                {item.type === 'revenue' ? (
+                                                    <ArrowUpCircle className="w-4 h-4 text-emerald-500" />
+                                                ) : (
+                                                    <ArrowDownCircle className="w-4 h-4 text-red-500" />
+                                                )}
+                                                <span className="text-xs font-medium">
+                                                    {item.type === 'revenue' ? 'Receita' : 'Despesa'}
+                                                </span>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-right text-emerald-600 font-medium">
-                                            {item.revenue_amount > 0 ? formatCurrency(item.revenue_amount) : '-'}
+                                        <TableCell>
+                                            <div className="flex items-center gap-1">
+                                                <span className="font-medium text-foreground truncate max-w-[200px]">
+                                                    {item.description}
+                                                </span>
+                                                {!item.bank_account_id && (
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>Sem banco vinculado</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                )}
+                                            </div>
                                         </TableCell>
-                                        <TableCell className="text-right text-red-600 font-medium">
-                                            {item.expense_amount > 0 ? formatCurrency(item.expense_amount) : '-'}
+                                        <TableCell className="text-xs text-muted-foreground">
+                                            {item.category_name}
                                         </TableCell>
-                                        <TableCell className="text-right font-bold text-foreground">
-                                            {formatCurrency(item.running_balance)}
+                                        <TableCell className={`text-right font-semibold ${item.type === 'revenue' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                            {item.type === 'revenue' ? '+' : '-'} {formatCurrency(item.amount)}
+                                        </TableCell>
+                                        <TableCell>
+                                            {item.status_display === 'Conciliado' ? (
+                                                <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-none text-xs">
+                                                    Conciliado
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+                                                    {item.status_display}
+                                                </Badge>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-center">
                                             {item.reconciled ? (
-                                                <TooltipProvider>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <div className="flex items-center justify-center gap-1">
-                                                                <Badge
-                                                                    variant="secondary"
-                                                                    className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-none gap-1"
-                                                                >
-                                                                    <CheckCircle2 className="w-3 h-3" />
-                                                                    Conciliado
-                                                                </Badge>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-6 w-6 text-muted-foreground hover:text-red-500"
-                                                                    onClick={() => handleUnreconcile(item.id)}
-                                                                    title="Desfazer Conciliação"
-                                                                >
-                                                                    <Undo2 className="w-3 h-3" />
-                                                                </Button>
-                                                            </div>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p>Método: {item.method || 'manual'}</p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TooltipProvider>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                                                    onClick={() => handleUnreconcile(item.id)}
+                                                    title="Desfazer Conciliação"
+                                                >
+                                                    <Undo2 className="w-4 h-4" />
+                                                </Button>
                                             ) : (
                                                 <Button
                                                     size="sm"
@@ -285,8 +305,8 @@ export function ReconciliationPage() {
                                                     className="h-7 text-xs gap-1 border-primary/20 hover:bg-primary/5 hover:text-primary"
                                                     onClick={() => handleReconcile(item)}
                                                 >
-                                                    {!item.bank_account_id && <AlertTriangle className="w-3 h-3 text-amber-500" />}
-                                                    Conciliar Manual
+                                                    <CheckCircle2 className="w-3 h-3" />
+                                                    Conciliar
                                                 </Button>
                                             )}
                                         </TableCell>
@@ -296,6 +316,19 @@ export function ReconciliationPage() {
                         </TableBody>
                     </Table>
                 </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="p-4 border-t">
+                        <PaginationControls
+                            currentPage={page}
+                            totalPages={totalPages}
+                            totalCount={totalCount}
+                            onPageChange={setPage}
+                            isLoading={isLoadingStatement}
+                        />
+                    </div>
+                )}
             </AppCard>
 
             {/* Dialog: Seleção de Banco para Vínculo Tardio */}
@@ -314,11 +347,9 @@ export function ReconciliationPage() {
                         {bankBindingTarget && (
                             <div className="p-3 rounded-lg bg-muted/50 border text-sm space-y-1">
                                 <p className="font-medium">{bankBindingTarget.description}</p>
-                                <p className="text-muted-foreground">
-                                    {bankBindingTarget.revenue_amount > 0
-                                        ? `Receita: ${formatCurrency(bankBindingTarget.revenue_amount)}`
-                                        : `Despesa: ${formatCurrency(bankBindingTarget.expense_amount)}`
-                                    }
+                                <p className={bankBindingTarget.type === 'revenue' ? 'text-emerald-600' : 'text-red-600'}>
+                                    {bankBindingTarget.type === 'revenue' ? 'Receita' : 'Despesa'}:{' '}
+                                    {formatCurrency(bankBindingTarget.amount)}
                                 </p>
                             </div>
                         )}
@@ -350,7 +381,7 @@ export function ReconciliationPage() {
             </Dialog>
 
             {/* Modal de Importação */}
-            {showImporter && selectedBankAccountId && selectedBankAccountId !== 'all' && (
+            {showImporter && selectedBankAccountId && !isConsolidated && (
                 <StatementImporter
                     bankAccountId={selectedBankAccountId}
                     onClose={() => setShowImporter(false)}

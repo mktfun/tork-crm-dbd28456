@@ -296,6 +296,66 @@ export function useBankStatementDetailed(
 }
 
 /**
+ * Interface para o extrato paginado
+ */
+export interface PaginatedStatementItem {
+    id: string;
+    transaction_date: string;
+    bank_name: string;
+    type: string;
+    description: string;
+    category_name: string;
+    amount: number;
+    running_balance: number;
+    status_display: string;
+    reconciled: boolean;
+    bank_account_id: string | null;
+    total_count: number;
+}
+
+/**
+ * Hook para buscar extrato paginado com metadados de banco
+ */
+export function useBankStatementPaginated(
+    bankAccountId: string | null,
+    startDate: string,
+    endDate: string,
+    page: number = 1,
+    pageSize: number = 20
+) {
+    const { user } = useAuth();
+
+    return useQuery({
+        queryKey: ['bank-statement-paginated', user?.id, bankAccountId, startDate, endDate, page, pageSize],
+        queryFn: async () => {
+            if (!user) return { items: [], totalCount: 0 };
+
+            const safeBank = bankAccountId && bankAccountId.length > 0 && bankAccountId !== 'all' ? bankAccountId : null;
+
+            const { data, error } = await (supabase.rpc as any)('get_bank_statement_paginated', {
+                p_bank_account_id: safeBank,
+                p_start_date: startDate,
+                p_end_date: endDate,
+                p_page: page,
+                p_page_size: pageSize,
+            });
+
+            if (error) {
+                console.error('Erro ao buscar extrato paginado:', error);
+                throw error;
+            }
+
+            const items = (data || []) as PaginatedStatementItem[];
+            const totalCount = items.length > 0 ? items[0].total_count : 0;
+
+            return { items, totalCount };
+        },
+        enabled: !!user && !!startDate && !!endDate,
+        staleTime: 30 * 1000,
+    });
+}
+
+/**
  * Mutation para conciliar transações manualmente
  */
 export function useReconcileManual() {
