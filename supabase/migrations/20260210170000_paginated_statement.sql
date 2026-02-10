@@ -39,7 +39,7 @@ BEGIN
         SELECT 
             t.id,
             t.transaction_date AS tx_date,
-            COALESCE(ba.name, 'Sem banco') AS bank_nm,
+            COALESCE(ba.bank_name, 'Sem banco') AS bank_nm,
             t.type,
             t.description,
             COALESCE(
