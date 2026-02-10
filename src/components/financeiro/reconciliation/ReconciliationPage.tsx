@@ -43,6 +43,7 @@ import { StatementImporter } from './StatementImporter';
 export function ReconciliationPage() {
     // State
     const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
+    const [showImporter, setShowImporter] = useState(false);
     const [dateRange, setDateRange] = useState({
         start: startOfMonth(new Date()),
         end: endOfMonth(new Date())
@@ -115,6 +116,13 @@ export function ReconciliationPage() {
                                 ))}
                             </SelectContent>
                         </Select>
+                    )}
+
+                    {selectedBankAccountId && selectedBankAccountId !== 'all' && (
+                        <Button variant="outline" size="sm" className="gap-1" onClick={() => setShowImporter(true)}>
+                            <Upload className="w-4 h-4" />
+                            Importar Extrato
+                        </Button>
                     )}
 
                     <Button variant="outline" size="icon" onClick={() => refetch()} title="Atualizar">
@@ -245,7 +253,16 @@ export function ReconciliationPage() {
                 </div>
             </AppCard>
 
-        
+            {showImporter && selectedBankAccountId && selectedBankAccountId !== 'all' && (
+                <StatementImporter
+                    bankAccountId={selectedBankAccountId}
+                    onClose={() => setShowImporter(false)}
+                    onSuccess={() => {
+                        setShowImporter(false);
+                        refetch();
+                    }}
+                />
+            )}
         </div>
     );
 }
