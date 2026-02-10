@@ -245,17 +245,7 @@ export function ReconciliationPage() {
                 </div>
             </AppCard>
 
-            {/* Modal de Importação */}
-            {showImporter && selectedBankAccountId && selectedBankAccountId !== 'all' && (
-                <StatementImporter
-                    bankAccountId={selectedBankAccountId}
-                    onClose={() => setShowImporter(false)}
-                    onSuccess={() => {
-                        setShowImporter(false);
-                        refetch();
-                    }}
-                />
-            )}
+        
         </div>
     );
 }

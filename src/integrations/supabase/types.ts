@@ -1779,6 +1779,7 @@ export type Database = {
           created_at: string
           created_by: string
           description: string
+          document_number: string | null
           id: string
           is_confirmed: boolean
           is_reconciled: boolean | null
@@ -1786,6 +1787,7 @@ export type Database = {
           reconciled: boolean | null
           reconciled_at: string | null
           reconciled_statement_id: string | null
+          reconciliation_method: string | null
           reference_number: string | null
           related_entity_id: string | null
           related_entity_type: string | null
@@ -1805,6 +1807,7 @@ export type Database = {
           created_at?: string
           created_by: string
           description: string
+          document_number?: string | null
           id?: string
           is_confirmed?: boolean
           is_reconciled?: boolean | null
@@ -1812,6 +1815,7 @@ export type Database = {
           reconciled?: boolean | null
           reconciled_at?: string | null
           reconciled_statement_id?: string | null
+          reconciliation_method?: string | null
           reference_number?: string | null
           related_entity_id?: string | null
           related_entity_type?: string | null
@@ -1831,6 +1835,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           description?: string
+          document_number?: string | null
           id?: string
           is_confirmed?: boolean
           is_reconciled?: boolean | null
@@ -1838,6 +1843,7 @@ export type Database = {
           reconciled?: boolean | null
           reconciled_at?: string | null
           reconciled_statement_id?: string | null
+          reconciliation_method?: string | null
           reference_number?: string | null
           related_entity_id?: string | null
           related_entity_type?: string | null
@@ -2508,8 +2514,9 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
-          memo: string | null
+          payment_date: string
           transaction_id: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -2517,8 +2524,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
-          memo?: string | null
+          payment_date?: string
           transaction_id: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -2526,8 +2534,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
-          memo?: string | null
+          payment_date?: string
           transaction_id?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -3167,6 +3176,26 @@ export type Database = {
       get_bank_balance: {
         Args: { p_bank_account_id: string; p_include_pending?: boolean }
         Returns: number
+      }
+      get_bank_statement_detailed: {
+        Args: {
+          p_bank_account_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: {
+          category_name: string
+          description: string
+          document_number: string
+          expense_amount: number
+          id: string
+          method: string
+          payment_date: string
+          reconciled: boolean
+          revenue_amount: number
+          running_balance: number
+          status: string
+        }[]
       }
       get_bank_transactions: {
         Args: {
@@ -3814,6 +3843,10 @@ export type Database = {
           system_description: string
           system_transaction_id: string
         }[]
+      }
+      unreconcile_transaction: {
+        Args: { p_transaction_id: string }
+        Returns: undefined
       }
       update_financial_account: {
         Args: {
