@@ -261,6 +261,7 @@ export interface DetailedStatementItem {
     status: string;
     reconciled: boolean;
     method: string;
+    bank_account_id: string | null;
 }
 
 export function useBankStatementDetailed(
@@ -276,7 +277,7 @@ export function useBankStatementDetailed(
             if (!user) return [];
 
             const { data, error } = await (supabase.rpc as any)('get_bank_statement_detailed', {
-                p_bank_account_id: bankAccountId,
+                p_bank_account_id: bankAccountId && bankAccountId.length > 0 ? bankAccountId : null,
                 p_start_date: startDate,
                 p_end_date: endDate
             });
@@ -341,11 +342,14 @@ export function useReconcileTransactionDirectly() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (systemTransactionId: string) => {
-            // Usa o nome exato do parâmetro SQL: p_transaction_id
-            const { data, error } = await (supabase.rpc as any)('manual_reconcile_transaction', {
-                p_transaction_id: systemTransactionId,
-            });
+        mutationFn: async ({ transactionId, bankAccountId }: { transactionId: string; bankAccountId?: string }) => {
+            const params: Record<string, any> = {
+                p_transaction_id: transactionId,
+            };
+            if (bankAccountId) {
+                params.p_bank_account_id = bankAccountId;
+            }
+            const { data, error } = await (supabase.rpc as any)('manual_reconcile_transaction', params);
 
             if (error) throw error;
 
@@ -363,6 +367,7 @@ export function useReconcileTransactionDirectly() {
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['account-balances'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-detailed'] });
 
             toast.success('Transação conciliada e saldo bancário atualizado!');
         },

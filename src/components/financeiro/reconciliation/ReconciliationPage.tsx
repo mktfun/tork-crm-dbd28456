@@ -10,7 +10,9 @@ import {
     CheckCircle2,
     Undo2,
     AlertCircle,
-    Upload
+    Upload,
+    AlertTriangle,
+    Landmark
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,11 +33,19 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from '@/components/ui/dialog';
 import { useBankAccounts } from '@/hooks/useBancos';
 import {
     useBankStatementDetailed,
     useReconcileTransactionDirectly,
-    useUnreconcileTransaction
+    useUnreconcileTransaction,
+    type DetailedStatementItem
 } from '@/hooks/useReconciliation';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { StatementImporter } from './StatementImporter';
@@ -47,14 +57,15 @@ export function ReconciliationPage() {
         start: startOfMonth(new Date()),
         end: endOfMonth(new Date())
     });
+    const [showImporter, setShowImporter] = useState(false);
+
+    // State for bank selection dialog (late binding)
+    const [bankBindingTarget, setBankBindingTarget] = useState<DetailedStatementItem | null>(null);
+    const [selectedBankForBinding, setSelectedBankForBinding] = useState<string>('');
 
     // Queries
     const { data: bankAccounts, isLoading: isLoadingAccounts } = useBankAccounts();
 
-    // Pass null if "Consolidado" (though UI might force selection for balance logic ease)
-    // The prompt implies "Se selecionado 'Consolidado', passe null". 
-    // However, progressive balance across mixed accounts might be weird visually if not ordered perfectly. 
-    // Data filtering is required for the RPC.
     const {
         data: statementItems,
         isLoading: isLoadingStatement,
@@ -70,9 +81,25 @@ export function ReconciliationPage() {
     const unreconcileMutation = useUnreconcileTransaction();
 
     // Handlers
-    const handleReconcile = async (id: string) => {
-        await reconcileMutation.mutateAsync(id);
-        // Optimistic update or refetch handled by hook invalidation
+    const handleReconcile = (item: DetailedStatementItem) => {
+        if (!item.bank_account_id) {
+            // Transaction has no bank → open dialog to select one
+            setBankBindingTarget(item);
+            setSelectedBankForBinding('');
+            return;
+        }
+        // Transaction already has a bank → reconcile directly
+        reconcileMutation.mutate({ transactionId: item.id });
+    };
+
+    const handleConfirmBankBinding = () => {
+        if (!bankBindingTarget || !selectedBankForBinding) return;
+        reconcileMutation.mutate({
+            transactionId: bankBindingTarget.id,
+            bankAccountId: selectedBankForBinding
+        });
+        setBankBindingTarget(null);
+        setSelectedBankForBinding('');
     };
 
     const handleUnreconcile = async (id: string) => {
@@ -117,6 +144,18 @@ export function ReconciliationPage() {
                         </Select>
                     )}
 
+                    {selectedBankAccountId && selectedBankAccountId !== 'all' && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => setShowImporter(true)}
+                        >
+                            <Upload className="w-4 h-4" />
+                            Importar Extrato
+                        </Button>
+                    )}
+
                     <Button variant="outline" size="icon" onClick={() => refetch()} title="Atualizar">
                         <RefreshCw className="w-4 h-4" />
                     </Button>
@@ -132,7 +171,6 @@ export function ReconciliationPage() {
                             {format(dateRange.start, "dd 'de' MMM", { locale: ptBR })} - {format(dateRange.end, "dd 'de' MMM, yyyy", { locale: ptBR })}
                         </span>
                     </div>
-                    {/* Add Date Picker here in future if needed */}
                 </div>
 
                 <div className="relative overflow-x-auto">
@@ -185,7 +223,21 @@ export function ReconciliationPage() {
                                         <TableCell>
                                             <div className="flex flex-col">
                                                 <span className="font-medium text-foreground">{item.description}</span>
-                                                <span className="text-xs text-muted-foreground">{item.category_name}</span>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-xs text-muted-foreground">{item.category_name}</span>
+                                                    {!item.bank_account_id && (
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <AlertTriangle className="w-3 h-3 text-amber-500" />
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>Sem banco vinculado</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    )}
+                                                </div>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right text-emerald-600 font-medium">
@@ -222,7 +274,7 @@ export function ReconciliationPage() {
                                                             </div>
                                                         </TooltipTrigger>
                                                         <TooltipContent>
-                                                            <p>Status: OK</p>
+                                                            <p>Método: {item.method || 'manual'}</p>
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 </TooltipProvider>
@@ -231,8 +283,9 @@ export function ReconciliationPage() {
                                                     size="sm"
                                                     variant="outline"
                                                     className="h-7 text-xs gap-1 border-primary/20 hover:bg-primary/5 hover:text-primary"
-                                                    onClick={() => handleReconcile(item.id)}
+                                                    onClick={() => handleReconcile(item)}
                                                 >
+                                                    {!item.bank_account_id && <AlertTriangle className="w-3 h-3 text-amber-500" />}
                                                     Conciliar Manual
                                                 </Button>
                                             )}
@@ -244,6 +297,57 @@ export function ReconciliationPage() {
                     </Table>
                 </div>
             </AppCard>
+
+            {/* Dialog: Seleção de Banco para Vínculo Tardio */}
+            <Dialog open={!!bankBindingTarget} onOpenChange={(open) => !open && setBankBindingTarget(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Landmark className="w-5 h-5 text-primary" />
+                            Vincular Conta Bancária
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Esta transação não possui conta bancária vinculada. Selecione o banco para conciliar:
+                        </p>
+                        {bankBindingTarget && (
+                            <div className="p-3 rounded-lg bg-muted/50 border text-sm space-y-1">
+                                <p className="font-medium">{bankBindingTarget.description}</p>
+                                <p className="text-muted-foreground">
+                                    {bankBindingTarget.revenue_amount > 0
+                                        ? `Receita: ${formatCurrency(bankBindingTarget.revenue_amount)}`
+                                        : `Despesa: ${formatCurrency(bankBindingTarget.expense_amount)}`
+                                    }
+                                </p>
+                            </div>
+                        )}
+                        <Select value={selectedBankForBinding} onValueChange={setSelectedBankForBinding}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione o banco..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {bankAccounts?.accounts?.map((account) => (
+                                    <SelectItem key={account.id} value={account.id}>
+                                        {account.bankName}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setBankBindingTarget(null)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleConfirmBankBinding}
+                            disabled={!selectedBankForBinding || reconcileMutation.isPending}
+                        >
+                            {reconcileMutation.isPending ? 'Conciliando...' : 'Vincular e Conciliar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Modal de Importação */}
             {showImporter && selectedBankAccountId && selectedBankAccountId !== 'all' && (
