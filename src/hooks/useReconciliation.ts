@@ -162,7 +162,8 @@ export function usePendingReconciliation(
                 amount: item.amount,
                 reference_number: item.reference_number,
                 status: item.reconciliation_status,
-                matched_id: item.matched_transaction_id
+                matched_id: item.matched_transaction_id,
+                type: item.amount < 0 ? 'expense' : 'revenue'
             }));
 
             return {
