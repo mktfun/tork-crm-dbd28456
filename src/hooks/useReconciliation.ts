@@ -344,13 +344,11 @@ export function useReconcileTransactionDirectly() {
 
     return useMutation({
         mutationFn: async ({ transactionId, bankAccountId }: { transactionId: string; bankAccountId?: string }) => {
-            const params: Record<string, any> = {
+            // SEMPRE enviar p_bank_account_id (mesmo null) para PostgREST resolver a assinatura correta
+            const { data, error } = await (supabase.rpc as any)('manual_reconcile_transaction', {
                 p_transaction_id: transactionId,
-            };
-            if (bankAccountId) {
-                params.p_bank_account_id = bankAccountId;
-            }
-            const { data, error } = await (supabase.rpc as any)('manual_reconcile_transaction', params);
+                p_bank_account_id: bankAccountId || null,
+            });
 
             if (error) throw error;
 
