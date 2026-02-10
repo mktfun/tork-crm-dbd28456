@@ -1133,49 +1133,9 @@ export type Database = {
         }
         Relationships: []
       }
-      crm_ai_prompts: {
-        Row: {
-          config_id: string
-          content: string
-          created_at: string
-          id: string
-          is_enabled: boolean | null
-          module_type: string
-          position: number | null
-          updated_at: string
-        }
-        Insert: {
-          config_id: string
-          content: string
-          created_at?: string
-          id?: string
-          is_enabled?: boolean | null
-          module_type: string
-          position?: number | null
-          updated_at?: string
-        }
-        Update: {
-          config_id?: string
-          content?: string
-          created_at?: string
-          id?: string
-          is_enabled?: boolean | null
-          module_type?: string
-          position?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "crm_ai_prompts_config_id_fkey"
-            columns: ["config_id"]
-            isOneToOne: false
-            referencedRelation: "crm_ai_config"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       crm_ai_settings: {
         Row: {
+          ai_completion_action: Json | null
           ai_custom_rules: string | null
           ai_name: string | null
           ai_objective: string | null
@@ -1190,6 +1150,7 @@ export type Database = {
           voice_id: string | null
         }
         Insert: {
+          ai_completion_action?: Json | null
           ai_custom_rules?: string | null
           ai_name?: string | null
           ai_objective?: string | null
@@ -1204,6 +1165,7 @@ export type Database = {
           voice_id?: string | null
         }
         Update: {
+          ai_completion_action?: Json | null
           ai_custom_rules?: string | null
           ai_name?: string | null
           ai_objective?: string | null
@@ -1821,13 +1783,17 @@ export type Database = {
           is_confirmed: boolean
           is_reconciled: boolean | null
           is_void: boolean | null
+          reconciled: boolean | null
           reconciled_at: string | null
           reconciled_statement_id: string | null
           reference_number: string | null
           related_entity_id: string | null
           related_entity_type: string | null
+          statement_id: string | null
           status: string | null
+          total_amount: number | null
           transaction_date: string
+          type: string | null
           user_id: string
           void_reason: string | null
           voided_at: string | null
@@ -1843,13 +1809,17 @@ export type Database = {
           is_confirmed?: boolean
           is_reconciled?: boolean | null
           is_void?: boolean | null
+          reconciled?: boolean | null
           reconciled_at?: string | null
           reconciled_statement_id?: string | null
           reference_number?: string | null
           related_entity_id?: string | null
           related_entity_type?: string | null
+          statement_id?: string | null
           status?: string | null
+          total_amount?: number | null
           transaction_date?: string
+          type?: string | null
           user_id: string
           void_reason?: string | null
           voided_at?: string | null
@@ -1865,13 +1835,17 @@ export type Database = {
           is_confirmed?: boolean
           is_reconciled?: boolean | null
           is_void?: boolean | null
+          reconciled?: boolean | null
           reconciled_at?: string | null
           reconciled_statement_id?: string | null
           reference_number?: string | null
           related_entity_id?: string | null
           related_entity_type?: string | null
+          statement_id?: string | null
           status?: string | null
+          total_amount?: number | null
           transaction_date?: string
+          type?: string | null
           user_id?: string
           void_reason?: string | null
           voided_at?: string | null
@@ -3045,6 +3019,17 @@ export type Database = {
       create_financial_movement:
         | {
             Args: {
+              p_account_id: string
+              p_amount: number
+              p_bank_account_id: string
+              p_description: string
+              p_transaction_date: string
+              p_type: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
               p_description: string
               p_movements: Json
               p_reference_number?: string
@@ -3168,6 +3153,18 @@ export type Database = {
           bucket_color: string
           bucket_count: number
           bucket_range: string
+        }[]
+      }
+      get_bank_account_statement: {
+        Args: { p_bank_account_id: string }
+        Returns: {
+          amount: number
+          category: string
+          created_at: string
+          description: string
+          status: string
+          transaction_date: string
+          transaction_id: string
         }[]
       }
       get_bank_balance: {
@@ -3572,6 +3569,16 @@ export type Database = {
             Args: { p_legacy_id?: string; p_transaction_id?: string }
             Returns: Json
           }
+      get_transactions_for_reconciliation: {
+        Args: { p_bank_account_id: string }
+        Returns: {
+          amount: number
+          category_name: string
+          description: string
+          id: string
+          transaction_date: string
+        }[]
+      }
       get_unbanked_transactions: {
         Args: { p_limit?: number; p_user_id: string }
         Returns: {
@@ -3696,6 +3703,10 @@ export type Database = {
       }
       is_admin: { Args: { user_id?: string }; Returns: boolean }
       link_manual_transactions: { Args: { p_user_id: string }; Returns: string }
+      manual_reconcile_transaction: {
+        Args: { p_transaction_id: string }
+        Returns: undefined
+      }
       match_knowledge: {
         Args: {
           match_count?: number

@@ -18,6 +18,7 @@ interface RecentTransaction {
   reference_number: string | null;
   created_at: string;
   is_void: boolean;
+  is_confirmed: boolean;
   total_amount: number;
   account_names: string;
   status: string;
@@ -204,7 +205,10 @@ export async function getRecentTransactions(params?: {
   });
 
   if (error) throw error;
-  return data || [];
+  return (data || []).map((tx: any) => ({
+    ...tx,
+    is_confirmed: tx.is_confirmed ?? (tx.status === 'confirmed')
+  }));
 }
 
 // ============ INTERFACE PARA RESULTADO DE ESTORNO ============
@@ -576,6 +580,7 @@ interface TransactionDetails {
   isVoid: boolean;
   voidReason: string | null;
   createdAt: string;
+  amount: number;
   attachments: string[];
   ledgerEntries: Array<{
     id: string;
@@ -630,6 +635,7 @@ export async function getTransactionDetails(
 
     if (txError) throw txError;
 
+    const totalAmount = tx.total_amount ?? 0;
     return {
       id: tx.id,
       description: tx.description || '',
@@ -649,6 +655,7 @@ export async function getTransactionDetails(
         accountName: l.financial_accounts?.name || 'Conta Desconhecida',
         accountType: l.financial_accounts?.type || 'unknown'
       })),
+      amount: Math.abs(totalAmount),
       legacyData: null
     };
   }
@@ -662,6 +669,11 @@ export async function getTransactionDetails(
   const rawMovements = raw.ledgerEntries || raw.ledger_entries || [];
   const rawLegacy = raw.legacyData || raw.legacy_data;
 
+  const rawAmount = raw.total_amount || raw.totalAmount || rawMovements.reduce((acc: number, e: any) => {
+    const t = e.accountType || e.account_type || '';
+    return (t === 'revenue' || t === 'expense') ? acc + Math.abs(e.amount) : acc;
+  }, 0);
+
   return {
     id: raw.id,
     description: raw.description,
@@ -672,6 +684,7 @@ export async function getTransactionDetails(
     isVoid: raw.isVoid ?? raw.is_void ?? false,
     voidReason: raw.voidReason || raw.void_reason,
     createdAt: raw.createdAt || raw.created_at,
+    amount: rawAmount,
     attachments: raw.attachments || [],
     ledgerEntries: rawMovements.map((entry: any) => ({
       id: entry.id,
