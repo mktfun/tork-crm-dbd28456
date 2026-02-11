@@ -265,7 +265,7 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
 
         {/* Linha 2: Coluna Esquerda - Faturamento */}
         <div className="h-full">
-          <ModuloFaturamento onClick={() => onTabChange('receitas')} />
+          <ModuloFaturamento onClick={() => setActiveTab('transacoes')} />
         </div>
 
         {/* Linha 2: Coluna Direita - Bancos */}

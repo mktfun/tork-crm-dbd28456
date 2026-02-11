@@ -1,7 +1,6 @@
 import { AccountsPayableReceivableTable } from "./tesouraria/AccountsPayableReceivableTable";
 import { AgingReportCard } from "./tesouraria/AgingReportCard";
-import { ReceivablesList } from "./tesouraria/ReceivablesList";
-import { PayablesList } from "./tesouraria/PayablesList";
+import { UpcomingTransactionsList } from "./tesouraria/UpcomingTransactionsList";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Wallet } from "lucide-react";
 import { DateRange } from "react-day-picker";
@@ -27,10 +26,9 @@ export function TesourariaTab({ dateRange }: TesourariaTabProps) {
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <ReceivablesList daysAhead={30} />
-          <PayablesList daysAhead={30} />
+        {/* KPI Cards Unified */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <UpcomingTransactionsList daysAhead={30} />
           <AgingReportCard defaultType="receivables" />
         </div>
 

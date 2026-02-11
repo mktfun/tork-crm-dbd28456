@@ -83,8 +83,14 @@ export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
 
   if (isLoading) {
     return (
-      <Card className="h-full bg-zinc-900/50 border-zinc-800">
-        <CardHeader className="pb-2">
+      <Card
+        className={cn(
+          "h-full bg-zinc-900/50 border-zinc-800 transition-all duration-200",
+          onClick && "cursor-pointer hover:bg-zinc-900/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+        )}
+        onClick={onClick}
+      >
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-white flex items-center gap-2 text-base">
             <BarChart3 className="h-5 w-5 text-primary" />
             Faturamento & Vendas
