@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -446,6 +447,51 @@ export function useBankTransactions(
     },
     enabled: true, // Sempre habilitado, bankAccountId null = todos os bancos
   });
+}
+
+/**
+ * Hook para atualizações em tempo real do banco
+ */
+export function useBankRealtime() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('bank-dashboard-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'financial_transactions'
+        },
+        () => {
+          // Invalidar queries relevantes quando houver mudança nas transações
+          queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+          queryClient.invalidateQueries({ queryKey: ['recent-transactions'] });
+          queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+          queryClient.invalidateQueries({ queryKey: ['revenue-transactions'] });
+          queryClient.invalidateQueries({ queryKey: ['unbanked-transactions'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bank_accounts'
+        },
+        () => {
+          // Invalidar resumo de contas quando houver mudança nos bancos
+          queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 }
 
 export interface BalanceDataPoint {

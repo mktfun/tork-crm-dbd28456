@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { useBankAccounts, useBankTransactions, BankAccount } from '@/hooks/useBancos';
+import { useBankAccounts, useBankTransactions, useBankRealtime, BankAccount } from '@/hooks/useBancos';
 import { BankTransactionsTable } from '@/components/financeiro/bancos/BankTransactionsTable';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
 
@@ -38,16 +38,46 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
     const navigate = useNavigate();
 
     // Se id for "todos", é visão consolidada
-    const pageSize = 10;
+    // Buscar 1000 itens para permitir agregação no front sem alterar SQL
+    const pageSize = 1000;
 
     // Se id for "todos", é visão consolidada
     const isConsolidated = bankId === 'todos';
     const bankAccountId = isConsolidated ? null : bankId;
 
+    // Ativar atualizações em tempo real
+    useBankRealtime();
+
+    // Buscar dados do banco
+
     // Buscar dados do banco
     const { data: bankData, isLoading: loadingAccounts, refetch: refetchAccounts } = useBankAccounts();
+    // Fetch inicial grande para cálculo local
     const { data: transactionsData, isLoading: loadingTransactions, error: transactionsError, refetch: refetchTransactions } =
-        useBankTransactions(bankAccountId, page, pageSize, search);
+        useBankTransactions(bankAccountId, 1, pageSize, search);
+
+    // Lógica Client-Side para Totais e Paginação
+    const allTransactions = transactionsData?.transactions || [];
+
+    // Filtrar Apenas Conciliados para exibição na Dashboard (Totals + Lista)
+    // O usuário solicitou explicitamente que "não conciliados" não apareçam e não somem
+    const validTransactions = allTransactions.filter(t => t.isReconciled);
+
+    // Calcular totais com base nos filtrados
+    const clientTotalIncome = validTransactions
+        .filter(t => ['revenue', 'receita', 'income', 'entrada'].includes((t.accountType || '').toLowerCase()))
+        .reduce((sum, t) => sum + t.amount, 0);
+
+    const clientTotalExpense = validTransactions
+        .filter(t => ['expense', 'despesa', 'saida'].includes((t.accountType || '').toLowerCase()))
+        .reduce((sum, t) => sum + t.amount, 0);
+
+    const clientTotalCount = validTransactions.length;
+
+    // Paginação Client-Side da lista filtrada
+    const itemsPerPage = 10;
+    const totalPages = Math.ceil(clientTotalCount / itemsPerPage) || 1;
+    const paginatedTransactions = validTransactions.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
     // Encontrar o banco atual
     const currentBank: BankAccount | undefined = isConsolidated
@@ -196,7 +226,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                                 <span className="text-sm font-medium">Receitas</span>
                             </div>
                             <p className="text-2xl font-bold text-emerald-500">
-                                {formatCurrency(transactionsData.totalIncome)}
+                                {formatCurrency(clientTotalIncome)}
                             </p>
                         </CardContent>
                     </Card>
@@ -208,7 +238,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                                 <span className="text-sm font-medium">Despesas</span>
                             </div>
                             <p className="text-2xl font-bold text-red-500">
-                                {formatCurrency(transactionsData.totalExpense)}
+                                {formatCurrency(clientTotalExpense)}
                             </p>
                         </CardContent>
                     </Card>
@@ -220,7 +250,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                                 <span className="text-sm font-medium">Transações</span>
                             </div>
                             <p className="text-2xl font-bold text-foreground">
-                                {transactionsData.totalCount}
+                                {clientTotalCount}
                             </p>
                         </CardContent>
                     </Card>
@@ -259,7 +289,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                                 Tentar novamente
                             </Button>
                         </div>
-                    ) : transactionsData?.transactions.length === 0 ? (
+                    ) : paginatedTransactions.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
                             <Landmark className="w-12 h-12 mx-auto mb-3 opacity-30" />
                             <p className="text-lg font-medium text-foreground">Nenhuma transação encontrada</p>
@@ -278,7 +308,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                     ) : (
                         <div className="max-h-[600px] overflow-auto">
                             <BankTransactionsTable
-                                transactions={(transactionsData?.transactions || []).map(tx => ({
+                                transactions={paginatedTransactions.map(tx => ({
                                     id: tx.transactionId,
                                     date: tx.transactionDate,
                                     bankName: tx.bankName || undefined,
@@ -295,7 +325,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                     )}
 
                     {/* Paginação */}
-                    {transactionsData && transactionsData.pageCount > 1 && (
+                    {clientTotalCount > itemsPerPage && (
                         <>
                             <Separator className="bg-border" />
                             <div className="flex items-center justify-between p-4">
@@ -309,13 +339,13 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                                     Anterior
                                 </Button>
                                 <span className="text-sm text-muted-foreground">
-                                    Página {page} de {transactionsData.pageCount}
+                                    Página {page} de {totalPages}
                                 </span>
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setPage(p => Math.min(transactionsData.pageCount, p + 1))}
-                                    disabled={page >= transactionsData.pageCount}
+                                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={page >= totalPages}
                                 >
                                     Próxima
                                     <ChevronRight className="w-4 h-4 ml-1" />

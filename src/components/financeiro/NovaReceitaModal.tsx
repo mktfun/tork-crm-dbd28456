@@ -146,11 +146,12 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Status Toggle - Full Width */}
             <FormField
               control={form.control}
               name="isConfirmed"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mb-4">
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                   <div className="space-y-0.5">
                     <FormLabel>Status: Recebido</FormLabel>
                     <DialogDescription>
@@ -167,23 +168,25 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               )}
             />
 
-            {/* Descrição */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descrição</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: Comissão extraordinária Porto Seguro" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Descrição - Full Width */}
+              <div className="col-span-1 sm:col-span-2">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Descrição</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Comissão extraordinária Porto Seguro" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-            {/* Valor e Data */}
-            <div className="grid grid-cols-2 gap-4">
+              {/* Valor & Data - Side by Side (Default Grid Behavior) */}
               <FormField
                 control={form.control}
                 name="amount"
@@ -217,184 +220,192 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
                   </FormItem>
                 )}
               />
-            </div>
 
-            {/* Categoria de Receita */}
-            <FormField
-              control={form.control}
-              name="revenueAccountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Categoria de Receita</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a categoria" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {revenueAccounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              {/* Categoria - Full Width */}
+              <div className="col-span-1 sm:col-span-2">
+                <FormField
+                  control={form.control}
+                  name="revenueAccountId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoria de Receita</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a categoria" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {revenueAccounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
+              {/* Banco - Full Width */}
+              <div className="col-span-1 sm:col-span-2">
+                <FormField
+                  control={form.control}
+                  name="bankAccountId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Banco <span className="text-muted-foreground font-normal">(Opcional)</span></FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o banco" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhum banco</SelectItem>
+                          {banks.map((bank) => (
+                            <SelectItem key={bank.id} value={bank.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{bank.icon}</span>
+                                <span>{bank.bankName}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-
-            {/* Banco (opcional) */}
-            <FormField
-              control={form.control}
-              name="bankAccountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Banco (Opcional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o banco" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum banco</SelectItem>
-                      {banks.map((bank) => (
-                        <SelectItem key={bank.id} value={bank.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{bank.icon}</span>
-                            <span>{bank.bankName}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Referência (opcional) */}
-            <FormField
-              control={form.control}
-              name="referenceNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Número de Referência (opcional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: NF-12345" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Observações (opcional) */}
-            <FormField
-              control={form.control}
-              name="memo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Observações (opcional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Notas adicionais sobre esta receita"
-                      className="resize-none"
-                      rows={2}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Novos Campos Opcionais: Ramo, Seguradora, Produtor */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="ramoId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ramo (Opcional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || "none"}>
+              {/* Referência - Full Width */}
+              <div className="col-span-1 sm:col-span-2">
+                <FormField
+                  control={form.control}
+                  name="referenceNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Número de Referência <span className="text-muted-foreground font-normal">(opcional)</span></FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
+                        <Input placeholder="Ex: NF-12345" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhum</SelectItem>
-                        {ramos.map((ramo) => (
-                          <SelectItem key={ramo.id} value={ramo.id}>
-                            {ramo.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-              <FormField
-                control={form.control}
-                name="insuranceCompanyId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Seguradora (Opcional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || "none"}>
+              {/* Observações - Full Width */}
+              <div className="col-span-1 sm:col-span-2">
+                <FormField
+                  control={form.control}
+                  name="memo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Observações <span className="text-muted-foreground font-normal">(opcional)</span></FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
+                        <Textarea
+                          placeholder="Notas adicionais sobre esta receita"
+                          className="resize-none"
+                          rows={2}
+                          {...field}
+                        />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhuma</SelectItem>
-                        {companies.map((company) => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-              <FormField
-                control={form.control}
-                name="producerId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Produtor (Opcional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || "none"}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhum</SelectItem>
-                        {producers.map((producer) => (
-                          <SelectItem key={producer.id} value={producer.id}>
-                            {producer.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Separator for Metadata */}
+              <div className="col-span-1 sm:col-span-2 border-t pt-4 mt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="ramoId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ramo <span className="text-muted-foreground font-normal text-xs">(Op)</span></FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || "none"}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">Nenhum</SelectItem>
+                            {ramos.map((ramo) => (
+                              <SelectItem key={ramo.id} value={ramo.id}>
+                                {ramo.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="insuranceCompanyId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Seguradora <span className="text-muted-foreground font-normal text-xs">(Op)</span></FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || "none"}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">Nenhuma</SelectItem>
+                            {companies.map((company) => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="producerId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Produtor <span className="text-muted-foreground font-normal text-xs">(Op)</span></FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || "none"}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">Nenhum</SelectItem>
+                            {producers.map((producer) => (
+                              <SelectItem key={producer.id} value={producer.id}>
+                                {producer.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Botões */}
-            <div className="flex justify-end gap-2 pt-4">
+            <div className="flex justify-end gap-2 pt-4 border-t mt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancelar
               </Button>
