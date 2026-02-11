@@ -252,7 +252,7 @@ export function useBankStatementEntries(
  */
 export interface DetailedStatementItem {
     id: string;
-    payment_date: string;
+    transaction_date: string;
     document_number: string | null;
     description: string;
     category_name: string;
