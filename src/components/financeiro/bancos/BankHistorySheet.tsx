@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Landmark, TrendingUp, TrendingDown, Hash, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
+import { format, subDays } from 'date-fns';
 import {
     Sheet,
     SheetContent,
@@ -11,9 +12,10 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { useBankTransactions } from '@/hooks/useBancos';
+import { useBankTransactions, useBankBalanceHistory } from '@/hooks/useBancos';
 import { BankTransactionsTable } from './BankTransactionsTable';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
+import { BalanceEvolutionChart } from './BalanceEvolutionChart';
 
 interface BankHistorySheetProps {
     bankAccountId: string | null; // null = visão consolidada de todos
@@ -47,6 +49,22 @@ export function BankHistorySheet({
     const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
 
     const { data, isLoading, error } = useBankTransactions(bankAccountId, page, pageSize, search);
+
+    // Dados para o gráfico de evolução do saldo (últimos 30 dias)
+    const { startDate, endDate } = useMemo(() => {
+        const end = new Date();
+        const start = subDays(end, 30);
+        return {
+            startDate: format(start, 'yyyy-MM-dd'),
+            endDate: format(end, 'yyyy-MM-dd')
+        };
+    }, []);
+
+    const { data: balanceHistory = [], isLoading: loadingHistory } = useBankBalanceHistory(
+        bankAccountId || '',
+        startDate,
+        endDate
+    );
 
     const isConsolidatedView = bankAccountId === null;
 
@@ -92,25 +110,11 @@ export function BankHistorySheet({
 
                     {/* Saldo atual (se não for visão consolidada) */}
                     {!isConsolidatedView && currentBalance !== undefined && (
-                        <div
-                            className="text-center p-4 rounded-lg mb-4"
-                            style={{
-                                backgroundColor: bankColor ? `${bankColor}10` : 'hsl(var(--muted))',
-                                borderLeft: `4px solid ${bankColor || 'hsl(var(--primary))'}`
-                            }}
-                        >
-                            <p className="text-sm text-muted-foreground">Saldo Atual</p>
-                            <p
-                                className="text-2xl font-bold"
-                                style={{ color: bankColor || 'hsl(var(--primary))' }}
-                            >
-                                {formatCurrency(currentBalance)}
-                            </p>
-                            {/* Placeholder para gráfico futuro */}
-                            <div className="mt-2 text-xs text-muted-foreground flex items-center justify-center gap-1 opacity-50">
-                                <TrendingUp className="w-3 h-3" />
-                                <span>Gráfico de evolução do saldo em breve</span>
-                            </div>
+                        <div className="mb-4">
+                            <BalanceEvolutionChart
+                                data={balanceHistory}
+                                isLoading={loadingHistory}
+                            />
                         </div>
                     )}
 

@@ -127,6 +127,9 @@ export async function registerExpense(payload: {
   referenceNumber?: string;
   memo?: string;
   isConfirmed?: boolean;
+  ramoId?: string;
+  insuranceCompanyId?: string;
+  producerId?: string;
 }): Promise<string> {
   const movements: Array<{ account_id: string; amount: number; memo?: string }> = [];
 
@@ -148,7 +151,10 @@ export async function registerExpense(payload: {
     p_related_entity_type: null,
     p_related_entity_id: null,
     p_bank_account_id: payload.bankAccountId || null,
-    p_is_confirmed: payload.isConfirmed ?? false
+    p_is_confirmed: payload.isConfirmed ?? false,
+    p_ramo_id: payload.ramoId || null,
+    p_insurance_company_id: payload.insuranceCompanyId || null,
+    p_producer_id: payload.producerId || null
   });
 
   if (error) throw error;
@@ -165,6 +171,9 @@ export async function registerRevenue(payload: {
   referenceNumber?: string;
   memo?: string;
   isConfirmed?: boolean;
+  ramoId?: string;
+  insuranceCompanyId?: string;
+  producerId?: string;
 }): Promise<string> {
   const movements: Array<{ account_id: string; amount: number; memo?: string }> = [];
 
@@ -186,7 +195,10 @@ export async function registerRevenue(payload: {
     p_related_entity_type: null,
     p_related_entity_id: null,
     p_bank_account_id: payload.bankAccountId || null,
-    p_is_confirmed: payload.isConfirmed ?? false
+    p_is_confirmed: payload.isConfirmed ?? false,
+    p_ramo_id: payload.ramoId || null,
+    p_insurance_company_id: payload.insuranceCompanyId || null,
+    p_producer_id: payload.producerId || null
   });
 
   if (error) throw error;
@@ -203,6 +215,9 @@ export async function createFinancialMovement(payload: {
   reference_number?: string;
   memo?: string;
   is_confirmed?: boolean;
+  ramo_id?: string;
+  insurance_company_id?: string;
+  producer_id?: string;
 }) {
   // Logic to find a default asset account if bank not provided
   // We need to fetch accounts to find a default one (e.g. 'Caixa').
@@ -237,7 +252,10 @@ export async function createFinancialMovement(payload: {
       bankAccountId: payload.bank_account_id,
       referenceNumber: payload.reference_number,
       memo: payload.memo,
-      isConfirmed: payload.is_confirmed ?? true
+      isConfirmed: payload.is_confirmed ?? true,
+      ramoId: payload.ramo_id,
+      insuranceCompanyId: payload.insurance_company_id,
+      producerId: payload.producer_id
     });
   } else {
     return registerRevenue({
@@ -249,7 +267,10 @@ export async function createFinancialMovement(payload: {
       bankAccountId: payload.bank_account_id,
       referenceNumber: payload.reference_number,
       memo: payload.memo,
-      isConfirmed: payload.is_confirmed ?? true
+      isConfirmed: payload.is_confirmed ?? true,
+      ramoId: payload.ramo_id,
+      insuranceCompanyId: payload.insurance_company_id,
+      producerId: payload.producer_id
     });
   }
 }

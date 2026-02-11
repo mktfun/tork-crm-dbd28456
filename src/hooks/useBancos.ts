@@ -445,3 +445,40 @@ export function useBankTransactions(
     enabled: true, // Sempre habilitado, bankAccountId null = todos os bancos
   });
 }
+
+export interface BalanceDataPoint {
+  date: string;
+  balance: number;
+}
+
+/**
+ * Hook para buscar histórico de saldo diário
+ */
+export function useBankBalanceHistory(
+  bankAccountId: string,
+  startDate: string,
+  endDate: string
+) {
+  return useQuery({
+    queryKey: ['bank-balance-history', bankAccountId, startDate, endDate],
+    queryFn: async (): Promise<BalanceDataPoint[]> => {
+      const { data, error } = await supabase
+        .rpc('get_daily_balances' as any, {
+          p_bank_account_id: bankAccountId,
+          p_start_date: startDate,
+          p_end_date: endDate
+        });
+
+      if (error) {
+        console.error('Erro ao buscar histórico de saldo:', error);
+        throw error;
+      }
+
+      return (data || []).map((row: any) => ({
+        date: row.day || row.date,
+        balance: Number(row.balance) || 0
+      }));
+    },
+    enabled: !!bankAccountId && !!startDate && !!endDate
+  });
+}

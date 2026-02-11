@@ -19,7 +19,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { NovaDespesaModal } from './NovaDespesaModal';
 import { TransactionDetailsSheet } from './TransactionDetailsSheet';
 import { RecurringConfigsList } from './RecurringConfigsList';
-import { useRecentTransactions } from '@/hooks/useFinanceiro';
+import { ExpenseEvolutionChart } from './despesas/ExpenseEvolutionChart';
+import { useRecentTransactions, useCashFlowData } from '@/hooks/useFinanceiro';
 import { parseLocalDate } from '@/utils/dateUtils';
 
 function formatCurrency(value: number): string {
@@ -85,6 +86,9 @@ export function DespesasTab({ dateRange }: DespesasTabProps) {
     };
   }, [dateRange]);
 
+  // Dados para o gráfico de despesas e fluxo de caixa
+  const { data: cashFlowData = [], isLoading: loadingCashFlow } = useCashFlowData(startDate, endDate);
+
   // Filtrar transações por status
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
@@ -146,6 +150,11 @@ export function DespesasTab({ dateRange }: DespesasTabProps) {
           <KpiCard title="Previsão a Pagar" value={kpis.aPagar} variant="warning" icon={Clock} />
         </div>
       </div>
+
+      {/* Gráfico de Evolução de Despesas */}
+      {viewMode === 'efetivado' && (
+        <ExpenseEvolutionChart data={cashFlowData} isLoading={loadingCashFlow} />
+      )}
 
       {/* Transactions List */}
       <Card>

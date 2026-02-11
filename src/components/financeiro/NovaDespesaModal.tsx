@@ -27,6 +27,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useFinancialAccounts, useCreateFinancialMovement } from '@/hooks/useFinanceiro';
 import { useBankAccounts } from '@/hooks/useBancos';
+import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
+import { useSupabaseCompanies } from '@/hooks/useSupabaseCompanies';
+import { useSupabaseProducers } from '@/hooks/useSupabaseProducers';
 import { FinancialAccount } from '@/types/financeiro';
 import { Badge } from '@/components/ui/badge';
 
@@ -37,6 +40,9 @@ interface FormData {
   expenseAccountId: string;
   bankAccountId?: string;
   referenceNumber: string;
+  ramoId?: string;
+  insuranceCompanyId?: string;
+  producerId?: string;
 }
 
 // Gerar ID único
@@ -55,6 +61,9 @@ export function NovaDespesaModal() {
   const { data: expenseAccounts = [], isLoading: loadingExpense } = useFinancialAccounts('expense');
   const { data: assetAccounts = [] } = useFinancialAccounts('asset'); // Para uso interno
   const { data: bankSummary } = useBankAccounts();
+  const { data: ramos = [] } = useSupabaseRamos();
+  const { companies = [] } = useSupabaseCompanies(); // Hook has slightly different signature
+  const { producers = [] } = useSupabaseProducers(); // Hook has slightly different signature
 
   const banks = bankSummary?.accounts?.filter(b => b.isActive) || [];
 
@@ -67,7 +76,10 @@ export function NovaDespesaModal() {
       transactionDate: format(new Date(), 'yyyy-MM-dd'),
       expenseAccountId: '',
       bankAccountId: '',
-      referenceNumber: ''
+      referenceNumber: '',
+      ramoId: '',
+      insuranceCompanyId: '',
+      producerId: ''
     }
   });
 
@@ -159,7 +171,10 @@ export function NovaDespesaModal() {
         type: 'expense',
         reference_number: data.referenceNumber || undefined,
         memo: attachmentUrl, // Usando memo para a URL do anexo por enquanto, ou conforme lógica original
-        is_confirmed: isPaid
+        is_confirmed: isPaid,
+        ramo_id: data.ramoId,
+        insurance_company_id: data.insuranceCompanyId,
+        producer_id: data.producerId
       }, {
         onSuccess: () => {
           toast.success('Despesa registrada com sucesso!');
@@ -324,6 +339,69 @@ export function NovaDespesaModal() {
               placeholder="Ex: NF 12345, Boleto, etc."
               {...register('referenceNumber')}
             />
+          </div>
+
+          {/* Novos Campos Opcionais: Ramo, Seguradora, Produtor */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Ramo (Opcional)</Label>
+              <Select
+                onValueChange={(value) => setValue('ramoId', value === 'none' ? '' : value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {ramos.map((ramo) => (
+                    <SelectItem key={ramo.id} value={ramo.id}>
+                      {ramo.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Seguradora (Opcional)</Label>
+              <Select
+                onValueChange={(value) => setValue('insuranceCompanyId', value === 'none' ? '' : value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Produtor (Opcional)</Label>
+              <Select
+                onValueChange={(value) => setValue('producerId', value === 'none' ? '' : value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {producers.map((producer) => (
+                    <SelectItem key={producer.id} value={producer.id}>
+                      {producer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Anexar Comprovante */}

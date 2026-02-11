@@ -30,6 +30,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 
 import { useFinancialAccountsWithDefaults } from '@/hooks/useFinanceiro';
 import { useBankAccounts } from '@/hooks/useBancos';
+import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
+import { useSupabaseCompanies } from '@/hooks/useSupabaseCompanies';
+import { useSupabaseProducers } from '@/hooks/useSupabaseProducers';
 import { registerRevenue } from '@/services/financialService';
 
 const revenueSchema = z.object({
@@ -41,6 +44,9 @@ const revenueSchema = z.object({
   referenceNumber: z.string().optional(),
   memo: z.string().optional(),
   isConfirmed: z.boolean(),
+  ramoId: z.string().optional(),
+  insuranceCompanyId: z.string().optional(),
+  producerId: z.string().optional(),
 });
 
 type RevenueFormData = z.infer<typeof revenueSchema>;
@@ -54,6 +60,9 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: accounts = [], isLoading: loadingAccounts } = useFinancialAccountsWithDefaults();
   const { data: bankSummary } = useBankAccounts();
+  const { data: ramos = [] } = useSupabaseRamos();
+  const { companies = [] } = useSupabaseCompanies();
+  const { producers = [] } = useSupabaseProducers();
 
   // Filtrar contas por tipo - apenas categorias de receita
   const revenueAccounts = accounts.filter(a => a.type === 'revenue');
@@ -70,6 +79,9 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
       referenceNumber: '',
       memo: '',
       isConfirmed: true,
+      ramoId: '',
+      insuranceCompanyId: '',
+      producerId: '',
     }
   });
 
@@ -95,6 +107,9 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
         referenceNumber: data.referenceNumber,
         memo: data.memo,
         isConfirmed: data.isConfirmed,
+        ramoId: data.ramoId,
+        insuranceCompanyId: data.insuranceCompanyId,
+        producerId: data.producerId,
       });
 
       toast.success('Receita registrada com sucesso!');
@@ -296,6 +311,87 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
                 </FormItem>
               )}
             />
+
+            {/* Novos Campos Opcionais: Ramo, Seguradora, Produtor */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="ramoId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ramo (Opcional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "none"}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {ramos.map((ramo) => (
+                          <SelectItem key={ramo.id} value={ramo.id}>
+                            {ramo.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="insuranceCompanyId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Seguradora (Opcional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "none"}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {companies.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="producerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Produtor (Opcional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "none"}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {producers.map((producer) => (
+                          <SelectItem key={producer.id} value={producer.id}>
+                            {producer.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             {/* Botões */}
             <div className="flex justify-end gap-2 pt-4">
