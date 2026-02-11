@@ -13,6 +13,7 @@ import { DateRange } from 'react-day-picker';
 
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AppCard } from '@/components/ui/app-card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -284,19 +285,22 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
             )}
 
             {/* Main Table */}
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-4">
-                    <div>
-                        <CardTitle>
-                            {transactionType === 'receitas'
-                                ? (isPendente ? 'Receitas Pendentes' : 'Receitas Confirmadas')
-                                : (isPendente ? 'Despesas Pendentes' : 'Despesas Pagas')}
-                        </CardTitle>
-                        <CardDescription>
-                            {isPendente
-                                ? `Previsões de ${transactionType === 'receitas' ? 'recebimento' : 'pagamento'}`
-                                : `Transações ${transactionType === 'receitas' ? 'recebidas' : 'pagas'} no período`}
-                        </CardDescription>
+            <AppCard className="border-none shadow-sm bg-transparent">
+                <CardHeader className="flex flex-row items-center justify-between pb-4 px-4">
+                    <div className="flex items-center gap-2">
+                        {transactionType === 'receitas' ? (
+                            <TrendingUp className="w-5 h-5 text-emerald-500" />
+                        ) : (
+                            <TrendingDown className="w-5 h-5 text-rose-500" />
+                        )}
+                        <div>
+                            <CardTitle className="text-base font-semibold text-foreground">
+                                {transactionType === 'receitas'
+                                    ? (isPendente ? 'Receitas Pendentes' : 'Receitas Confirmadas')
+                                    : (isPendente ? 'Despesas Pendentes' : 'Despesas Pagas')}
+                            </CardTitle>
+                            {/* Description removed or moved to tooltip if needed for cleaner look, keeping title minimal as per reference */}
+                        </div>
                     </div>
 
                     {/* Batch Action Button */}
@@ -304,18 +308,18 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                         <Button
                             onClick={handleOpenSettleModal}
                             className={cn(
-                                "gap-2",
+                                "gap-2 h-8",
                                 transactionType === 'receitas'
                                     ? "bg-emerald-600 hover:bg-emerald-700"
                                     : "bg-rose-600 hover:bg-rose-700"
                             )}
                         >
                             <Check className="w-4 h-4" />
-                            Confirmar ({selectedIds.size}) - {formatCurrency(selectedTotalAmount)}
+                            Confirmar ({selectedIds.size})
                         </Button>
                     )}
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                     <TransactionsTable
                         transactions={displayTransactions}
                         isLoading={isLoading}
@@ -328,7 +332,7 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                         pageSize={10}
                     />
                 </CardContent>
-            </Card>
+            </AppCard>
 
             {/* Configurações Recorrentes (Apenas Despesas) */}
             {transactionType === 'despesas' && (

@@ -10,6 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AppCard } from '@/components/ui/app-card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -96,7 +97,7 @@ export function DreTable({ className }: DreTableProps) {
     const expenseRows = rows.filter(r => r.account_type === 'expense');
 
     // Calcular totais por mês
-    const sumByMonth = (items: DreRow[], month: typeof MONTHS[number]) => 
+    const sumByMonth = (items: DreRow[], month: typeof MONTHS[number]) =>
       items.reduce((acc, row) => acc + row[month], 0);
 
     const totalRevenue = revenueRows.reduce((acc, row) => acc + row.total, 0);
@@ -124,8 +125,8 @@ export function DreTable({ className }: DreTableProps) {
   const hasData = rows.length > 0;
 
   return (
-    <Card className={className}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+    <AppCard className={`border-none shadow-sm bg-transparent ${className || ''}`}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 px-4">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-primary/10">
             <Calculator className="w-5 h-5 text-primary" />
@@ -137,29 +138,29 @@ export function DreTable({ className }: DreTableProps) {
         </div>
         <YearSelector value={selectedYear} onChange={setSelectedYear} />
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         {!hasData ? (
           <EmptyDreState />
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/30">
-                  <TableHead className="min-w-[180px] font-semibold">Categoria</TableHead>
+                <TableRow className="hover:bg-transparent border-border">
+                  <TableHead className="min-w-[180px] font-semibold pl-6">Categoria</TableHead>
                   {MONTH_LABELS.map((label, i) => (
                     <TableHead key={i} className="text-right min-w-[80px] font-medium">
                       {label}
                     </TableHead>
                   ))}
-                  <TableHead className="text-right min-w-[100px] font-semibold bg-muted/50">
+                  <TableHead className="text-right min-w-[100px] font-semibold pr-6">
                     Total
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {/* SEÇÃO DE RECEITAS */}
-                <TableRow className="bg-emerald-500/5 hover:bg-emerald-500/10">
-                  <TableCell colSpan={14} className="font-semibold text-emerald-600 dark:text-emerald-400">
+                <TableRow className="bg-emerald-500/5 hover:bg-emerald-500/10 border-border">
+                  <TableCell colSpan={14} className="font-semibold text-emerald-600 dark:text-emerald-400 pl-6">
                     <div className="flex items-center gap-2">
                       <TrendingUp className="w-4 h-4" />
                       (+) RECEITAS
@@ -167,21 +168,21 @@ export function DreTable({ className }: DreTableProps) {
                   </TableCell>
                 </TableRow>
                 {revenueRows.map((row, idx) => (
-                  <TableRow key={`rev-${idx}`} className="hover:bg-muted/30">
+                  <TableRow key={`rev-${idx}`} className="hover:bg-muted/30 border-border">
                     <TableCell className="pl-8 text-muted-foreground">{row.category}</TableCell>
                     {MONTHS.map((month) => (
                       <TableCell key={month} className="text-right tabular-nums">
                         {row[month] > 0 ? formatCurrency(row[month], true) : '-'}
                       </TableCell>
                     ))}
-                    <TableCell className="text-right font-medium bg-muted/20 tabular-nums">
+                    <TableCell className="text-right font-medium bg-muted/20 tabular-nums pr-6">
                       {formatCurrency(row.total)}
                     </TableCell>
                   </TableRow>
                 ))}
                 {/* Subtotal Receitas */}
-                <TableRow className="bg-emerald-500/10 border-t-2 border-emerald-500/20">
-                  <TableCell className="font-semibold text-emerald-600 dark:text-emerald-400">
+                <TableRow className="bg-emerald-500/10 border-t-2 border-emerald-500/20 hover:bg-emerald-500/20">
+                  <TableCell className="font-semibold text-emerald-600 dark:text-emerald-400 pl-6">
                     = Subtotal Receitas
                   </TableCell>
                   {MONTHS.map((month) => (
@@ -189,19 +190,19 @@ export function DreTable({ className }: DreTableProps) {
                       {summary.byMonth[month].revenue > 0 ? formatCurrency(summary.byMonth[month].revenue, true) : '-'}
                     </TableCell>
                   ))}
-                  <TableCell className="text-right font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  <TableCell className="text-right font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 tabular-nums pr-6">
                     {formatCurrency(summary.totalRevenue)}
                   </TableCell>
                 </TableRow>
 
                 {/* Espaçador */}
-                <TableRow className="h-4 hover:bg-transparent">
+                <TableRow className="h-4 hover:bg-transparent border-none">
                   <TableCell colSpan={14}></TableCell>
                 </TableRow>
 
                 {/* SEÇÃO DE DESPESAS */}
-                <TableRow className="bg-rose-500/5 hover:bg-rose-500/10">
-                  <TableCell colSpan={14} className="font-semibold text-rose-600 dark:text-rose-400">
+                <TableRow className="bg-rose-500/5 hover:bg-rose-500/10 border-border">
+                  <TableCell colSpan={14} className="font-semibold text-rose-600 dark:text-rose-400 pl-6">
                     <div className="flex items-center gap-2">
                       <TrendingDown className="w-4 h-4" />
                       (-) DESPESAS
@@ -209,21 +210,21 @@ export function DreTable({ className }: DreTableProps) {
                   </TableCell>
                 </TableRow>
                 {expenseRows.map((row, idx) => (
-                  <TableRow key={`exp-${idx}`} className="hover:bg-muted/30">
+                  <TableRow key={`exp-${idx}`} className="hover:bg-muted/30 border-border">
                     <TableCell className="pl-8 text-muted-foreground">{row.category}</TableCell>
                     {MONTHS.map((month) => (
                       <TableCell key={month} className="text-right tabular-nums">
                         {row[month] > 0 ? formatCurrency(row[month], true) : '-'}
                       </TableCell>
                     ))}
-                    <TableCell className="text-right font-medium bg-muted/20 tabular-nums">
+                    <TableCell className="text-right font-medium bg-muted/20 tabular-nums pr-6">
                       {formatCurrency(row.total)}
                     </TableCell>
                   </TableRow>
                 ))}
                 {/* Subtotal Despesas */}
-                <TableRow className="bg-rose-500/10 border-t-2 border-rose-500/20">
-                  <TableCell className="font-semibold text-rose-600 dark:text-rose-400">
+                <TableRow className="bg-rose-500/10 border-t-2 border-rose-500/20 hover:bg-rose-500/20">
+                  <TableCell className="font-semibold text-rose-600 dark:text-rose-400 pl-6">
                     = Subtotal Despesas
                   </TableCell>
                   {MONTHS.map((month) => (
@@ -231,19 +232,19 @@ export function DreTable({ className }: DreTableProps) {
                       {summary.byMonth[month].expense > 0 ? formatCurrency(summary.byMonth[month].expense, true) : '-'}
                     </TableCell>
                   ))}
-                  <TableCell className="text-right font-bold bg-rose-500/20 text-rose-600 dark:text-rose-400 tabular-nums">
+                  <TableCell className="text-right font-bold bg-rose-500/20 text-rose-600 dark:text-rose-400 tabular-nums pr-6">
                     {formatCurrency(summary.totalExpense)}
                   </TableCell>
                 </TableRow>
 
                 {/* Espaçador */}
-                <TableRow className="h-4 hover:bg-transparent">
+                <TableRow className="h-4 hover:bg-transparent border-none">
                   <TableCell colSpan={14}></TableCell>
                 </TableRow>
 
                 {/* RESULTADO LÍQUIDO */}
                 <TableRow className={`border-t-4 ${summary.netResult >= 0 ? 'bg-emerald-500/15 border-emerald-500/30' : 'bg-rose-500/15 border-rose-500/30'}`}>
-                  <TableCell className="font-bold text-lg">
+                  <TableCell className="font-bold text-lg pl-6">
                     <div className="flex items-center gap-2">
                       <Calculator className="w-5 h-5" />
                       RESULTADO
@@ -255,16 +256,16 @@ export function DreTable({ className }: DreTableProps) {
                   {MONTHS.map((month) => {
                     const net = summary.byMonth[month].net;
                     return (
-                      <TableCell 
-                        key={month} 
+                      <TableCell
+                        key={month}
                         className={`text-right font-semibold tabular-nums ${net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}
                       >
                         {net !== 0 ? formatCurrency(net, true) : '-'}
                       </TableCell>
                     );
                   })}
-                  <TableCell 
-                    className={`text-right font-bold text-lg tabular-nums ${summary.netResult >= 0 ? 'bg-emerald-500/25 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/25 text-rose-600 dark:text-rose-400'}`}
+                  <TableCell
+                    className={`text-right font-bold text-lg tabular-nums pr-6 ${summary.netResult >= 0 ? 'bg-emerald-500/25 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/25 text-rose-600 dark:text-rose-400'}`}
                   >
                     {formatCurrency(summary.netResult)}
                   </TableCell>
@@ -274,6 +275,6 @@ export function DreTable({ className }: DreTableProps) {
           </div>
         )}
       </CardContent>
-    </Card>
+    </AppCard>
   );
 }

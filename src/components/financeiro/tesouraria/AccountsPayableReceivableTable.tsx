@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppCard } from "@/components/ui/app-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { usePayableReceivableTransactions } from "@/hooks/useFinanceiro";
@@ -74,25 +75,25 @@ export function AccountsPayableReceivableTable() {
   const renderTable = () => {
     if (isLoading) {
       return (
-        <div className="rounded-md border">
+        <div className="bg-transparent">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Vencimento</TableHead>
+              <TableRow className="hover:bg-transparent border-border">
+                <TableHead className="pl-6">Vencimento</TableHead>
                 <TableHead>Entidade</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="pr-6">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {[1, 2, 3, 4, 5].map((i) => (
                 <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell className="pl-6"><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                  <TableCell className="pr-6"><Skeleton className="h-5 w-20" /></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -123,21 +124,21 @@ export function AccountsPayableReceivableTable() {
     }
 
     return (
-      <div className="rounded-md border">
+      <div className="bg-transparent">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Vencimento</TableHead>
+            <TableRow className="hover:bg-transparent border-border">
+              <TableHead className="pl-6">Vencimento</TableHead>
               <TableHead>Entidade</TableHead>
               <TableHead>Descrição</TableHead>
               <TableHead className="text-right">Valor</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="pr-6">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedTransactions.map((transaction) => (
-              <TableRow key={transaction.transactionId}>
-                <TableCell className="font-medium">
+              <TableRow key={transaction.transactionId} className="hover:bg-muted/50 border-border">
+                <TableCell className="pl-6 font-medium">
                   {formatDate(transaction.dueDate)}
                   {transaction.daysOverdue > 0 && (
                     <span className="text-xs text-red-600 ml-2">
@@ -154,7 +155,7 @@ export function AccountsPayableReceivableTable() {
                     {formatCurrency(Number(transaction.amount))}
                   </span>
                 </TableCell>
-                <TableCell>
+                <TableCell className="pr-6">
                   {getStatusBadge(transaction.status)}
                 </TableCell>
               </TableRow>
@@ -203,10 +204,10 @@ export function AccountsPayableReceivableTable() {
   const payableCount = transactions?.filter(t => t.transactionType === 'pagar').length || 0;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
+    <AppCard className="border-none shadow-sm bg-transparent">
+      <CardHeader className="pb-3 px-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">Contas a Pagar e Receber</CardTitle>
+          <CardTitle className="text-base font-semibold text-foreground">Contas a Pagar e Receber</CardTitle>
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-muted-foreground" />
             <ToggleGroup
@@ -231,28 +232,34 @@ export function AccountsPayableReceivableTable() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as 'receber' | 'pagar')} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="receber" className="gap-2">
-              <TrendingUp className="w-4 h-4" />
-              A Receber ({receivableCount})
-            </TabsTrigger>
-            <TabsTrigger value="pagar" className="gap-2">
-              <TrendingDown className="w-4 h-4" />
-              A Pagar ({payableCount})
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="receber" className="mt-4">
+          <div className="px-4 pb-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="receber" className="gap-2">
+                <TrendingUp className="w-4 h-4" />
+                A Receber ({receivableCount})
+              </TabsTrigger>
+              <TabsTrigger value="pagar" className="gap-2">
+                <TrendingDown className="w-4 h-4" />
+                A Pagar ({payableCount})
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          <TabsContent value="receber" className="mt-0">
             {renderTable()}
-            {renderPagination()}
+            <div className="px-4">
+              {renderPagination()}
+            </div>
           </TabsContent>
-          <TabsContent value="pagar" className="mt-4">
+          <TabsContent value="pagar" className="mt-0">
             {renderTable()}
-            {renderPagination()}
+            <div className="px-4">
+              {renderPagination()}
+            </div>
           </TabsContent>
         </Tabs>
       </CardContent>
-    </Card>
+    </AppCard>
   );
 }
