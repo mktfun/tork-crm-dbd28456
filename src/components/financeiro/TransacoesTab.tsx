@@ -28,6 +28,7 @@ import { FaturamentoChart } from './faturamento/FaturamentoChart';
 import { FaturamentoBreakdown } from './faturamento/FaturamentoBreakdown';
 import { MetasCard } from './faturamento/MetasCard';
 import { RecurringConfigsList } from './RecurringConfigsList';
+import { ExpenseEvolutionChart } from './despesas/ExpenseEvolutionChart';
 
 import {
     useRevenueTransactions,
@@ -256,7 +257,12 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                 <FaturamentoChart data={cashFlowData} isLoading={loadingCashFlow} />
             )}
 
-            {/* Extra Cards - Metas/Breakdown for receitas, Recorrentes for despesas */}
+            {/* Chart - only for despesas efetivadas */}
+            {transactionType === 'despesas' && statusFilter === 'efetivado' && (
+                <ExpenseEvolutionChart data={cashFlowData} isLoading={loadingCashFlow} />
+            )}
+
+            {/* Extra Cards - Metas/Breakdown for receitas */}
             {transactionType === 'receitas' && statusFilter === 'efetivado' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <MetasCard faturamentoAtual={kpis.efetivado} />
@@ -264,8 +270,15 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                 </div>
             )}
 
+            {/* Configurações Recorrentes (Apenas Despesas) */}
             {transactionType === 'despesas' && (
-                <RecurringConfigsList />
+                <div className="pt-8 border-t space-y-4">
+                    <div className="flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-muted-foreground" />
+                        <h3 className="text-lg font-semibold">Configurações Recorrentes</h3>
+                    </div>
+                    <RecurringConfigsList />
+                </div>
             )}
 
             {/* Sync Info */}
