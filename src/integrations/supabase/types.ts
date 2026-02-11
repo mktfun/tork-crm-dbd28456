@@ -553,6 +553,7 @@ export type Database = {
           current_balance: number
           icon: string | null
           id: string
+          initial_balance: number | null
           is_active: boolean
           last_sync_date: string | null
           updated_at: string
@@ -568,6 +569,7 @@ export type Database = {
           current_balance?: number
           icon?: string | null
           id?: string
+          initial_balance?: number | null
           is_active?: boolean
           last_sync_date?: string | null
           updated_at?: string
@@ -583,6 +585,7 @@ export type Database = {
           current_balance?: number
           icon?: string | null
           id?: string
+          initial_balance?: number | null
           is_active?: boolean
           last_sync_date?: string | null
           updated_at?: string
@@ -1781,9 +1784,12 @@ export type Database = {
           description: string
           document_number: string | null
           id: string
+          insurance_company_id: string | null
           is_confirmed: boolean
           is_reconciled: boolean | null
           is_void: boolean | null
+          producer_id: string | null
+          ramo_id: string | null
           reconciled: boolean | null
           reconciled_at: string | null
           reconciled_statement_id: string | null
@@ -1809,9 +1815,12 @@ export type Database = {
           description: string
           document_number?: string | null
           id?: string
+          insurance_company_id?: string | null
           is_confirmed?: boolean
           is_reconciled?: boolean | null
           is_void?: boolean | null
+          producer_id?: string | null
+          ramo_id?: string | null
           reconciled?: boolean | null
           reconciled_at?: string | null
           reconciled_statement_id?: string | null
@@ -1837,9 +1846,12 @@ export type Database = {
           description?: string
           document_number?: string | null
           id?: string
+          insurance_company_id?: string | null
           is_confirmed?: boolean
           is_reconciled?: boolean | null
           is_void?: boolean | null
+          producer_id?: string | null
+          ramo_id?: string | null
           reconciled?: boolean | null
           reconciled_at?: string | null
           reconciled_statement_id?: string | null
@@ -1871,6 +1883,34 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "reconciliation_dashboard"
             referencedColumns: ["bank_account_id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_insurance_company_id_fkey"
+            columns: ["insurance_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_insurance_company_id_fkey"
+            columns: ["insurance_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_with_ramos_count"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_producer_id_fkey"
+            columns: ["producer_id"]
+            isOneToOne: false
+            referencedRelation: "producers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_ramo_id_fkey"
+            columns: ["ramo_id"]
+            isOneToOne: false
+            referencedRelation: "ramos"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "financial_transactions_reconciled_statement_id_fkey"
@@ -3025,17 +3065,6 @@ export type Database = {
       create_financial_movement:
         | {
             Args: {
-              p_account_id: string
-              p_amount: number
-              p_bank_account_id: string
-              p_description: string
-              p_transaction_date: string
-              p_type: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
               p_description: string
               p_movements: Json
               p_reference_number?: string
@@ -3061,8 +3090,11 @@ export type Database = {
             Args: {
               p_bank_account_id?: string
               p_description: string
+              p_insurance_company_id?: string
               p_is_confirmed?: boolean
               p_movements: Json
+              p_producer_id?: string
+              p_ramo_id?: string
               p_reference_number?: string
               p_related_entity_id?: string
               p_related_entity_type?: string
@@ -3152,15 +3184,26 @@ export type Database = {
         }[]
       }
       get_admin_metrics: { Args: never; Returns: Json }
-      get_aging_report: {
-        Args: { p_reference_date?: string; p_user_id: string }
-        Returns: {
-          bucket_amount: number
-          bucket_color: string
-          bucket_count: number
-          bucket_range: string
-        }[]
-      }
+      get_aging_report:
+        | {
+            Args: { p_reference_date?: string; p_user_id: string }
+            Returns: {
+              bucket_amount: number
+              bucket_color: string
+              bucket_count: number
+              bucket_range: string
+            }[]
+          }
+        | {
+            Args: { p_type?: string; p_user_id: string }
+            Returns: {
+              bucket_amount: number
+              bucket_color: string
+              bucket_count: number
+              bucket_range: string
+              bucket_sort_order: number
+            }[]
+          }
       get_bank_account_statement: {
         Args: { p_bank_account_id: string }
         Returns: {
@@ -3184,27 +3227,78 @@ export type Database = {
           p_start_date: string
         }
         Returns: {
+          bank_account_id: string
           category_name: string
           description: string
           document_number: string
           expense_amount: number
           id: string
           method: string
-          payment_date: string
           reconciled: boolean
           revenue_amount: number
           running_balance: number
           status: string
+          transaction_date: string
         }[]
       }
-      get_bank_transactions: {
+      get_bank_statement_paginated: {
         Args: {
-          p_bank_account_id?: string
+          p_bank_account_id: string
+          p_end_date: string
           p_page?: number
           p_page_size?: number
+          p_start_date: string
         }
-        Returns: Json
+        Returns: {
+          amount: number
+          bank_account_id: string
+          bank_name: string
+          category_name: string
+          description: string
+          id: string
+          reconciled: boolean
+          running_balance: number
+          status_display: string
+          total_count: number
+          transaction_date: string
+          type: string
+        }[]
       }
+      get_bank_transactions:
+        | {
+            Args: {
+              p_bank_account_id?: string
+              p_page?: number
+              p_page_size?: number
+              p_search?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_bank_account_id: string
+              p_end_date: string
+              p_page?: number
+              p_page_size?: number
+              p_search?: string
+              p_start_date: string
+              p_status?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_bank_account_id: string
+              p_end_date: string
+              p_page?: number
+              p_page_size?: number
+              p_reconciled_only?: boolean
+              p_search?: string
+              p_start_date: string
+              p_status?: string
+            }
+            Returns: Json
+          }
       get_brokerage_by_slug: { Args: { p_slug: string }; Returns: Json }
       get_cash_flow_data: {
         Args: {
@@ -3294,6 +3388,17 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      get_daily_balances: {
+        Args: {
+          p_bank_account_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: {
+          balance: number
+          day: string
+        }[]
       }
       get_dashboard_financial_kpis: {
         Args: { p_end_date?: string; p_start_date?: string }
@@ -3616,6 +3721,19 @@ export type Database = {
           transaction_type: string
         }[]
       }
+      get_upcoming_payables: {
+        Args: { p_days_ahead?: number; p_user_id: string }
+        Returns: {
+          amount: number
+          days_until_due: number
+          description: string
+          due_date: string
+          entity_name: string
+          related_entity_id: string
+          related_entity_type: string
+          transaction_id: string
+        }[]
+      }
       get_upcoming_receivables: {
         Args: { p_days_ahead?: number; p_user_id: string }
         Returns: {
@@ -3730,7 +3848,7 @@ export type Database = {
       is_admin: { Args: { user_id?: string }; Returns: boolean }
       link_manual_transactions: { Args: { p_user_id: string }; Returns: string }
       manual_reconcile_transaction: {
-        Args: { p_transaction_id: string }
+        Args: { p_bank_account_id?: string; p_transaction_id: string }
         Returns: undefined
       }
       match_knowledge: {

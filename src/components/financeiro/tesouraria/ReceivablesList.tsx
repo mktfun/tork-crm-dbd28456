@@ -15,20 +15,14 @@ import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 interface ReceivablesListProps {
   daysAhead?: number;
 }
 
 export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
-  const { data: receivables, isLoading, error } = useUpcomingReceivables(daysAhead);
+  const [period, setPeriod] = useState(daysAhead);
+  const { data: receivables, isLoading, error } = useUpcomingReceivables(period);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Landmark, Building2, ArrowRight } from "lucide-react";
+import { Landmark, Building2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBankAccounts, type BankAccountType } from "@/hooks/useBancos";
 
@@ -60,6 +60,7 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
         </CardTitle>
         <Wallet className="h-4 w-4 text-emerald-500" />
       </CardHeader>
+      <CardContent className="flex-1 p-4 pt-0">
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
           {[1, 2, 3, 4].map((i) => (
@@ -127,7 +128,7 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
         </div>
       )}
     </CardContent>
-    </Card >
+    </Card>
   );
 };
 
