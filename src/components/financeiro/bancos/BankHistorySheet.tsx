@@ -12,7 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { useBankTransactions } from '@/hooks/useBancos';
-import { BankTransactionRow } from './BankTransactionRow';
+import { BankTransactionsTable } from './BankTransactionsTable';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
 
 interface BankHistorySheetProps {
@@ -60,7 +60,7 @@ export function BankHistorySheet({
     return (
         <>
             <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-                <SheetContent className="w-full sm:max-w-lg">
+                <SheetContent className="w-full sm:max-w-2xl">
                     <SheetHeader className="pb-4">
                         <div className="flex items-center gap-3">
                             {isConsolidatedView ? (
@@ -168,15 +168,21 @@ export function BankHistorySheet({
                                 <p className="text-sm">Este banco ainda não possui movimentações</p>
                             </div>
                         ) : (
-                            <div className="space-y-2 pr-4">
-                                {data?.transactions.map((tx) => (
-                                    <BankTransactionRow
-                                        key={tx.transactionId}
-                                        transaction={tx}
-                                        showBankName={isConsolidatedView}
-                                        onClick={handleTransactionClick}
-                                    />
-                                ))}
+                            <div className="pr-1">
+                                <BankTransactionsTable
+                                    transactions={(data?.transactions || []).map(tx => ({
+                                        id: tx.transactionId,
+                                        date: tx.transactionDate,
+                                        bankName: tx.bankName || undefined,
+                                        type: (tx.accountType === 'revenue' || tx.accountType === 'receita' || tx.amount >= 0) ? 'entrada' : 'saida',
+                                        description: tx.description,
+                                        category: tx.accountName || 'Sem categoria',
+                                        amount: tx.amount,
+                                        reconciliationStatus: 'conciliado'
+                                    }))}
+                                    showBankColumn={isConsolidatedView}
+                                    onTransactionClick={handleTransactionClick}
+                                />
                             </div>
                         )}
                     </ScrollArea>
