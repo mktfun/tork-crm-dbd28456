@@ -40,12 +40,13 @@ export function BankHistorySheet({
     onClose,
 }: BankHistorySheetProps) {
     const [page, setPage] = useState(1);
-    const pageSize = 15;
+    const [search, setSearch] = useState('');
+    const pageSize = 10;
 
     // State para abrir detalhes de uma transação
     const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
 
-    const { data, isLoading, error } = useBankTransactions(bankAccountId, page, pageSize);
+    const { data, isLoading, error } = useBankTransactions(bankAccountId, page, pageSize, search);
 
     const isConsolidatedView = bankAccountId === null;
 
@@ -60,7 +61,7 @@ export function BankHistorySheet({
     return (
         <>
             <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-                <SheetContent className="w-full sm:max-w-2xl">
+                <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full">
                     <SheetHeader className="pb-4">
                         <div className="flex items-center gap-3">
                             {isConsolidatedView ? (
@@ -94,7 +95,7 @@ export function BankHistorySheet({
                         <div
                             className="text-center p-4 rounded-lg mb-4"
                             style={{
-                                backgroundColor: bankColor ? `${bankColor}10` : 'hsl(var(--muted) / 0.3)',
+                                backgroundColor: bankColor ? `${bankColor}10` : 'hsl(var(--muted))',
                                 borderLeft: `4px solid ${bankColor || 'hsl(var(--primary))'}`
                             }}
                         >
@@ -105,6 +106,11 @@ export function BankHistorySheet({
                             >
                                 {formatCurrency(currentBalance)}
                             </p>
+                            {/* Placeholder para gráfico futuro */}
+                            <div className="mt-2 text-xs text-muted-foreground flex items-center justify-center gap-1 opacity-50">
+                                <TrendingUp className="w-3 h-3" />
+                                <span>Gráfico de evolução do saldo em breve</span>
+                            </div>
                         </div>
                     )}
 
@@ -135,12 +141,12 @@ export function BankHistorySheet({
                                     {formatCurrency(data.totalExpense)}
                                 </p>
                             </div>
-                            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                            <div className="p-3 rounded-lg bg-muted border border-border">
                                 <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
                                     <Hash className="w-3 h-3" />
                                     Transações
                                 </div>
-                                <p className="text-sm font-semibold">
+                                <p className="text-sm font-semibold text-foreground">
                                     {data.totalCount}
                                 </p>
                             </div>
@@ -149,8 +155,22 @@ export function BankHistorySheet({
 
                     <Separator className="mb-4" />
 
+                    {/* Search Input */}
+                    <div className="mb-4">
+                        <input
+                            type="text"
+                            placeholder="Pesquisar por descrição ou categoria..."
+                            value={search}
+                            onChange={(e) => {
+                                setSearch(e.target.value);
+                                setPage(1); // Reset page on search
+                            }}
+                            className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-input"
+                        />
+                    </div>
+
                     {/* Lista de Transações */}
-                    <ScrollArea className="h-[calc(100vh-380px)]">
+                    <ScrollArea className="flex-1 -mr-4 pr-4">
                         {isLoading ? (
                             <div className="space-y-2">
                                 {[...Array(5)].map((_, i) => (
@@ -165,10 +185,12 @@ export function BankHistorySheet({
                             <div className="text-center py-8 text-muted-foreground">
                                 <Landmark className="w-12 h-12 mx-auto mb-3 opacity-30" />
                                 <p>Nenhuma transação encontrada</p>
-                                <p className="text-sm">Este banco ainda não possui movimentações</p>
+                                <p className="text-sm">
+                                    {search ? 'Tente buscar com outro termo' : 'Este banco ainda não possui movimentações'}
+                                </p>
                             </div>
                         ) : (
-                            <div className="pr-1">
+                            <div>
                                 <BankTransactionsTable
                                     transactions={(data?.transactions || []).map(tx => ({
                                         id: tx.transactionId,
@@ -189,8 +211,7 @@ export function BankHistorySheet({
 
                     {/* Paginação */}
                     {data && data.pageCount > 1 && (
-                        <>
-                            <Separator className="my-4" />
+                        <div className="pt-4 mt-auto border-t border-border">
                             <div className="flex items-center justify-between">
                                 <Button
                                     variant="outline"
@@ -214,7 +235,7 @@ export function BankHistorySheet({
                                     <ChevronRight className="w-4 h-4 ml-1" />
                                 </Button>
                             </div>
-                        </>
+                        </div>
                     )}
                 </SheetContent>
             </Sheet>

@@ -60,64 +60,64 @@ export function BankTransactionsTable({
   };
 
   return (
-    <Card className="border-none shadow-sm">
+    <Card className="border-none shadow-sm bg-transparent">
       <CardHeader className="pb-3 px-4">
         <div className="flex items-center gap-2">
-          <Landmark className="w-5 h-5 text-blue-600" />
-          <CardTitle className="text-base font-semibold text-gray-800">Movimentações Recentes</CardTitle>
+          <Landmark className="w-5 h-5 text-primary" />
+          <CardTitle className="text-base font-semibold text-foreground">Movimentações Recentes</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="p-0">
         <Table>
           <TableHeader>
-            <TableRow className="hover:bg-transparent border-gray-100">
-              <TableHead className="pl-6 w-[120px]">Data</TableHead>
-              {showBankColumn && <TableHead className="w-[140px]">Banco</TableHead>}
-              <TableHead className="w-[120px]">Tipo</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead>Categoria</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-              <TableHead className="pr-6 text-right w-[120px]">Conciliação</TableHead>
+            <TableRow className="hover:bg-transparent border-border">
+              <TableHead className="pl-6 w-[120px] text-muted-foreground">Data</TableHead>
+              {showBankColumn && <TableHead className="w-[140px] text-muted-foreground">Banco</TableHead>}
+              <TableHead className="w-[120px] text-muted-foreground">Tipo</TableHead>
+              <TableHead className="text-muted-foreground">Descrição</TableHead>
+              <TableHead className="text-muted-foreground">Categoria</TableHead>
+              <TableHead className="text-right text-muted-foreground">Valor</TableHead>
+              <TableHead className="pr-6 text-right w-[120px] text-muted-foreground">Conciliação</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {transactions.map((transaction) => (
               <TableRow
                 key={transaction.id}
-                className={`hover:bg-gray-50/50 border-gray-50 ${onTransactionClick ? 'cursor-pointer' : ''}`}
+                className={`hover:bg-muted/50 border-border ${onTransactionClick ? 'cursor-pointer' : ''}`}
                 onClick={() => onTransactionClick && onTransactionClick(transaction.id)}
               >
-                <TableCell className="pl-6 font-medium text-gray-600">
+                <TableCell className="pl-6 font-medium text-muted-foreground">
                   {formatDate(transaction.date)}
                 </TableCell>
                 {showBankColumn && (
-                  <TableCell className="font-medium text-gray-900">{transaction.bankName}</TableCell>
+                  <TableCell className="font-medium text-foreground">{transaction.bankName}</TableCell>
                 )}
                 <TableCell>
                   <div className="flex items-center gap-1.5">
                     {transaction.type === 'entrada' ? (
                       <>
                         <ArrowUpRight className="w-4 h-4 text-emerald-500" />
-                        <span className="text-emerald-700 font-medium text-sm">Entrada</span>
+                        <span className="text-emerald-500 font-medium text-sm">Entrada</span>
                       </>
                     ) : (
                       <>
                         <ArrowDownRight className="w-4 h-4 text-rose-500" />
-                        <span className="text-rose-700 font-medium text-sm">Saída</span>
+                        <span className="text-rose-500 font-medium text-sm">Saída</span>
                       </>
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-gray-700">
+                <TableCell className="text-foreground">
                   {transaction.description}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="rounded-full px-3 py-0.5 font-normal text-gray-600 border-gray-200 bg-white">
+                  <Badge variant="outline" className="rounded-full px-3 py-0.5 font-normal text-muted-foreground border-border bg-background">
                     {transaction.category}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right font-medium">
-                  <span className={transaction.type === 'entrada' ? 'text-emerald-600' : 'text-rose-600'}>
+                  <span className={transaction.type === 'entrada' ? 'text-emerald-500' : 'text-rose-500'}>
                     {transaction.type === 'entrada' ? '+' : '-'}
                     {formatCurrency(transaction.amount)}
                   </span>

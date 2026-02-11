@@ -34,10 +34,11 @@ function formatCurrency(value: number): string {
 
 export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
     const [page, setPage] = useState(1);
+    const [search, setSearch] = useState('');
     const navigate = useNavigate();
 
     // Se id for "todos", é visão consolidada
-    const pageSize = 20;
+    const pageSize = 10;
 
     // Se id for "todos", é visão consolidada
     const isConsolidated = bankId === 'todos';
@@ -46,7 +47,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
     // Buscar dados do banco
     const { data: bankData, isLoading: loadingAccounts, refetch: refetchAccounts } = useBankAccounts();
     const { data: transactionsData, isLoading: loadingTransactions, error: transactionsError, refetch: refetchTransactions } =
-        useBankTransactions(bankAccountId, page, pageSize);
+        useBankTransactions(bankAccountId, page, pageSize, search);
 
     // Encontrar o banco atual
     const currentBank: BankAccount | undefined = isConsolidated
@@ -145,7 +146,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
 
             {/* Card de Saldo Principal */}
             <Card
-                className="overflow-hidden"
+                className="overflow-hidden border-border bg-card"
                 style={{
                     borderTop: `4px solid ${displayColor || 'hsl(var(--primary))'}`
                 }}
@@ -218,7 +219,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                                 <Hash className="w-5 h-5" />
                                 <span className="text-sm font-medium">Transações</span>
                             </div>
-                            <p className="text-2xl font-bold">
+                            <p className="text-2xl font-bold text-foreground">
                                 {transactionsData.totalCount}
                             </p>
                         </CardContent>
@@ -227,11 +228,23 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
             )}
 
             {/* Histórico de Transações */}
-            <Card>
-                <CardHeader className="pb-3">
+            <Card className="border-border bg-card">
+                <CardHeader className="pb-3 flex flex-row items-center justify-between">
                     <CardTitle className="text-lg">Histórico de Movimentações</CardTitle>
+                    <div className="w-64">
+                        <input
+                            type="text"
+                            placeholder="Pesquisar..."
+                            value={search}
+                            onChange={(e) => {
+                                setSearch(e.target.value);
+                                setPage(1);
+                            }}
+                            className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-input"
+                        />
+                    </div>
                 </CardHeader>
-                <Separator />
+                <Separator className="bg-border" />
                 <CardContent className="p-0">
                     {loadingTransactions ? (
                         <div className="p-4 space-y-3">
@@ -249,14 +262,18 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                     ) : transactionsData?.transactions.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground">
                             <Landmark className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                            <p className="text-lg font-medium text-foreground">Nenhuma transação vinculada</p>
-                            <p className="text-sm mb-4">Para visualizar transações aqui, você precisa conciliar os lançamentos.</p>
-                            <Button
-                                variant="outline"
-                                onClick={() => navigate('/dashboard/financeiro?tab=conciliacao')}
-                            >
-                                Ir para Conciliação Bancária
-                            </Button>
+                            <p className="text-lg font-medium text-foreground">Nenhuma transação encontrada</p>
+                            <p className="text-sm mb-4">
+                                {search ? 'Tente buscar com outro termo' : 'Para visualizar transações aqui, você precisa conciliar os lançamentos.'}
+                            </p>
+                            {!search && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => navigate('/dashboard/financeiro?tab=conciliacao')}
+                                >
+                                    Ir para Conciliação Bancária
+                                </Button>
+                            )}
                         </div>
                     ) : (
                         <div className="max-h-[600px] overflow-auto">
@@ -269,7 +286,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                                     description: tx.description,
                                     category: tx.accountName || 'Sem categoria',
                                     amount: tx.amount,
-                                    reconciliationStatus: 'conciliado' // Hardcoded conforme solicitação visual, já que status real é 'confirmed'
+                                    reconciliationStatus: 'conciliado' // Hardcoded conforme solicitação visual
                                 }))}
                                 showBankColumn={isConsolidated}
                                 onTransactionClick={handleTransactionClick}
@@ -280,7 +297,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                     {/* Paginação */}
                     {transactionsData && transactionsData.pageCount > 1 && (
                         <>
-                            <Separator />
+                            <Separator className="bg-border" />
                             <div className="flex items-center justify-between p-4">
                                 <Button
                                     variant="outline"

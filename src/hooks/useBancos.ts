@@ -385,16 +385,18 @@ export interface BankTransactionsResult {
 export function useBankTransactions(
   bankAccountId: string | null,
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
+  search?: string
 ) {
   return useQuery({
-    queryKey: ['bank-transactions', bankAccountId, page, pageSize],
+    queryKey: ['bank-transactions', bankAccountId, page, pageSize, search],
     queryFn: async (): Promise<BankTransactionsResult> => {
       const { data, error } = await supabase
         .rpc('get_bank_transactions' as any, {
           p_bank_account_id: bankAccountId,
           p_page: page,
-          p_page_size: pageSize
+          p_page_size: pageSize,
+          p_search: search || null
         });
 
       if (error) {
