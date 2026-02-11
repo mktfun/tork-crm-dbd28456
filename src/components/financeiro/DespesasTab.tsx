@@ -116,6 +116,11 @@ export function DespesasTab({ dateRange }: DespesasTabProps) {
 
   return (
     <div className="space-y-6">
+      {/* Gráfico de Evolução de Despesas (Moved to Top) */}
+      {viewMode === 'efetivado' && (
+        <ExpenseEvolutionChart data={cashFlowData} isLoading={loadingCashFlow} />
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -150,11 +155,6 @@ export function DespesasTab({ dateRange }: DespesasTabProps) {
           <KpiCard title="Previsão a Pagar" value={kpis.aPagar} variant="warning" icon={Clock} />
         </div>
       </div>
-
-      {/* Gráfico de Evolução de Despesas */}
-      {viewMode === 'efetivado' && (
-        <ExpenseEvolutionChart data={cashFlowData} isLoading={loadingCashFlow} />
-      )}
 
       {/* Transactions List */}
       <Card>
@@ -230,8 +230,14 @@ export function DespesasTab({ dateRange }: DespesasTabProps) {
         </CardContent>
       </Card>
 
-      {/* Configurações Recorrentes */}
-      <RecurringConfigsList />
+      {/* Configurações Recorrentes (Moved to Bottom with Title) */}
+      <div className="pt-8 border-t space-y-4">
+        <div className="flex items-center gap-2">
+          <Clock className="w-5 h-5 text-muted-foreground" />
+          <h3 className="text-lg font-semibold">Configurações Recorrentes</h3>
+        </div>
+        <RecurringConfigsList />
+      </div>
 
       {/* Details Sheet */}
       <TransactionDetailsSheet
