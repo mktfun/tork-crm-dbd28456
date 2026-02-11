@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useBankAccounts, useBankTransactions, BankAccount } from '@/hooks/useBancos';
-import { BankTransactionRow } from '@/components/financeiro/bancos/BankTransactionRow';
+import { BankTransactionsTable } from '@/components/financeiro/bancos/BankTransactionsTable';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
 
 interface BankDashboardViewProps {
@@ -259,15 +259,21 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                             </Button>
                         </div>
                     ) : (
-                        <div className="divide-y max-h-[600px] overflow-auto">
-                            {transactionsData?.transactions.map((tx) => (
-                                <BankTransactionRow
-                                    key={tx.transactionId}
-                                    transaction={tx}
-                                    showBankName={isConsolidated}
-                                    onClick={handleTransactionClick}
-                                />
-                            ))}
+                        <div className="max-h-[600px] overflow-auto">
+                            <BankTransactionsTable
+                                transactions={(transactionsData?.transactions || []).map(tx => ({
+                                    id: tx.transactionId,
+                                    date: tx.transactionDate,
+                                    bankName: tx.bankName || undefined,
+                                    type: (tx.accountType === 'revenue' || tx.accountType === 'receita' || tx.amount >= 0) ? 'entrada' : 'saida',
+                                    description: tx.description,
+                                    category: tx.accountName || 'Sem categoria',
+                                    amount: tx.amount,
+                                    reconciliationStatus: 'conciliado' // Hardcoded conforme solicitação visual, já que status real é 'confirmed'
+                                }))}
+                                showBankColumn={isConsolidated}
+                                onTransactionClick={handleTransactionClick}
+                            />
                         </div>
                     )}
 
