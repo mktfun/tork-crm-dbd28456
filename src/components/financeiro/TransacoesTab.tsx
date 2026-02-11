@@ -330,10 +330,12 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                 </CardContent>
             </Card>
 
-            {/* Configurações Recorrentes */}
-            <div className="pt-8 border-t">
-                <RecurringConfigsList type={transactionType === 'receitas' ? 'revenue' : 'expense'} />
-            </div>
+            {/* Configurações Recorrentes (Apenas Despesas) */}
+            {transactionType === 'despesas' && (
+                <div className="pt-8 border-t">
+                    <RecurringConfigsList type="all" />
+                </div>
+            )}
 
             {/* Details Sheet */}
             <TransactionDetailsSheet
