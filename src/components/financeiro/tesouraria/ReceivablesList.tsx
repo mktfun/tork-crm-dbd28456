@@ -1,5 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppCard } from "@/components/ui/app-card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar, AlertCircle } from "lucide-react";
 import { useUpcomingReceivables } from "@/hooks/useFinanceiro";
@@ -7,6 +14,14 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ReceivablesListProps {
   daysAhead?: number;
@@ -103,9 +118,21 @@ export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
   return (
     <AppCard>
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-muted-foreground" />
-          <CardTitle className="text-base">Recebíveis (Próximos {daysAhead} dias)</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-muted-foreground" />
+            <CardTitle className="text-base">Recebíveis</CardTitle>
+          </div>
+          <Select value={String(period)} onValueChange={(v) => setPeriod(Number(v))}>
+            <SelectTrigger className="w-[140px] bg-transparent border-border text-xs h-8">
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Próximos 7 dias</SelectItem>
+              <SelectItem value="30">Próximos 30 dias</SelectItem>
+              <SelectItem value="90">Próximos 90 dias</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </CardHeader>
       <CardContent>
