@@ -286,7 +286,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                                     description: tx.description,
                                     category: tx.accountName || 'Sem categoria',
                                     amount: tx.amount,
-                                    reconciliationStatus: 'conciliado' // Hardcoded conforme solicitação visual
+                                    reconciliationStatus: tx.isReconciled ? 'conciliado' : 'pendente'
                                 }))}
                                 showBankColumn={isConsolidated}
                                 onTransactionClick={handleTransactionClick}

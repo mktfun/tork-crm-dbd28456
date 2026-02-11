@@ -365,6 +365,7 @@ export interface BankTransaction {
   isVoid: boolean;
   relatedEntityType: string | null;
   relatedEntityId: string | null;
+  isReconciled: boolean;
 }
 
 export interface BankTransactionsResult {
@@ -432,6 +433,7 @@ export function useBankTransactions(
         isVoid: tx.is_void || false,
         relatedEntityType: tx.related_entity_type || null,
         relatedEntityId: tx.related_entity_id || null,
+        isReconciled: tx.is_reconciled || false,
       }));
 
       return {
