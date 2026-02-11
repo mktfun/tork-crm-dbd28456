@@ -415,18 +415,17 @@ export function useReconcileTransactionDirectly() {
             return { success: true };
         },
         onSuccess: () => {
-            // Invalida a lista de conciliação e outras dependentes
+            // Invalida TODAS as queries financeiras (prefix match, não exact)
             queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
             queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
             queryClient.invalidateQueries({ queryKey: ['transactions-reconciliation'] });
-
-            // Invalidações adicionais para garantir consistência total na UI
             queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard-financial-kpis'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['account-balances'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-detailed'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
 
             toast.success('Transação conciliada e saldo bancário atualizado!');
         },
@@ -453,14 +452,17 @@ export function useUnreconcileTransaction() {
             return { success: true };
         },
         onSuccess: () => {
-            // Invalida tudo para garantir consistência
+            // Invalida TODAS as queries financeiras
             queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
             queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['transactions-reconciliation'] });
             queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard-financial-kpis'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['account-balances'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-detailed'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
 
             toast.success('Conciliação desfeita com sucesso!');
         },
