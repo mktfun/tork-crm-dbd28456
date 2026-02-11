@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppCard } from "@/components/ui/app-card";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, AlertCircle } from "lucide-react";
 import { useAgingReport } from "@/hooks/useFinanceiro";
@@ -83,7 +84,7 @@ export function AgingReportCard() {
   }
 
   return (
-    <Card>
+    <AppCard>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-amber-500" />
@@ -106,11 +107,11 @@ export function AgingReportCard() {
                   </span>
                 </div>
               </div>
-              <Progress 
-                value={percentage} 
-                className="h-2" 
-                style={{ 
-                  ['--progress-background' as any]: bucket.bucketColor 
+              <Progress
+                value={percentage}
+                className="h-2"
+                style={{
+                  ['--progress-background' as any]: bucket.bucketColor
                 }}
               />
             </div>
@@ -125,6 +126,6 @@ export function AgingReportCard() {
           </div>
         </div>
       </CardContent>
-    </Card>
+    </AppCard>
   );
 }

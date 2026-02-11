@@ -124,7 +124,7 @@ export function AccountsPayableReceivableTable() {
     }
 
     return (
-      <div className="bg-transparent">
+      <div className="bg-card/5 rounded-lg">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
@@ -204,7 +204,7 @@ export function AccountsPayableReceivableTable() {
   const payableCount = transactions?.filter(t => t.transactionType === 'pagar').length || 0;
 
   return (
-    <AppCard className="border-none shadow-sm bg-card/5">
+    <AppCard className="border-none shadow-sm">
       <CardHeader className="pb-3 px-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold text-foreground">Contas a Pagar e Receber</CardTitle>

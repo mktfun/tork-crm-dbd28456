@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppCard } from "@/components/ui/app-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar, AlertCircle } from "lucide-react";
 import { useUpcomingReceivables } from "@/hooks/useFinanceiro";
@@ -100,7 +101,7 @@ export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
   }
 
   return (
-    <Card>
+    <AppCard>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Calendar className="w-5 h-5 text-muted-foreground" />
@@ -151,6 +152,6 @@ export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
           </div>
         </div>
       </CardContent>
-    </Card>
+    </AppCard>
   );
 }
