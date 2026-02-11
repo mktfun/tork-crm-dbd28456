@@ -28,19 +28,25 @@ import {
 } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
-import { useFinancialAccountsWithDefaults, useRegisterRevenue } from '@/hooks/useFinanceiro';
+import { useFinancialAccountsWithDefaults } from '@/hooks/useFinanceiro';
 import { useBankAccounts } from '@/hooks/useBancos';
+import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
+import { useSupabaseCompanies } from '@/hooks/useSupabaseCompanies';
+import { useSupabaseProducers } from '@/hooks/useSupabaseProducers';
+import { registerRevenue } from '@/services/financialService';
 
 const revenueSchema = z.object({
   description: z.string().min(3, 'Descrição deve ter pelo menos 3 caracteres'),
   amount: z.number().positive('Valor deve ser positivo'),
   transactionDate: z.string().min(1, 'Data é obrigatória'),
   revenueAccountId: z.string().min(1, 'Selecione uma categoria'),
-  assetAccountId: z.string().min(1, 'Selecione a conta de destino'),
   bankAccountId: z.string().optional(),
   referenceNumber: z.string().optional(),
   memo: z.string().optional(),
   isConfirmed: z.boolean(),
+  ramoId: z.string().optional(),
+  insuranceCompanyId: z.string().optional(),
+  producerId: z.string().optional(),
 });
 
 type RevenueFormData = z.infer<typeof revenueSchema>;
@@ -51,13 +57,15 @@ interface NovaReceitaModalProps {
 
 export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
   const [open, setOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: accounts = [], isLoading: loadingAccounts } = useFinancialAccountsWithDefaults();
   const { data: bankSummary } = useBankAccounts();
-  const registerRevenue = useRegisterRevenue();
+  const { data: ramos = [] } = useSupabaseRamos();
+  const { companies = [] } = useSupabaseCompanies();
+  const { producers = [] } = useSupabaseProducers();
 
-  // Filtrar contas por tipo
+  // Filtrar contas por tipo - apenas categorias de receita
   const revenueAccounts = accounts.filter(a => a.type === 'revenue');
-  const assetAccounts = accounts.filter(a => a.type === 'asset');
   const banks = bankSummary?.accounts?.filter(b => b.isActive) || [];
 
   const form = useForm<RevenueFormData>({
@@ -67,26 +75,41 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
       amount: 0,
       transactionDate: format(new Date(), 'yyyy-MM-dd'),
       revenueAccountId: '',
-      assetAccountId: '',
       bankAccountId: '',
       referenceNumber: '',
       memo: '',
       isConfirmed: true,
+      ramoId: '',
+      insuranceCompanyId: '',
+      producerId: '',
     }
   });
 
   const onSubmit = async (data: RevenueFormData) => {
+    setIsSubmitting(true);
     try {
-      await registerRevenue.mutateAsync({
+      // Buscar conta padrão de "Comissões a Receber" para provisões
+      const defaultAssetAccount = accounts.find(a =>
+        a.type === 'asset' && a.name.toLowerCase().includes('comiss')
+      ) || accounts.find(a => a.type === 'asset');
+
+      if (!defaultAssetAccount) {
+        throw new Error('Conta de ativo padrão não encontrada');
+      }
+
+      await registerRevenue({
         description: data.description,
         amount: data.amount,
         transactionDate: data.transactionDate,
         revenueAccountId: data.revenueAccountId,
-        assetAccountId: data.assetAccountId,
-        bankAccountId: data.bankAccountId === 'none' ? undefined : data.bankAccountId,
+        assetAccountId: defaultAssetAccount.id, // Usa conta padrão para ledger
+        bankAccountId: data.bankAccountId && data.bankAccountId !== 'none' ? data.bankAccountId : undefined,
         referenceNumber: data.referenceNumber,
         memo: data.memo,
         isConfirmed: data.isConfirmed,
+        ramoId: data.ramoId,
+        insuranceCompanyId: data.insuranceCompanyId,
+        producerId: data.producerId,
       });
 
       toast.success('Receita registrada com sucesso!');
@@ -95,6 +118,8 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
     } catch (error: any) {
       console.error('Erro ao registrar receita:', error);
       toast.error(error.message || 'Erro ao registrar receita');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -104,7 +129,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
         {trigger || (
           <Button variant="outline" className="gap-2">
             <TrendingUp className="w-4 h-4" />
-            Nova Receita
+            Receita
           </Button>
         )}
       </DialogTrigger>
@@ -112,7 +137,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-emerald-500" />
-            Nova Receita Manual
+            Receita
           </DialogTitle>
           <DialogDescription>
             Registre uma receita avulsa no sistema financeiro
@@ -220,31 +245,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               )}
             />
 
-            {/* Conta de Destino */}
-            <FormField
-              control={form.control}
-              name="assetAccountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Conta de Destino *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Onde o dinheiro vai entrar" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {assetAccounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+
 
             {/* Banco (opcional) */}
             <FormField
@@ -252,7 +253,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               name="bankAccountId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Banco (opcional)</FormLabel>
+                  <FormLabel>Banco (Opcional)</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
@@ -311,6 +312,87 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               )}
             />
 
+            {/* Novos Campos Opcionais: Ramo, Seguradora, Produtor */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="ramoId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ramo (Opcional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "none"}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {ramos.map((ramo) => (
+                          <SelectItem key={ramo.id} value={ramo.id}>
+                            {ramo.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="insuranceCompanyId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Seguradora (Opcional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "none"}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {companies.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="producerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Produtor (Opcional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "none"}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {producers.map((producer) => (
+                          <SelectItem key={producer.id} value={producer.id}>
+                            {producer.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             {/* Botões */}
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
@@ -319,9 +401,9 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
               <Button
                 type="submit"
                 className="gap-2 bg-emerald-600 hover:bg-emerald-700"
-                disabled={registerRevenue.isPending || loadingAccounts}
+                disabled={isSubmitting || loadingAccounts}
               >
-                {registerRevenue.isPending ? (
+                {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Salvando...
@@ -329,7 +411,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
                 ) : (
                   <>
                     <TrendingUp className="w-4 h-4" />
-                    Registrar Receita
+                    Adicionar
                   </>
                 )}
               </Button>

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Landmark, TrendingUp, TrendingDown, Hash, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
+import { format, subDays } from 'date-fns';
 import {
     Sheet,
     SheetContent,
@@ -11,9 +12,10 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { useBankTransactions } from '@/hooks/useBancos';
-import { BankTransactionRow } from './BankTransactionRow';
+import { useBankTransactions, useBankBalanceHistory } from '@/hooks/useBancos';
+import { BankTransactionsTable } from './BankTransactionsTable';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
+import { BalanceEvolutionChart } from './BalanceEvolutionChart';
 
 interface BankHistorySheetProps {
     bankAccountId: string | null; // null = visão consolidada de todos
@@ -40,12 +42,29 @@ export function BankHistorySheet({
     onClose,
 }: BankHistorySheetProps) {
     const [page, setPage] = useState(1);
-    const pageSize = 15;
+    const [search, setSearch] = useState('');
+    const pageSize = 10;
 
     // State para abrir detalhes de uma transação
     const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
 
-    const { data, isLoading, error } = useBankTransactions(bankAccountId, page, pageSize);
+    const { data, isLoading, error } = useBankTransactions(bankAccountId, page, pageSize, search);
+
+    // Dados para o gráfico de evolução do saldo (últimos 30 dias)
+    const { startDate, endDate } = useMemo(() => {
+        const end = new Date();
+        const start = subDays(end, 30);
+        return {
+            startDate: format(start, 'yyyy-MM-dd'),
+            endDate: format(end, 'yyyy-MM-dd')
+        };
+    }, []);
+
+    const { data: balanceHistory = [], isLoading: loadingHistory } = useBankBalanceHistory(
+        bankAccountId || '',
+        startDate,
+        endDate
+    );
 
     const isConsolidatedView = bankAccountId === null;
 
@@ -60,7 +79,7 @@ export function BankHistorySheet({
     return (
         <>
             <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-                <SheetContent className="w-full sm:max-w-lg">
+                <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full">
                     <SheetHeader className="pb-4">
                         <div className="flex items-center gap-3">
                             {isConsolidatedView ? (
@@ -91,20 +110,11 @@ export function BankHistorySheet({
 
                     {/* Saldo atual (se não for visão consolidada) */}
                     {!isConsolidatedView && currentBalance !== undefined && (
-                        <div
-                            className="text-center p-4 rounded-lg mb-4"
-                            style={{
-                                backgroundColor: bankColor ? `${bankColor}10` : 'hsl(var(--muted) / 0.3)',
-                                borderLeft: `4px solid ${bankColor || 'hsl(var(--primary))'}`
-                            }}
-                        >
-                            <p className="text-sm text-muted-foreground">Saldo Atual</p>
-                            <p
-                                className="text-2xl font-bold"
-                                style={{ color: bankColor || 'hsl(var(--primary))' }}
-                            >
-                                {formatCurrency(currentBalance)}
-                            </p>
+                        <div className="mb-4">
+                            <BalanceEvolutionChart
+                                data={balanceHistory}
+                                isLoading={loadingHistory}
+                            />
                         </div>
                     )}
 
@@ -135,12 +145,12 @@ export function BankHistorySheet({
                                     {formatCurrency(data.totalExpense)}
                                 </p>
                             </div>
-                            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                            <div className="p-3 rounded-lg bg-muted border border-border">
                                 <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
                                     <Hash className="w-3 h-3" />
                                     Transações
                                 </div>
-                                <p className="text-sm font-semibold">
+                                <p className="text-sm font-semibold text-foreground">
                                     {data.totalCount}
                                 </p>
                             </div>
@@ -149,8 +159,22 @@ export function BankHistorySheet({
 
                     <Separator className="mb-4" />
 
+                    {/* Search Input */}
+                    <div className="mb-4">
+                        <input
+                            type="text"
+                            placeholder="Pesquisar por descrição ou categoria..."
+                            value={search}
+                            onChange={(e) => {
+                                setSearch(e.target.value);
+                                setPage(1); // Reset page on search
+                            }}
+                            className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-input"
+                        />
+                    </div>
+
                     {/* Lista de Transações */}
-                    <ScrollArea className="h-[calc(100vh-380px)]">
+                    <ScrollArea className="flex-1 -mr-4 pr-4">
                         {isLoading ? (
                             <div className="space-y-2">
                                 {[...Array(5)].map((_, i) => (
@@ -165,26 +189,33 @@ export function BankHistorySheet({
                             <div className="text-center py-8 text-muted-foreground">
                                 <Landmark className="w-12 h-12 mx-auto mb-3 opacity-30" />
                                 <p>Nenhuma transação encontrada</p>
-                                <p className="text-sm">Este banco ainda não possui movimentações</p>
+                                <p className="text-sm">
+                                    {search ? 'Tente buscar com outro termo' : 'Este banco ainda não possui movimentações'}
+                                </p>
                             </div>
                         ) : (
-                            <div className="space-y-2 pr-4">
-                                {data?.transactions.map((tx) => (
-                                    <BankTransactionRow
-                                        key={tx.transactionId}
-                                        transaction={tx}
-                                        showBankName={isConsolidatedView}
-                                        onClick={handleTransactionClick}
-                                    />
-                                ))}
+                            <div>
+                                <BankTransactionsTable
+                                    transactions={(data?.transactions || []).map(tx => ({
+                                        id: tx.transactionId,
+                                        date: tx.transactionDate,
+                                        bankName: tx.bankName || undefined,
+                                        type: (tx.accountType === 'revenue' || tx.accountType === 'receita' || tx.amount >= 0) ? 'entrada' : 'saida',
+                                        description: tx.description,
+                                        category: tx.accountName || 'Sem categoria',
+                                        amount: tx.amount,
+                                        reconciliationStatus: 'conciliado'
+                                    }))}
+                                    showBankColumn={isConsolidatedView}
+                                    onTransactionClick={handleTransactionClick}
+                                />
                             </div>
                         )}
                     </ScrollArea>
 
                     {/* Paginação */}
                     {data && data.pageCount > 1 && (
-                        <>
-                            <Separator className="my-4" />
+                        <div className="pt-4 mt-auto border-t border-border">
                             <div className="flex items-center justify-between">
                                 <Button
                                     variant="outline"
@@ -208,7 +239,7 @@ export function BankHistorySheet({
                                     <ChevronRight className="w-4 h-4 ml-1" />
                                 </Button>
                             </div>
-                        </>
+                        </div>
                     )}
                 </SheetContent>
             </Sheet>

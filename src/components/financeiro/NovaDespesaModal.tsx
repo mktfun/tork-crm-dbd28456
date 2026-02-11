@@ -25,8 +25,11 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 
 import { supabase } from '@/integrations/supabase/client';
-import { useFinancialAccounts, useRegisterExpense } from '@/hooks/useFinanceiro';
+import { useFinancialAccounts, useCreateFinancialMovement } from '@/hooks/useFinanceiro';
 import { useBankAccounts } from '@/hooks/useBancos';
+import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
+import { useSupabaseCompanies } from '@/hooks/useSupabaseCompanies';
+import { useSupabaseProducers } from '@/hooks/useSupabaseProducers';
 import { FinancialAccount } from '@/types/financeiro';
 import { Badge } from '@/components/ui/badge';
 
@@ -35,9 +38,11 @@ interface FormData {
   amount: string;
   transactionDate: string;
   expenseAccountId: string;
-  assetAccountId: string;
   bankAccountId?: string;
   referenceNumber: string;
+  ramoId?: string;
+  insuranceCompanyId?: string;
+  producerId?: string;
 }
 
 // Gerar ID único
@@ -54,12 +59,15 @@ export function NovaDespesaModal() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: expenseAccounts = [], isLoading: loadingExpense } = useFinancialAccounts('expense');
-  const { data: assetAccounts = [], isLoading: loadingAsset } = useFinancialAccounts('asset');
+  const { data: assetAccounts = [] } = useFinancialAccounts('asset'); // Para uso interno
   const { data: bankSummary } = useBankAccounts();
+  const { data: ramos = [] } = useSupabaseRamos();
+  const { companies = [] } = useSupabaseCompanies(); // Hook has slightly different signature
+  const { producers = [] } = useSupabaseProducers(); // Hook has slightly different signature
 
   const banks = bankSummary?.accounts?.filter(b => b.isActive) || [];
 
-  const registerExpense = useRegisterExpense();
+  const { mutate: createMovement, isPending: isCreating } = useCreateFinancialMovement();
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
     defaultValues: {
@@ -67,9 +75,11 @@ export function NovaDespesaModal() {
       amount: '',
       transactionDate: format(new Date(), 'yyyy-MM-dd'),
       expenseAccountId: '',
-      assetAccountId: '',
       bankAccountId: '',
-      referenceNumber: ''
+      referenceNumber: '',
+      ramoId: '',
+      insuranceCompanyId: '',
+      producerId: ''
     }
   });
 
@@ -152,41 +162,51 @@ export function NovaDespesaModal() {
         }
       }
 
-      await registerExpense.mutateAsync({
+      createMovement({
         description: data.description,
-        amount,
-        transactionDate: data.transactionDate,
-        expenseAccountId: data.expenseAccountId,
-        assetAccountId: data.assetAccountId,
-        bankAccountId: data.bankAccountId === 'none' ? undefined : data.bankAccountId,
-        referenceNumber: data.referenceNumber || undefined,
-        isConfirmed: isPaid,
-        memo: attachmentUrl,
+        amount: amount,
+        account_id: data.expenseAccountId,
+        bank_account_id: data.bankAccountId && data.bankAccountId !== 'none' ? data.bankAccountId : undefined,
+        payment_date: data.transactionDate,
+        type: 'expense',
+        reference_number: data.referenceNumber || undefined,
+        memo: attachmentUrl, // Usando memo para a URL do anexo por enquanto, ou conforme lógica original
+        is_confirmed: isPaid,
+        ramo_id: data.ramoId,
+        insurance_company_id: data.insuranceCompanyId,
+        producer_id: data.producerId
+      }, {
+        onSuccess: () => {
+          toast.success('Despesa registrada com sucesso!');
+          reset();
+          removeAttachment();
+          setOpen(false);
+        },
+        onError: (error: any) => {
+          console.error('Erro ao registrar despesa:', error);
+          toast.error(error.message || 'Erro ao registrar despesa');
+        }
       });
 
-      toast.success('Despesa registrada com sucesso!');
-      reset();
-      removeAttachment();
-      setOpen(false);
     } catch (error: any) {
-      console.error('Erro ao registrar despesa:', error);
-      toast.error(error.message || 'Erro ao registrar despesa');
+      console.error('Erro ao processar formulário:', error);
+      toast.error(error.message || 'Erro ao processar');
     }
   };
 
-  const isLoading = loadingExpense || loadingAsset;
+  const isLoading = loadingExpense;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="gap-2">
           <Plus className="w-4 h-4" />
-          Nova Despesa
+          Despesa
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Registrar Despesa</DialogTitle>
+          <DialogTitle>Despesa</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
@@ -287,33 +307,9 @@ export function NovaDespesaModal() {
             )}
           </div>
 
-          {/* Conta de Saída (Ativo) */}
+          {/* Banco */}
           <div className="space-y-2">
-            <Label>De onde saiu o dinheiro? *</Label>
-            <Select
-              onValueChange={(value) => setValue('assetAccountId', value)}
-              disabled={isLoading}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a conta" />
-              </SelectTrigger>
-              <SelectContent>
-                {assetAccounts.map((acc) => (
-                  <SelectItem key={acc.id} value={acc.id}>
-                    {acc.code ? `${acc.code} - ${acc.name}` : acc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <input type="hidden" {...register('assetAccountId', { required: 'Selecione uma conta' })} />
-            {errors.assetAccountId && (
-              <p className="text-sm text-destructive">{errors.assetAccountId.message}</p>
-            )}
-          </div>
-
-          {/* Banco (opcional) */}
-          <div className="space-y-2">
-            <Label>Banco (opcional)</Label>
+            <Label>Banco (Opcional)</Label>
             <Select
               onValueChange={(value) => setValue('bankAccountId', value === 'none' ? '' : value)}
               disabled={isLoading}
@@ -343,6 +339,69 @@ export function NovaDespesaModal() {
               placeholder="Ex: NF 12345, Boleto, etc."
               {...register('referenceNumber')}
             />
+          </div>
+
+          {/* Novos Campos Opcionais: Ramo, Seguradora, Produtor */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Ramo (Opcional)</Label>
+              <Select
+                onValueChange={(value) => setValue('ramoId', value === 'none' ? '' : value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {ramos.map((ramo) => (
+                    <SelectItem key={ramo.id} value={ramo.id}>
+                      {ramo.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Seguradora (Opcional)</Label>
+              <Select
+                onValueChange={(value) => setValue('insuranceCompanyId', value === 'none' ? '' : value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Produtor (Opcional)</Label>
+              <Select
+                onValueChange={(value) => setValue('producerId', value === 'none' ? '' : value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {producers.map((producer) => (
+                    <SelectItem key={producer.id} value={producer.id}>
+                      {producer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Anexar Comprovante */}
@@ -412,15 +471,15 @@ export function NovaDespesaModal() {
             </Button>
             <Button
               type="submit"
-              disabled={registerExpense.isPending || isUploading}
+              disabled={isCreating || isUploading}
             >
-              {(registerExpense.isPending || isUploading) ? (
+              {(isCreating || isUploading) ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   {isUploading ? 'Anexando...' : 'Salvando...'}
                 </>
               ) : (
-                'Salvar Despesa'
+                'Adicionar'
               )}
             </Button>
           </div>

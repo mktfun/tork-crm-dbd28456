@@ -18,6 +18,7 @@ interface RecentTransaction {
   reference_number: string | null;
   created_at: string;
   is_void: boolean;
+  is_confirmed: boolean;
   total_amount: number;
   account_names: string;
   status: string;
@@ -126,11 +127,21 @@ export async function registerExpense(payload: {
   referenceNumber?: string;
   memo?: string;
   isConfirmed?: boolean;
+  ramoId?: string;
+  insuranceCompanyId?: string;
+  producerId?: string;
 }): Promise<string> {
-  const movements: Array<{ account_id: string; amount: number; memo?: string }> = [
-    { account_id: payload.expenseAccountId, amount: payload.amount, memo: payload.memo },
-    { account_id: payload.assetAccountId, amount: -payload.amount, memo: payload.memo }
-  ];
+  const movements: Array<{ account_id: string; amount: number; memo?: string }> = [];
+
+  // Lançamento de despesa (sempre ocorre)
+  movements.push({ account_id: payload.expenseAccountId, amount: payload.amount, memo: payload.memo });
+
+  // Contrapartida:
+  // Se tem banco E está pago => Não lança no ledger de contas (será movido no bank_accounts pela RPC)
+  // Se não tem banco OU não está pago => Lança na conta de ativo/passivo informada (ex: Caixa ou Contas a Pagar)
+  if (!payload.bankAccountId || !payload.isConfirmed) {
+    movements.push({ account_id: payload.assetAccountId, amount: -payload.amount, memo: payload.memo });
+  }
 
   const { data, error } = await supabase.rpc('create_financial_movement', {
     p_description: payload.description,
@@ -140,7 +151,10 @@ export async function registerExpense(payload: {
     p_related_entity_type: null,
     p_related_entity_id: null,
     p_bank_account_id: payload.bankAccountId || null,
-    p_is_confirmed: payload.isConfirmed ?? false
+    p_is_confirmed: payload.isConfirmed ?? false,
+    p_ramo_id: payload.ramoId || null,
+    p_insurance_company_id: payload.insuranceCompanyId || null,
+    p_producer_id: payload.producerId || null
   });
 
   if (error) throw error;
@@ -157,11 +171,21 @@ export async function registerRevenue(payload: {
   referenceNumber?: string;
   memo?: string;
   isConfirmed?: boolean;
+  ramoId?: string;
+  insuranceCompanyId?: string;
+  producerId?: string;
 }): Promise<string> {
-  const movements: Array<{ account_id: string; amount: number; memo?: string }> = [
-    { account_id: payload.assetAccountId, amount: payload.amount, memo: payload.memo },
-    { account_id: payload.revenueAccountId, amount: -payload.amount, memo: payload.memo }
-  ];
+  const movements: Array<{ account_id: string; amount: number; memo?: string }> = [];
+
+  // Contrapartida:
+  // Se tem banco E está confirmado => Não lança no ledger de contas (será movido no bank_accounts pela RPC)
+  // Se não tem banco OU pendente => Lança na conta de ativo (ex: Comissões a Receber)
+  if (!payload.bankAccountId || !payload.isConfirmed) {
+    movements.push({ account_id: payload.assetAccountId, amount: payload.amount, memo: payload.memo });
+  }
+
+  // Lançamento de receita (sempre ocorre)
+  movements.push({ account_id: payload.revenueAccountId, amount: -payload.amount, memo: payload.memo });
 
   const { data, error } = await supabase.rpc('create_financial_movement', {
     p_description: payload.description,
@@ -171,11 +195,84 @@ export async function registerRevenue(payload: {
     p_related_entity_type: null,
     p_related_entity_id: null,
     p_bank_account_id: payload.bankAccountId || null,
-    p_is_confirmed: payload.isConfirmed ?? false
+    p_is_confirmed: payload.isConfirmed ?? false,
+    p_ramo_id: payload.ramoId || null,
+    p_insurance_company_id: payload.insuranceCompanyId || null,
+    p_producer_id: payload.producerId || null
   });
 
   if (error) throw error;
   return data;
+}
+
+export async function createFinancialMovement(payload: {
+  description: string;
+  amount: number;
+  payment_date: string;
+  account_id: string; // The category (expense or revenue account id)
+  bank_account_id?: string;
+  type: 'expense' | 'revenue';
+  reference_number?: string;
+  memo?: string;
+  is_confirmed?: boolean;
+  ramo_id?: string;
+  insurance_company_id?: string;
+  producer_id?: string;
+}) {
+  // Logic to find a default asset account if bank not provided
+  // We need to fetch accounts to find a default one (e.g. 'Caixa').
+  // Since this runs on client side (service), we can query supabase directly.
+
+  let assetAccountId = '';
+
+  // Try to find a default asset account (e.g. Caixa)
+  const { data: accounts } = await supabase
+    .from('financial_accounts')
+    .select('id, name, type')
+    .eq('status', 'active')
+    .eq('type', 'asset');
+
+  if (accounts && accounts.length > 0) {
+    const caixa = accounts.find(a => a.name.toLowerCase().includes('caixa'));
+    assetAccountId = caixa ? caixa.id : accounts[0].id;
+  } else {
+    // If no asset account exists, we might fail or let the specific function fail.
+    // For now, let's assume one exists or the specific function handles it (it requires it).
+    // Warning: registerExpense/Revenue Require 'assetAccountId'.
+    console.warn('No asset account found for default counterpart');
+  }
+
+  if (payload.type === 'expense') {
+    return registerExpense({
+      description: payload.description,
+      amount: payload.amount,
+      transactionDate: payload.payment_date,
+      expenseAccountId: payload.account_id,
+      assetAccountId: assetAccountId,
+      bankAccountId: payload.bank_account_id,
+      referenceNumber: payload.reference_number,
+      memo: payload.memo,
+      isConfirmed: payload.is_confirmed ?? true,
+      ramoId: payload.ramo_id,
+      insuranceCompanyId: payload.insurance_company_id,
+      producerId: payload.producer_id
+    });
+  } else {
+    return registerRevenue({
+      description: payload.description,
+      amount: payload.amount,
+      transactionDate: payload.payment_date,
+      revenueAccountId: payload.account_id,
+      assetAccountId: assetAccountId,
+      bankAccountId: payload.bank_account_id,
+      referenceNumber: payload.reference_number,
+      memo: payload.memo,
+      isConfirmed: payload.is_confirmed ?? true,
+      ramoId: payload.ramo_id,
+      insuranceCompanyId: payload.insurance_company_id,
+      producerId: payload.producer_id
+    });
+  }
 }
 
 export async function getRecentTransactions(params?: {
@@ -190,7 +287,10 @@ export async function getRecentTransactions(params?: {
   });
 
   if (error) throw error;
-  return data || [];
+  return (data || []).map((tx: any) => ({
+    ...tx,
+    is_confirmed: tx.is_confirmed ?? (tx.status === 'confirmed')
+  }));
 }
 
 // ============ INTERFACE PARA RESULTADO DE ESTORNO ============
@@ -562,6 +662,7 @@ interface TransactionDetails {
   isVoid: boolean;
   voidReason: string | null;
   createdAt: string;
+  amount: number;
   attachments: string[];
   ledgerEntries: Array<{
     id: string;
@@ -616,6 +717,7 @@ export async function getTransactionDetails(
 
     if (txError) throw txError;
 
+    const totalAmount = tx.total_amount ?? 0;
     return {
       id: tx.id,
       description: tx.description || '',
@@ -635,6 +737,7 @@ export async function getTransactionDetails(
         accountName: l.financial_accounts?.name || 'Conta Desconhecida',
         accountType: l.financial_accounts?.type || 'unknown'
       })),
+      amount: Math.abs(totalAmount),
       legacyData: null
     };
   }
@@ -648,6 +751,11 @@ export async function getTransactionDetails(
   const rawMovements = raw.ledgerEntries || raw.ledger_entries || [];
   const rawLegacy = raw.legacyData || raw.legacy_data;
 
+  const rawAmount = raw.total_amount || raw.totalAmount || rawMovements.reduce((acc: number, e: any) => {
+    const t = e.accountType || e.account_type || '';
+    return (t === 'revenue' || t === 'expense') ? acc + Math.abs(e.amount) : acc;
+  }, 0);
+
   return {
     id: raw.id,
     description: raw.description,
@@ -658,6 +766,7 @@ export async function getTransactionDetails(
     isVoid: raw.isVoid ?? raw.is_void ?? false,
     voidReason: raw.voidReason || raw.void_reason,
     createdAt: raw.createdAt || raw.created_at,
+    amount: rawAmount,
     attachments: raw.attachments || [],
     ledgerEntries: rawMovements.map((entry: any) => ({
       id: entry.id,
@@ -794,73 +903,24 @@ export async function getPayableReceivableTransactions(
   const { data: user } = await supabase.auth.getUser();
   if (!user?.user) throw new Error('Usuário não autenticado');
 
-  let query = supabase
-    .from('financial_transactions')
-    .select(`
-      id,
-      description,
-      transaction_date,
-      is_confirmed,
-      is_void,
-      financial_ledger!inner(
-        amount,
-        financial_accounts!inner(
-          type,
-          name
-        )
-      )
-    `)
-    .eq('user_id', user.user.id)
-    .eq('is_void', false)
-    .order('transaction_date', { ascending: false });
-
-  const { data, error } = await query;
+  // Usar a RPC que faz JOIN correto com transactions legado para pegar client_name
+  const { data, error } = await supabase.rpc('get_payable_receivable_transactions', {
+    p_user_id: user.user.id,
+    p_transaction_type: transactionType === 'all' ? null : transactionType,
+    p_status: statusFilter === 'all' ? null : statusFilter
+  });
 
   if (error) throw error;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const transactions: PayableReceivableTransaction[] = (data || []).map((tx: any) => {
-    const ledgerEntry = tx.financial_ledger[0];
-    const account = ledgerEntry?.financial_accounts;
-    const txDate = new Date(tx.transaction_date);
-    txDate.setHours(0, 0, 0, 0);
-    
-    const daysDiff = Math.floor((today.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    let status: 'atrasado' | 'pendente' | 'pago';
-    if (tx.is_confirmed) {
-      status = 'pago';
-    } else if (daysDiff > 0) {
-      status = 'atrasado';
-    } else {
-      status = 'pendente';
-    }
-
-    const type = account?.type === 'revenue' || account?.type === 'income' ? 'receber' : 'pagar';
-
-    return {
-      transactionId: tx.id,
-      transactionType: type,
-      dueDate: tx.transaction_date,
-      entityName: account?.name || 'Não especificado',
-      description: tx.description,
-      amount: Math.abs(ledgerEntry?.amount || 0),
-      status,
-      daysOverdue: status === 'atrasado' ? daysDiff : 0,
-    };
-  });
-
-  let filtered = transactions;
-
-  if (transactionType !== 'all') {
-    filtered = filtered.filter(t => t.transactionType === transactionType);
-  }
-
-  if (statusFilter !== 'all') {
-    filtered = filtered.filter(t => t.status === statusFilter);
-  }
-
-  return filtered;
+  return (data || []).map((row: any) => ({
+    transactionId: row.transaction_id,
+    transactionType: row.transaction_type as 'receber' | 'pagar',
+    dueDate: row.due_date,
+    entityName: row.entity_name || 'Não especificado',
+    description: row.description || '',
+    amount: Math.abs(Number(row.amount) || 0),
+    status: row.status as 'atrasado' | 'pendente' | 'pago',
+    daysOverdue: Number(row.days_overdue) || 0,
+  }));
 }
+
