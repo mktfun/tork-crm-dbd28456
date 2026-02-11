@@ -270,16 +270,7 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                 </div>
             )}
 
-            {/* Configurações Recorrentes (Apenas Despesas) */}
-            {transactionType === 'despesas' && (
-                <div className="pt-8 border-t space-y-4">
-                    <div className="flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-muted-foreground" />
-                        <h3 className="text-lg font-semibold">Configurações Recorrentes</h3>
-                    </div>
-                    <RecurringConfigsList />
-                </div>
-            )}
+// Remove this block from lines 274-282
 
             {/* Sync Info */}
             {syncedCount > 0 && isPendente && (
@@ -338,6 +329,11 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                     />
                 </CardContent>
             </Card>
+
+            {/* Configurações Recorrentes */}
+            <div className="pt-8 border-t">
+                <RecurringConfigsList type={transactionType === 'receitas' ? 'revenue' : 'expense'} />
+            </div>
 
             {/* Details Sheet */}
             <TransactionDetailsSheet

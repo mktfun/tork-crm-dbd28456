@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  Repeat, 
-  Pencil, 
-  Trash2, 
+import {
+  Repeat,
+  Pencil,
+  Trash2,
   MoreHorizontal,
   Home,
   Laptop,
@@ -45,8 +45,8 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import { RecurringConfigModal } from './RecurringConfigModal';
-import { 
-  useRecurringConfigs, 
+import {
+  useRecurringConfigs,
   useDeleteRecurringConfig,
   useUpdateRecurringConfig
 } from '@/hooks/useRecurringConfigs';
@@ -83,15 +83,15 @@ interface RecurringConfigCardProps {
   onToggleActive: (config: RecurringConfig) => void;
 }
 
-function RecurringConfigCard({ 
-  config, 
-  onEdit, 
+function RecurringConfigCard({
+  config,
+  onEdit,
   onDelete,
-  onToggleActive 
+  onToggleActive
 }: RecurringConfigCardProps) {
   const Icon = getRecurringIcon(config.name);
   const isExpense = config.nature === 'expense';
-  
+
   return (
     <div className={cn(
       "p-4 rounded-lg border bg-card transition-all hover:shadow-md",
@@ -101,8 +101,8 @@ function RecurringConfigCard({
         <div className="flex items-center gap-3">
           <div className={cn(
             "p-2.5 rounded-lg",
-            isExpense 
-              ? "bg-rose-500/10 text-rose-500" 
+            isExpense
+              ? "bg-rose-500/10 text-rose-500"
               : "bg-emerald-500/10 text-emerald-500"
           )}>
             <Icon className="w-5 h-5" />
@@ -163,7 +163,7 @@ function RecurringConfigCard({
                 )}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 onClick={() => onDelete(config.id)}
                 className="text-destructive focus:text-destructive"
               >
@@ -178,11 +178,17 @@ function RecurringConfigCard({
   );
 }
 
-export function RecurringConfigsList() {
+// ... (existing imports)
+
+interface RecurringConfigsListProps {
+  type?: 'revenue' | 'expense' | 'all';
+}
+
+export function RecurringConfigsList({ type = 'all' }: RecurringConfigsListProps) {
   const { data: configs = [], isLoading } = useRecurringConfigs();
   const deleteMutation = useDeleteRecurringConfig();
   const updateMutation = useUpdateRecurringConfig();
-  
+
   const [editingConfig, setEditingConfig] = useState<RecurringConfig | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -200,9 +206,9 @@ export function RecurringConfigsList() {
     });
   };
 
-  // Separar despesas e receitas
-  const expenses = configs.filter(c => c.nature === 'expense');
-  const revenues = configs.filter(c => c.nature === 'revenue');
+  // Separar despesas e receitas com filtro adicional
+  const expenses = configs.filter(c => c.nature === 'expense' && (type === 'all' || type === 'expense'));
+  const revenues = configs.filter(c => c.nature === 'revenue' && (type === 'all' || type === 'revenue'));
 
   // Calcular totais mensais
   const totalMonthlyExpense = expenses
@@ -212,13 +218,25 @@ export function RecurringConfigsList() {
     .filter(c => c.is_active && c.frequency === 'monthly')
     .reduce((sum, c) => sum + c.amount, 0);
 
+  const getTitle = () => {
+    if (type === 'revenue') return 'Receitas Recorrentes';
+    if (type === 'expense') return 'Despesas Recorrentes';
+    return 'Configurações Recorrentes';
+  };
+
+  const getDescription = () => {
+    if (type === 'revenue') return 'Receitas que se repetem automaticamente';
+    if (type === 'expense') return 'Despesas que se repetem automaticamente';
+    return 'Despesas e receitas que se repetem automaticamente';
+  };
+
   if (isLoading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Repeat className="w-5 h-5" />
-            Configurações Recorrentes
+            {getTitle()}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -240,10 +258,10 @@ export function RecurringConfigsList() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Repeat className="w-5 h-5" />
-                Configurações Recorrentes
+                {getTitle()}
               </CardTitle>
               <CardDescription>
-                Despesas e receitas que se repetem automaticamente
+                {getDescription()}
               </CardDescription>
             </div>
             <div className="flex items-center gap-4">
@@ -288,10 +306,12 @@ export function RecurringConfigsList() {
               {/* Despesas */}
               {expenses.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <TrendingDown className="w-4 h-4 text-rose-500" />
-                    Despesas Recorrentes ({expenses.length})
-                  </h3>
+                  {type === 'all' && (
+                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <TrendingDown className="w-4 h-4 text-rose-500" />
+                      Despesas Recorrentes ({expenses.length})
+                    </h3>
+                  )}
                   <div className="space-y-2">
                     {expenses.map(config => (
                       <RecurringConfigCard
@@ -309,10 +329,12 @@ export function RecurringConfigsList() {
               {/* Receitas */}
               {revenues.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-emerald-500" />
-                    Receitas Recorrentes ({revenues.length})
-                  </h3>
+                  {type === 'all' && (
+                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-emerald-500" />
+                      Receitas Recorrentes ({revenues.length})
+                    </h3>
+                  )}
                   <div className="space-y-2">
                     {revenues.map(config => (
                       <RecurringConfigCard
@@ -331,7 +353,7 @@ export function RecurringConfigsList() {
         </CardContent>
       </Card>
 
-      {/* Modal de Edição */}
+      {/* Modal de Edição e Dialog de Exclusão (Mantenha inalterados) */}
       {editingConfig && (
         <RecurringConfigModal
           config={editingConfig}
@@ -340,19 +362,18 @@ export function RecurringConfigsList() {
         />
       )}
 
-      {/* Dialog de Confirmação de Exclusão */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir Configuração Recorrente?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. A configuração será removida 
+              Esta ação não pode ser desfeita. A configuração será removida
               permanentemente e não aparecerá mais nas projeções.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
