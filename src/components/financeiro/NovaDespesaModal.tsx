@@ -209,13 +209,15 @@ export function NovaDespesaModal() {
           <DialogTitle>Despesa</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
-          {/* Descrição */}
-          <div className="space-y-2">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 mt-4">
+          {/* Descrição - Full Width */}
+          <div className="space-y-1">
             <Label htmlFor="description">Descrição *</Label>
             <Textarea
               id="description"
               placeholder="Ex: Pagamento de conta de luz"
+              className="resize-none"
+              rows={2}
               {...register('description', { required: 'Descrição obrigatória' })}
             />
             {errors.description && (
@@ -223,9 +225,9 @@ export function NovaDespesaModal() {
             )}
           </div>
 
-          {/* Valor e Data */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+          {/* Valor e Data - Side by Side */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
               <Label htmlFor="amount">Valor (R$) *</Label>
               <Input
                 id="amount"
@@ -238,11 +240,11 @@ export function NovaDespesaModal() {
                 <p className="text-sm text-destructive">{errors.amount.message}</p>
               )}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <Label htmlFor="transactionDate">Data *</Label>
                 {isDateFuture && (
-                  <Badge variant="outline" className="gap-1 text-amber-600 border-amber-500/30 bg-amber-500/10">
+                  <Badge variant="outline" className="gap-1 text-amber-600 border-amber-500/30 bg-amber-500/10 h-5 px-1.5 text-[10px]">
                     <Calendar className="w-3 h-3" />
                     Previsão
                   </Badge>
@@ -253,38 +255,35 @@ export function NovaDespesaModal() {
                 type="date"
                 {...register('transactionDate', { required: 'Data obrigatória' })}
               />
-              {isDateFuture && (
-                <p className="text-xs text-muted-foreground">
-                  Despesas futuras aparecem como previsão no Fluxo de Caixa
-                </p>
-              )}
+              {/* Future date warning removed to save space, relying on Badge above */}
               {errors.transactionDate && (
                 <p className="text-sm text-destructive">{errors.transactionDate.message}</p>
               )}
             </div>
           </div>
 
-          {/* Checkbox: Já paga? */}
-          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+          {/* Checkbox: Já paga? - Compact */}
+          <div className="flex items-center space-x-2 p-2 rounded-lg bg-muted/30 border border-border/50">
             <Checkbox
               id="isPaid"
               checked={isPaid}
               onCheckedChange={(checked) => setIsPaid(!!checked)}
             />
-            <div className="flex-1">
+            <div className="flex-1 flex items-center justify-between">
               <Label htmlFor="isPaid" className="text-sm font-medium cursor-pointer">
                 Despesa já foi paga
               </Label>
               {!isPaid && (
-                <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                <span className="text-xs text-amber-600 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
-                  Esta despesa aparecerá como "A Pagar" no fluxo de caixa
-                </p>
+                  A Pagar
+                </span>
               )}
             </div>
           </div>
 
-          <div className="space-y-2">
+          {/* Categoria - Full Width */}
+          <div className="space-y-1">
             <Label>Para que foi? (Categoria) *</Label>
             <Select
               onValueChange={(value) => setValue('expenseAccountId', value)}
@@ -307,49 +306,50 @@ export function NovaDespesaModal() {
             )}
           </div>
 
-          {/* Banco */}
-          <div className="space-y-2">
-            <Label>Banco (Opcional)</Label>
-            <Select
-              onValueChange={(value) => setValue('bankAccountId', value === 'none' ? '' : value)}
-              disabled={isLoading}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o banco" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Nenhum banco</SelectItem>
-                {banks.map((bank) => (
-                  <SelectItem key={bank.id} value={bank.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{bank.icon}</span>
-                      <span>{bank.bankName}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Banco e Referência - 2 Cols */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Banco <span className="text-xs text-muted-foreground/80 font-normal">(Opcional)</span></Label>
+              <Select
+                onValueChange={(value) => setValue('bankAccountId', value === 'none' ? '' : value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o banco" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum banco</SelectItem>
+                  {banks.map((bank) => (
+                    <SelectItem key={bank.id} value={bank.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{bank.icon}</span>
+                        <span>{bank.bankName}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="referenceNumber">Referência <span className="text-xs text-muted-foreground/80 font-normal">(opcional)</span></Label>
+              <Input
+                id="referenceNumber"
+                placeholder="Ex: NF 12345"
+                {...register('referenceNumber')}
+              />
+            </div>
           </div>
 
-          {/* Referência (opcional) */}
-          <div className="space-y-2">
-            <Label htmlFor="referenceNumber">Referência (opcional)</Label>
-            <Input
-              id="referenceNumber"
-              placeholder="Ex: NF 12345, Boleto, etc."
-              {...register('referenceNumber')}
-            />
-          </div>
-
-          {/* Novos Campos Opcionais: Ramo, Seguradora, Produtor */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Ramo (Opcional)</Label>
+          {/* Metadata - 3 Cols */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label>Ramo <span className="text-xs text-muted-foreground/80 font-normal">(Op)</span></Label>
               <Select
                 onValueChange={(value) => setValue('ramoId', value === 'none' ? '' : value)}
                 disabled={isLoading}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
@@ -363,13 +363,13 @@ export function NovaDespesaModal() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Seguradora (Opcional)</Label>
+            <div className="space-y-1">
+              <Label>Seguradora <span className="text-xs text-muted-foreground/80 font-normal">(Op)</span></Label>
               <Select
                 onValueChange={(value) => setValue('insuranceCompanyId', value === 'none' ? '' : value)}
                 disabled={isLoading}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
@@ -383,13 +383,13 @@ export function NovaDespesaModal() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Produtor (Opcional)</Label>
+            <div className="space-y-1">
+              <Label>Produtor <span className="text-xs text-muted-foreground/80 font-normal">(Op)</span></Label>
               <Select
                 onValueChange={(value) => setValue('producerId', value === 'none' ? '' : value)}
                 disabled={isLoading}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
@@ -404,21 +404,21 @@ export function NovaDespesaModal() {
             </div>
           </div>
 
-          {/* Anexar Comprovante */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Paperclip className="w-4 h-4" />
-              Anexar Comprovante (opcional)
+          {/* Anexar Comprovante - Compact */}
+          <div className="space-y-1">
+            <Label className="flex items-center gap-2 text-sm">
+              <Paperclip className="w-3 h-3" />
+              Anexar Comprovante <span className="text-xs text-muted-foreground/80 font-normal">(opcional)</span>
             </Label>
 
             {!attachmentFile ? (
               <div
-                className="border-2 border-dashed border-border/50 rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                className="border border-dashed border-border/50 rounded-lg h-14 flex items-center justify-center gap-2 hover:border-primary/50 transition-colors cursor-pointer bg-muted/10"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Clique para selecionar imagem ou PDF
+                <Upload className="w-4 h-4 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">
+                  Clique para anexar (PDF ou Imagem)
                 </p>
                 <input
                   ref={fileInputRef}
@@ -429,21 +429,21 @@ export function NovaDespesaModal() {
                 />
               </div>
             ) : (
-              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border border-border/30">
+              <div className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-border/30 h-14">
                 {attachmentPreview ? (
                   <img
                     src={attachmentPreview}
                     alt="Preview"
-                    className="w-12 h-12 rounded object-cover"
+                    className="w-10 h-10 rounded object-cover"
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
-                    <Paperclip className="w-5 h-5 text-muted-foreground" />
+                  <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                    <Paperclip className="w-4 h-4 text-muted-foreground" />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{attachmentFile.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs font-medium truncate">{attachmentFile.name}</p>
+                  <p className="text-[10px] text-muted-foreground">
                     {(attachmentFile.size / 1024).toFixed(1)} KB
                   </p>
                 </div>
@@ -452,7 +452,7 @@ export function NovaDespesaModal() {
                   variant="ghost"
                   size="icon"
                   onClick={removeAttachment}
-                  className="text-muted-foreground hover:text-destructive"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
                 >
                   <X className="w-4 h-4" />
                 </Button>
@@ -461,7 +461,7 @@ export function NovaDespesaModal() {
           </div>
 
           {/* Botões */}
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
