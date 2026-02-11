@@ -204,7 +204,7 @@ export function AccountsPayableReceivableTable() {
   const payableCount = transactions?.filter(t => t.transactionType === 'pagar').length || 0;
 
   return (
-    <AppCard className="border-none shadow-sm bg-transparent">
+    <AppCard className="border-none shadow-sm bg-card/5">
       <CardHeader className="pb-3 px-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold text-foreground">Contas a Pagar e Receber</CardTitle>

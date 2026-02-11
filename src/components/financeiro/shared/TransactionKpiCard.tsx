@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
+import { CardContent } from '@/components/ui/card';
+import { AppCard } from '@/components/ui/app-card';
 
 function formatCurrency(value: number | null | undefined): string {
     if (value == null || isNaN(value)) return 'R$ 0,00';
@@ -30,7 +31,7 @@ const iconStyles = {
 
 export function TransactionKpiCard({ title, value, variant, icon: Icon }: TransactionKpiCardProps) {
     return (
-        <Card className={cn('border', styles[variant])}>
+        <AppCard className={cn('border', styles[variant])}>
             <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                     <div className={cn('p-2 rounded-lg', iconStyles[variant])}>
@@ -42,7 +43,7 @@ export function TransactionKpiCard({ title, value, variant, icon: Icon }: Transa
                     </div>
                 </div>
             </CardContent>
-        </Card>
+        </AppCard>
     );
 }
 
