@@ -200,11 +200,11 @@ export function BankHistorySheet({
                                         id: tx.transactionId,
                                         date: tx.transactionDate,
                                         bankName: tx.bankName || undefined,
-                                        type: (tx.accountType === 'revenue' || tx.accountType === 'receita' || tx.amount >= 0) ? 'entrada' : 'saida',
+                                        type: (tx.accountType === 'expense' || tx.accountType === 'despesa') ? 'saida' : 'entrada',
                                         description: tx.description,
                                         category: tx.accountName || 'Sem categoria',
                                         amount: tx.amount,
-                                        reconciliationStatus: 'conciliado'
+                                        reconciliationStatus: tx.isReconciled ? 'conciliado' : 'pendente'
                                     }))}
                                     showBankColumn={isConsolidatedView}
                                     onTransactionClick={handleTransactionClick}

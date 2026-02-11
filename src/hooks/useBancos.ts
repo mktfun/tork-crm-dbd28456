@@ -365,6 +365,8 @@ export interface BankTransaction {
   isVoid: boolean;
   relatedEntityType: string | null;
   relatedEntityId: string | null;
+  isConfirmed: boolean;
+  isReconciled: boolean;
 }
 
 export interface BankTransactionsResult {
@@ -428,10 +430,13 @@ export function useBankTransactions(
         bankAccountId: tx.bank_account_id || null,
         bankName: tx.bank_name || null,
         bankColor: tx.bank_color || null,
-        status: 'confirmed',
+
         isVoid: tx.is_void || false,
         relatedEntityType: tx.related_entity_type || null,
         relatedEntityId: tx.related_entity_id || null,
+        isConfirmed: tx.is_confirmed || false,
+        isReconciled: tx.reconciled || false,
+        status: tx.status || 'pending',
       }));
 
       return {
