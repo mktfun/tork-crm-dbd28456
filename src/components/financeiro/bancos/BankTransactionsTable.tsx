@@ -76,8 +76,7 @@ export function BankTransactionsTable({
               <TableHead className="w-[120px] text-muted-foreground">Tipo</TableHead>
               <TableHead className="text-muted-foreground">Descrição</TableHead>
               <TableHead className="text-muted-foreground">Categoria</TableHead>
-              <TableHead className="text-right text-muted-foreground">Valor</TableHead>
-              <TableHead className="pr-6 text-right w-[120px] text-muted-foreground">Conciliação</TableHead>
+              <TableHead className="text-right text-muted-foreground pr-6">Valor</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -116,14 +115,11 @@ export function BankTransactionsTable({
                     {transaction.category}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right font-medium">
+                <TableCell className="text-right font-medium pr-6">
                   <span className={transaction.type === 'entrada' ? 'text-emerald-500' : 'text-rose-500'}>
                     {transaction.type === 'entrada' ? '+' : '-'}
                     {formatCurrency(transaction.amount)}
                   </span>
-                </TableCell>
-                <TableCell className="pr-6 text-right">
-                  {getReconciliationBadge(transaction.reconciliationStatus)}
                 </TableCell>
               </TableRow>
             ))}
