@@ -91,7 +91,7 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
         return entries;
     };
 
-    // Parser simplificado para OFX (apenas estrutura básica)
+    // Parser robusto para OFX (suporta formatos de bancos brasileiros)
     const parseOFX = (content: string): ParsedEntry[] => {
         const entries: ParsedEntry[] = [];
 
@@ -102,12 +102,14 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
         while ((match = stmtTrnRegex.exec(content)) !== null) {
             const txnContent = match[1];
 
-            // Extrair campos
+            // Extrair campos — DTPOSTED pode ter timezone: 20230115120000[-3:BRT]
             const dateMatch = txnContent.match(/<DTPOSTED>(\d{8})/);
-            const amountMatch = txnContent.match(/<TRNAMT>([+-]?[\d.]+)/);
-            const memoMatch = txnContent.match(/<MEMO>([^<]+)/);
-            const nameMatch = txnContent.match(/<NAME>([^<]+)/);
-            const fitidMatch = txnContent.match(/<FITID>([^<]+)/);
+            // TRNAMT pode usar vírgula ou ponto como decimal
+            const amountMatch = txnContent.match(/<TRNAMT>([+-]?[\d.,]+)/);
+            const memoMatch = txnContent.match(/<MEMO>([^<\r\n]+)/);
+            const nameMatch = txnContent.match(/<NAME>([^<\r\n]+)/);
+            const fitidMatch = txnContent.match(/<FITID>([^<\r\n]+)/);
+            const typeMatch = txnContent.match(/<TRNTYPE>([^<\r\n]+)/);
 
             if (dateMatch && amountMatch) {
                 const dateStr = dateMatch[1];
@@ -117,20 +119,45 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
                     parseInt(dateStr.substring(6, 8))
                 );
 
-                entries.push({
-                    transaction_date: date.toISOString().split('T')[0],
-                    description: memoMatch?.[1] || nameMatch?.[1] || 'Transação OFX',
-                    amount: parseFloat(amountMatch[1]),
-                    reference_number: fitidMatch?.[1],
-                });
+                // Normalizar valor: trocar vírgula por ponto
+                const amountRaw = amountMatch[1].replace(',', '.');
+                const amount = parseFloat(amountRaw);
+
+                // Descrição: prioriza MEMO, fallback NAME, fallback TRNTYPE
+                const description = (memoMatch?.[1] || nameMatch?.[1] || typeMatch?.[1] || 'Transação OFX').trim();
+
+                if (!isNaN(amount) && !isNaN(date.getTime())) {
+                    entries.push({
+                        transaction_date: date.toISOString().split('T')[0],
+                        description,
+                        amount,
+                        reference_number: fitidMatch?.[1]?.trim(),
+                    });
+                }
             }
         }
 
         return entries;
     };
 
+    // Detecta charset do header OFX (CHARSET:1252, CHARSET:ISO-8859-1, etc.)
+    const detectOFXCharset = (content: string): string | null => {
+        const charsetMatch = content.match(/CHARSET[:\s]*(\S+)/i);
+        if (charsetMatch) {
+            const charset = charsetMatch[1].toUpperCase().replace(/[^A-Z0-9-]/g, '');
+            if (charset === '1252' || charset === 'WINDOWS-1252') return 'windows-1252';
+            if (charset.includes('8859') || charset.includes('LATIN')) return 'iso-8859-1';
+        }
+        return null;
+    };
+
     const handleFile = useCallback((file: File) => {
         setError(null);
+
+        const isOFX = file.name.toLowerCase().endsWith('.ofx');
+
+        // OFX brasileiros geralmente usam ISO-8859-1 ou windows-1252
+        const initialEncoding = isOFX ? 'iso-8859-1' : 'utf-8';
 
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -138,7 +165,25 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
 
             let entries: ParsedEntry[] = [];
 
-            if (file.name.toLowerCase().endsWith('.ofx')) {
+            if (isOFX) {
+                // Verificar se o charset declarado é diferente do usado
+                const declaredCharset = detectOFXCharset(content);
+                if (declaredCharset && declaredCharset !== initialEncoding) {
+                    // Re-ler com o charset correto
+                    const reReader = new FileReader();
+                    reReader.onload = (re) => {
+                        const reContent = re.target?.result as string;
+                        const reEntries = parseOFX(reContent);
+                        if (reEntries.length === 0) {
+                            setError('Nenhuma transação válida encontrada no arquivo OFX.');
+                            return;
+                        }
+                        setParsedEntries(reEntries);
+                    };
+                    reReader.readAsText(file, declaredCharset);
+                    return;
+                }
+
                 entries = parseOFX(content);
             } else if (file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.txt')) {
                 entries = parseCSV(content);
@@ -159,7 +204,7 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
             setError('Erro ao ler o arquivo.');
         };
 
-        reader.readAsText(file, 'utf-8');
+        reader.readAsText(file, initialEncoding);
     }, []);
 
     const handleDrop = useCallback((e: React.DragEvent) => {
@@ -208,8 +253,8 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
                             {/* Drop Zone */}
                             <div
                                 className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragging
-                                        ? 'border-primary bg-primary/10'
-                                        : 'border-border hover:border-primary/50'
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-border hover:border-primary/50'
                                     }`}
                                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                                 onDragLeave={() => setIsDragging(false)}

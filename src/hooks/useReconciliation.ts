@@ -321,12 +321,15 @@ export function useBankStatementPaginated(
     startDate: string,
     endDate: string,
     page: number = 1,
-    pageSize: number = 20
+    pageSize: number = 20,
+    searchTerm: string = '',
+    status: string = 'todas',
+    type: string = 'todos'
 ) {
     const { user } = useAuth();
 
     return useQuery({
-        queryKey: ['bank-statement-paginated', user?.id, bankAccountId, startDate, endDate, page, pageSize],
+        queryKey: ['bank-statement-paginated', user?.id, bankAccountId, startDate, endDate, page, pageSize, searchTerm, status, type],
         queryFn: async () => {
             if (!user) return { items: [], totalCount: 0 };
 
@@ -338,6 +341,9 @@ export function useBankStatementPaginated(
                 p_end_date: endDate,
                 p_page: page,
                 p_page_size: pageSize,
+                p_search_term: searchTerm || null,
+                p_status: status,
+                p_type: type
             });
 
             if (error) {

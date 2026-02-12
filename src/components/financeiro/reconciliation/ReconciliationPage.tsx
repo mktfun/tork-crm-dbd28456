@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
 import {
     GitCompare,
     RefreshCw,
@@ -13,7 +14,14 @@ import {
     Landmark,
     ArrowUpCircle,
     ArrowDownCircle,
+    Search,
+    X,
 } from 'lucide-react';
+import { DatePickerWithRange } from '@/components/ui/date-picker-with-range';
+import { Input } from '@/components/ui/input';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AppCard } from '@/components/ui/app-card';
@@ -56,10 +64,20 @@ const PAGE_SIZE = 20;
 export function ReconciliationPage() {
     // State
     const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
-    const [dateRange, setDateRange] = useState({
-        start: startOfMonth(new Date()),
-        end: endOfMonth(new Date())
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: startOfMonth(new Date()),
+        to: endOfMonth(new Date())
     });
+
+    // Filtros
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>('todas');
+    const [typeFilter, setTypeFilter] = useState<string>('todos');
+
+    // Batch Selection
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
     const [showImporter, setShowImporter] = useState(false);
     const [page, setPage] = useState(1);
 
@@ -72,16 +90,33 @@ export function ReconciliationPage() {
     // Queries
     const { data: bankAccounts, isLoading: isLoadingAccounts } = useBankAccounts();
 
+    // Debounce search effect
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setPage(1);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    // Reset page on filter change
+    useEffect(() => {
+        setPage(1);
+    }, [statusFilter, typeFilter, dateRange]);
+
     const {
         data: statementData,
         isLoading: isLoadingStatement,
         refetch
     } = useBankStatementPaginated(
         selectedBankAccountId,
-        format(dateRange.start, 'yyyy-MM-dd'),
-        format(dateRange.end, 'yyyy-MM-dd'),
+        dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '',
+        dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '',
         page,
-        PAGE_SIZE
+        PAGE_SIZE,
+        debouncedSearch,
+        statusFilter,
+        typeFilter
     );
 
     const items = statementData?.items || [];
@@ -91,6 +126,7 @@ export function ReconciliationPage() {
     // Mutations
     const reconcileMutation = useReconcileTransactionDirectly();
     const unreconcileMutation = useUnreconcileTransaction();
+    const batchReconcileMutation = useReconcileTransactionDirectly();
 
     // Handlers
     const handleReconcile = (item: PaginatedStatementItem) => {
@@ -100,6 +136,37 @@ export function ReconciliationPage() {
             return;
         }
         reconcileMutation.mutate({ transactionId: item.id });
+    };
+
+    const handleBatchReconcile = async () => {
+        if (selectedIds.length === 0) return;
+
+        const count = selectedIds.length;
+        for (const id of selectedIds) {
+            const item = items.find(i => i.id === id);
+            if (item && item.bank_account_id) {
+                await batchReconcileMutation.mutateAsync({ transactionId: id });
+            }
+        }
+        setSelectedIds([]);
+        toast.success(`${count} transações processadas.`);
+    };
+
+    const handleToggleSelect = (id: string) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            const eligibleIds = items
+                .filter(i => !i.reconciled && i.bank_account_id)
+                .map(i => i.id);
+            setSelectedIds(eligibleIds);
+        } else {
+            setSelectedIds([]);
+        }
     };
 
     const handleConfirmBankBinding = () => {
@@ -118,12 +185,12 @@ export function ReconciliationPage() {
 
     const handleBankChange = (value: string) => {
         setSelectedBankAccountId(value);
-        setPage(1); // Reset to page 1 on bank change
+        setPage(1);
     };
 
     return (
         <div className="space-y-6">
-            {/* Header & Filters */}
+            {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary/10 rounded-lg">
@@ -136,16 +203,46 @@ export function ReconciliationPage() {
                         </p>
                     </div>
                 </div>
+            </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+            {/* Filters Bar */}
+            <AppCard className="p-4 space-y-4">
+                <div className="flex flex-wrap items-center gap-4">
+                    {/* Search */}
+                    <div className="relative flex-1 min-w-[200px]">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Buscar por descrição..."
+                            className="pl-9"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        {searchTerm && (
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Date Picker */}
+                    <DatePickerWithRange
+                        date={dateRange}
+                        onDateChange={setDateRange}
+                        className="w-[260px]"
+                    />
+
+                    {/* Bank Select */}
                     {isLoadingAccounts ? (
                         <Skeleton className="h-10 w-[200px]" />
                     ) : (
                         <Select
-                            value={selectedBankAccountId || ""}
+                            value={selectedBankAccountId || "all"}
                             onValueChange={handleBankChange}
                         >
-                            <SelectTrigger className="w-[240px]">
+                            <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Selecione o Banco..." />
                             </SelectTrigger>
                             <SelectContent>
@@ -159,42 +256,87 @@ export function ReconciliationPage() {
                         </Select>
                     )}
 
-                    {!isConsolidated && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => setShowImporter(true)}
-                        >
-                            <Upload className="w-4 h-4" />
-                            Importar Extrato
+                    {/* Actions */}
+                    <div className="flex items-center gap-2">
+                        {!isConsolidated && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => setShowImporter(true)}
+                            >
+                                <Upload className="w-4 h-4" />
+                                Importar
+                            </Button>
+                        )}
+                        <Button variant="outline" size="icon" onClick={() => refetch()} title="Atualizar">
+                            <RefreshCw className="w-4 h-4" />
                         </Button>
-                    )}
-
-                    <Button variant="outline" size="icon" onClick={() => refetch()} title="Atualizar">
-                        <RefreshCw className="w-4 h-4" />
-                    </Button>
+                    </div>
                 </div>
-            </div>
+
+                {/* Secondary Filters */}
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">Status:</span>
+                            <ToggleGroup type="single" value={statusFilter} onValueChange={(v) => v && setStatusFilter(v)}>
+                                <ToggleGroupItem value="todas" aria-label="Todas">Todas</ToggleGroupItem>
+                                <ToggleGroupItem value="pendente" aria-label="Pendentes">Pendentes</ToggleGroupItem>
+                                <ToggleGroupItem value="conciliado" aria-label="Conciliados">Conciliados</ToggleGroupItem>
+                            </ToggleGroup>
+                        </div>
+
+                        <div className="h-4 w-px bg-border" />
+
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">Tipo:</span>
+                            <ToggleGroup type="single" value={typeFilter} onValueChange={(v) => v && setTypeFilter(v)}>
+                                <ToggleGroupItem value="todos" aria-label="Todos">Todos</ToggleGroupItem>
+                                <ToggleGroupItem value="receita" aria-label="Receitas">Receitas</ToggleGroupItem>
+                                <ToggleGroupItem value="despesa" aria-label="Despesas">Despesas</ToggleGroupItem>
+                            </ToggleGroup>
+                        </div>
+                    </div>
+
+                    <div className="text-sm text-muted-foreground">
+                        {totalCount} registros encontrados
+                    </div>
+                </div>
+            </AppCard>
 
             {/* Main Content */}
             <AppCard className="overflow-hidden">
                 <div className="p-4 border-b bg-muted/30 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <CalendarIcon className="w-4 h-4" />
-                        <span>
-                            {format(dateRange.start, "dd 'de' MMM", { locale: ptBR })} - {format(dateRange.end, "dd 'de' MMM, yyyy", { locale: ptBR })}
-                        </span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                        {totalCount} movimentações
-                    </span>
+                    {selectedIds.length > 0 ? (
+                        <div className="flex items-center gap-2 text-primary font-medium bg-primary/10 px-3 py-1 rounded-full animate-in fade-in">
+                            <CheckCircle2 className="w-4 h-4" />
+                            {selectedIds.length} selecionados
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <CalendarIcon className="w-4 h-4" />
+                            <span>Período: {dateRange?.from ? format(dateRange.from, 'dd/MM/yyyy') : ''} - {dateRange?.to ? format(dateRange.to, 'dd/MM/yyyy') : ''}</span>
+                        </div>
+                    )}
+
+                    {selectedIds.length > 0 && (
+                        <Button size="sm" onClick={handleBatchReconcile} disabled={batchReconcileMutation.isPending}>
+                            {batchReconcileMutation.isPending ? 'Processando...' : 'Conciliar Selecionados'}
+                        </Button>
+                    )}
                 </div>
 
                 <div className="relative overflow-x-auto">
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-[40px]">
+                                    <Checkbox
+                                        checked={items.length > 0 && items.every(i => selectedIds.includes(i.id) || i.reconciled || !i.bank_account_id)}
+                                        onCheckedChange={handleSelectAll}
+                                    />
+                                </TableHead>
                                 <TableHead>Data</TableHead>
                                 {isConsolidated && <TableHead>Banco</TableHead>}
                                 <TableHead>Tipo</TableHead>
@@ -209,6 +351,7 @@ export function ReconciliationPage() {
                             {isLoadingStatement ? (
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <TableRow key={i}>
+                                        <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                                         <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                                         {isConsolidated && <TableCell><Skeleton className="h-4 w-24" /></TableCell>}
                                         <TableCell><Skeleton className="h-4 w-16" /></TableCell>
@@ -221,7 +364,7 @@ export function ReconciliationPage() {
                                 ))
                             ) : items.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={isConsolidated ? 8 : 7} className="h-32 text-center text-muted-foreground">
+                                    <TableCell colSpan={isConsolidated ? 9 : 8} className="h-32 text-center text-muted-foreground">
                                         <div className="flex flex-col items-center gap-2">
                                             <AlertCircle className="w-8 h-8 opacity-50" />
                                             <p>Nenhuma movimentação encontrada neste período.</p>
@@ -231,6 +374,13 @@ export function ReconciliationPage() {
                             ) : (
                                 items.map((item) => (
                                     <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
+                                        <TableCell>
+                                            <Checkbox
+                                                checked={selectedIds.includes(item.id)}
+                                                onCheckedChange={() => handleToggleSelect(item.id)}
+                                                disabled={item.reconciled || !item.bank_account_id}
+                                            />
+                                        </TableCell>
                                         <TableCell className="whitespace-nowrap font-medium text-muted-foreground">
                                             {format(new Date(item.transaction_date), 'dd/MM/yyyy')}
                                         </TableCell>
