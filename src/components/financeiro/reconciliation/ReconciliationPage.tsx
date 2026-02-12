@@ -20,6 +20,7 @@ import {
 import { DatePickerWithRange } from '@/components/ui/date-picker-with-range';
 import { Input } from '@/components/ui/input';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
@@ -280,22 +281,26 @@ export function ReconciliationPage() {
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-muted-foreground">Status:</span>
-                            <ToggleGroup type="single" value={statusFilter} onValueChange={(v) => v && setStatusFilter(v)}>
-                                <ToggleGroupItem value="todas" aria-label="Todas">Todas</ToggleGroupItem>
-                                <ToggleGroupItem value="pendente" aria-label="Pendentes">Pendentes</ToggleGroupItem>
-                                <ToggleGroupItem value="conciliado" aria-label="Conciliados">Conciliados</ToggleGroupItem>
-                            </ToggleGroup>
+                            <Tabs value={statusFilter} onValueChange={(v) => v && setStatusFilter(v)} className="w-auto">
+                                <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-8">
+                                    <TabsTrigger value="todas" className="text-xs px-3 h-6 data-[state=active]:bg-white/10 data-[state=active]:text-white">Todas</TabsTrigger>
+                                    <TabsTrigger value="pendente" className="text-xs px-3 h-6 data-[state=active]:bg-white/10 data-[state=active]:text-white">Pendentes</TabsTrigger>
+                                    <TabsTrigger value="conciliado" className="text-xs px-3 h-6 data-[state=active]:bg-white/10 data-[state=active]:text-white">Conciliados</TabsTrigger>
+                                </TabsList>
+                            </Tabs>
                         </div>
 
                         <div className="h-4 w-px bg-border" />
 
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-muted-foreground">Tipo:</span>
-                            <ToggleGroup type="single" value={typeFilter} onValueChange={(v) => v && setTypeFilter(v)}>
-                                <ToggleGroupItem value="todos" aria-label="Todos">Todos</ToggleGroupItem>
-                                <ToggleGroupItem value="receita" aria-label="Receitas">Receitas</ToggleGroupItem>
-                                <ToggleGroupItem value="despesa" aria-label="Despesas">Despesas</ToggleGroupItem>
-                            </ToggleGroup>
+                            <Tabs value={typeFilter} onValueChange={(v) => v && setTypeFilter(v)} className="w-auto">
+                                <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-8">
+                                    <TabsTrigger value="todos" className="text-xs px-3 h-6 data-[state=active]:bg-white/10 data-[state=active]:text-white">Todos</TabsTrigger>
+                                    <TabsTrigger value="receita" className="text-xs px-3 h-6 data-[state=active]:bg-white/10 data-[state=active]:text-white">Receitas</TabsTrigger>
+                                    <TabsTrigger value="despesa" className="text-xs px-3 h-6 data-[state=active]:bg-white/10 data-[state=active]:text-white">Despesas</TabsTrigger>
+                                </TabsList>
+                            </Tabs>
                         </div>
                     </div>
 

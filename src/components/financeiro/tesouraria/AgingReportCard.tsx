@@ -6,7 +6,7 @@ import { AlertTriangle, AlertCircle } from "lucide-react";
 import { useAgingReport } from "@/hooks/useFinanceiro";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface AgingReportCardProps {
   defaultType?: 'receivables' | 'payables';
@@ -94,19 +94,16 @@ export function AgingReportCard({ defaultType = 'receivables' }: AgingReportCard
                 <CardDescription>Faturas e recebíveis em atraso</CardDescription>
               </div>
             </div>
-            <ToggleGroup
-              type="single"
-              value={type}
-              onValueChange={(v) => v && setType(v as 'receivables' | 'payables')}
-              className="gap-1 bg-muted/50 p-1 rounded-lg h-8"
-            >
-              <ToggleGroupItem value="receivables" size="sm" className="h-6 text-xs px-2 data-[state=on]:bg-background">
-                A Receber
-              </ToggleGroupItem>
-              <ToggleGroupItem value="payables" size="sm" className="h-6 text-xs px-2 data-[state=on]:bg-background">
-                A Pagar
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <Tabs value={type} onValueChange={(v) => v && setType(v as 'receivables' | 'payables')} className="w-auto">
+              <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-9">
+                <TabsTrigger value="receivables" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                  A Receber
+                </TabsTrigger>
+                <TabsTrigger value="payables" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                  A Pagar
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </CardHeader>
         <CardContent>
@@ -133,19 +130,16 @@ export function AgingReportCard({ defaultType = 'receivables' }: AgingReportCard
               <CardDescription>Faturas e recebíveis em atraso</CardDescription>
             </div>
           </div>
-          <ToggleGroup
-            type="single"
-            value={type}
-            onValueChange={(v) => v && setType(v as 'receivables' | 'payables')}
-            className="gap-1 bg-muted/50 p-1 rounded-lg h-8"
-          >
-            <ToggleGroupItem value="receivables" size="sm" className="h-6 text-xs px-2 data-[state=on]:bg-background">
-              A Receber
-            </ToggleGroupItem>
-            <ToggleGroupItem value="payables" size="sm" className="h-6 text-xs px-2 data-[state=on]:bg-background">
-              A Pagar
-            </ToggleGroupItem>
-          </ToggleGroup>
+          <Tabs value={type} onValueChange={(v) => v && setType(v as 'receivables' | 'payables')} className="w-auto">
+            <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-9">
+              <TabsTrigger value="receivables" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                A Receber
+              </TabsTrigger>
+              <TabsTrigger value="payables" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                A Pagar
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
