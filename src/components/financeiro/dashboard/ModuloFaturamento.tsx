@@ -110,8 +110,9 @@ export const ModuloFaturamento = ({ onClick, dateRange }: ModuloFaturamentoProps
   }
 
   const faturamentoMes = producaoData?.reduce((acc, item) => acc + (item.total_comissao || 0), 0) || 0;
+  const totalPremio = producaoData?.reduce((acc, item) => acc + (item.total_premio || 0), 0) || 0;
   const operacoes = producaoData?.reduce((acc, item) => acc + (item.qtd_vendas || 0), 0) || 0;
-  const ticketMedio = operacoes > 0 ? faturamentoMes / operacoes : 0;
+  const ticketMedio = operacoes > 0 ? totalPremio / operacoes : 0;
 
   return (
     <Card
