@@ -408,11 +408,15 @@ export default function FinanceiroERP() {
     };
   }, [dateRange]);
 
-  // KPIs globais - apenas transações EFETIVADAS (completed)
-  // Substituindo useFinancialSummary por cálculo local baseado no cashFlowData
+  // Cash flow data for KPIs
+  const { data: cashFlowData = [], isLoading: cashFlowLoading } = useCashFlowData(
+    startDate,
+    endDate,
+    'day'
+  );
+
   const summary = useMemo(() => {
     if (!cashFlowData || cashFlowData.length === 0) return null;
-
     return cashFlowData.reduce((acc, item) => ({
       totalIncome: (acc.totalIncome || 0) + (item.income || 0),
       totalExpense: (acc.totalExpense || 0) + (item.expense || 0),
@@ -420,6 +424,17 @@ export default function FinanceiroERP() {
   }, [cashFlowData]);
 
   const summaryLoading = cashFlowLoading;
+
+  // Handlers
+  const handleViewTransactionDetails = (id: string) => {
+    setDetailsTransactionId(id);
+    setIsLegacyLookup(false);
+  };
+
+  const handleCloseDetails = () => {
+    setDetailsTransactionId(null);
+    setIsLegacyLookup(false);
+  };
 
   // KPIs adicionais - pendentes (Desativados temporariamente pois dependem de RPCs com erro de due_date)
   // const { data: pendingThisMonth, isLoading: pendingThisMonthLoading } = usePendingThisMonth();
