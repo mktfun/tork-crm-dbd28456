@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -19,8 +19,8 @@ import {
 } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -39,15 +39,15 @@ import { ReconciliationPage } from '@/components/financeiro/reconciliation';
 import { ModuloFaturamento } from '@/components/financeiro/dashboard/ModuloFaturamento';
 import { ModuloTesouraria } from '@/components/financeiro/dashboard/ModuloTesouraria';
 import { ModuloMultiBancos } from '@/components/financeiro/dashboard/ModuloMultiBancos';
+import { RecentTransactionsCard } from '@/components/financeiro/dashboard/RecentTransactionsCard';
 import {
   useFinancialAccountsWithDefaults,
-  useRecentTransactions,
   useCashFlowData,
 } from '@/hooks/useFinanceiro';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { parseLocalDate } from '@/utils/dateUtils';
+
 import { cn } from '@/lib/utils';
-import { ptBR } from 'date-fns/locale';
+
 
 // ============ KPI CONFIGURATION - 4 KPIS SIMPLES ============
 
@@ -291,94 +291,7 @@ function DreTab() {
   );
 }
 
-// ============ ÚLTIMAS MOVIMENTAÇÕES ============
 
-interface RecentMovementsProps {
-  onViewDetails: (id: string) => void;
-}
-
-function RecentMovements({ onViewDetails }: RecentMovementsProps) {
-  const { data: transactions = [], isLoading } = useRecentTransactions();
-
-  if (isLoading) {
-    return (
-      <Card className="bg-zinc-900/50 border-zinc-800">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-20 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (transactions.length === 0) {
-    return (
-      <Card className="bg-zinc-900/50 border-zinc-800">
-        <CardContent className="p-8 text-center">
-          <CalendarClock className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-          <p className="text-sm text-zinc-400">Nenhuma movimentação recente</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="bg-zinc-900/50 border-zinc-800">
-      <CardContent className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {transactions.slice(0, 8).map((tx) => {
-            const txDate = parseLocalDate(String(tx.transaction_date));
-            const isPending = tx.status === 'pending';
-            const isRevenue = tx.total_amount > 0;
-
-            return (
-              <div
-                key={tx.id}
-                className={cn(
-                  "p-4 rounded-lg transition-all cursor-pointer",
-                  "bg-zinc-800/50 hover:bg-zinc-800 border",
-                  isRevenue
-                    ? "border-emerald-500/20 hover:border-emerald-500/40"
-                    : "border-rose-500/20 hover:border-rose-500/40",
-                  isPending && "ring-1 ring-amber-500/30"
-                )}
-                onClick={() => onViewDetails(tx.id)}
-              >
-                {/* Header com data e badge */}
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-zinc-500 font-medium">
-                    {format(txDate, "dd/MM/yy", { locale: ptBR })}
-                  </span>
-                  {isPending && (
-                    <Badge variant="outline" className="text-amber-500 border-amber-500/30 text-[9px] px-1.5 py-0 h-4">
-                      Pendente
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Descrição */}
-                <p className="text-sm font-medium text-zinc-200 truncate mb-2" title={tx.description}>
-                  {tx.description}
-                </p>
-
-                {/* Valor */}
-                <p className={cn(
-                  "text-lg font-bold",
-                  isRevenue ? 'text-emerald-400' : 'text-rose-400'
-                )}>
-                  {isRevenue ? '+' : ''}{formatCurrency(Math.abs(tx.total_amount))}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 // ============ MAIN COMPONENT ============
 
@@ -505,10 +418,7 @@ export default function FinanceiroERP() {
             onTabChange={setActiveTab}
           />
           <div className="mt-6">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-              Últimas Movimentações
-            </h3>
-            <RecentMovements onViewDetails={handleViewTransactionDetails} />
+            <RecentTransactionsCard onViewDetails={handleViewTransactionDetails} />
           </div>
         </TabsContent>
 
