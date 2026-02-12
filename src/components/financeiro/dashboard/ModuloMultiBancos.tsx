@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Landmark, Building2, Wallet } from "lucide-react";
+import { Landmark, Building2, Wallet, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBankAccounts, type BankAccountType } from "@/hooks/useBancos";
 
@@ -50,15 +50,24 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
 
   return (
     <Card
-      className="h-full bg-zinc-900/50 border-zinc-800 flex flex-col"
+      className={cn(
+        "h-full bg-zinc-900/50 border-zinc-800 transition-all duration-200",
+        onClick && "cursor-pointer hover:bg-zinc-900/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+      )}
+      onClick={onClick}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-zinc-400">
-          Saldos Bancários
+        <CardTitle className="text-white flex items-center justify-between text-base w-full">
+          <span className="flex items-center gap-2">
+            <Landmark className="h-5 w-5 text-primary" />
+            Saldos Bancários
+          </span>
+          {onClick && (
+            <ArrowRight className="h-4 w-4 text-muted-foreground transition-colors" />
+          )}
         </CardTitle>
-        <Wallet className="h-4 w-4 text-emerald-500" />
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col">
+      <CardContent className="flex-1 flex flex-col pt-2">
         {/* ========== SALDO CONSOLIDADO (MOVIDO PARA CÁ) ========== */}
         <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 mb-4">
           <div className="flex items-center justify-between mb-1">
