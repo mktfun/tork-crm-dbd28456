@@ -2,8 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, TrendingDown, CreditCard, RefreshCw, BarChart3, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFinancialSummary } from "@/hooks/useFinanceiro";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DateRange } from "react-day-picker";
 
 interface StatItemProps {
   label: string;
@@ -63,12 +64,19 @@ const StatItem = ({ label, value, percent, icon, isHero = false }: StatItemProps
 
 interface ModuloFaturamentoProps {
   onClick?: () => void;
+  dateRange?: DateRange;
 }
 
-export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
+export const ModuloFaturamento = ({ onClick, dateRange }: ModuloFaturamentoProps) => {
   const now = new Date();
-  const startDate = format(startOfMonth(now), 'yyyy-MM-dd');
-  const endDate = format(endOfMonth(now), 'yyyy-MM-dd');
+  const defaultFrom = startOfMonth(now);
+  const defaultTo = endOfMonth(now);
+
+  const from = dateRange?.from || defaultFrom;
+  const to = dateRange?.to || defaultTo;
+
+  const startDate = format(startOfDay(from), 'yyyy-MM-dd');
+  const endDate = format(endOfDay(to), 'yyyy-MM-dd');
 
   const { data: summary, isLoading } = useFinancialSummary(startDate, endDate);
 

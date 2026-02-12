@@ -256,25 +256,29 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
 
   return (
     <div className="space-y-6">
-      {/* Módulos do Dashboard Executivo */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Linha 1: Tesouraria (Largura Total) */}
-        <div className="col-span-1 lg:col-span-2 h-full">
-          <ModuloTesouraria onClick={() => onTabChange('tesouraria')} />
-        </div>
-
-        {/* Linha 2: Coluna Esquerda - Faturamento */}
-        <div className="h-full">
-          <ModuloFaturamento onClick={() => setActiveTab('transacoes')} />
-        </div>
-
-        {/* Linha 2: Coluna Direita - Bancos */}
-        <div className="h-full">
+      {/* ========== SEÇÃO 1: FLUXO DE CAIXA ========== */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+          Fluxo de Caixa
+        </h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ModuloFaturamento
+            onClick={() => onTabChange('transacoes')}
+            dateRange={dateRange}
+          />
           <ModuloMultiBancos onClick={() => onTabChange('caixa')} />
         </div>
       </div>
 
-      {/* Gráfico de Fluxo de Caixa */}
+      {/* ========== SEÇÃO 2: TESOURARIA & CONTAS ========== */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+          Tesouraria & Contas
+        </h3>
+        <ModuloTesouraria onClick={() => onTabChange('tesouraria')} />
+      </div>
+
+      {/* ========== GRÁFICO DE FLUXO DE CAIXA ========== */}
       <CashFlowChart
         data={cashFlowData}
         isLoading={cashFlowLoading}
@@ -330,59 +334,62 @@ function RecentMovements({ onViewDetails }: RecentMovementsProps) {
   }
 
   if (transactions.length === 0) {
-    return null;
+    return (
+      <Card className="bg-zinc-900/50 border-zinc-800">
+        <CardContent className="p-8 text-center">
+          <CalendarClock className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
+          <p className="text-sm text-zinc-400">Nenhuma movimentação recente</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <CalendarClock className="w-4 h-4" />
-            Últimas Movimentações
-          </CardTitle>
-          <Badge variant="secondary" className="text-xs">
-            {transactions.length} recentes
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+    <Card className="bg-zinc-900/50 border-zinc-800">
+      <CardContent className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {transactions.slice(0, 8).map((tx) => {
             const txDate = parseLocalDate(String(tx.transaction_date));
-            // ✅ Usar status real da RPC (não inferir por reference_number)
             const isPending = tx.status === 'pending';
+            const isRevenue = tx.total_amount > 0;
 
             return (
               <div
                 key={tx.id}
                 className={cn(
-                  "p-3 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer",
-                  isPending && "border-l-2 border-amber-500/50"
+                  "p-4 rounded-lg transition-all cursor-pointer",
+                  "bg-zinc-800/50 hover:bg-zinc-800 border",
+                  isRevenue
+                    ? "border-emerald-500/20 hover:border-emerald-500/40"
+                    : "border-rose-500/20 hover:border-rose-500/40",
+                  isPending && "ring-1 ring-amber-500/30"
                 )}
                 onClick={() => onViewDetails(tx.id)}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-medium truncate">{tx.description}</p>
-                      {isPending && (
-                        <Badge variant="outline" className="text-amber-500 border-amber-500/30 text-[10px] px-1 py-0 h-4 flex-shrink-0">
-                          Pendente
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {format(txDate, "dd/MM", { locale: ptBR })}
-                    </p>
-                  </div>
-                  <p className={cn(
-                    "text-sm font-semibold flex-shrink-0",
-                    tx.total_amount > 0 ? 'text-emerald-500' : 'text-rose-500'
-                  )}>
-                    {tx.total_amount > 0 ? '+' : ''}{formatCurrency(Math.abs(tx.total_amount))}
-                  </p>
+                {/* Header com data e badge */}
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-zinc-500 font-medium">
+                    {format(txDate, "dd/MM/yy", { locale: ptBR })}
+                  </span>
+                  {isPending && (
+                    <Badge variant="outline" className="text-amber-500 border-amber-500/30 text-[9px] px-1.5 py-0 h-4">
+                      Pendente
+                    </Badge>
+                  )}
                 </div>
+
+                {/* Descrição */}
+                <p className="text-sm font-medium text-zinc-200 truncate mb-2" title={tx.description}>
+                  {tx.description}
+                </p>
+
+                {/* Valor */}
+                <p className={cn(
+                  "text-lg font-bold",
+                  isRevenue ? 'text-emerald-400' : 'text-rose-400'
+                )}>
+                  {isRevenue ? '+' : ''}{formatCurrency(Math.abs(tx.total_amount))}
+                </p>
               </div>
             );
           })}
@@ -519,6 +526,9 @@ export default function FinanceiroERP() {
             onTabChange={setActiveTab}
           />
           <div className="mt-6">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              Últimas Movimentações
+            </h3>
             <RecentMovements onViewDetails={handleViewTransactionDetails} />
           </div>
         </TabsContent>
