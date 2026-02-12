@@ -1,7 +1,6 @@
 import { AccountsPayableReceivableTable } from "./tesouraria/AccountsPayableReceivableTable";
 import { AgingReportCard } from "./tesouraria/AgingReportCard";
 import { UpcomingTransactionsList } from "./tesouraria/UpcomingTransactionsList";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Wallet } from "lucide-react";
 import { DateRange } from "react-day-picker";
 

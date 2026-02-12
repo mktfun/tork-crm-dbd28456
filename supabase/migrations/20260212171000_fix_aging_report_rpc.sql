@@ -1,7 +1,10 @@
--- Dropar versao legada
+-- Drop ALL existing signatures to avoid ambiguity
 DROP FUNCTION IF EXISTS get_aging_report(uuid, text);
+DROP FUNCTION IF EXISTS get_aging_report(uuid, text, date);
+DROP FUNCTION IF EXISTS get_aging_report(uuid);
+DROP FUNCTION IF EXISTS get_aging_report(uuid, date);
 
--- Recriar a versao moderna com suporte a p_type
+-- Recreate with correct table/column names
 CREATE OR REPLACE FUNCTION get_aging_report(
   p_user_id uuid, 
   p_type text DEFAULT 'receivables',
@@ -11,23 +14,11 @@ RETURNS TABLE(bucket_range text, bucket_amount numeric, bucket_count integer, bu
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_account_type TEXT;
-  v_bucket_1_label TEXT;
-  v_bucket_2_label TEXT;
-  v_bucket_3_label TEXT;
-  v_bucket_4_label TEXT;
 BEGIN
   IF p_type = 'receivables' THEN
     v_account_type := 'revenue';
-    v_bucket_1_label := '1-30 dias';
-    v_bucket_2_label := '31-60 dias';
-    v_bucket_3_label := '61-90 dias';
-    v_bucket_4_label := '90+ dias';
   ELSE
     v_account_type := 'expense';
-    v_bucket_1_label := '1-30 dias';
-    v_bucket_2_label := '31-60 dias';
-    v_bucket_3_label := '61-90 dias';
-    v_bucket_4_label := '90+ dias';
   END IF;
 
   RETURN QUERY
@@ -42,20 +33,17 @@ BEGIN
     WHERE ft.user_id = p_user_id
       AND fa.type = v_account_type
       AND NOT ft.is_confirmed
-      AND NOT ft.reconciled
       AND NOT ft.is_void
       AND ft.transaction_date < p_reference_date
-      -- Para evitar contagem dupla se houver múltiplos entries no ledger para a mesma conta (raro, mas possível)
-      -- Group by para garantir unicidade da transação
     GROUP BY ft.id, ft.total_amount, ft.transaction_date
   ),
   buckets AS (
     SELECT
       CASE
-        WHEN days_overdue <= 30 THEN v_bucket_1_label
-        WHEN days_overdue <= 60 THEN v_bucket_2_label
-        WHEN days_overdue <= 90 THEN v_bucket_3_label
-        ELSE v_bucket_4_label
+        WHEN days_overdue <= 30 THEN '1-30 dias'
+        WHEN days_overdue <= 60 THEN '31-60 dias'
+        WHEN days_overdue <= 90 THEN '61-90 dias'
+        ELSE '90+ dias'
       END as range_label,
       CASE
         WHEN days_overdue <= 30 THEN 1
@@ -64,13 +52,13 @@ BEGIN
         ELSE 4
       END as sort_order,
       CASE
-        WHEN days_overdue <= 30 THEN 'bg-yellow-500' -- Amarelo para atraso curto
-        WHEN days_overdue <= 60 THEN 'bg-orange-500' -- Laranja para médio
-        WHEN days_overdue <= 90 THEN 'bg-red-500'    -- Vermelho para longo
-        ELSE 'bg-red-700'                            -- Vermelho escuro para crítico
+        WHEN days_overdue <= 30 THEN '#FBBF24'
+        WHEN days_overdue <= 60 THEN '#F97316'
+        WHEN days_overdue <= 90 THEN '#EF4444'
+        ELSE '#B91C1C'
       END as color_class,
-      amount
-    FROM overdue
+      o.amount
+    FROM overdue o
   )
   SELECT
     b.range_label::text,
@@ -82,3 +70,5 @@ BEGIN
   ORDER BY b.sort_order;
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION get_aging_report(uuid, text, date) TO authenticated;

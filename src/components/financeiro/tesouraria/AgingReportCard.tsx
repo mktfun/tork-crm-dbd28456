@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AppCard } from "@/components/ui/app-card";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, AlertCircle } from "lucide-react";
@@ -177,7 +177,7 @@ export function AgingReportCard({ defaultType = 'receivables' }: AgingReportCard
         <div className="pt-4 border-t">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Total em Atraso</span>
-            <span className="text-lg font-bold text-red-600">
+            <span className="text-lg font-bold text-destructive">
               {formatCurrency(totalAmount)}
             </span>
           </div>
