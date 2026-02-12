@@ -672,9 +672,13 @@ export function useCurrentMonthGoal(goalType: 'revenue' | 'profit' | 'commission
       const month = now.getMonth() + 1;
       const year = now.getFullYear();
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario nao autenticado');
+
       const { data, error } = await supabase
         .from('financial_goals')
         .select('*')
+        .eq('user_id', user.id)
         .eq('month', month)
         .eq('year', year)
         .eq('goal_type', goalType)
@@ -713,23 +717,38 @@ export function useGoalsByPeriod(
   return useQuery({
     queryKey: ['goals-by-period', startYear, startMonth, endYear, endMonth, goalType],
     queryFn: async (): Promise<FinancialGoal[]> => {
-      // Mock data - tabela financial_goals não existe ainda
-      const goals: FinancialGoal[] = [];
-      for (let y = startYear; y <= endYear; y++) {
-        const mStart = y === startYear ? startMonth : 1;
-        const mEnd = y === endYear ? endMonth : 12;
-        for (let m = mStart; m <= mEnd; m++) {
-          goals.push({
-            goalId: `mock-goal-${y}-${m}`,
-            goalAmount: 50000 + Math.random() * 10000,
-            year: y,
-            month: m,
-            description: `Meta ${m}/${y}`,
-            createdAt: new Date().toISOString()
-          });
-        }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario nao autenticado');
+
+      const { data, error } = await supabase
+        .from('financial_goals')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('goal_type', goalType)
+        .gte('year', startYear)
+        .lte('year', endYear);
+
+      if (error) {
+        console.error('Error fetching goals by period:', error);
+        throw error;
       }
-      return goals;
+
+      // Filter months in JS to simplify query logic for cross-year periods
+      // Also mapped to domain object
+      const filtered = (data || []).filter(item => {
+        if (item.year === startYear && item.month < startMonth) return false;
+        if (item.year === endYear && item.month > endMonth) return false;
+        return true;
+      });
+
+      return filtered.map(item => ({
+        goalId: item.id,
+        goalAmount: Number(item.goal_amount),
+        year: item.year,
+        month: item.month,
+        description: item.description,
+        createdAt: item.created_at
+      }));
     },
   });
 }
@@ -746,68 +765,49 @@ export function useGoalVsActual(
   return useQuery({
     queryKey: ['goal-vs-actual', year, month, goalType],
     queryFn: async (): Promise<GoalVsActual | null> => {
-      const startDate = format(new Date(year, month - 1, 1), 'yyyy-MM-dd');
-      const endDate = format(endOfMonth(new Date(year, month - 1, 1)), 'yyyy-MM-dd');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario nao autenticado');
 
-      // 1. Buscar Meta
-      const { data: goalData, error: goalError } = await supabase
-        .from('financial_goals')
-        .select('goal_amount')
-        .eq('month', month)
-        .eq('year', year)
-        .eq('goal_type', goalType)
-        .maybeSingle();
+      // Passing p_user_id to satisfy generated types, even if RPC uses auth.uid() internally
+      // Casting to any to avoid strict type checks if definition is slightly off
+      const params: any = {
+        p_year: year,
+        p_month: month,
+        p_user_id: user.id
+      };
 
-      if (goalError) {
-        console.error('Error fetching goal:', goalError);
-        throw goalError;
+      const { data, error } = await supabase.rpc('get_goal_vs_actual', params) as any;
+
+      if (error) {
+        console.error('Error calling get_goal_vs_actual:', error);
+        return null;
       }
 
-      if (!goalData) return null; // Sem meta definida
+      const result = Array.isArray(data) ? data[0] : data;
 
-      // 2. Buscar Realizado (Receita Total)
-      // Usando a tabela financial_summary cacheada ou somando transações
-      // Vamos simplificar e somar transactions 'completed' de revenue
-      const { data: transactions, error: txError } = await supabase
-        .from('financial_transactions')
-        .select(`
-          id,
-          amount,
-          financial_ledger!inner (
-            account_id,
-            amount
-          )
-        `)
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-        .eq('status', 'completed')
-        .gte('transaction_date', startDate)
-        .lte('transaction_date', endDate);
+      if (!result) return {
+        goalAmount: 0,
+        actualAmount: 0,
+        difference: 0,
+        percentageAchieved: 0,
+        status: 'below'
+      };
 
-      // Nota: A query acima é complexa pq revenue é negativo no ledger, mas positivo na transaction (depende da implementação).
-      // No seed: "Revenue entries were made negative, and pending ...".
-      // Melhor usar a RPC get_revenue_by_dimension para pegar o total, agrupando tudo.
-      // Ou melhor, RPC get_financial_summary se existisse.
-      // Vou usar get_revenue_by_dimension e somar tudo.
+      const goal = Number(result.goal_amount || 0);
+      const actual = Number(result.actual_amount || 0);
+      const percentage = Number(result.progress || 0);
+      const diff = actual - goal;
 
-      const { data: revenueData, error: rpcError } = await supabase.rpc('get_revenue_by_dimension', {
-        p_user_id: (await supabase.auth.getUser()).data.user?.id,
-        p_start_date: startDate,
-        p_end_date: endDate,
-        p_dimension: 'type' // Qualquer dimensão serve, vamos somar o total
-      });
-
-      if (rpcError) throw rpcError;
-
-      const actualAmount = (revenueData as any[]).reduce((sum, item) => sum + Number(item.total_revenue), 0);
-      const goalAmount = Number(goalData.goal_amount);
-      const percentageAchieved = goalAmount > 0 ? (actualAmount / goalAmount) * 100 : 0;
+      let status: 'achieved' | 'near' | 'below' = 'below';
+      if (percentage >= 100) status = 'achieved';
+      else if (percentage >= 80) status = 'near';
 
       return {
-        goalAmount,
-        actualAmount,
-        difference: actualAmount - goalAmount,
-        percentageAchieved,
-        status: percentageAchieved >= 100 ? 'achieved' : percentageAchieved >= 80 ? 'near' : 'below'
+        goalAmount: goal,
+        actualAmount: actual,
+        difference: diff,
+        percentageAchieved: percentage,
+        status
       };
     },
   });
@@ -828,19 +828,27 @@ export function useUpsertGoal() {
       goalType?: 'revenue' | 'profit' | 'commission';
       description?: string;
     }) => {
-      // Mock - tabela financial_goals não existe ainda
-      console.log('Mock: Salvando meta', params);
-      return {
-        id: `mock-goal-${params.year}-${params.month}`,
-        user_id: 'mock-user',
-        year: params.year,
-        month: params.month,
-        goal_amount: params.goalAmount,
-        goal_type: params.goalType || 'revenue',
-        description: params.description || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario nao autenticado');
+
+      const { data, error } = await supabase
+        .from('financial_goals')
+        .upsert({
+          user_id: user.id,
+          year: params.year,
+          month: params.month,
+          goal_amount: params.goalAmount,
+          goal_type: params.goalType || 'revenue',
+          description: params.description || null,
+        }, { onConflict: 'user_id,year,month,goal_type' })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error upserting goal:', error);
+        throw error;
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['current-month-goal'] });
@@ -852,15 +860,21 @@ export function useUpsertGoal() {
 
 /**
  * Hook para deletar meta financeira
- * Mock já que a tabela financial_goals não existe ainda
  */
 export function useDeleteGoal() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (goalId: string) => {
-      // Mock - tabela financial_goals não existe ainda
-      console.log('Mock: Deletando meta', goalId);
+      const { error } = await supabase
+        .from('financial_goals')
+        .delete()
+        .eq('id', goalId);
+
+      if (error) {
+        console.error('Error deleting goal:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['current-month-goal'] });
