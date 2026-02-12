@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Check, Clock, Lock, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -16,12 +16,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { parseLocalDate } from '@/utils/dateUtils';
 import { formatCurrency } from './TransactionKpiCard';
 
@@ -33,7 +27,7 @@ export interface Transaction {
     account_name?: string | null;
     amount: number | null;
     total_amount?: number;
-    is_confirmed: boolean; // Keeping for compatibility but verified via reconciled
+    is_confirmed: boolean;
     reconciled?: boolean;
     legacy_status?: string | null;
     related_entity_id?: string | null;
@@ -83,11 +77,6 @@ export function TransactionsTable({
         setPage(1);
     }, [searchTerm]);
 
-    // Transações selecionáveis logic removed
-
-    const colorClass = type === 'receita' ? 'text-emerald-500' : 'text-rose-500';
-    const prefix = type === 'receita' ? '+' : '-';
-
     if (isLoading) {
         return (
             <div className="space-y-3">
@@ -99,149 +88,124 @@ export function TransactionsTable({
     }
 
     return (
-        <TooltipProvider>
-            <div className="space-y-4">
-                {/* Search */}
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Buscar por descrição, cliente ou categoria..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                    />
-                </div>
-
-                {/* Table */}
-                {paginatedTransactions.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                        <p>{searchTerm ? 'Nenhuma transação encontrada.' : `Nenhuma ${type} no período.`}</p>
-                    </div>
-                ) : (
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="hover:bg-transparent border-border">
-                                <TableHead className="pl-6 w-[120px] text-muted-foreground">Data</TableHead>
-                                <TableHead className="min-w-[280px] text-muted-foreground">Descrição</TableHead>
-                                <TableHead className="w-32 text-muted-foreground">Banco</TableHead>
-                                <TableHead className="w-40 text-muted-foreground">Categoria</TableHead>
-                                <TableHead className="w-24 text-muted-foreground">Status</TableHead>
-                                <TableHead className="text-right w-32 text-muted-foreground pr-6">Valor</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {paginatedTransactions.map((tx) => {
-                                const isConfirmed = tx.reconciled ?? tx.is_confirmed;
-                                const isSynchronized = tx.legacy_status !== null;
-                                const amount = tx.amount ?? tx.total_amount ?? 0;
-
-                                const displayDate = tx.transaction_date
-                                    ? format(parseLocalDate(String(tx.transaction_date)), 'dd/MM/yyyy', { locale: ptBR })
-                                    : '-';
-
-                                return (
-                                    <TableRow
-                                        key={tx.id}
-                                        className={cn(
-                                            "cursor-pointer hover:bg-muted/50 border-border",
-                                            isConfirmed && "opacity-60"
-                                        )}
-                                        onClick={() => onViewDetails(tx.id)}
-                                    >
-                                        <TableCell className="pl-6 font-medium text-muted-foreground">
-                                            {displayDate}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col gap-0.5">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="whitespace-normal break-words">
-                                                        {tx.description}
-                                                    </span>
-                                                    {isSynchronized && (
-                                                        <Badge variant="outline" className="text-xs gap-1 flex-shrink-0">
-                                                            <Lock className="w-2.5 h-2.5" />
-                                                            Sync
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                {tx.client_name && (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {tx.client_name}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            {tx.bankName ? (
-                                                <Badge variant="secondary" className="text-xs truncate max-w-[120px]">
-                                                    {tx.bankName}
-                                                </Badge>
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground/50 italic">
-                                                    Sem vínculo
-                                                </span>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {tx.account_name && (
-                                                <Badge variant="secondary" className="text-xs truncate max-w-[120px]">
-                                                    {tx.account_name}
-                                                </Badge>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {isConfirmed ? (
-                                                <Badge variant="default" className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30 gap-1">
-                                                    <Check className="w-3 h-3" />
-                                                    Confirmado
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant="outline" className="text-amber-600 border-amber-500/30 gap-1">
-                                                    <Clock className="w-3 h-3" />
-                                                    Pendente
-                                                </Badge>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className={cn("text-right font-semibold pr-6", colorClass)}>
-                                            {prefix}{formatCurrency(Math.abs(amount))}
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                )}
-
-                {/* Pagination */}
-                {totalItems > pageSize && (
-                    <div className="flex items-center justify-between pt-4 border-t">
-                        <span className="text-sm text-muted-foreground">
-                            Mostrando {((page - 1) * pageSize) + 1}-{Math.min(page * pageSize, totalItems)} de {totalItems}
-                        </span>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setPage(p => Math.max(1, p - 1))}
-                                disabled={page === 1}
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                            </Button>
-                            <span className="text-sm">
-                                Página {page} de {totalPages}
-                            </span>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                disabled={page === totalPages}
-                            >
-                                <ChevronRight className="w-4 h-4" />
-                            </Button>
-                        </div>
-                    </div>
-                )}
+        <div className="space-y-4">
+            {/* Search */}
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                    placeholder="Buscar por descrição, cliente ou categoria..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                />
             </div>
-        </TooltipProvider>
+
+            {/* Table */}
+            {paginatedTransactions.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                    <p>{searchTerm ? 'Nenhuma transação encontrada.' : `Nenhuma ${type} no período.`}</p>
+                </div>
+            ) : (
+                <Table>
+                    <TableHeader>
+                        <TableRow className="hover:bg-transparent border-border">
+                            <TableHead className="pl-6 w-[120px] text-muted-foreground">Data</TableHead>
+                            <TableHead className="w-[120px] text-muted-foreground">Tipo</TableHead>
+                            <TableHead className="text-muted-foreground">Descrição</TableHead>
+                            <TableHead className="text-muted-foreground">Categoria</TableHead>
+                            <TableHead className="text-right text-muted-foreground pr-6">Valor</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {paginatedTransactions.map((tx) => {
+                            const isConfirmed = tx.reconciled ?? tx.is_confirmed;
+                            const amount = tx.amount ?? tx.total_amount ?? 0;
+
+                            const displayDate = tx.transaction_date
+                                ? format(parseLocalDate(String(tx.transaction_date)), 'dd/MM/yyyy', { locale: ptBR })
+                                : '-';
+
+                            return (
+                                <TableRow
+                                    key={tx.id}
+                                    className={cn(
+                                        "cursor-pointer hover:bg-muted/50 border-border",
+                                        isConfirmed && "opacity-60"
+                                    )}
+                                    onClick={() => onViewDetails(tx.id)}
+                                >
+                                    <TableCell className="pl-6 font-medium text-muted-foreground">
+                                        {displayDate}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-1.5">
+                                            {type === 'receita' ? (
+                                                <>
+                                                    <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                                                    <span className="text-emerald-500 font-medium text-sm">Entrada</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <ArrowDownRight className="w-4 h-4 text-rose-500" />
+                                                    <span className="text-rose-500 font-medium text-sm">Saída</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-foreground">
+                                        {tx.description}
+                                    </TableCell>
+                                    <TableCell>
+                                        {tx.account_name ? (
+                                            <Badge variant="outline" className="rounded-full px-3 py-0.5 font-normal text-muted-foreground border-border bg-background">
+                                                {tx.account_name}
+                                            </Badge>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground/50 italic">—</span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-right font-medium pr-6">
+                                        <span className={type === 'receita' ? 'text-emerald-500' : 'text-rose-500'}>
+                                            {type === 'receita' ? '+' : '-'}
+                                            {formatCurrency(Math.abs(amount))}
+                                        </span>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            )}
+
+            {/* Pagination */}
+            {totalItems > pageSize && (
+                <div className="flex items-center justify-between pt-4 border-t border-border">
+                    <span className="text-sm text-muted-foreground">
+                        Mostrando {((page - 1) * pageSize) + 1}-{Math.min(page * pageSize, totalItems)} de {totalItems}
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <span className="text-sm">
+                            Página {page} de {totalPages}
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            disabled={page === totalPages}
+                        >
+                            <ChevronRight className="w-4 h-4" />
+                        </Button>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

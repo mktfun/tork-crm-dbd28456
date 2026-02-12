@@ -21,7 +21,7 @@ import {
 import { usePayableReceivableTransactions } from "@/hooks/useFinanceiro";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { TrendingDown, TrendingUp, AlertCircle, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, AlertCircle, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -70,12 +70,12 @@ export function AccountsPayableReceivableTable() {
 
   const getStatusBadge = (status: 'atrasado' | 'pendente' | 'pago') => {
     const variants = {
-      atrasado: { variant: "destructive" as const, label: "Atrasado" },
-      pendente: { variant: "secondary" as const, label: "Pendente" },
-      pago: { variant: "default" as const, label: "Pago" },
+      atrasado: { className: "bg-rose-100 text-rose-700 hover:bg-rose-100 border-none", label: "Atrasado" },
+      pendente: { className: "bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none", label: "Pendente" },
+      pago: { className: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none", label: "Pago" },
     };
     const config = variants[status];
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    return <Badge className={config.className}>{config.label}</Badge>;
   };
 
   const renderTable = () => {
@@ -86,18 +86,20 @@ export function AccountsPayableReceivableTable() {
             <TableHeader>
               <TableRow className="hover:bg-transparent border-border">
                 <TableHead className="pl-6 text-muted-foreground">Vencimento</TableHead>
-                <TableHead className="text-muted-foreground">Entidade</TableHead>
+                <TableHead className="text-muted-foreground">Tipo</TableHead>
                 <TableHead className="text-muted-foreground">Descrição</TableHead>
+                <TableHead className="text-muted-foreground">Entidade</TableHead>
                 <TableHead className="text-right text-muted-foreground">Valor</TableHead>
                 <TableHead className="pr-6 text-muted-foreground">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {[1, 2, 3, 4, 5].map((i) => (
-                <TableRow key={i}>
+                <TableRow key={i} className="border-border">
                   <TableCell className="pl-6"><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
                   <TableCell className="pr-6"><Skeleton className="h-5 w-20" /></TableCell>
                 </TableRow>
@@ -121,8 +123,7 @@ export function AccountsPayableReceivableTable() {
 
     if (!transactions || transactions.length === 0) {
       return (
-        <div className="text-center py-12 text-muted-foreground border rounded-md">
-          <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+        <div className="text-center py-12 text-muted-foreground">
           <p className="text-sm">Nenhuma transação encontrada</p>
           <p className="text-xs mt-1">Tente alterar os filtros acima.</p>
         </div>
@@ -135,8 +136,9 @@ export function AccountsPayableReceivableTable() {
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
               <TableHead className="pl-6 text-muted-foreground">Vencimento</TableHead>
-              <TableHead className="text-muted-foreground">Entidade</TableHead>
+              <TableHead className="w-[120px] text-muted-foreground">Tipo</TableHead>
               <TableHead className="text-muted-foreground">Descrição</TableHead>
+              <TableHead className="text-muted-foreground">Entidade</TableHead>
               <TableHead className="text-right text-muted-foreground">Valor</TableHead>
               <TableHead className="pr-6 text-muted-foreground">Status</TableHead>
             </TableRow>
@@ -144,20 +146,40 @@ export function AccountsPayableReceivableTable() {
           <TableBody>
             {paginatedTransactions.map((transaction) => (
               <TableRow key={transaction.transactionId} className="hover:bg-muted/50 border-border">
-                <TableCell className="pl-6 font-medium">
+                <TableCell className="pl-6 font-medium text-muted-foreground">
                   {formatDate(transaction.dueDate)}
                   {transaction.daysOverdue > 0 && (
-                    <span className="text-xs text-red-600 ml-2">
+                    <span className="text-xs text-rose-500 ml-2">
                       ({transaction.daysOverdue}d atraso)
                     </span>
                   )}
                 </TableCell>
-                <TableCell>{transaction.entityName}</TableCell>
-                <TableCell className="max-w-[250px] truncate" title={transaction.description}>
+                <TableCell>
+                  <div className="flex items-center gap-1.5">
+                    {transaction.transactionType === 'receber' ? (
+                      <>
+                        <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                        <span className="text-emerald-500 font-medium text-sm">Entrada</span>
+                      </>
+                    ) : (
+                      <>
+                        <ArrowDownRight className="w-4 h-4 text-rose-500" />
+                        <span className="text-rose-500 font-medium text-sm">Saída</span>
+                      </>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="text-foreground max-w-[250px] truncate" title={transaction.description}>
                   {transaction.description}
                 </TableCell>
-                <TableCell className="text-right font-semibold">
-                  <span className={transaction.transactionType === 'receber' ? 'text-emerald-600' : 'text-red-600'}>
+                <TableCell>
+                  <Badge variant="outline" className="rounded-full px-3 py-0.5 font-normal text-muted-foreground border-border bg-background">
+                    {transaction.entityName}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right font-medium">
+                  <span className={transaction.transactionType === 'receber' ? 'text-emerald-500' : 'text-rose-500'}>
+                    {transaction.transactionType === 'receber' ? '+' : '-'}
                     {formatCurrency(Number(transaction.amount))}
                   </span>
                 </TableCell>
@@ -177,7 +199,7 @@ export function AccountsPayableReceivableTable() {
     if (totalItems <= pageSize) return null;
 
     return (
-      <div className="flex items-center justify-between mt-4 pt-4 border-t">
+      <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
         <span className="text-sm text-muted-foreground">
           Mostrando {((page - 1) * pageSize) + 1}-{Math.min(page * pageSize, totalItems)} de {totalItems}
         </span>
@@ -215,7 +237,7 @@ export function AccountsPayableReceivableTable() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
-              <TrendingUp className="w-5 h-5 text-primary" />
+              <ArrowUpRight className="w-5 h-5 text-primary" />
             </div>
             <div>
               <CardTitle className="text-lg font-semibold text-foreground">Contas a Pagar e Receber</CardTitle>
@@ -246,14 +268,14 @@ export function AccountsPayableReceivableTable() {
                 value="receber"
                 className="data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:hover:bg-white/5 gap-2"
               >
-                <TrendingUp className="w-4 h-4 text-emerald-500" />
+                <ArrowUpRight className="w-4 h-4 text-emerald-500" />
                 A Receber ({receivableCount})
               </TabsTrigger>
               <TabsTrigger
                 value="pagar"
                 className="data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:hover:bg-white/5 gap-2"
               >
-                <TrendingDown className="w-4 h-4 text-red-500" />
+                <ArrowDownRight className="w-4 h-4 text-rose-500" />
                 A Pagar ({payableCount})
               </TabsTrigger>
             </TabsList>
