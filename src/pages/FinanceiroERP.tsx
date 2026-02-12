@@ -40,6 +40,7 @@ import { ModuloFaturamento } from '@/components/financeiro/dashboard/ModuloFatur
 import { ModuloTesouraria } from '@/components/financeiro/dashboard/ModuloTesouraria';
 import { ModuloMultiBancos } from '@/components/financeiro/dashboard/ModuloMultiBancos';
 import { RecentTransactionsCard } from '@/components/financeiro/dashboard/RecentTransactionsCard';
+import { PageDebugger } from '@/components/shared/PageDebugger';
 import {
   useFinancialAccountsWithDefaults,
   useCashFlowData,
@@ -458,6 +459,9 @@ export default function FinanceiroERP() {
         open={!!detailsTransactionId}
         onClose={handleCloseDetails}
       />
+
+      {/* Protocolo de Sanidade - Debug Mode */}
+      <PageDebugger context={activeTab} />
     </div>
   );
 }
