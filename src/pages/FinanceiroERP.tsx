@@ -376,36 +376,36 @@ export default function FinanceiroERP() {
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-muted/50">
-          <TabsTrigger value="visao-geral" className="gap-2">
+        <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl">
+          <TabsTrigger value="visao-geral" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
             <BarChart3 className="w-4 h-4" />
             Visão Geral
           </TabsTrigger>
-          <TabsTrigger value="caixa" className="gap-2">
+          <TabsTrigger value="caixa" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
             <Landmark className="w-4 h-4" />
             Bancos
           </TabsTrigger>
-          <TabsTrigger value="tesouraria" className="gap-2">
+          <TabsTrigger value="tesouraria" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
             <Wallet className="w-4 h-4" />
             Tesouraria
           </TabsTrigger>
-          <TabsTrigger value="transacoes" className="gap-2">
+          <TabsTrigger value="transacoes" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
             <Wallet className="w-4 h-4" />
             Transações
           </TabsTrigger>
-          <TabsTrigger value="provisoes" className="gap-2">
+          <TabsTrigger value="provisoes" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
             <LineChart className="w-4 h-4" />
             Provisões
           </TabsTrigger>
-          <TabsTrigger value="dre" className="gap-2">
+          <TabsTrigger value="dre" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
             <FileSpreadsheet className="w-4 h-4" />
             DRE
           </TabsTrigger>
-          <TabsTrigger value="conciliacao" className="gap-2">
+          <TabsTrigger value="conciliacao" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
             <GitCompare className="w-4 h-4" />
             Conciliação
           </TabsTrigger>
-          <TabsTrigger value="config" className="gap-2">
+          <TabsTrigger value="config" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
             <Settings className="w-4 h-4" />
             Configurações
           </TabsTrigger>

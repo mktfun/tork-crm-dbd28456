@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { ProjectedCashFlowChart } from './ProjectedCashFlowChart';
 import { useProjectedCashFlow } from '@/hooks/useRecurringConfigs';
@@ -124,22 +124,19 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
               <Filter className="w-4 h-4 text-muted-foreground" />
               Agrupar:
             </Label>
-            <ToggleGroup
-              type="single"
-              value={granularity}
-              onValueChange={(v) => v && setGranularity(v as GranularityOption)}
-              className="justify-start"
-            >
-              <ToggleGroupItem value="day" size="sm" className="h-9 px-3" aria-label="Diário">
-                Dia
-              </ToggleGroupItem>
-              <ToggleGroupItem value="week" size="sm" className="h-9 px-3" aria-label="Semanal">
-                Semana
-              </ToggleGroupItem>
-              <ToggleGroupItem value="month" size="sm" className="h-9 px-3" aria-label="Mensal">
-                Mês
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <Tabs value={granularity} onValueChange={(v) => v && setGranularity(v as GranularityOption)} className="w-auto">
+              <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-9">
+                <TabsTrigger value="day" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                  Dia
+                </TabsTrigger>
+                <TabsTrigger value="week" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                  Semana
+                </TabsTrigger>
+                <TabsTrigger value="month" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                  Mês
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </div>
       </div>

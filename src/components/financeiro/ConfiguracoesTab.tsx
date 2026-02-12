@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { 
-  Landmark, 
-  Tags, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Loader2, 
+import {
+  Landmark,
+  Tags,
+  Plus,
+  Edit2,
+  Trash2,
+  Loader2,
   ShieldCheck,
   Zap,
   Target
@@ -162,7 +162,7 @@ function AutomationSection() {
             )}
             <div className="bg-muted/50 p-3 rounded-md">
               <p className="text-sm text-muted-foreground">
-                <strong>Como funciona:</strong> Todo dia às 3h da manhã, o sistema verifica as comissões 
+                <strong>Como funciona:</strong> Todo dia às 3h da manhã, o sistema verifica as comissões
                 pendentes e as marca como pagas conforme suas configurações.
               </p>
             </div>
@@ -179,7 +179,7 @@ function CommissionTargetSection({ assetAccounts }: { assetAccounts: FinancialAc
   const { brokerages, updateBrokerage, addBrokerage, loading } = useSupabaseBrokerages();
   const [saving, setSaving] = useState(false);
   const [initializing, setInitializing] = useState(false);
-  
+
   // Auto-criar corretora se não existir
   useEffect(() => {
     const initBrokerage = async () => {
@@ -196,7 +196,7 @@ function CommissionTargetSection({ assetAccounts }: { assetAccounts: FinancialAc
     };
     initBrokerage();
   }, [loading, brokerages.length, initializing, addBrokerage]);
-  
+
   const brokerage = brokerages[0];
   const settings = brokerage?.financial_settings || {};
 
@@ -247,13 +247,13 @@ function CommissionTargetSection({ assetAccounts }: { assetAccounts: FinancialAc
             <SelectTrigger id="commission-account" className="mt-1">
               <SelectValue placeholder="Selecione uma conta" />
             </SelectTrigger>
-            <SelectContent 
+            <SelectContent
               className="z-50 bg-popover border shadow-lg"
               onCloseAutoFocus={(e) => e.preventDefault()}
             >
               {assetAccounts.map((acc) => (
-                <SelectItem 
-                  key={acc.id} 
+                <SelectItem
+                  key={acc.id}
                   value={acc.id}
                   onPointerDown={(e) => e.stopPropagation()}
                 >
@@ -303,15 +303,15 @@ interface AccountListProps {
   isLoading: boolean;
 }
 
-function AccountListSection({ 
-  title, 
-  description, 
-  icon: Icon, 
-  accounts, 
+function AccountListSection({
+  title,
+  description,
+  icon: Icon,
+  accounts,
   accountType,
-  onEdit, 
+  onEdit,
   onDelete,
-  isLoading 
+  isLoading
 }: AccountListProps) {
   const [showModal, setShowModal] = useState(false);
 
@@ -343,7 +343,7 @@ function AccountListSection({
           <ScrollArea className="h-[280px]">
             <div className="space-y-2">
               {accounts.map((account) => (
-                <div 
+                <div
                   key={account.id}
                   className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                 >
@@ -361,20 +361,20 @@ function AccountListSection({
                       <p className="text-xs text-muted-foreground">{account.code}</p>
                     )}
                   </div>
-                  
+
                   {!account.isSystem && (
                     <div className="flex items-center gap-1 ml-2">
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         className="h-8 w-8"
                         onClick={() => onEdit(account)}
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={() => onDelete(account)}
                       >
@@ -388,7 +388,7 @@ function AccountListSection({
           </ScrollArea>
         )}
       </CardContent>
-      
+
       <AccountFormModal
         open={showModal}
         onOpenChange={setShowModal}
@@ -402,10 +402,10 @@ function AccountListSection({
 
 export function ConfiguracoesTab() {
   const { data: accounts = [], isLoading } = useFinancialAccountsWithDefaults();
-  
+
   const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
   const [deleteAccount, setDeleteAccount] = useState<FinancialAccount | null>(null);
-  
+
   // Filtrar contas por tipo
   const assetAccounts = accounts.filter(a => a.type === 'asset');
   const expenseAccounts = accounts.filter(a => a.type === 'expense');
@@ -432,9 +432,9 @@ export function ConfiguracoesTab() {
 
       {/* Tabs */}
       <Tabs defaultValue="automacao" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="automacao">Automação</TabsTrigger>
-          <TabsTrigger value="plano-contas">Plano de Contas</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl">
+          <TabsTrigger value="automacao" className="data-[state=active]:bg-white/10 data-[state=active]:text-white">Automação</TabsTrigger>
+          <TabsTrigger value="plano-contas" className="data-[state=active]:bg-white/10 data-[state=active]:text-white">Plano de Contas</TabsTrigger>
         </TabsList>
 
         {/* Tab: Automação */}
@@ -456,7 +456,7 @@ export function ConfiguracoesTab() {
               onDelete={handleDelete}
               isLoading={isLoading}
             />
-            
+
             <AccountListSection
               title="Categorias"
               description="Despesas e receitas para classificação"

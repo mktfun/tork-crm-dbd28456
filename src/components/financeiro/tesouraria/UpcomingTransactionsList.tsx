@@ -15,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface UpcomingTransactionsListProps {
     daysAhead?: number;
@@ -115,19 +115,16 @@ export function UpcomingTransactionsList({ daysAhead = 30 }: UpcomingTransaction
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <ToggleGroup
-                            type="single"
-                            value={type}
-                            onValueChange={(v) => v && setType(v as 'receivables' | 'payables')}
-                            className="bg-muted/50 p-1 rounded-lg"
-                        >
-                            <ToggleGroupItem value="receivables" size="sm" className="h-7 text-xs px-2 data-[state=on]:bg-white dark:data-[state=on]:bg-zinc-800 data-[state=on]:shadow-sm transition-all duration-200">
-                                A Receber
-                            </ToggleGroupItem>
-                            <ToggleGroupItem value="payables" size="sm" className="h-7 text-xs px-2 data-[state=on]:bg-white dark:data-[state=on]:bg-zinc-800 data-[state=on]:shadow-sm transition-all duration-200">
-                                A Pagar
-                            </ToggleGroupItem>
-                        </ToggleGroup>
+                        <Tabs value={type} onValueChange={(v) => v && setType(v as 'receivables' | 'payables')} className="w-auto">
+                            <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-9">
+                                <TabsTrigger value="receivables" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                                    A Receber
+                                </TabsTrigger>
+                                <TabsTrigger value="payables" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                                    A Pagar
+                                </TabsTrigger>
+                            </TabsList>
+                        </Tabs>
 
                         <Select value={String(period)} onValueChange={(v) => setPeriod(Number(v))}>
                             <SelectTrigger className="w-[110px] bg-transparent border-input text-xs h-9">

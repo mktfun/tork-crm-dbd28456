@@ -11,10 +11,10 @@ interface FaturamentoBreakdownProps {
   dateRange?: DateRange;
 }
 
-function BreakdownList({ 
-  dimension, 
-  dateRange 
-}: { 
+function BreakdownList({
+  dimension,
+  dateRange
+}: {
   dimension: 'producer' | 'type' | 'insurance_company';
   dateRange?: DateRange;
 }) {
@@ -106,16 +106,16 @@ export function FaturamentoBreakdown({ dateRange }: FaturamentoBreakdownProps) {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="produtor" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="produtor" className="gap-1 text-xs">
+          <TabsList className="grid w-full grid-cols-3 bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl">
+            <TabsTrigger value="produtor" className="gap-1 text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white">
               <Users className="w-3 h-3" />
               Produtor
             </TabsTrigger>
-            <TabsTrigger value="ramo" className="gap-1 text-xs">
+            <TabsTrigger value="ramo" className="gap-1 text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white">
               <PieChart className="w-3 h-3" />
               Ramo
             </TabsTrigger>
-            <TabsTrigger value="seguradora" className="gap-1 text-xs">
+            <TabsTrigger value="seguradora" className="gap-1 text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white">
               <Building2 className="w-3 h-3" />
               Seguradora
             </TabsTrigger>

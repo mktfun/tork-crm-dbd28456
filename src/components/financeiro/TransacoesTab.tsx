@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AppCard } from '@/components/ui/app-card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { TransactionKpiCard, formatCurrency } from './shared/TransactionKpiCard';
@@ -209,12 +209,12 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
             {/* Header with Type Toggle */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <Tabs value={transactionType} onValueChange={(v) => handleTypeChange(v as TransactionType)} className="w-full sm:w-auto">
-                    <TabsList className="grid grid-cols-2 w-full sm:w-[300px]">
-                        <TabsTrigger value="receitas" className="gap-2">
+                    <TabsList className="grid grid-cols-2 w-full sm:w-[300px] bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl">
+                        <TabsTrigger value="receitas" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
                             <TrendingUp className="w-4 h-4" />
                             Receitas
                         </TabsTrigger>
-                        <TabsTrigger value="despesas" className="gap-2">
+                        <TabsTrigger value="despesas" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
                             <TrendingDown className="w-4 h-4" />
                             Despesas
                         </TabsTrigger>
@@ -228,21 +228,18 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
 
             {/* Status Toggle + KPIs */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <ToggleGroup
-                    type="single"
-                    value={statusFilter}
-                    onValueChange={(val) => val && handleStatusChange(val as StatusFilter)}
-                    className="bg-muted/50 p-1 rounded-lg"
-                >
-                    <ToggleGroupItem value="efetivado" className="gap-2 data-[state=on]:bg-background">
-                        <Check className="w-4 h-4" />
-                        Efetivado
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="pendente" className="gap-2 data-[state=on]:bg-background">
-                        <Clock className="w-4 h-4" />
-                        {transactionType === 'receitas' ? 'A Receber' : 'A Pagar'}
-                    </ToggleGroupItem>
-                </ToggleGroup>
+                <Tabs value={statusFilter} onValueChange={(val) => val && handleStatusChange(val as StatusFilter)} className="w-auto">
+                    <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-9">
+                        <TabsTrigger value="efetivado" className="gap-2 text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                            <Check className="w-4 h-4" />
+                            Efetivado
+                        </TabsTrigger>
+                        <TabsTrigger value="pendente" className="gap-2 text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                            <Clock className="w-4 h-4" />
+                            {transactionType === 'receitas' ? 'A Receber' : 'A Pagar'}
+                        </TabsTrigger>
+                    </TabsList>
+                </Tabs>
 
                 <div className="flex-1 grid grid-cols-2 gap-3">
                     <TransactionKpiCard
