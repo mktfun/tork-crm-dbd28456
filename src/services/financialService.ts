@@ -368,7 +368,10 @@ export async function getFinancialSummary(params: {
     p_end_date: params.endDate
   });
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching financial summary:', error);
+    throw error;
+  }
 
   const row = data as any || {};
   return {

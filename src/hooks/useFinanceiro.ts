@@ -374,27 +374,23 @@ export function useTransactionDetails(transactionId: string | null, isLegacyId =
 /**
  * Hook para buscar totais pendentes (A Receber e A Pagar)
  */
-export function usePendingTotals(startDate?: string, endDate?: string) {
+export function usePendingTotals() {
   return useQuery({
-    queryKey: ['pending-totals', startDate, endDate],
+    queryKey: ['pending-totals'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_pending_totals', {
-        p_start_date: startDate || undefined,
-        p_end_date: endDate || undefined
-      });
+      const { data, error } = await supabase.rpc('get_pending_totals');
 
       if (error) {
         console.error('Error fetching pending totals:', error);
         throw error;
       }
 
-      // RPC retorna array com 1 linha [{ total_receivables, total_payables }]
-      // ou vazio
-      const row = (data as any[])?.[0] || { total_receivables: 0, total_payables: 0 };
+      // RPC retorna JSON { receivable, payable, receivable_count, payable_count }
+      const result = (data as any) || { receivable: 0, payable: 0 };
 
       return {
-        receivable: Number(row.total_receivables || 0),
-        payable: Number(row.total_payables || 0)
+        receivable: Number(result.receivable || 0),
+        payable: Number(result.payable || 0)
       };
     }
   });
