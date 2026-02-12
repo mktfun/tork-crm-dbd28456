@@ -234,7 +234,7 @@ export function MetasCard({ faturamentoAtual }: MetasCardProps) {
             )}
           </div>
         </CardContent>
-      </Card>
+      </AppCard>
 
       <SetGoalModal
         open={showSetGoalModal}

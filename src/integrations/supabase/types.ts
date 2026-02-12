@@ -2821,8 +2821,8 @@ export type Database = {
       financial_dre_view: {
         Row: {
           account_type:
-          | Database["public"]["Enums"]["financial_account_type"]
-          | null
+            | Database["public"]["Enums"]["financial_account_type"]
+            | null
           category: string | null
           month: number | null
           period: string | null
@@ -3063,45 +3063,45 @@ export type Database = {
       count_problematic_descriptions: { Args: never; Returns: number }
       count_wrong_backfill_dates: { Args: never; Returns: number }
       create_financial_movement:
-      | {
-        Args: {
-          p_description: string
-          p_movements: Json
-          p_reference_number?: string
-          p_related_entity_id?: string
-          p_related_entity_type?: string
-          p_transaction_date: string
-        }
-        Returns: string
-      }
-      | {
-        Args: {
-          p_bank_account_id?: string
-          p_description: string
-          p_movements: Json
-          p_reference_number?: string
-          p_related_entity_id?: string
-          p_related_entity_type?: string
-          p_transaction_date: string
-        }
-        Returns: string
-      }
-      | {
-        Args: {
-          p_bank_account_id?: string
-          p_description: string
-          p_insurance_company_id?: string
-          p_is_confirmed?: boolean
-          p_movements: Json
-          p_producer_id?: string
-          p_ramo_id?: string
-          p_reference_number?: string
-          p_related_entity_id?: string
-          p_related_entity_type?: string
-          p_transaction_date: string
-        }
-        Returns: string
-      }
+        | {
+            Args: {
+              p_description: string
+              p_movements: Json
+              p_reference_number?: string
+              p_related_entity_id?: string
+              p_related_entity_type?: string
+              p_transaction_date: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_bank_account_id?: string
+              p_description: string
+              p_movements: Json
+              p_reference_number?: string
+              p_related_entity_id?: string
+              p_related_entity_type?: string
+              p_transaction_date: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_bank_account_id?: string
+              p_description: string
+              p_insurance_company_id?: string
+              p_is_confirmed?: boolean
+              p_movements: Json
+              p_producer_id?: string
+              p_ramo_id?: string
+              p_reference_number?: string
+              p_related_entity_id?: string
+              p_related_entity_type?: string
+              p_transaction_date: string
+            }
+            Returns: string
+          }
       create_transaction_from_statement: {
         Args: {
           p_category_account_id: string
@@ -3147,6 +3147,7 @@ export type Database = {
           occurrence_date: string
         }[]
       }
+      generate_recurring_transactions: { Args: never; Returns: number }
       get_account_balances: {
         Args: never
         Returns: {
@@ -3185,25 +3186,25 @@ export type Database = {
       }
       get_admin_metrics: { Args: never; Returns: Json }
       get_aging_report:
-      | {
-        Args: { p_reference_date?: string; p_user_id: string }
-        Returns: {
-          bucket_amount: number
-          bucket_color: string
-          bucket_count: number
-          bucket_range: string
-        }[]
-      }
-      | {
-        Args: { p_type?: string; p_user_id: string }
-        Returns: {
-          bucket_amount: number
-          bucket_color: string
-          bucket_count: number
-          bucket_range: string
-          bucket_sort_order: number
-        }[]
-      }
+        | {
+            Args: { p_reference_date?: string; p_user_id: string }
+            Returns: {
+              bucket_amount: number
+              bucket_color: string
+              bucket_count: number
+              bucket_range: string
+            }[]
+          }
+        | {
+            Args: { p_type?: string; p_user_id: string }
+            Returns: {
+              bucket_amount: number
+              bucket_color: string
+              bucket_count: number
+              bucket_range: string
+              bucket_sort_order: number
+            }[]
+          }
       get_bank_account_statement: {
         Args: { p_bank_account_id: string }
         Returns: {
@@ -3241,64 +3242,91 @@ export type Database = {
           transaction_date: string
         }[]
       }
-      get_bank_statement_paginated: {
-        Args: {
-          p_bank_account_id: string
-          p_end_date: string
-          p_page?: number
-          p_page_size?: number
-          p_start_date: string
-        }
-        Returns: {
-          amount: number
-          bank_account_id: string
-          bank_name: string
-          category_name: string
-          description: string
-          id: string
-          reconciled: boolean
-          running_balance: number
-          status_display: string
-          total_count: number
-          transaction_date: string
-          type: string
-        }[]
-      }
+      get_bank_statement_paginated:
+        | {
+            Args: {
+              p_bank_account_id: string
+              p_end_date: string
+              p_page?: number
+              p_page_size?: number
+              p_start_date: string
+            }
+            Returns: {
+              amount: number
+              bank_account_id: string
+              bank_name: string
+              category_name: string
+              description: string
+              id: string
+              reconciled: boolean
+              running_balance: number
+              status_display: string
+              total_count: number
+              transaction_date: string
+              type: string
+            }[]
+          }
+        | {
+            Args: {
+              p_bank_account_id: string
+              p_end_date: string
+              p_page?: number
+              p_page_size?: number
+              p_search_term?: string
+              p_start_date: string
+              p_status?: string
+              p_type?: string
+            }
+            Returns: {
+              amount: number
+              bank_account_id: string
+              bank_name: string
+              category_name: string
+              description: string
+              id: string
+              reconciled: boolean
+              running_balance: number
+              status_display: string
+              total_count: number
+              transaction_date: string
+              type: string
+            }[]
+          }
       get_bank_transactions:
-      | {
-        Args: {
-          p_bank_account_id?: string
-          p_page?: number
-          p_page_size?: number
-          p_search?: string
-        }
-        Returns: Json
-      }
-      | {
-        Args: {
-          p_bank_account_id: string
-          p_end_date: string
-          p_page?: number
-          p_page_size?: number
-          p_search?: string
-          p_start_date: string
-          p_status?: string
-        }
-        Returns: Json
-      }
-      | {
-        Args: {
-          p_bank_account_id: string
-          p_end_date: string
-          p_page?: number
-          p_page_size?: number
-          p_reconciled_only?: boolean
-          p_search?: string
-          p_start_date: string
-          p_status?: string
-        }
-        Returns: Json
-      }
+        | {
+            Args: {
+              p_bank_account_id?: string
+              p_page?: number
+              p_page_size?: number
+              p_search?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_bank_account_id: string
+              p_end_date: string
+              p_page?: number
+              p_page_size?: number
+              p_search?: string
+              p_start_date: string
+              p_status?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_bank_account_id: string
+              p_end_date: string
+              p_page?: number
+              p_page_size?: number
+              p_reconciled_only?: boolean
+              p_search?: string
+              p_start_date: string
+              p_status?: string
+            }
+            Returns: Json
+          }
       get_brokerage_by_slug: { Args: { p_slug: string }; Returns: Json }
       get_cash_flow_data: {
         Args: {
@@ -3488,7 +3516,6 @@ export type Database = {
           actual_amount: number
           difference: number
           goal_amount: number
-          goal_id: string
           percentage_achieved: number
           status: string
         }[]
@@ -3559,17 +3586,17 @@ export type Database = {
         }[]
       }
       get_pending_totals:
-      | {
-        Args: { p_end_date?: string; p_start_date?: string }
-        Returns: Json
-      }
-      | {
-        Args: { p_user_id: string }
-        Returns: {
-          total_payables: number
-          total_receivables: number
-        }[]
-      }
+        | {
+            Args: { p_end_date?: string; p_start_date?: string }
+            Returns: Json
+          }
+        | {
+            Args: { p_user_id: string }
+            Returns: {
+              total_payables: number
+              total_receivables: number
+            }[]
+          }
       get_portal_cards_hybrid: {
         Args: {
           p_client_id: string
@@ -3640,15 +3667,17 @@ export type Database = {
         Args: { p_limit?: number; p_offset?: number; p_type?: string }
         Returns: {
           account_names: string
+          amount: number
           created_at: string
           description: string
           id: string
           is_void: boolean
+          reconciled: boolean
           reference_number: string
           status: string
           total_amount: number
           transaction_date: string
-          reconciled: boolean
+          type: string
         }[]
       }
       get_revenue_by_dimension: {
@@ -3659,8 +3688,9 @@ export type Database = {
           p_user_id: string
         }
         Returns: {
-          dimension_value: string
-          total_revenue: number
+          dimension_name: string
+          percentage: number
+          total_amount: number
           transaction_count: number
         }[]
       }
@@ -3676,16 +3706,17 @@ export type Database = {
         Returns: {
           account_name: string
           amount: number
+          bank_name: string
           client_name: string
           description: string
           id: string
           is_confirmed: boolean
           legacy_status: string
           policy_number: string
+          reconciled: boolean
           related_entity_id: string
           related_entity_type: string
           transaction_date: string
-          reconciled: boolean
         }[]
       }
       get_schema_info: { Args: never; Returns: Json }
@@ -3697,11 +3728,11 @@ export type Database = {
         }[]
       }
       get_transaction_details:
-      | { Args: { p_transaction_id: string }; Returns: Json }
-      | {
-        Args: { p_legacy_id?: string; p_transaction_id?: string }
-        Returns: Json
-      }
+        | { Args: { p_transaction_id: string }; Returns: Json }
+        | {
+            Args: { p_legacy_id?: string; p_transaction_id?: string }
+            Returns: Json
+          }
       get_transactions_for_reconciliation: {
         Args: { p_bank_account_id: string }
         Returns: {
@@ -3770,8 +3801,8 @@ export type Database = {
         Args: never
         Returns: {
           account_type:
-          | Database["public"]["Enums"]["financial_account_type"]
-          | null
+            | Database["public"]["Enums"]["financial_account_type"]
+            | null
           category: string | null
           month: number | null
           period: string | null
@@ -3899,33 +3930,35 @@ export type Database = {
         Returns: Json
       }
       register_policy_commission:
-      | {
-        Args: {
-          p_client_name?: string
-          p_commission_amount?: number
-          p_policy_id: string
-          p_policy_number?: string
-          p_ramo_name?: string
-          p_status?: string
-          p_transaction_date?: string
-        }
-        Returns: {
-          reference_number: string
-          success: boolean
-          transaction_id: string
-        }[]
-      }
-      | {
-        Args: {
-          p_client_name: string
-          p_commission_amount: number
-          p_company_name?: string
-          p_policy_id: string
-          p_policy_number: string
-          p_ramo_name: string
-        }
-        Returns: Json
-      }
+        | {
+            Args: {
+              p_client_name?: string
+              p_commission_amount?: number
+              p_policy_id: string
+              p_policy_number?: string
+              p_ramo_name?: string
+              p_status?: string
+              p_transaction_date?: string
+            }
+            Returns: {
+              reference_number: string
+              success: boolean
+              transaction_id: string
+            }[]
+          }
+        | {
+            Args: {
+              p_client_name: string
+              p_commission_amount: number
+              p_company_name?: string
+              p_policy_id: string
+              p_policy_number: string
+              p_ramo_name: string
+              p_status?: string
+              p_transaction_date?: string
+            }
+            Returns: Json
+          }
       sanitize_orphan_transactions: {
         Args: never
         Returns: {
@@ -4032,11 +4065,11 @@ export type Database = {
     Enums: {
       financial_account_status: "active" | "archived"
       financial_account_type:
-      | "asset"
-      | "liability"
-      | "equity"
-      | "revenue"
-      | "expense"
+        | "asset"
+        | "liability"
+        | "equity"
+        | "revenue"
+        | "expense"
       user_role: "admin" | "corretor" | "assistente"
     }
     CompositeTypes: {
@@ -4065,116 +4098,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-  : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-  ? R
-  : never
+    ? R
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
+      Insert: infer I
+    }
+    ? I
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
+      Update: infer U
+    }
+    ? U
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema["Enums"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema["CompositeTypes"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 export const Constants = {
   public: {
