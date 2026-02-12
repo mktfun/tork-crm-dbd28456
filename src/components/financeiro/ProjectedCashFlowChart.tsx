@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Loader2, 
+import {
+  TrendingUp,
+  TrendingDown,
+  Loader2,
   AlertTriangle,
   Wallet
 } from 'lucide-react';
@@ -92,10 +92,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export function ProjectedCashFlowChart({ 
-  data, 
-  isLoading, 
-  granularity = 'day' 
+export function ProjectedCashFlowChart({
+  data,
+  isLoading,
+  granularity = 'day'
 }: ProjectedCashFlowChartProps) {
   const chartData = useMemo(() => {
     return data.map(point => ({
@@ -107,7 +107,7 @@ export function ProjectedCashFlowChart({
   }, [data]);
 
   const hasData = chartData.length > 0;
-  
+
   // Calcular totais e verificar déficits
   const analysis = useMemo(() => {
     if (!hasData) return null;
@@ -116,8 +116,8 @@ export function ProjectedCashFlowChart({
     const maxBalance = Math.max(...chartData.map(p => p.running_balance));
     const finalBalance = chartData[chartData.length - 1]?.running_balance || 0;
     const hasDeficit = minBalance < 0;
-    const deficitPeriod = hasDeficit 
-      ? chartData.find(p => p.running_balance < 0)?.period 
+    const deficitPeriod = hasDeficit
+      ? chartData.find(p => p.running_balance < 0)?.period
       : null;
 
     const totalProjectedIncome = chartData.reduce((sum, p) => sum + p.projected_income, 0);
@@ -155,6 +155,12 @@ export function ProjectedCashFlowChart({
     );
   }
 
+  // Lógica para largura dinâmica e scroll
+  const minWidthPerPoint = granularity === 'day' ? 40 : granularity === 'week' ? 60 : 80;
+  const chartWidth = Math.max(chartData.length * minWidthPerPoint, 800);
+  const containerStyle = { width: `${chartWidth}px`, height: '100%' };
+  const showScroll = chartData.length > 20; // Ativar scroll se tiver muitos pontos
+
   return (
     <Card>
       <CardHeader>
@@ -184,7 +190,7 @@ export function ProjectedCashFlowChart({
                   {formatCurrency(analysis.totalProjectedExpense)}
                 </span>
               </div>
-              <Badge 
+              <Badge
                 variant={analysis.finalBalance >= 0 ? 'default' : 'destructive'}
                 className="gap-1"
               >
@@ -215,78 +221,85 @@ export function ProjectedCashFlowChart({
             <p className="text-sm">Configure receitas pendentes ou despesas recorrentes.</p>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={350}>
-            <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-              
-              <XAxis 
-                dataKey="period" 
-                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                tickLine={false}
-                axisLine={{ stroke: 'hsl(var(--border))' }}
-              />
-              
-              <YAxis 
-                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                tickFormatter={(value) => formatCurrency(value)}
-                tickLine={false}
-                axisLine={{ stroke: 'hsl(var(--border))' }}
-                width={90}
-              />
-              
-              <Tooltip content={<CustomTooltip />} />
-              
-              <Legend 
-                wrapperStyle={{ paddingTop: 20 }}
-                formatter={(value) => (
-                  <span className="text-xs text-muted-foreground">{value}</span>
-                )}
-              />
+          <div className="w-full overflow-x-auto pb-4">
+            <div style={{ height: 400, width: showScroll ? chartWidth : '100%', minWidth: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} vertical={false} />
 
-              {/* Linha de referência zero */}
-              <ReferenceLine 
-                y={0} 
-                stroke="hsl(var(--destructive))" 
-                strokeDasharray="5 5" 
-                strokeWidth={1.5}
-                label={{
-                  value: 'Zona Crítica',
-                  position: 'right',
-                  fill: 'hsl(var(--destructive))',
-                  fontSize: 10,
-                }}
-              />
+                  <XAxis
+                    dataKey="period"
+                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                    tickLine={false}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    interval={granularity === 'day' ? 'preserveStartEnd' : 0}
+                    minTickGap={30}
+                  />
 
-              {/* Barras de Receitas (verde) */}
-              <Bar 
-                dataKey="totalIncome" 
-                name="Receitas" 
-                fill="hsl(142, 76%, 36%)"
-                radius={[4, 4, 0, 0]}
-                maxBarSize={40}
-              />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                    tickFormatter={(value) => formatCurrency(value)}
+                    tickLine={false}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    width={90}
+                  />
 
-              {/* Barras de Despesas (vermelho) */}
-              <Bar 
-                dataKey="totalExpense" 
-                name="Despesas" 
-                fill="hsl(0, 84%, 60%)"
-                radius={[4, 4, 0, 0]}
-                maxBarSize={40}
-              />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted)/0.2)' }} />
 
-              {/* Linha de Saldo Acumulado */}
-              <Line
-                type="monotone"
-                dataKey="running_balance"
-                name="Saldo Projetado"
-                stroke="hsl(var(--primary))"
-                strokeWidth={3}
-                dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 4 }}
-                activeDot={{ r: 6, fill: 'hsl(var(--primary))' }}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
+                  <Legend
+                    wrapperStyle={{ paddingTop: 20 }}
+                    formatter={(value) => (
+                      <span className="text-xs text-muted-foreground font-medium">{value}</span>
+                    )}
+                  />
+
+                  {/* Linha de referência zero */}
+                  <ReferenceLine
+                    y={0}
+                    stroke="hsl(var(--destructive))"
+                    strokeDasharray="5 5"
+                    strokeWidth={1.5}
+                  />
+
+                  {/* Barras de Receitas (verde) */}
+                  <Bar
+                    dataKey="totalIncome"
+                    name="Receitas"
+                    fill="hsl(142, 70%, 45%)"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={50}
+                    stackId="a" // Opcional: Stacked ou lado a lado? Lado a lado é melhor para comparar
+                  />
+
+                  {/* Barras de Despesas (vermelho) */}
+                  <Bar
+                    dataKey="totalExpense"
+                    name="Despesas"
+                    fill="hsl(0, 84%, 60%)"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={50}
+                  />
+
+                  {/* Linha de Saldo Acumulado */}
+                  <Line
+                    type="monotone"
+                    dataKey="running_balance"
+                    name="Saldo Projetado"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={3}
+                    dot={chartData.length < 30 ? { fill: 'hsl(var(--primary))', strokeWidth: 0, r: 4 } : false}
+                    activeDot={{ r: 6, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+                    connectNulls
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            {showScroll && (
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                &larr; Role horizontalmente para ver mais &rarr;
+              </p>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
