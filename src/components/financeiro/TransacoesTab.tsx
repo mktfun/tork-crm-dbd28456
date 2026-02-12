@@ -291,7 +291,7 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
             )}
 
             {/* Main Table */}
-            <AppCard className="border-none shadow-sm bg-transparent">
+            <AppCard className="border-none shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between pb-4 px-4">
                     <div className="flex items-center gap-2">
                         {transactionType === 'receitas' ? (
