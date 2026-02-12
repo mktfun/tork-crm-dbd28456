@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingUp, TrendingDown, CreditCard, BarChart3, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useFinancialSummary } from "@/hooks/useFinanceiro";
+import { useProducaoData } from "@/hooks/useRelatorios";
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DateRange } from "react-day-picker";
@@ -76,7 +76,7 @@ export const ModuloFaturamento = ({ onClick, dateRange }: ModuloFaturamentoProps
   const startDate = format(startOfDay(from), 'yyyy-MM-dd');
   const endDate = format(endOfDay(to), 'yyyy-MM-dd');
 
-  const { data: summary, isLoading } = useFinancialSummary(startDate, endDate);
+  const { data: producaoData, isLoading } = useProducaoData(startDate, endDate);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -109,8 +109,8 @@ export const ModuloFaturamento = ({ onClick, dateRange }: ModuloFaturamentoProps
     );
   }
 
-  const faturamentoMes = summary?.totalIncome || 0;
-  const operacoes = summary?.transactionCount || 0;
+  const faturamentoMes = producaoData?.reduce((acc, item) => acc + (item.total_comissao || 0), 0) || 0;
+  const operacoes = producaoData?.reduce((acc, item) => acc + (item.qtd_vendas || 0), 0) || 0;
   const ticketMedio = operacoes > 0 ? faturamentoMes / operacoes : 0;
 
   return (

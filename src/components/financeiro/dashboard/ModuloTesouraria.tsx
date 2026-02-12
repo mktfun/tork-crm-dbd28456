@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpCircle, ArrowDownCircle, Wallet, Calendar, ArrowRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAgingReport, useUpcomingReceivables, usePendingTotals } from "@/hooks/useFinanceiro";
+import { useAgingReport, useUpcomingReceivables } from "@/hooks/useFinanceiro";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -26,10 +26,78 @@ interface ModuloTesourariaProps {
   onClick?: () => void;
 }
 
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+
 export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
   const { data: agingData, isLoading: isLoadingAging } = useAgingReport();
   const { data: upcomingData, isLoading: isLoadingUpcoming } = useUpcomingReceivables(30);
-  const { data: totalsData, isLoading: isLoadingTotals } = usePendingTotals();
+
+  // Query para A RECEBER (receitas pendentes)
+  const { data: receivableData, isLoading: isLoadingReceivable } = useQuery({
+    queryKey: ['tesouraria-receivable'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('financial_ledger')
+        .select(`
+          amount,
+          financial_transactions!inner(
+            id,
+            status,
+            is_void,
+            user_id
+          ),
+          financial_accounts!inner(
+            type
+          )
+        `)
+        .eq('financial_transactions.status', 'pending')
+        .eq('financial_transactions.is_void', false)
+        .eq('financial_accounts.type', 'revenue');
+
+      if (error) throw error;
+
+      // Sum absolute amounts
+      const total = data?.reduce((acc, item) => acc + Math.abs(item.amount), 0) || 0;
+      return total;
+    }
+  });
+
+  // Query para A PAGAR (despesas pendentes)
+  const { data: payableData, isLoading: isLoadingPayable } = useQuery({
+    queryKey: ['tesouraria-payable'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('financial_ledger')
+        .select(`
+          amount,
+          financial_transactions!inner(
+            id,
+            status,
+            is_void,
+            user_id
+          ),
+          financial_accounts!inner(
+            type
+          )
+        `)
+        .eq('financial_transactions.status', 'pending')
+        .eq('financial_transactions.is_void', false)
+        .eq('financial_accounts.type', 'expense');
+
+      if (error) throw error;
+
+      // Sum absolute amounts
+      const total = data?.reduce((acc, item) => acc + Math.abs(item.amount), 0) || 0;
+      return total;
+    }
+  });
+
+  const totalsData = {
+    receivable: receivableData || 0,
+    payable: payableData || 0
+  };
+  const isLoadingTotals = isLoadingReceivable || isLoadingPayable;
 
   const isLoading = isLoadingAging || isLoadingUpcoming || isLoadingTotals;
 
