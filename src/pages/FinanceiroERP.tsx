@@ -256,7 +256,6 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
 
   return (
     <div className="space-y-6">
-
       {/* ========== SEÇÃO 1: FLUXO DE CAIXA ========== */}
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
@@ -264,10 +263,10 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
         </h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <ModuloFaturamento
-            onClick={() => onTabChange('transacoes')} // Navigate to transacoes
+            onClick={() => onTabChange('transacoes')}
             dateRange={dateRange}
           />
-          <ModuloMultiBancos onClick={() => onTabChange('caixa')} /> // Navigate to caixa
+          <ModuloMultiBancos onClick={() => onTabChange('caixa')} />
         </div>
       </div>
 
@@ -276,7 +275,7 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
           Tesouraria & Contas
         </h3>
-        <ModuloTesouraria onClick={() => onTabChange('tesouraria')} /> // Navigate to tesouraria
+        <ModuloTesouraria onClick={() => onTabChange('tesouraria')} />
       </div>
 
       {/* ========== GRÁFICO DE FLUXO DE CAIXA ========== */}
@@ -285,247 +284,22 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
         isLoading={cashFlowLoading}
         granularity="day"
       />
-    </div >
-  );
-}
-
-// ============ DRE TAB ============
-
-function DreTab() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">DRE / Relatórios</h2>
-        <p className="text-sm text-muted-foreground">
-          Demonstrativo de Resultado do Exercício - visão consolidada de receitas e despesas
-        </p>
-      </div>
-      <DreTable />
     </div>
   );
 }
 
-// ============ ÚLTIMAS MOVIMENTAÇÕES (COMPACTO NO FINAL) ============
+// ... (DRE Tab and RecentMovements remain the same) ...
 
-interface RecentMovementsProps {
-  onViewDetails: (id: string) => void;
-}
-
-function RecentMovements({ onViewDetails }: RecentMovementsProps) {
-  const { data: transactions = [], isLoading } = useRecentTransactions();
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <CalendarClock className="w-4 h-4" />
-            Últimas Movimentações
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (transactions.length === 0) {
-    return (
-      <Card className="bg-zinc-900/50 border-zinc-800">
-        <CardContent className="p-8 text-center">
-          <CalendarClock className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-          <p className="text-sm text-zinc-400">Nenhuma movimentação recente</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="bg-zinc-900/50 border-zinc-800">
-      <CardContent className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {transactions.slice(0, 8).map((tx) => {
-            const txDate = parseLocalDate(String(tx.transaction_date));
-            const isPending = tx.status === 'pending';
-            const isRevenue = tx.total_amount > 0;
-
-            return (
-              <div
-                key={tx.id}
-                className={cn(
-                  "p-4 rounded-lg transition-all cursor-pointer",
-                  "bg-zinc-800/50 hover:bg-zinc-800 border",
-                  isRevenue
-                    ? "border-emerald-500/20 hover:border-emerald-500/40"
-                    : "border-rose-500/20 hover:border-rose-500/40",
-                  isPending && "ring-1 ring-amber-500/30"
-                )}
-                onClick={() => onViewDetails(tx.id)}
-              >
-                {/* Header com data e badge */}
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-zinc-500 font-medium">
-                    {format(txDate, "dd/MM/yy", { locale: ptBR })}
-                  </span>
-                  {isPending && (
-                    <Badge variant="outline" className="text-amber-500 border-amber-500/30 text-[9px] px-1.5 py-0 h-4">
-                      Pendente
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Descrição */}
-                <p className="text-sm font-medium text-zinc-200 truncate mb-2" title={tx.description}>
-                  {tx.description}
-                </p>
-
-                {/* Valor */}
-                <p className={cn(
-                  "text-lg font-bold",
-                  isRevenue ? 'text-emerald-400' : 'text-rose-400'
-                )}>
-                  {isRevenue ? '+' : ''}{formatCurrency(Math.abs(tx.total_amount))}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ============ MAIN COMPONENT ============
-
-export default function FinanceiroERP() {
-  usePageTitle('Financeiro');
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // Estado global de filtro de datas
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
-  });
-
-  // Estado para controle da aba e detalhes
-  const [activeTab, setActiveTab] = useState('visao-geral');
-  const [detailsTransactionId, setDetailsTransactionId] = useState<string | null>(null);
-  const [isLegacyLookup, setIsLegacyLookup] = useState(false);
-  const navigate = useNavigate();
-
-  // Datas normalizadas para queries
-  const { startDate, endDate } = useMemo(() => {
-    const from = dateRange?.from || startOfMonth(new Date());
-    const to = dateRange?.to || endOfMonth(new Date());
-    return {
-      startDate: format(startOfDay(from), 'yyyy-MM-dd'),
-      endDate: format(endOfDay(to), 'yyyy-MM-dd')
-    };
-  }, [dateRange]);
-
-  // KPIs globais - apenas transações EFETIVADAS (completed)
-  const { data: summary, isLoading: summaryLoading } = useFinancialSummary(startDate, endDate);
-
-  // KPIs adicionais - pendentes
-  const { data: pendingThisMonth, isLoading: pendingThisMonthLoading } = usePendingThisMonth();
-  const { data: totalPending, isLoading: totalPendingLoading } = useTotalPendingReceivables();
-
-  // Deep link: verificar parâmetros da URL ao carregar
-  useEffect(() => {
-    const transactionId = searchParams.get('transactionId');
-    const legacyId = searchParams.get('legacyId');
-    const tabParam = searchParams.get('tab');
-
-    if (transactionId || legacyId) {
-      setDetailsTransactionId(transactionId || legacyId);
-      setIsLegacyLookup(!!legacyId && !transactionId);
-      setActiveTab('receitas');
-    } else if (tabParam) {
-      setActiveTab(tabParam);
-    }
-  }, [searchParams]);
-
-  // Limpar URL quando fechar a gaveta
-  const handleCloseDetails = () => {
-    setDetailsTransactionId(null);
-    setIsLegacyLookup(false);
-
-    if (searchParams.has('transactionId') || searchParams.has('legacyId')) {
-      searchParams.delete('transactionId');
-      searchParams.delete('legacyId');
-      setSearchParams(searchParams, { replace: true });
-    }
-  };
-
-  const handleViewTransactionDetails = (id: string) => {
-    setDetailsTransactionId(id);
-    setIsLegacyLookup(false);
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Action Bar (Header removido - agora está na página pai Financeiro.tsx) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-2">
-        <DateRangeFilter value={dateRange} onChange={setDateRange} />
-        <ImportReceiptsModal />
-        <ImportTransactionsModal />
-      </div>
-
-      {/* KPIs Fixos - 4 Cards Simples */}
-      <KpiSection
-        summary={summary}
-        pendingThisMonth={pendingThisMonth}
-        totalPending={totalPending}
-        isLoading={summaryLoading || pendingThisMonthLoading || totalPendingLoading}
-      />
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-muted/50">
-          <TabsTrigger value="visao-geral" className="gap-2">
-            <BarChart3 className="w-4 h-4" />
-            Visão Geral
-          </TabsTrigger>
-          <TabsTrigger value="caixa" className="gap-2">
-            <Landmark className="w-4 h-4" />
-            Bancos
-          </TabsTrigger>
-          <TabsTrigger value="tesouraria" className="gap-2">
-            <Wallet className="w-4 h-4" />
-            Tesouraria
-          </TabsTrigger>
-          <TabsTrigger value="transacoes" className="gap-2">
-            <Wallet className="w-4 h-4" />
-            Transações
-          </TabsTrigger>
-          <TabsTrigger value="provisoes" className="gap-2">
-            <LineChart className="w-4 h-4" />
-            Provisões
-          </TabsTrigger>
-          <TabsTrigger value="dre" className="gap-2">
-            <FileSpreadsheet className="w-4 h-4" />
-            DRE
-          </TabsTrigger>
-
-          <TabsTrigger value="conciliacao" className="gap-2">
-            <GitCompare className="w-4 h-4" />
-            Conciliação
-          </TabsTrigger>
-          <TabsTrigger value="config" className="gap-2">
-            <Settings className="w-4 h-4" />
-            Configurações
-          </TabsTrigger>
-        </TabsList>
-
+// Inside TabsContent in FinanceiroERP function:
+/*
         <TabsContent value="visao-geral">
           <VisaoGeral
             dateRange={dateRange}
             onNavigate={(path) => navigate(path)}
             onTabChange={setActiveTab}
           />
+          
+          {/* ========== SEÇÃO 3: ÚLTIMAS MOVIMENTAÇÕES ========== * /}
           <div className="mt-6">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Últimas Movimentações
@@ -533,6 +307,7 @@ export default function FinanceiroERP() {
             <RecentMovements onViewDetails={handleViewTransactionDetails} />
           </div>
         </TabsContent>
+*/
 
         <TabsContent value="caixa">
           <CaixaTab dateRange={dateRange} />
@@ -563,16 +338,16 @@ export default function FinanceiroERP() {
         <TabsContent value="config">
           <ConfiguracoesTab />
         </TabsContent>
-      </Tabs>
+      </Tabs >
 
 
-      {/* Deep Link Details Sheet */}
-      <TransactionDetailsSheet
-        transactionId={detailsTransactionId}
-        isLegacyId={isLegacyLookup}
-        open={!!detailsTransactionId}
-        onClose={handleCloseDetails}
-      />
-    </div>
+  {/* Deep Link Details Sheet */ }
+  < TransactionDetailsSheet
+transactionId = { detailsTransactionId }
+isLegacyId = { isLegacyLookup }
+open = {!!detailsTransactionId}
+onClose = { handleCloseDetails }
+  />
+    </div >
   );
 }

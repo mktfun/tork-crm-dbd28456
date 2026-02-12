@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, RefreshCw, BarChart3, ArrowRight } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, BarChart3, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFinancialSummary } from "@/hooks/useFinanceiro";
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
@@ -68,12 +68,10 @@ interface ModuloFaturamentoProps {
 }
 
 export const ModuloFaturamento = ({ onClick, dateRange }: ModuloFaturamentoProps) => {
+  // Use dateRange if provided, otherwise use current month
   const now = new Date();
-  const defaultFrom = startOfMonth(now);
-  const defaultTo = endOfMonth(now);
-
-  const from = dateRange?.from || defaultFrom;
-  const to = dateRange?.to || defaultTo;
+  const from = dateRange?.from || startOfMonth(now);
+  const to = dateRange?.to || endOfMonth(now);
 
   const startDate = format(startOfDay(from), 'yyyy-MM-dd');
   const endDate = format(endOfDay(to), 'yyyy-MM-dd');
@@ -140,7 +138,7 @@ export const ModuloFaturamento = ({ onClick, dateRange }: ModuloFaturamentoProps
           <StatItem
             label="Faturamento Mês"
             value={formatCurrency(faturamentoMes)}
-            // percent removido pois não tenho dado histórico real fácil aqui
+            // percent removed as we don't have real historical data here easily
             icon={<DollarSign className="h-5 w-5" />}
             isHero
           />

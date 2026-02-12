@@ -47,8 +47,6 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
   const totalBalance = summary?.totalBalance ?? 0;
   const activeAccounts = summary?.activeAccounts ?? 0;
   const accounts = summary?.accounts?.filter(acc => acc.isActive) ?? [];
-  const displayedAccounts = accounts.slice(0, 2);
-  const hiddenCount = Math.max(0, accounts.length - 2);
 
   return (
     <Card
@@ -61,7 +59,7 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
         <Wallet className="h-4 w-4 text-emerald-500" />
       </CardHeader>
       <CardContent className="flex-1 flex flex-col">
-        {/* Saldo Consolidado - MOVIDO PARA CÁ */}
+        {/* ========== SALDO CONSOLIDADO (MOVIDO PARA CÁ) ========== */}
         <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 mb-4">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-zinc-400 uppercase tracking-wide">
@@ -85,7 +83,7 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
           )}
         </div>
 
-        {/* Grid de Bancos - LIMITADO A 2 */}
+        {/* ========== GRID DE BANCOS (LIMITADO A 2) ========== */}
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
             {[1, 2].map((i) => (
@@ -112,7 +110,7 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
-              {displayedAccounts.map((bank) => {
+              {accounts.slice(0, 2).map((bank) => {
                 const typeBadge = getTypeBadge(bank.accountType);
                 const colors = getColorClasses(bank.color);
 
@@ -133,7 +131,7 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
                     </div>
 
                     {/* Saldo */}
-                    <p className="text-sm font-semibold text-white mb-2">
+                    <p className="text-lg font-semibold text-white mb-2">
                       {formatCurrency(bank.currentBalance)}
                     </p>
 
@@ -142,6 +140,11 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
                       <Badge variant={typeBadge.variant} className="text-[10px] h-5">
                         {typeBadge.label}
                       </Badge>
+                      {bank.lastSyncDate && (
+                        <span className="text-[10px] text-zinc-500 truncate max-w-[80px]">
+                          Sync: {new Date(bank.lastSyncDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -149,10 +152,10 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
             </div>
 
             {/* Indicador de contas ocultas */}
-            {hiddenCount > 0 && (
+            {accounts.length > 2 && (
               <div className="mt-3 text-center">
                 <p className="text-xs text-zinc-500">
-                  +{hiddenCount} {hiddenCount === 1 ? 'outra conta' : 'outras contas'}
+                  +{accounts.length - 2} {accounts.length - 2 === 1 ? 'outra conta' : 'outras contas'}
                 </p>
               </div>
             )}
