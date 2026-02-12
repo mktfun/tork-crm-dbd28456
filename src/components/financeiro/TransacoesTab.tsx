@@ -278,7 +278,6 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                 </div>
             )}
 
-// Remove this block from lines 274-282
 
             {/* Sync Info */}
             {syncedCount > 0 && isPendente && (

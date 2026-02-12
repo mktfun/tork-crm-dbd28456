@@ -542,6 +542,7 @@ export interface RevenueTransaction {
   related_entity_id: string | null;
   related_entity_type: string | null;
   reconciled: boolean;
+  bankName?: string | null;
 }
 
 export async function getRevenueTransactions(params: {
@@ -569,7 +570,8 @@ export async function getRevenueTransactions(params: {
     policy_number: row.policy_number || null,
     related_entity_id: row.related_entity_id || null,
     related_entity_type: row.related_entity_type || null,
-    reconciled: row.reconciled ?? false
+    reconciled: row.reconciled ?? false,
+    bankName: row.bank_name || null
   }));
 }
 

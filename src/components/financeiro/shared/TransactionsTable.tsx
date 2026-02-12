@@ -38,6 +38,7 @@ export interface Transaction {
     legacy_status?: string | null;
     related_entity_id?: string | null;
     related_entity_type?: string | null;
+    bankName?: string | null;
 }
 
 interface TransactionsTableProps {
@@ -123,6 +124,7 @@ export function TransactionsTable({
                                 {/* Checkbox column removed */}
                                 <TableHead className="w-24">Data</TableHead>
                                 <TableHead className="min-w-[280px]">Descrição</TableHead>
+                                <TableHead className="w-32">Banco</TableHead>
                                 <TableHead className="w-40">Categoria</TableHead>
                                 <TableHead className="w-24">Status</TableHead>
                                 <TableHead className="text-right w-32">Valor</TableHead>
@@ -170,6 +172,17 @@ export function TransactionsTable({
                                                     </span>
                                                 )}
                                             </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {tx.bankName ? (
+                                                <Badge variant="outline" className="text-xs text-blue-600 bg-blue-50 border-blue-200 truncate max-w-[120px]">
+                                                    {tx.bankName}
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground/50 italic">
+                                                    Sem vínculo
+                                                </span>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             {tx.account_name && (
