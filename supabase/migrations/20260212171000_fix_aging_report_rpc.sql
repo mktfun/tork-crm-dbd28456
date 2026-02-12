@@ -1,10 +1,6 @@
--- Drop ALL existing signatures to avoid ambiguity
-DROP FUNCTION IF EXISTS get_aging_report(uuid, text);
+-- Fix: cast fa.type enum to text for comparison
 DROP FUNCTION IF EXISTS get_aging_report(uuid, text, date);
-DROP FUNCTION IF EXISTS get_aging_report(uuid);
-DROP FUNCTION IF EXISTS get_aging_report(uuid, date);
 
--- Recreate with correct table/column names
 CREATE OR REPLACE FUNCTION get_aging_report(
   p_user_id uuid, 
   p_type text DEFAULT 'receivables',
@@ -31,7 +27,7 @@ BEGIN
     JOIN financial_ledger fl ON fl.transaction_id = ft.id
     JOIN financial_accounts fa ON fa.id = fl.account_id
     WHERE ft.user_id = p_user_id
-      AND fa.type = v_account_type
+      AND fa.type::text = v_account_type
       AND NOT ft.is_confirmed
       AND NOT ft.is_void
       AND ft.transaction_date < p_reference_date
@@ -40,21 +36,21 @@ BEGIN
   buckets AS (
     SELECT
       CASE
-        WHEN days_overdue <= 30 THEN '1-30 dias'
-        WHEN days_overdue <= 60 THEN '31-60 dias'
-        WHEN days_overdue <= 90 THEN '61-90 dias'
+        WHEN o.days_overdue <= 30 THEN '1-30 dias'
+        WHEN o.days_overdue <= 60 THEN '31-60 dias'
+        WHEN o.days_overdue <= 90 THEN '61-90 dias'
         ELSE '90+ dias'
       END as range_label,
       CASE
-        WHEN days_overdue <= 30 THEN 1
-        WHEN days_overdue <= 60 THEN 2
-        WHEN days_overdue <= 90 THEN 3
+        WHEN o.days_overdue <= 30 THEN 1
+        WHEN o.days_overdue <= 60 THEN 2
+        WHEN o.days_overdue <= 90 THEN 3
         ELSE 4
       END as sort_order,
       CASE
-        WHEN days_overdue <= 30 THEN '#FBBF24'
-        WHEN days_overdue <= 60 THEN '#F97316'
-        WHEN days_overdue <= 90 THEN '#EF4444'
+        WHEN o.days_overdue <= 30 THEN '#FBBF24'
+        WHEN o.days_overdue <= 60 THEN '#F97316'
+        WHEN o.days_overdue <= 90 THEN '#EF4444'
         ELSE '#B91C1C'
       END as color_class,
       o.amount
