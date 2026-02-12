@@ -1,8 +1,9 @@
-import { DateRange } from "react-day-picker";
-import { Wallet } from "lucide-react";
-import { ReceivablesList } from "./tesouraria/ReceivablesList";
-import { AgingReportCard } from "./tesouraria/AgingReportCard";
 import { AccountsPayableReceivableTable } from "./tesouraria/AccountsPayableReceivableTable";
+import { AgingReportCard } from "./tesouraria/AgingReportCard";
+import { UpcomingTransactionsList } from "./tesouraria/UpcomingTransactionsList";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Wallet } from "lucide-react";
+import { DateRange } from "react-day-picker";
 
 interface TesourariaTabProps {
   dateRange: DateRange | undefined;
@@ -10,28 +11,30 @@ interface TesourariaTabProps {
 
 export function TesourariaTab({ dateRange }: TesourariaTabProps) {
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-primary/10 rounded-lg">
-          <Wallet className="w-6 h-6 text-primary" />
+    <ScrollArea className="h-[calc(100vh-220px)] w-full">
+      <div className="space-y-6 pr-4 pb-8">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Wallet className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">Tesouraria</h2>
+            <p className="text-sm text-muted-foreground">
+              Gestão de recebíveis, contas a pagar e relatórios de aging
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-semibold text-foreground">Tesouraria</h2>
-          <p className="text-sm text-muted-foreground">
-            Gestão de recebíveis, contas a pagar e relatórios de aging
-          </p>
+
+        {/* KPI Cards Unified */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <UpcomingTransactionsList daysAhead={30} />
+          <AgingReportCard defaultType="receivables" />
         </div>
-      </div>
 
-      {/* Grid de Cards Superiores */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ReceivablesList daysAhead={30} />
-        <AgingReportCard />
+        {/* Main Table */}
+        <AccountsPayableReceivableTable />
       </div>
-
-      {/* Tabela de Contas a Pagar e Receber */}
-      <AccountsPayableReceivableTable />
-    </div>
+    </ScrollArea>
   );
 }

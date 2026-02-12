@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Landmark, Building2, ArrowRight } from "lucide-react";
+import { Landmark, Building2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBankAccounts, type BankAccountType } from "@/hooks/useBancos";
 
@@ -31,9 +31,9 @@ const getColorClasses = (color?: string) => {
     '#FF8700': { text: 'text-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20' },
     '#0066CC': { text: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/20' },
   };
-  
-  return color && colorMap[color] 
-    ? colorMap[color] 
+
+  return color && colorMap[color]
+    ? colorMap[color]
     : { text: 'text-primary', bg: 'bg-primary/10 border-primary/20' };
 };
 
@@ -49,40 +49,31 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
   const accounts = summary?.accounts?.filter(acc => acc.isActive) ?? [];
 
   return (
-    <Card 
-      className={cn(
-        "h-full bg-zinc-900/50 border-zinc-800 flex flex-col transition-all duration-200",
-        onClick && "cursor-pointer hover:bg-zinc-900/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
-      )}
-      onClick={onClick}
+    <Card
+      className="h-full bg-zinc-900/50 border-zinc-800 flex flex-col"
     >
-      <CardHeader className="pb-2">
-        <CardTitle className="text-white flex items-center justify-between text-base">
-          <span className="flex items-center gap-2">
-            <Landmark className="h-5 w-5 text-primary" />
-            Saldos Bancários
-          </span>
-          {onClick && (
-            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          )}
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-zinc-400">
+          Saldos Bancários
         </CardTitle>
+        <Wallet className="h-4 w-4 text-emerald-500" />
       </CardHeader>
       <CardContent className="flex-1 flex flex-col">
-        {/* Hero: Saldo Consolidado */}
-        <div className="rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 p-4 mb-4">
+        {/* ========== SALDO CONSOLIDADO (MOVIDO PARA CÁ) ========== */}
+        <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 mb-4">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-zinc-400 uppercase tracking-wide">
-              Saldo Consolidado Disponível
+              Saldo Consolidado
             </span>
             <Badge variant="secondary" className="text-[10px] h-5">
               Atualizado agora
             </Badge>
           </div>
           {isLoading ? (
-            <Skeleton className="h-9 w-40 mt-1" />
+            <Skeleton className="h-8 w-32 mt-1" />
           ) : (
             <>
-              <p className="text-3xl font-bold tracking-tight text-primary">
+              <p className="text-2xl font-bold text-primary">
                 {formatCurrency(totalBalance)}
               </p>
               <p className="text-xs text-zinc-500 mt-1">
@@ -92,10 +83,10 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
           )}
         </div>
 
-        {/* Grid de Bancos */}
+        {/* ========== GRID DE BANCOS (LIMITADO A 2) ========== */}
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
-            {[1, 2, 3, 4].map((i) => (
+            {[1, 2].map((i) => (
               <div key={i} className="rounded-lg border border-zinc-800 p-3">
                 <Skeleton className="h-4 w-24 mb-2" />
                 <Skeleton className="h-6 w-32 mb-2" />
@@ -117,47 +108,58 @@ export const ModuloMultiBancos = ({ onClick }: ModuloMultiBancosProps) => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
-            {accounts.map((bank) => {
-              const typeBadge = getTypeBadge(bank.accountType);
-              const colors = getColorClasses(bank.color);
-              
-              return (
-                <div
-                  key={bank.id}
-                  className={cn(
-                    "rounded-lg border p-3 transition-colors hover:bg-zinc-800/50",
-                    colors.bg
-                  )}
-                >
-                  {/* Header do Mini-Card */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <Building2 className={cn("h-4 w-4", colors.text)} />
-                    <span className="text-sm font-medium text-zinc-200 truncate">
-                      {bank.bankName}
-                    </span>
-                  </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
+              {accounts.slice(0, 2).map((bank) => {
+                const typeBadge = getTypeBadge(bank.accountType);
+                const colors = getColorClasses(bank.color);
 
-                  {/* Saldo */}
-                  <p className="text-lg font-semibold text-white mb-2">
-                    {formatCurrency(bank.currentBalance)}
-                  </p>
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between">
-                    <Badge variant={typeBadge.variant} className="text-[10px] h-5">
-                      {typeBadge.label}
-                    </Badge>
-                    {bank.lastSyncDate && (
-                      <span className="text-[10px] text-zinc-500 truncate max-w-[80px]">
-                        Sync: {new Date(bank.lastSyncDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                      </span>
+                return (
+                  <div
+                    key={bank.id}
+                    className={cn(
+                      "rounded-lg border p-3 transition-colors hover:bg-zinc-800/50",
+                      colors.bg
                     )}
+                  >
+                    {/* Header do Mini-Card */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <Building2 className={cn("h-4 w-4", colors.text)} />
+                      <span className="text-sm font-medium text-zinc-200 truncate">
+                        {bank.bankName}
+                      </span>
+                    </div>
+
+                    {/* Saldo */}
+                    <p className="text-lg font-semibold text-white mb-2">
+                      {formatCurrency(bank.currentBalance)}
+                    </p>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between">
+                      <Badge variant={typeBadge.variant} className="text-[10px] h-5">
+                        {typeBadge.label}
+                      </Badge>
+                      {bank.lastSyncDate && (
+                        <span className="text-[10px] text-zinc-500 truncate max-w-[80px]">
+                          Sync: {new Date(bank.lastSyncDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+
+            {/* Indicador de contas ocultas */}
+            {accounts.length > 2 && (
+              <div className="mt-3 text-center">
+                <p className="text-xs text-zinc-500">
+                  +{accounts.length - 2} {accounts.length - 2 === 1 ? 'outra conta' : 'outras contas'}
+                </p>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

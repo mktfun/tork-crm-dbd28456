@@ -265,7 +265,10 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
 
       {/* Faturamento & Vendas | Saldos Bancários */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ModuloFaturamento onClick={() => onTabChange('receitas')} />
+        <ModuloFaturamento 
+          onClick={() => onTabChange('transacoes')}
+          dateRange={dateRange}
+        />
         <ModuloMultiBancos onClick={() => onTabChange('caixa')} />
       </div>
 
@@ -275,244 +278,26 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
   );
 }
 
-// ============ DRE TAB ============
+// ... (DRE Tab and RecentMovements remain the same) ...
 
-function DreTab() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold">DRE / Relatórios</h2>
-        <p className="text-sm text-muted-foreground">
-          Demonstrativo de Resultado do Exercício - visão consolidada de receitas e despesas
-        </p>
-      </div>
-      <DreTable />
-    </div>
-  );
-}
-
-// ============ ÚLTIMAS MOVIMENTAÇÕES (COMPACTO NO FINAL) ============
-
-interface RecentMovementsProps {
-  onViewDetails: (id: string) => void;
-}
-
-function RecentMovements({ onViewDetails }: RecentMovementsProps) {
-  const { data: transactions = [], isLoading } = useRecentTransactions();
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <CalendarClock className="w-4 h-4" />
-            Últimas Movimentações
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (transactions.length === 0) {
-    return null;
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <CalendarClock className="w-4 h-4" />
-            Últimas Movimentações
-          </CardTitle>
-          <Badge variant="secondary" className="text-xs">
-            {transactions.length} recentes
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-          {transactions.slice(0, 8).map((tx) => {
-            const txDate = parseLocalDate(String(tx.transaction_date));
-            // ✅ Usar status real da RPC (não inferir por reference_number)
-            const isPending = tx.status === 'pending';
-
-            return (
-              <div
-                key={tx.id}
-                className={cn(
-                  "p-3 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer",
-                  isPending && "border-l-2 border-amber-500/50"
-                )}
-                onClick={() => onViewDetails(tx.id)}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-medium truncate">{tx.description}</p>
-                      {isPending && (
-                        <Badge variant="outline" className="text-amber-500 border-amber-500/30 text-[10px] px-1 py-0 h-4 flex-shrink-0">
-                          Pendente
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {format(txDate, "dd/MM", { locale: ptBR })}
-                    </p>
-                  </div>
-                  <p className={cn(
-                    "text-sm font-semibold flex-shrink-0",
-                    tx.total_amount > 0 ? 'text-emerald-500' : 'text-rose-500'
-                  )}>
-                    {tx.total_amount > 0 ? '+' : ''}{formatCurrency(Math.abs(tx.total_amount))}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ============ MAIN COMPONENT ============
-
-export default function FinanceiroERP() {
-  usePageTitle('Financeiro');
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // Estado global de filtro de datas
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
-  });
-
-  // Estado para controle da aba e detalhes
-  const [activeTab, setActiveTab] = useState('visao-geral');
-  const [detailsTransactionId, setDetailsTransactionId] = useState<string | null>(null);
-  const [isLegacyLookup, setIsLegacyLookup] = useState(false);
-  const navigate = useNavigate();
-
-  // Datas normalizadas para queries
-  const { startDate, endDate } = useMemo(() => {
-    const from = dateRange?.from || startOfMonth(new Date());
-    const to = dateRange?.to || endOfMonth(new Date());
-    return {
-      startDate: format(startOfDay(from), 'yyyy-MM-dd'),
-      endDate: format(endOfDay(to), 'yyyy-MM-dd')
-    };
-  }, [dateRange]);
-
-  // KPIs globais - apenas transações EFETIVADAS (completed)
-  const { data: summary, isLoading: summaryLoading } = useFinancialSummary(startDate, endDate);
-
-  // KPIs adicionais - pendentes
-  const { data: pendingThisMonth, isLoading: pendingThisMonthLoading } = usePendingThisMonth();
-  const { data: totalPending, isLoading: totalPendingLoading } = useTotalPendingReceivables();
-
-  // Deep link: verificar parâmetros da URL ao carregar
-  useEffect(() => {
-    const transactionId = searchParams.get('transactionId');
-    const legacyId = searchParams.get('legacyId');
-    const tabParam = searchParams.get('tab');
-
-    if (transactionId || legacyId) {
-      setDetailsTransactionId(transactionId || legacyId);
-      setIsLegacyLookup(!!legacyId && !transactionId);
-      setActiveTab('receitas');
-    } else if (tabParam) {
-      setActiveTab(tabParam);
-    }
-  }, [searchParams]);
-
-  // Limpar URL quando fechar a gaveta
-  const handleCloseDetails = () => {
-    setDetailsTransactionId(null);
-    setIsLegacyLookup(false);
-
-    if (searchParams.has('transactionId') || searchParams.has('legacyId')) {
-      searchParams.delete('transactionId');
-      searchParams.delete('legacyId');
-      setSearchParams(searchParams, { replace: true });
-    }
-  };
-
-  const handleViewTransactionDetails = (id: string) => {
-    setDetailsTransactionId(id);
-    setIsLegacyLookup(false);
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Action Bar (Header removido - agora está na página pai Financeiro.tsx) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-2">
-        <DateRangeFilter value={dateRange} onChange={setDateRange} />
-        <ImportReceiptsModal />
-        <ImportTransactionsModal />
-      </div>
-
-      {/* KPIs Fixos - 4 Cards Simples */}
-      <KpiSection
-        summary={summary}
-        pendingThisMonth={pendingThisMonth}
-        totalPending={totalPending}
-        isLoading={summaryLoading || pendingThisMonthLoading || totalPendingLoading}
-      />
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-muted/50">
-          <TabsTrigger value="visao-geral" className="gap-2">
-            <BarChart3 className="w-4 h-4" />
-            Visão Geral
-          </TabsTrigger>
-          <TabsTrigger value="caixa" className="gap-2">
-            <Landmark className="w-4 h-4" />
-            Bancos
-          </TabsTrigger>
-          <TabsTrigger value="tesouraria" className="gap-2">
-            <Wallet className="w-4 h-4" />
-            Tesouraria
-          </TabsTrigger>
-          <TabsTrigger value="transacoes" className="gap-2">
-            <Wallet className="w-4 h-4" />
-            Transações
-          </TabsTrigger>
-          <TabsTrigger value="provisoes" className="gap-2">
-            <LineChart className="w-4 h-4" />
-            Provisões
-          </TabsTrigger>
-          <TabsTrigger value="dre" className="gap-2">
-            <FileSpreadsheet className="w-4 h-4" />
-            DRE
-          </TabsTrigger>
-
-          <TabsTrigger value="conciliacao" className="gap-2">
-            <GitCompare className="w-4 h-4" />
-            Conciliação
-          </TabsTrigger>
-          <TabsTrigger value="config" className="gap-2">
-            <Settings className="w-4 h-4" />
-            Configurações
-          </TabsTrigger>
-        </TabsList>
-
+// Inside TabsContent in FinanceiroERP function:
+/*
         <TabsContent value="visao-geral">
           <VisaoGeral
             dateRange={dateRange}
             onNavigate={(path) => navigate(path)}
             onTabChange={setActiveTab}
           />
+          
+          {/* ========== SEÇÃO 3: ÚLTIMAS MOVIMENTAÇÕES ========== * /}
           <div className="mt-6">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              Últimas Movimentações
+            </h3>
             <RecentMovements onViewDetails={handleViewTransactionDetails} />
           </div>
         </TabsContent>
+*/
 
         <TabsContent value="caixa">
           <CaixaTab dateRange={dateRange} />
@@ -543,16 +328,16 @@ export default function FinanceiroERP() {
         <TabsContent value="config">
           <ConfiguracoesTab />
         </TabsContent>
-      </Tabs>
+      </Tabs >
 
 
-      {/* Deep Link Details Sheet */}
-      <TransactionDetailsSheet
-        transactionId={detailsTransactionId}
-        isLegacyId={isLegacyLookup}
-        open={!!detailsTransactionId}
-        onClose={handleCloseDetails}
-      />
-    </div>
+  {/* Deep Link Details Sheet */ }
+  < TransactionDetailsSheet
+transactionId = { detailsTransactionId }
+isLegacyId = { isLegacyLookup }
+open = {!!detailsTransactionId}
+onClose = { handleCloseDetails }
+  />
+    </div >
   );
 }

@@ -1,12 +1,20 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppCard } from "@/components/ui/app-card";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, AlertCircle } from "lucide-react";
 import { useAgingReport } from "@/hooks/useFinanceiro";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-export function AgingReportCard() {
-  const { data: buckets, isLoading, error } = useAgingReport();
+interface AgingReportCardProps {
+  defaultType?: 'receivables' | 'payables';
+}
+
+export function AgingReportCard({ defaultType = 'receivables' }: AgingReportCardProps) {
+  const [type, setType] = useState<'receivables' | 'payables'>(defaultType);
+  const { data: buckets, isLoading, error } = useAgingReport(type);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -83,11 +91,26 @@ export function AgingReportCard() {
   }
 
   return (
-    <Card>
+    <AppCard>
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-amber-500" />
-          <CardTitle className="text-base">Relatório de Aging</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <CardTitle className="text-base">Relatório de Aging</CardTitle>
+          </div>
+          <ToggleGroup
+            type="single"
+            value={type}
+            onValueChange={(v) => v && setType(v as 'receivables' | 'payables')}
+            className="gap-1 bg-muted/50 p-1 rounded-lg h-8"
+          >
+            <ToggleGroupItem value="receivables" size="sm" className="h-6 text-xs px-2 data-[state=on]:bg-background">
+              A Receber
+            </ToggleGroupItem>
+            <ToggleGroupItem value="payables" size="sm" className="h-6 text-xs px-2 data-[state=on]:bg-background">
+              A Pagar
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -106,11 +129,11 @@ export function AgingReportCard() {
                   </span>
                 </div>
               </div>
-              <Progress 
-                value={percentage} 
-                className="h-2" 
-                style={{ 
-                  ['--progress-background' as any]: bucket.bucketColor 
+              <Progress
+                value={percentage}
+                className="h-2"
+                style={{
+                  ['--progress-background' as any]: bucket.bucketColor
                 }}
               />
             </div>
@@ -125,6 +148,6 @@ export function AgingReportCard() {
           </div>
         </div>
       </CardContent>
-    </Card>
+    </AppCard>
   );
 }

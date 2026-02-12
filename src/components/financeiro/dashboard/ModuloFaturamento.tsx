@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, RefreshCw, BarChart3, ArrowRight } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, BarChart3, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFinancialSummary } from "@/hooks/useFinanceiro";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DateRange } from "react-day-picker";
 
 interface StatItemProps {
   label: string;
@@ -63,12 +64,17 @@ const StatItem = ({ label, value, percent, icon, isHero = false }: StatItemProps
 
 interface ModuloFaturamentoProps {
   onClick?: () => void;
+  dateRange?: DateRange;
 }
 
-export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
+export const ModuloFaturamento = ({ onClick, dateRange }: ModuloFaturamentoProps) => {
+  // Use dateRange if provided, otherwise use current month
   const now = new Date();
-  const startDate = format(startOfMonth(now), 'yyyy-MM-dd');
-  const endDate = format(endOfMonth(now), 'yyyy-MM-dd');
+  const from = dateRange?.from || startOfMonth(now);
+  const to = dateRange?.to || endOfMonth(now);
+
+  const startDate = format(startOfDay(from), 'yyyy-MM-dd');
+  const endDate = format(endOfDay(to), 'yyyy-MM-dd');
 
   const { data: summary, isLoading } = useFinancialSummary(startDate, endDate);
 
@@ -83,8 +89,14 @@ export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
 
   if (isLoading) {
     return (
-      <Card className="h-full bg-zinc-900/50 border-zinc-800">
-        <CardHeader className="pb-2">
+      <Card
+        className={cn(
+          "h-full bg-zinc-900/50 border-zinc-800 transition-all duration-200",
+          onClick && "cursor-pointer hover:bg-zinc-900/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+        )}
+        onClick={onClick}
+      >
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-white flex items-center gap-2 text-base">
             <BarChart3 className="h-5 w-5 text-primary" />
             Faturamento & Vendas
@@ -126,7 +138,7 @@ export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
           <StatItem
             label="Faturamento Mês"
             value={formatCurrency(faturamentoMes)}
-            // percent removido pois não tenho dado histórico real fácil aqui
+            // percent removed as we don't have real historical data here easily
             icon={<DollarSign className="h-5 w-5" />}
             isHero
           />

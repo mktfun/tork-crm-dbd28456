@@ -12,6 +12,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppCard } from "@/components/ui/app-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { usePayableReceivableTransactions } from "@/hooks/useFinanceiro";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -124,7 +131,7 @@ export function AccountsPayableReceivableTable() {
     }
 
     return (
-      <div className="bg-transparent">
+      <div className="bg-card/5 rounded-lg">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
@@ -204,44 +211,42 @@ export function AccountsPayableReceivableTable() {
   const payableCount = transactions?.filter(t => t.transactionType === 'pagar').length || 0;
 
   return (
-    <AppCard className="border-none shadow-sm bg-card/5">
+    <AppCard className="border-none shadow-sm">
       <CardHeader className="pb-3 px-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold text-foreground">Contas a Pagar e Receber</CardTitle>
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-muted-foreground" />
-            <ToggleGroup
-              type="single"
-              value={statusFilter}
-              onValueChange={(value) => value && handleStatusChange(value as 'all' | 'atrasado' | 'pendente' | 'pago')}
-              className="gap-1"
-            >
-              <ToggleGroupItem value="all" size="sm" className="text-xs">
-                Todos
-              </ToggleGroupItem>
-              <ToggleGroupItem value="atrasado" size="sm" className="text-xs">
-                Atrasados
-              </ToggleGroupItem>
-              <ToggleGroupItem value="pendente" size="sm" className="text-xs">
-                Pendentes
-              </ToggleGroupItem>
-              <ToggleGroupItem value="pago" size="sm" className="text-xs">
-                Pagos
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <Select value={statusFilter} onValueChange={(value) => handleStatusChange(value as any)}>
+              <SelectTrigger className="w-[180px] bg-transparent border-border">
+                <SelectValue placeholder="Filtrar por status..." />
+              </SelectTrigger>
+              <SelectContent className="glass-component">
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="pendente">Pendentes</SelectItem>
+                <SelectItem value="atrasado">Atrasados</SelectItem>
+                <SelectItem value="pago">Pagos</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </CardHeader>
       <CardContent className="p-0">
         <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as 'receber' | 'pagar')} className="w-full">
           <div className="px-4 pb-4">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="receber" className="gap-2">
-                <TrendingUp className="w-4 h-4" />
+            <TabsList className="grid w-full grid-cols-2 bg-transparent border p-1 rounded-lg">
+              <TabsTrigger
+                value="receber"
+                className="data-[state=active]:bg-muted/50 data-[state=inactive]:bg-transparent data-[state=inactive]:hover:bg-muted/20 gap-2"
+              >
+                <TrendingUp className="w-4 h-4 text-emerald-500" />
                 A Receber ({receivableCount})
               </TabsTrigger>
-              <TabsTrigger value="pagar" className="gap-2">
-                <TrendingDown className="w-4 h-4" />
+              <TabsTrigger
+                value="pagar"
+                className="data-[state=active]:bg-muted/50 data-[state=inactive]:bg-transparent data-[state=inactive]:hover:bg-muted/20 gap-2"
+              >
+                <TrendingDown className="w-4 h-4 text-red-500" />
                 A Pagar ({payableCount})
               </TabsTrigger>
             </TabsList>
