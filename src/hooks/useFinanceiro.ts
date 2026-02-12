@@ -475,7 +475,7 @@ export function useRevenueByDimension(
       if (error) throw error;
 
       // Mapear campos snake_case para camelCase
-      const rawData = data as Array<{
+      const rawData = (data as unknown) as Array<{
         dimension_name: string;
         total_amount: number;
         transaction_count: number;

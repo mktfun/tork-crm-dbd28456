@@ -175,7 +175,7 @@ export function TransactionsTable({
                                         </TableCell>
                                         <TableCell>
                                             {tx.bankName ? (
-                                                <Badge variant="outline" className="text-xs text-blue-600 bg-blue-50 border-blue-200 truncate max-w-[120px]">
+                                                <Badge variant="secondary" className="text-xs truncate max-w-[120px]">
                                                     {tx.bankName}
                                                 </Badge>
                                             ) : (

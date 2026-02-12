@@ -316,10 +316,6 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                         transactions={displayTransactions}
                         isLoading={isLoading}
                         type={transactionType === 'receitas' ? 'receita' : 'despesa'}
-                        // showSelection={false}
-                        selectedIds={new Set()}
-                        onToggleSelect={() => { }}
-                        onSelectAll={() => { }}
                         onViewDetails={(id) => setDetailsId(id)}
                         pageSize={10}
                     />
