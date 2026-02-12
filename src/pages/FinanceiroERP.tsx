@@ -256,30 +256,21 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
 
   return (
     <div className="space-y-6">
-      {/* Módulos do Dashboard Executivo */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Linha 1: Tesouraria (Largura Total) */}
-        <div className="col-span-1 lg:col-span-2 h-full">
-          <ModuloTesouraria onClick={() => onTabChange('tesouraria')} />
-        </div>
-
-        {/* Linha 2: Coluna Esquerda - Faturamento */}
-        <div className="h-full">
-          <ModuloFaturamento onClick={() => onTabChange('receitas')} />
-        </div>
-
-        {/* Linha 2: Coluna Direita - Bancos */}
-        <div className="h-full">
-          <ModuloMultiBancos onClick={() => onTabChange('caixa')} />
-        </div>
-      </div>
-
-      {/* Gráfico de Fluxo de Caixa */}
+      {/* Gráfico de Fluxo de Caixa - PRIMEIRO */}
       <CashFlowChart
         data={cashFlowData}
         isLoading={cashFlowLoading}
         granularity="day"
       />
+
+      {/* Faturamento & Vendas | Saldos Bancários */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ModuloFaturamento onClick={() => onTabChange('receitas')} />
+        <ModuloMultiBancos onClick={() => onTabChange('caixa')} />
+      </div>
+
+      {/* Tesouraria & Contas - Largura Total */}
+      <ModuloTesouraria onClick={() => onTabChange('tesouraria')} />
     </div>
   );
 }
