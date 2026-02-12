@@ -2,8 +2,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
     History,
-    ArrowUpCircle,
-    ArrowDownCircle,
+    ArrowUpRight,
+    ArrowDownRight,
     CalendarClock,
 } from 'lucide-react';
 
@@ -30,7 +30,7 @@ type BadgeStatus = 'confirmed' | 'pending' | 'void' | string;
 function getStatusBadge(status: BadgeStatus, isConfirmed: boolean) {
     if (status === 'void') {
         return (
-            <Badge variant="outline" className="text-zinc-500 border-zinc-600 text-[10px]">
+            <Badge variant="outline" className="text-muted-foreground border-border text-[10px]">
                 Anulado
             </Badge>
         );
@@ -112,12 +112,12 @@ export function RecentTransactionsCard({ onViewDetails }: RecentTransactionsCard
             {/* Table */}
             <Table>
                 <TableHeader>
-                    <TableRow className="border-white/10 hover:bg-transparent">
-                        <TableHead className="text-zinc-400 w-10">Tipo</TableHead>
-                        <TableHead className="text-zinc-400">Descrição</TableHead>
-                        <TableHead className="text-zinc-400">Data</TableHead>
-                        <TableHead className="text-zinc-400 text-right">Valor</TableHead>
-                        <TableHead className="text-zinc-400 text-center">Status</TableHead>
+                    <TableRow className="border-border hover:bg-transparent">
+                        <TableHead className="text-muted-foreground w-10">Tipo</TableHead>
+                        <TableHead className="text-muted-foreground">Descrição</TableHead>
+                        <TableHead className="text-muted-foreground">Data</TableHead>
+                        <TableHead className="text-muted-foreground text-right">Valor</TableHead>
+                        <TableHead className="text-muted-foreground text-center">Status</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -128,20 +128,20 @@ export function RecentTransactionsCard({ onViewDetails }: RecentTransactionsCard
                         return (
                             <TableRow
                                 key={tx.id}
-                                className="border-white/5 cursor-pointer hover:bg-white/5 transition-colors"
+                                className="border-border cursor-pointer hover:bg-muted/50 transition-colors"
                                 onClick={() => onViewDetails(tx.id)}
                                 aria-label={`${isRevenue ? 'Receita' : 'Despesa'}: ${tx.description}, ${formatCurrency(Math.abs(tx.total_amount))}`}
                             >
                                 {/* Tipo */}
                                 <TableCell className="py-3">
                                     {isRevenue ? (
-                                        <ArrowUpCircle
-                                            className="w-5 h-5 text-emerald-400"
+                                        <ArrowUpRight
+                                            className="w-5 h-5 text-emerald-500"
                                             aria-label="Receita"
                                         />
                                     ) : (
-                                        <ArrowDownCircle
-                                            className="w-5 h-5 text-rose-400"
+                                        <ArrowDownRight
+                                            className="w-5 h-5 text-rose-500"
                                             aria-label="Despesa"
                                         />
                                     )}
@@ -149,15 +149,15 @@ export function RecentTransactionsCard({ onViewDetails }: RecentTransactionsCard
 
                                 {/* Descrição */}
                                 <TableCell className="py-3">
-                                    <span className="text-sm font-medium text-zinc-200 truncate block max-w-[200px]" title={tx.description}>
+                                    <span className="text-sm font-medium text-foreground truncate block max-w-[200px]" title={tx.description}>
                                         {tx.description}
                                     </span>
                                 </TableCell>
 
                                 {/* Data */}
                                 <TableCell className="py-3">
-                                    <span className="text-xs text-zinc-400">
-                                        {format(txDate, "dd/MM/yy", { locale: ptBR })}
+                                    <span className="text-xs text-muted-foreground">
+                                        {format(txDate, "dd/MM/yyyy", { locale: ptBR })}
                                     </span>
                                 </TableCell>
 
@@ -165,8 +165,8 @@ export function RecentTransactionsCard({ onViewDetails }: RecentTransactionsCard
                                 <TableCell className="py-3 text-right">
                                     <span
                                         className={cn(
-                                            'text-sm font-bold',
-                                            isRevenue ? 'text-emerald-400' : 'text-rose-400'
+                                            'text-sm font-semibold',
+                                            isRevenue ? 'text-emerald-500' : 'text-rose-500'
                                         )}
                                     >
                                         {isRevenue ? '+' : '-'}{formatCurrency(Math.abs(tx.total_amount))}

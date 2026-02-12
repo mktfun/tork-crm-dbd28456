@@ -120,14 +120,13 @@ export function TransactionsTable({
                 ) : (
                     <Table>
                         <TableHeader>
-                            <TableRow>
-                                {/* Checkbox column removed */}
-                                <TableHead className="w-24">Data</TableHead>
-                                <TableHead className="min-w-[280px]">Descrição</TableHead>
-                                <TableHead className="w-32">Banco</TableHead>
-                                <TableHead className="w-40">Categoria</TableHead>
-                                <TableHead className="w-24">Status</TableHead>
-                                <TableHead className="text-right w-32">Valor</TableHead>
+                            <TableRow className="hover:bg-transparent border-border">
+                                <TableHead className="pl-6 w-[120px] text-muted-foreground">Data</TableHead>
+                                <TableHead className="min-w-[280px] text-muted-foreground">Descrição</TableHead>
+                                <TableHead className="w-32 text-muted-foreground">Banco</TableHead>
+                                <TableHead className="w-40 text-muted-foreground">Categoria</TableHead>
+                                <TableHead className="w-24 text-muted-foreground">Status</TableHead>
+                                <TableHead className="text-right w-32 text-muted-foreground pr-6">Valor</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -137,20 +136,19 @@ export function TransactionsTable({
                                 const amount = tx.amount ?? tx.total_amount ?? 0;
 
                                 const displayDate = tx.transaction_date
-                                    ? format(parseLocalDate(String(tx.transaction_date)), 'dd/MM', { locale: ptBR })
+                                    ? format(parseLocalDate(String(tx.transaction_date)), 'dd/MM/yyyy', { locale: ptBR })
                                     : '-';
 
                                 return (
                                     <TableRow
                                         key={tx.id}
                                         className={cn(
-                                            "cursor-pointer hover:bg-muted/50",
+                                            "cursor-pointer hover:bg-muted/50 border-border",
                                             isConfirmed && "opacity-60"
                                         )}
                                         onClick={() => onViewDetails(tx.id)}
                                     >
-                                        {/* Selection cell removed */}
-                                        <TableCell className="font-mono text-sm">
+                                        <TableCell className="pl-6 font-medium text-muted-foreground">
                                             {displayDate}
                                         </TableCell>
                                         <TableCell>
@@ -204,7 +202,7 @@ export function TransactionsTable({
                                                 </Badge>
                                             )}
                                         </TableCell>
-                                        <TableCell className={cn("text-right font-semibold", colorClass)}>
+                                        <TableCell className={cn("text-right font-semibold pr-6", colorClass)}>
                                             {prefix}{formatCurrency(Math.abs(amount))}
                                         </TableCell>
                                     </TableRow>

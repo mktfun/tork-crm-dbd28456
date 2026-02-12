@@ -12,8 +12,8 @@ import {
     Upload,
     AlertTriangle,
     Landmark,
-    ArrowUpCircle,
-    ArrowDownCircle,
+    ArrowUpRight,
+    ArrowDownRight,
     Search,
     X,
 } from 'lucide-react';
@@ -334,21 +334,21 @@ export function ReconciliationPage() {
                 <div className="relative overflow-x-auto">
                     <Table>
                         <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[40px]">
+                            <TableRow className="hover:bg-transparent border-border">
+                                <TableHead className="pl-6 w-[40px] text-muted-foreground">
                                     <Checkbox
                                         checked={items.length > 0 && items.every(i => selectedIds.includes(i.id) || i.reconciled || !i.bank_account_id)}
                                         onCheckedChange={handleSelectAll}
                                     />
                                 </TableHead>
-                                <TableHead>Data</TableHead>
-                                {isConsolidated && <TableHead>Banco</TableHead>}
-                                <TableHead>Tipo</TableHead>
-                                <TableHead>Descrição</TableHead>
-                                <TableHead>Categoria</TableHead>
-                                <TableHead className="text-right">Valor</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-center">Ações</TableHead>
+                                <TableHead className="text-muted-foreground">Data</TableHead>
+                                {isConsolidated && <TableHead className="text-muted-foreground">Banco</TableHead>}
+                                <TableHead className="text-muted-foreground">Tipo</TableHead>
+                                <TableHead className="text-muted-foreground">Descrição</TableHead>
+                                <TableHead className="text-muted-foreground">Categoria</TableHead>
+                                <TableHead className="text-right text-muted-foreground">Valor</TableHead>
+                                <TableHead className="text-muted-foreground">Status</TableHead>
+                                <TableHead className="text-center text-muted-foreground pr-6">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -377,8 +377,8 @@ export function ReconciliationPage() {
                                 </TableRow>
                             ) : (
                                 items.map((item) => (
-                                    <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
-                                        <TableCell>
+                                    <TableRow key={item.id} className="hover:bg-muted/50 border-border transition-colors">
+                                        <TableCell className="pl-6">
                                             <Checkbox
                                                 checked={selectedIds.includes(item.id)}
                                                 onCheckedChange={() => handleToggleSelect(item.id)}
@@ -394,15 +394,18 @@ export function ReconciliationPage() {
                                             </TableCell>
                                         )}
                                         <TableCell>
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1.5">
                                                 {item.type === 'revenue' ? (
-                                                    <ArrowUpCircle className="w-4 h-4 text-emerald-500" />
+                                                    <>
+                                                        <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                                                        <span className="text-emerald-500 font-medium text-sm">Receita</span>
+                                                    </>
                                                 ) : (
-                                                    <ArrowDownCircle className="w-4 h-4 text-red-500" />
+                                                    <>
+                                                        <ArrowDownRight className="w-4 h-4 text-rose-500" />
+                                                        <span className="text-rose-500 font-medium text-sm">Despesa</span>
+                                                    </>
                                                 )}
-                                                <span className="text-xs font-medium">
-                                                    {item.type === 'revenue' ? 'Receita' : 'Despesa'}
-                                                </span>
                                             </div>
                                         </TableCell>
                                         <TableCell>
@@ -427,16 +430,16 @@ export function ReconciliationPage() {
                                         <TableCell className="text-xs text-muted-foreground">
                                             {item.category_name}
                                         </TableCell>
-                                        <TableCell className={`text-right font-semibold ${item.type === 'revenue' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                        <TableCell className={`text-right font-semibold ${item.type === 'revenue' ? 'text-emerald-500' : 'text-rose-500'}`}>
                                             {item.type === 'revenue' ? '+' : '-'} {formatCurrency(item.amount)}
                                         </TableCell>
                                         <TableCell>
                                             {item.status_display === 'Conciliado' ? (
-                                                <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-none text-xs">
+                                                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none text-xs">
                                                     Conciliado
                                                 </Badge>
                                             ) : (
-                                                <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+                                                <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none text-xs">
                                                     {item.status_display}
                                                 </Badge>
                                             )}

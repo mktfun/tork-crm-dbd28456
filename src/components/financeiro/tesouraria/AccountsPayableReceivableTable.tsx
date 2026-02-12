@@ -85,11 +85,11 @@ export function AccountsPayableReceivableTable() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-border">
-                <TableHead className="pl-6">Vencimento</TableHead>
-                <TableHead>Entidade</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead className="pr-6">Status</TableHead>
+                <TableHead className="pl-6 text-muted-foreground">Vencimento</TableHead>
+                <TableHead className="text-muted-foreground">Entidade</TableHead>
+                <TableHead className="text-muted-foreground">Descrição</TableHead>
+                <TableHead className="text-right text-muted-foreground">Valor</TableHead>
+                <TableHead className="pr-6 text-muted-foreground">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -134,11 +134,11 @@ export function AccountsPayableReceivableTable() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
-              <TableHead className="pl-6">Vencimento</TableHead>
-              <TableHead>Entidade</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-              <TableHead className="pr-6">Status</TableHead>
+              <TableHead className="pl-6 text-muted-foreground">Vencimento</TableHead>
+              <TableHead className="text-muted-foreground">Entidade</TableHead>
+              <TableHead className="text-muted-foreground">Descrição</TableHead>
+              <TableHead className="text-right text-muted-foreground">Valor</TableHead>
+              <TableHead className="pr-6 text-muted-foreground">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
