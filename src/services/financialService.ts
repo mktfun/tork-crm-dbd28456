@@ -22,6 +22,7 @@ interface RecentTransaction {
   total_amount: number;
   account_names: string;
   status: string;
+  reconciled: boolean;
 }
 
 // ============ CONTAS ============
@@ -289,7 +290,8 @@ export async function getRecentTransactions(params?: {
   if (error) throw error;
   return (data || []).map((tx: any) => ({
     ...tx,
-    is_confirmed: tx.is_confirmed ?? (tx.status === 'confirmed')
+    is_confirmed: tx.is_confirmed ?? (tx.status === 'confirmed'),
+    reconciled: tx.reconciled ?? false
   }));
 }
 
@@ -539,6 +541,7 @@ export interface RevenueTransaction {
   policy_number: string | null;
   related_entity_id: string | null;
   related_entity_type: string | null;
+  reconciled: boolean;
 }
 
 export async function getRevenueTransactions(params: {
@@ -565,7 +568,8 @@ export async function getRevenueTransactions(params: {
     client_name: row.client_name || null,
     policy_number: row.policy_number || null,
     related_entity_id: row.related_entity_id || null,
-    related_entity_type: row.related_entity_type || null
+    related_entity_type: row.related_entity_type || null,
+    reconciled: row.reconciled ?? false
   }));
 }
 

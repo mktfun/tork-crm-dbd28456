@@ -6,7 +6,6 @@ import { Check, Clock, Lock, ChevronLeft, ChevronRight, Search } from 'lucide-re
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -34,7 +33,8 @@ export interface Transaction {
     account_name?: string | null;
     amount: number | null;
     total_amount?: number;
-    is_confirmed: boolean;
+    is_confirmed: boolean; // Keeping for compatibility but verified via reconciled
+    reconciled?: boolean;
     legacy_status?: string | null;
     related_entity_id?: string | null;
     related_entity_type?: string | null;
@@ -44,10 +44,6 @@ interface TransactionsTableProps {
     transactions: Transaction[];
     isLoading: boolean;
     type: 'receita' | 'despesa';
-    showSelection?: boolean;
-    selectedIds: Set<string>;
-    onToggleSelect: (id: string) => void;
-    onSelectAll: (checked: boolean) => void;
     onViewDetails: (id: string) => void;
     pageSize?: number;
 }
@@ -56,10 +52,6 @@ export function TransactionsTable({
     transactions,
     isLoading,
     type,
-    showSelection = false,
-    selectedIds,
-    onToggleSelect,
-    onSelectAll,
     onViewDetails,
     pageSize = 10
 }: TransactionsTableProps) {
@@ -90,10 +82,7 @@ export function TransactionsTable({
         setPage(1);
     }, [searchTerm]);
 
-    // Transações selecionáveis
-    const selectableTransactions = transactions.filter(tx => !tx.is_confirmed && tx.legacy_status === null);
-    const allSelectableSelected = selectableTransactions.length > 0 &&
-        selectableTransactions.every(tx => selectedIds.has(tx.id));
+    // Transações selecionáveis logic removed
 
     const colorClass = type === 'receita' ? 'text-emerald-500' : 'text-rose-500';
     const prefix = type === 'receita' ? '+' : '-';
@@ -131,15 +120,7 @@ export function TransactionsTable({
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                {showSelection && (
-                                    <TableHead className="w-10">
-                                        <Checkbox
-                                            checked={allSelectableSelected}
-                                            onCheckedChange={(checked) => onSelectAll(!!checked)}
-                                            disabled={selectableTransactions.length === 0}
-                                        />
-                                    </TableHead>
-                                )}
+                                {/* Checkbox column removed */}
                                 <TableHead className="w-24">Data</TableHead>
                                 <TableHead className="min-w-[280px]">Descrição</TableHead>
                                 <TableHead className="w-40">Categoria</TableHead>
@@ -149,7 +130,7 @@ export function TransactionsTable({
                         </TableHeader>
                         <TableBody>
                             {paginatedTransactions.map((tx) => {
-                                const isConfirmed = tx.is_confirmed;
+                                const isConfirmed = tx.reconciled ?? tx.is_confirmed;
                                 const isSynchronized = tx.legacy_status !== null;
                                 const amount = tx.amount ?? tx.total_amount ?? 0;
 
@@ -166,31 +147,7 @@ export function TransactionsTable({
                                         )}
                                         onClick={() => onViewDetails(tx.id)}
                                     >
-                                        {showSelection && (
-                                            <TableCell onClick={(e) => e.stopPropagation()}>
-                                                {isSynchronized && !isConfirmed ? (
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <div className="flex items-center justify-center w-4 h-4">
-                                                                <Lock className="w-3.5 h-3.5 text-muted-foreground" />
-                                                            </div>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p className="font-medium">Transação Sincronizada</p>
-                                                            <p className="text-xs text-muted-foreground">
-                                                                Alterações devem ser feitas na Apólice
-                                                            </p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                ) : (
-                                                    <Checkbox
-                                                        checked={selectedIds.has(tx.id)}
-                                                        onCheckedChange={() => onToggleSelect(tx.id)}
-                                                        disabled={isConfirmed}
-                                                    />
-                                                )}
-                                            </TableCell>
-                                        )}
+                                        {/* Selection cell removed */}
                                         <TableCell className="font-mono text-sm">
                                             {displayDate}
                                         </TableCell>

@@ -24,7 +24,7 @@ import { TransactionsTable, Transaction } from './shared/TransactionsTable';
 import { NovaReceitaModal } from './NovaReceitaModal';
 import { NovaDespesaModal } from './NovaDespesaModal';
 import { TransactionDetailsSheet } from './TransactionDetailsSheet';
-import { SettleTransactionModal } from './SettleTransactionModal';
+// import { SettleTransactionModal } from './SettleTransactionModal';
 import { FaturamentoChart } from './faturamento/FaturamentoChart';
 import { FaturamentoBreakdown } from './faturamento/FaturamentoBreakdown';
 import { MetasCard } from './faturamento/MetasCard';
@@ -48,9 +48,9 @@ type StatusFilter = 'efetivado' | 'pendente';
 export function TransacoesTab({ dateRange }: TransacoesTabProps) {
     const [transactionType, setTransactionType] = useState<TransactionType>('receitas');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('efetivado');
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [detailsId, setDetailsId] = useState<string | null>(null);
-    const [settleModalOpen, setSettleModalOpen] = useState(false);
+    // const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    // const [settleModalOpen, setSettleModalOpen] = useState(false);
 
     // Datas normalizadas
     const { startDate, endDate } = useMemo(() => {
@@ -81,10 +81,10 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
         if (transactionType === 'receitas') {
             if (statusFilter === 'pendente') {
                 // Todas as pendentes históricas
-                return allRevenue.filter(tx => !tx.is_confirmed);
+                return allRevenue.filter(tx => !tx.reconciled);
             } else {
                 // Confirmadas do período
-                return periodRevenue.filter(tx => tx.is_confirmed);
+                return periodRevenue.filter(tx => tx.reconciled);
             }
         } else {
             // Despesas - filtrar por período para efetivadas
@@ -98,14 +98,14 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
 
             if (statusFilter === 'pendente') {
                 return allExpenses
-                    .filter(tx => !tx.is_confirmed)
+                    .filter(tx => !tx.reconciled)
                     .map(tx => ({
                         ...tx,
                         amount: tx.total_amount ?? 0
                     }));
             } else {
                 return allExpenses
-                    .filter(tx => tx.is_confirmed && inPeriod(txDate(tx)))
+                    .filter(tx => tx.reconciled && inPeriod(txDate(tx)))
                     .map(tx => ({
                         ...tx,
                         amount: tx.total_amount ?? 0
@@ -122,14 +122,14 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
 
     const kpis = useMemo(() => {
         if (transactionType === 'receitas') {
-            const confirmadas = periodRevenue.filter(tx => tx.is_confirmed);
+            const confirmadas = periodRevenue.filter(tx => tx.reconciled);
             return {
                 efetivado: confirmadas.reduce((sum, tx) => sum + (tx.amount || 0), 0),
                 pendente: summary?.pendingIncome ?? 0
             };
         } else {
-            const efetivadas = allExpenses.filter(tx => tx.is_confirmed);
-            const pendentes = allExpenses.filter(tx => !tx.is_confirmed);
+            const efetivadas = allExpenses.filter(tx => tx.reconciled);
+            const pendentes = allExpenses.filter(tx => !tx.reconciled);
             return {
                 efetivado: efetivadas.reduce((sum, tx) => sum + Math.abs(tx.total_amount || 0), 0),
                 pendente: pendentes.reduce((sum, tx) => sum + Math.abs(tx.total_amount || 0), 0)
@@ -139,6 +139,10 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
 
     // ========== SELECTION HANDLERS ==========
 
+    // ========== SELECTION HANDLERS ==========
+
+    // Selection logic removed per new requirements
+    /*
     const selectableTransactions = displayTransactions.filter(tx => !tx.is_confirmed && tx.legacy_status === null);
 
     const handleToggleSelect = (id: string) => {
@@ -172,29 +176,32 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
     const handleSettleSuccess = () => {
         setSelectedIds(new Set());
     };
+    */
 
     // Reset selection when switching tabs
     const handleTypeChange = (type: TransactionType) => {
         setTransactionType(type);
-        setSelectedIds(new Set());
+        // setSelectedIds(new Set());
     };
 
     const handleStatusChange = (status: StatusFilter) => {
         setStatusFilter(status);
-        setSelectedIds(new Set());
+        // setSelectedIds(new Set());
     };
 
     // ========== COMPUTED VALUES ==========
 
+    /*
     const selectedTotalAmount = useMemo(() => {
         return displayTransactions
             .filter(tx => selectedIds.has(tx.id))
             .reduce((sum, tx) => sum + Math.abs(tx.amount || tx.total_amount || 0), 0);
     }, [displayTransactions, selectedIds]);
+    */
 
-    const syncedCount = displayTransactions.filter(tx => tx.legacy_status !== null && !tx.is_confirmed).length;
+    const syncedCount = displayTransactions.filter(tx => tx.legacy_status !== null && !tx.reconciled).length;
 
-    const showSelection = statusFilter === 'pendente';
+    // const showSelection = statusFilter === 'pendente';
     const isPendente = statusFilter === 'pendente';
 
     return (
@@ -303,31 +310,17 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                         </div>
                     </div>
 
-                    {/* Batch Action Button */}
-                    {showSelection && selectedIds.size > 0 && (
-                        <Button
-                            onClick={handleOpenSettleModal}
-                            className={cn(
-                                "gap-2 h-8",
-                                transactionType === 'receitas'
-                                    ? "bg-emerald-600 hover:bg-emerald-700"
-                                    : "bg-rose-600 hover:bg-rose-700"
-                            )}
-                        >
-                            <Check className="w-4 h-4" />
-                            Confirmar ({selectedIds.size})
-                        </Button>
-                    )}
+                    {/* Batch Action Button - Removed */}
                 </CardHeader>
                 <CardContent className="p-0">
                     <TransactionsTable
                         transactions={displayTransactions}
                         isLoading={isLoading}
                         type={transactionType === 'receitas' ? 'receita' : 'despesa'}
-                        showSelection={showSelection}
-                        selectedIds={selectedIds}
-                        onToggleSelect={handleToggleSelect}
-                        onSelectAll={handleSelectAll}
+                        // showSelection={false}
+                        selectedIds={new Set()}
+                        onToggleSelect={() => { }}
+                        onSelectAll={() => { }}
                         onViewDetails={(id) => setDetailsId(id)}
                         pageSize={10}
                     />
@@ -349,7 +342,8 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                 onClose={() => setDetailsId(null)}
             />
 
-            {/* Settle Modal */}
+            {/* Settle Modal - Removed */}
+            {/* 
             <SettleTransactionModal
                 open={settleModalOpen}
                 onClose={() => setSettleModalOpen(false)}
@@ -362,6 +356,7 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                 totalAmount={selectedTotalAmount}
                 onSuccess={handleSettleSuccess}
             />
+            */}
         </div>
     );
 }
