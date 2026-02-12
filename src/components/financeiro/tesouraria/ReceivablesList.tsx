@@ -21,6 +21,7 @@ interface ReceivablesListProps {
 }
 
 export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
+  // State for period filtering
   const [period, setPeriod] = useState(daysAhead);
   const { data: receivables, isLoading, error } = useUpcomingReceivables(period);
 

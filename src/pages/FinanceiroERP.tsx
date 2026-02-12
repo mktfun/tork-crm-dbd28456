@@ -256,35 +256,35 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
 
   return (
     <div className="space-y-6">
-<<<<<<< HEAD
-  {/* ========== SEÇÃO 1: FLUXO DE CAIXA ========== */ }
-  <div>
-    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-      Fluxo de Caixa
-    </h3>
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <ModuloFaturamento
-        onClick={() => onTabChange('transacoes')}
-        dateRange={dateRange}
+
+      {/* ========== SEÇÃO 1: FLUXO DE CAIXA ========== */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+          Fluxo de Caixa
+        </h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ModuloFaturamento
+            onClick={() => onTabChange('transacoes')} // Navigate to transacoes
+            dateRange={dateRange}
+          />
+          <ModuloMultiBancos onClick={() => onTabChange('caixa')} /> // Navigate to caixa
+        </div>
+      </div>
+
+      {/* ========== SEÇÃO 2: TESOURARIA & CONTAS ========== */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+          Tesouraria & Contas
+        </h3>
+        <ModuloTesouraria onClick={() => onTabChange('tesouraria')} /> // Navigate to tesouraria
+      </div>
+
+      {/* ========== GRÁFICO DE FLUXO DE CAIXA ========== */}
+      <CashFlowChart
+        data={cashFlowData}
+        isLoading={cashFlowLoading}
+        granularity="day"
       />
-      <ModuloMultiBancos onClick={() => onTabChange('caixa')} />
-    </div>
-  </div>
-
-  {/* ========== SEÇÃO 2: TESOURARIA & CONTAS ========== */ }
-  <div>
-    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-      Tesouraria & Contas
-    </h3>
-    <ModuloTesouraria onClick={() => onTabChange('tesouraria')} />
-  </div>
-
-  {/* ========== GRÁFICO DE FLUXO DE CAIXA ========== */ }
-  <CashFlowChart
-    data={cashFlowData}
-    isLoading={cashFlowLoading}
-    granularity="day"
-  />
     </div >
   );
 }
