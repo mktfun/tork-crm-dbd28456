@@ -475,14 +475,18 @@ export function useRevenueByDimension(
       if (error) throw error;
 
       // Mapear campos snake_case para camelCase
-      const rawData = data as Array<{ dimension_value: string; total_revenue: number; transaction_count: number }> || [];
-      const totalRevenue = rawData.reduce((sum, item) => sum + Number(item.total_revenue), 0);
+      const rawData = data as Array<{
+        dimension_name: string;
+        total_amount: number;
+        transaction_count: number;
+        percentage: number;
+      }> || [];
 
       return rawData.map(item => ({
-        dimensionName: item.dimension_value,
-        totalAmount: Number(item.total_revenue),
+        dimensionName: item.dimension_name,
+        totalAmount: Number(item.total_amount),
         transactionCount: Number(item.transaction_count),
-        percentage: totalRevenue > 0 ? (Number(item.total_revenue) / totalRevenue) * 100 : 0
+        percentage: Number(item.percentage)
       })) as DimensionBreakdown[];
     },
   });
