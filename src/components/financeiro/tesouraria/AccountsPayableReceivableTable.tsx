@@ -131,7 +131,7 @@ export function AccountsPayableReceivableTable() {
     }
 
     return (
-      <div className="bg-card/5 rounded-lg">
+      <div className="bg-transparent rounded-lg">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
@@ -211,10 +211,18 @@ export function AccountsPayableReceivableTable() {
   const payableCount = transactions?.filter(t => t.transactionType === 'pagar').length || 0;
 
   return (
-    <AppCard className="border-none shadow-sm">
+    <AppCard>
       <CardHeader className="pb-3 px-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold text-foreground">Contas a Pagar e Receber</CardTitle>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <TrendingUp className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-semibold text-foreground">Contas a Pagar e Receber</CardTitle>
+              <p className="text-sm text-muted-foreground">Gerencie suas pendências financeiras</p>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-muted-foreground" />
             <Select value={statusFilter} onValueChange={(value) => handleStatusChange(value as any)}>

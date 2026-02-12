@@ -1,4 +1,5 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppCard } from "@/components/ui/app-card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Target, TrendingUp, TrendingDown, AlertCircle, Settings } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ interface MetasCardProps {
 export function MetasCard({ faturamentoAtual }: MetasCardProps) {
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
-  
+
   const { data: goalData, isLoading, error } = useGoalVsActual(currentYear, currentMonth, 'revenue');
   const [showSetGoalModal, setShowSetGoalModal] = useState(false);
 
@@ -31,15 +32,17 @@ export function MetasCard({ faturamentoAtual }: MetasCardProps) {
 
   if (isLoading) {
     return (
-      <Card className="border-2">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-primary" />
-            Meta Mensal
-          </CardTitle>
-          <CardDescription>
-            Acompanhamento do objetivo de faturamento
-          </CardDescription>
+      <AppCard>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Target className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-semibold">Meta Mensal</CardTitle>
+              <CardDescription>Acompanhamento do objetivo</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -54,18 +57,23 @@ export function MetasCard({ faturamentoAtual }: MetasCardProps) {
             <Skeleton className="h-16 w-full" />
           </div>
         </CardContent>
-      </Card>
+      </AppCard>
     );
   }
 
   if (error) {
     return (
-      <Card className="border-2 border-destructive/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-primary" />
-            Meta Mensal
-          </CardTitle>
+      <AppCard>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Target className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-semibold">Meta Mensal</CardTitle>
+              <CardDescription>Acompanhamento do objetivo</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Alert variant="destructive">
@@ -75,7 +83,7 @@ export function MetasCard({ faturamentoAtual }: MetasCardProps) {
             </AlertDescription>
           </Alert>
         </CardContent>
-      </Card>
+      </AppCard>
     );
   }
 
@@ -83,15 +91,17 @@ export function MetasCard({ faturamentoAtual }: MetasCardProps) {
   if (!goalData) {
     return (
       <>
-        <Card className="border-2 border-dashed">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-muted-foreground" />
-              Meta Mensal
-            </CardTitle>
-            <CardDescription>
-              Defina uma meta para acompanhar seu desempenho
-            </CardDescription>
+        <AppCard>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Target className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-semibold">Meta Mensal</CardTitle>
+                <CardDescription>Acompanhamento do objetivo</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-center py-8">
@@ -105,9 +115,9 @@ export function MetasCard({ faturamentoAtual }: MetasCardProps) {
               </Button>
             </div>
           </CardContent>
-        </Card>
+        </AppCard>
 
-        <SetGoalModal 
+        <SetGoalModal
           open={showSetGoalModal}
           onClose={() => setShowSetGoalModal(false)}
           year={currentYear}
@@ -127,27 +137,26 @@ export function MetasCard({ faturamentoAtual }: MetasCardProps) {
 
   return (
     <>
-      <Card className={cn(
-        "border-2",
+      <AppCard className={cn(
         isAcimaDaMeta && "border-emerald-500/50 bg-emerald-500/5",
         isProximoDaMeta && "border-amber-500/50 bg-amber-500/5"
       )}>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-primary/10 rounded-lg">
                 <Target className={cn(
                   "w-5 h-5",
                   isAcimaDaMeta ? "text-emerald-600" : isProximoDaMeta ? "text-amber-600" : "text-primary"
                 )} />
-                Meta Mensal
-              </CardTitle>
-              <CardDescription>
-                Acompanhamento do objetivo de faturamento
-              </CardDescription>
+              </div>
+              <div>
+                <CardTitle className="text-lg font-semibold">Meta Mensal</CardTitle>
+                <CardDescription>Acompanhamento do objetivo</CardDescription>
+              </div>
             </div>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               onClick={() => setShowSetGoalModal(true)}
               className="h-8 w-8"
@@ -168,8 +177,8 @@ export function MetasCard({ faturamentoAtual }: MetasCardProps) {
                 {Math.round(percentualAtingido)}%
               </span>
             </div>
-            <Progress 
-              value={Math.min(percentualAtingido, 100)} 
+            <Progress
+              value={Math.min(percentualAtingido, 100)}
               className={cn(
                 "h-3",
                 isAcimaDaMeta && "[&>div]:bg-emerald-600",
@@ -197,9 +206,9 @@ export function MetasCard({ faturamentoAtual }: MetasCardProps) {
           {/* Status */}
           <div className={cn(
             "flex items-center gap-2 p-3 rounded-lg text-sm",
-            isAcimaDaMeta ? "bg-emerald-500/10 text-emerald-600" : 
-            isProximoDaMeta ? "bg-amber-500/10 text-amber-600" : 
-            "bg-muted text-muted-foreground"
+            isAcimaDaMeta ? "bg-emerald-500/10 text-emerald-600" :
+              isProximoDaMeta ? "bg-amber-500/10 text-amber-600" :
+                "bg-muted text-muted-foreground"
           )}>
             {isAcimaDaMeta ? (
               <>
@@ -227,7 +236,7 @@ export function MetasCard({ faturamentoAtual }: MetasCardProps) {
         </CardContent>
       </Card>
 
-      <SetGoalModal 
+      <SetGoalModal
         open={showSetGoalModal}
         onClose={() => setShowSetGoalModal(false)}
         year={currentYear}

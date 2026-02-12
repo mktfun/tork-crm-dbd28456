@@ -291,25 +291,29 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
             )}
 
             {/* Main Table */}
-            <AppCard className="border-none shadow-sm">
-                <CardHeader className="flex flex-row items-center justify-between pb-4 px-4">
-                    <div className="flex items-center gap-2">
-                        {transactionType === 'receitas' ? (
-                            <TrendingUp className="w-5 h-5 text-emerald-500" />
-                        ) : (
-                            <TrendingDown className="w-5 h-5 text-rose-500" />
-                        )}
+            <AppCard>
+                <CardHeader className="pb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                            {transactionType === 'receitas' ? (
+                                <TrendingUp className="w-5 h-5 text-emerald-500" />
+                            ) : (
+                                <TrendingDown className="w-5 h-5 text-rose-500" />
+                            )}
+                        </div>
                         <div>
-                            <CardTitle className="text-base font-semibold text-foreground">
+                            <CardTitle className="text-lg font-semibold text-foreground">
                                 {transactionType === 'receitas'
                                     ? (isPendente ? 'Receitas Pendentes' : 'Receitas Confirmadas')
                                     : (isPendente ? 'Despesas Pendentes' : 'Despesas Pagas')}
                             </CardTitle>
-                            {/* Description removed or moved to tooltip if needed for cleaner look, keeping title minimal as per reference */}
+                            <CardDescription>
+                                {transactionType === 'receitas'
+                                    ? 'Gestão de entradas e recebimentos'
+                                    : 'Gestão de saídas e pagamentos'}
+                            </CardDescription>
                         </div>
                     </div>
-
-                    {/* Batch Action Button - Removed */}
                 </CardHeader>
                 <CardContent className="p-0">
                     <TransactionsTable
