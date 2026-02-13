@@ -31,23 +31,27 @@ serve(async (req) => {
       throw new Error('Não autenticado');
     }
 
-    const { inbox_id, n8n_webhook_url } = await req.json();
+    const { inbox_id, n8n_webhook_url, contact_id } = await req.json();
 
     if (!inbox_id || !n8n_webhook_url) {
       throw new Error('inbox_id e n8n_webhook_url são obrigatórios');
     }
 
     // Buscar dados de teste do CRM
-    // 1. Buscar um cliente válido do usuário
-    const { data: client, error: clientError } = await supabaseClient
+    // 1. Buscar cliente - por contact_id se fornecido, senão qualquer cliente do usuário
+    let clientQuery = supabaseClient
       .from('clientes')
       .select('id, name, email, phone')
-      .eq('user_id', user.id)
-      .limit(1)
-      .single();
+      .eq('user_id', user.id);
+
+    if (contact_id) {
+      clientQuery = clientQuery.eq('id', contact_id);
+    }
+
+    const { data: client, error: clientError } = await clientQuery.limit(1).single();
 
     if (clientError || !client) {
-      throw new Error('Nenhum cliente encontrado para teste');
+      throw new Error(contact_id ? 'Cliente não encontrado com o ID informado' : 'Nenhum cliente encontrado para teste');
     }
 
     // 2. Buscar um pipeline e etapa do usuário
