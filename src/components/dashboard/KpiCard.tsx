@@ -43,7 +43,7 @@ export function KpiCard({
   className
 }: KpiCardProps) {
   const colorClasses = {
-    default: 'flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-zinc-800 bg-zinc-900 hover:bg-zinc-800/70',
+    default: 'flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70',
     warning: 'flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-yellow-500/50 bg-yellow-900/30 text-yellow-300 hover:bg-yellow-900/40',
     danger: 'flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-red-500/60 bg-red-900/40 text-red-300 hover:bg-red-900/50'
   };
@@ -57,9 +57,9 @@ export function KpiCard({
       onClick={onClick}
     >
       <div className="flex justify-between items-start mb-3">
-        <span className="text-sm font-medium text-zinc-400">{title}</span>
+        <span className="text-sm font-medium text-muted-foreground">{title}</span>
         <div className={cn(
-          "p-2 rounded-lg bg-white/10",
+          "p-2 rounded-lg bg-foreground/10",
           colorVariant !== 'default' ? 'text-current' : ''
         )}>
           {icon}
@@ -67,11 +67,11 @@ export function KpiCard({
       </div>
 
       <div>
-        <h2 className="text-2xl md:text-3xl font-bold text-white break-words mb-1">
+        <h2 className="text-2xl md:text-3xl font-bold text-foreground break-words mb-1">
           {value}
         </h2>
         {comparison && (
-          <p className="text-xs text-zinc-500 line-clamp-2">{comparison}</p>
+          <p className="text-xs text-muted-foreground line-clamp-2">{comparison}</p>
         )}
       </div>
     </AppCard>

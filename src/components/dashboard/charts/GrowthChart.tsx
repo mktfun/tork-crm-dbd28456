@@ -26,7 +26,7 @@ export function GrowthChart({ data, type: initialType = 'bar', dateRange, insigh
   // Determinar o tipo de período baseado no dateRange
   const periodType = useMemo(() => {
     if (!dateRange?.from || !dateRange?.to) return 'Mensal';
-    
+
     const diasDiferenca = differenceInDays(dateRange.to, dateRange.from);
     return diasDiferenca <= 90 ? 'Diário' : 'Mensal';
   }, [dateRange]);
@@ -40,7 +40,7 @@ export function GrowthChart({ data, type: initialType = 'bar', dateRange, insigh
     if (active && payload && payload.length) {
       return (
         <div className="bg-gray-900/95 backdrop-blur-sm p-3 border border-gray-700 rounded-lg shadow-lg">
-          <p className="font-semibold text-white mb-2">{label}</p>
+          <p className="font-semibold text-foreground mb-2">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} className="text-sm text-gray-200">
               <span className="font-medium" style={{ color: entry.color }}>
@@ -67,32 +67,32 @@ export function GrowthChart({ data, type: initialType = 'bar', dateRange, insigh
           }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-          <XAxis 
-            dataKey="month" 
+          <XAxis
+            dataKey="month"
             tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
             stroke="rgba(255,255,255,0.3)"
           />
-          <YAxis 
+          <YAxis
             tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
             stroke="rgba(255,255,255,0.3)"
           />
           <Tooltip content={<CustomTooltip />} />
-          <Legend 
+          <Legend
             wrapperStyle={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}
           />
-          <Line 
-            type="monotone" 
-            dataKey="novas" 
-            stroke="#3b82f6" 
+          <Line
+            type="monotone"
+            dataKey="novas"
+            stroke="#3b82f6"
             name="Novas Apólices"
             strokeWidth={3}
             dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
             activeDot={{ r: 6 }}
           />
-          <Line 
-            type="monotone" 
-            dataKey="renovadas" 
-            stroke="#10b981" 
+          <Line
+            type="monotone"
+            dataKey="renovadas"
+            stroke="#10b981"
             name="Apólices Renovadas"
             strokeWidth={3}
             dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
@@ -113,28 +113,28 @@ export function GrowthChart({ data, type: initialType = 'bar', dateRange, insigh
         }}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-        <XAxis 
-          dataKey="month" 
+        <XAxis
+          dataKey="month"
           tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
           stroke="rgba(255,255,255,0.3)"
         />
-        <YAxis 
+        <YAxis
           tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
           stroke="rgba(255,255,255,0.3)"
         />
         <Tooltip content={<CustomTooltip />} />
-        <Legend 
+        <Legend
           wrapperStyle={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}
         />
-        <Bar 
-          dataKey="novas" 
-          fill="#3b82f6" 
+        <Bar
+          dataKey="novas"
+          fill="#3b82f6"
           name="Novas Apólices"
           radius={[2, 2, 0, 0]}
         />
-        <Bar 
-          dataKey="renovadas" 
-          fill="#10b981" 
+        <Bar
+          dataKey="renovadas"
+          fill="#10b981"
           name="Apólices Renovadas"
           radius={[2, 2, 0, 0]}
         />
@@ -147,26 +147,26 @@ export function GrowthChart({ data, type: initialType = 'bar', dateRange, insigh
     return (
       <AppCard className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">
+          <h3 className="text-lg font-semibold text-foreground">
             Crescimento {periodType} - Novas vs Renovadas
           </h3>
         </div>
-        
+
         <div className="h-80 flex items-center justify-center">
           <div className="text-center">
             <div className="text-6xl mb-4">📊</div>
-            <h4 className="text-lg font-semibold text-white mb-2">
+            <h4 className="text-lg font-semibold text-foreground mb-2">
               Nenhum dado encontrado
             </h4>
             <p className="text-gray-400 text-sm max-w-md">
-              {dateRange?.from && dateRange?.to 
+              {dateRange?.from && dateRange?.to
                 ? 'Não há apólices criadas no período selecionado. Tente selecionar um período diferente.'
                 : 'Ainda não há apólices criadas. Comece criando suas primeiras apólices para ver os dados aqui.'
               }
             </p>
           </div>
         </div>
-        
+
         <ChartInsight icon={TrendingUp} text={insight} />
       </AppCard>
     );
@@ -175,25 +175,25 @@ export function GrowthChart({ data, type: initialType = 'bar', dateRange, insigh
   return (
     <AppCard className="p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white">
+        <h3 className="text-lg font-semibold text-foreground">
           Crescimento {periodType} - Novas vs Renovadas
         </h3>
-        
-        <ToggleGroup 
-          type="single" 
-          value={chartType} 
+
+        <ToggleGroup
+          type="single"
+          value={chartType}
           onValueChange={(value) => value && setChartType(value as 'bar' | 'line')}
           className="bg-gray-800/50 border border-gray-700"
         >
-          <ToggleGroupItem 
-            value="bar" 
+          <ToggleGroupItem
+            value="bar"
             aria-label="Visualização em barras"
             className="data-[state=on]:bg-blue-600 data-[state=on]:text-white"
           >
             <BarChart3 className="h-4 w-4" />
           </ToggleGroupItem>
-          <ToggleGroupItem 
-            value="line" 
+          <ToggleGroupItem
+            value="line"
             aria-label="Visualização em linhas"
             className="data-[state=on]:bg-blue-600 data-[state=on]:text-white"
           >
@@ -201,13 +201,13 @@ export function GrowthChart({ data, type: initialType = 'bar', dateRange, insigh
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
-      
+
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           {renderChart()}
         </ResponsiveContainer>
       </div>
-      
+
       <ChartInsight icon={TrendingUp} text={insight} />
     </AppCard>
   );

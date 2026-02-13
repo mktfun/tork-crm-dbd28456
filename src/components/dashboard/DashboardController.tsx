@@ -15,26 +15,26 @@ export function DashboardController() {
 
   // Hook com dados filtrados - AGORA PASSA O FILTRO DE DATA
   const metrics = useDashboardMetrics({ dateRange });
-  
+
   return (
     <div className="space-y-6">
       {/* Painel de Controle - O CHEFE */}
       <AppCard className="p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-lg font-semibold text-white">
+          <h2 className="text-lg font-semibold text-foreground">
             Controle de Gráficos
           </h2>
-          
+
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
             {/* Filtro de Data Global */}
             <div className="flex items-center gap-2">
-              <span className="text-sm text-white/80">Período:</span>
+              <span className="text-sm text-muted-foreground">Período:</span>
               <DatePickerWithRange date={dateRange} onDateChange={setDateRange} className="w-auto" />
             </div>
 
             {/* Seletor de Tipo de Gráfico de Crescimento */}
             <div className="flex items-center gap-2">
-              <span className="text-sm text-white/80">Crescimento:</span>
+              <span className="text-sm text-muted-foreground">Crescimento:</span>
               <div className="flex gap-1">
                 <Button variant={chartType === 'bar' ? 'default' : 'outline'} size="sm" onClick={() => setChartType('bar')} className="gap-1">
                   <BarChart3 className="w-4 h-4" />

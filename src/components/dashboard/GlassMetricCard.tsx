@@ -23,27 +23,27 @@ export function GlassMetricCard({
   const trendColors = {
     up: 'text-green-400',
     down: 'text-red-400',
-    neutral: 'text-white'
+    neutral: 'text-foreground'
   };
 
   return (
     <Link to={href} className="block group">
       <div className={cn(
         "glass-card p-6 transition-all duration-300 hover:scale-105 hover:shadow-2xl",
-        "hover:bg-white/20 cursor-pointer",
+        "hover:bg-foreground/20 cursor-pointer",
         className
       )}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             {Icon && (
-              <div className="p-2 rounded-lg bg-white/10">
-                <Icon className="w-5 h-5 text-white" />
+              <div className="p-2 rounded-lg bg-foreground/10">
+                <Icon className="w-5 h-5 text-foreground" />
               </div>
             )}
-            <h3 className="text-sm font-medium text-white/80">{title}</h3>
+            <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
           </div>
         </div>
-        
+
         <div className="space-y-1">
           <div className={cn(
             "text-3xl font-bold transition-colors",

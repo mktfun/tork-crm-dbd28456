@@ -11,27 +11,27 @@ interface DashboardChartsGridProps {
   metrics: any;
 }
 
-export function DashboardChartsGrid({ 
-  dateRange, 
-  chartType, 
-  metrics 
+export function DashboardChartsGrid({
+  dateRange,
+  chartType,
+  metrics
 }: DashboardChartsGridProps) {
-  
+
   if (metrics.isLoading) {
     return (
       <div className="space-y-6">
         {/* Crescimento Mensal - Área Vermelha */}
         <div className="grid grid-cols-1">
           <AppCard className="p-6 flex items-center justify-center h-80">
-            <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </AppCard>
         </div>
-        
+
         {/* Gráficos de Pizza - Área Verde */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {[...Array(2)].map((_, i) => (
             <AppCard key={i} className="p-6 flex items-center justify-center h-80">
-              <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </AppCard>
           ))}
         </div>
@@ -43,22 +43,22 @@ export function DashboardChartsGrid({
     <div className="space-y-6">
       {/* ÁREA VERMELHA - GRÁFICO DE CRESCIMENTO MENSAL (LINHA INTEIRA) */}
       <div className="grid grid-cols-1">
-        <GrowthChart 
+        <GrowthChart
           data={metrics.monthlyGrowthData}
           type={chartType}
           dateRange={dateRange}
           insight={metrics.insightCrescimento}
         />
       </div>
-      
+
       {/* ÁREA VERDE - GRÁFICOS DE PIZZA LADO A LADO */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <BranchDistributionChart 
+        <BranchDistributionChart
           data={metrics.branchDistributionData}
           dateRange={dateRange}
           insight={metrics.insightRamoPrincipal}
         />
-        <CompanyDistributionChart 
+        <CompanyDistributionChart
           data={metrics.companyDistributionData}
           dateRange={dateRange}
           insight={metrics.insightSeguradoraPrincipal}
