@@ -160,7 +160,7 @@ export function DreTable({ className }: DreTableProps) {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <AppCard className={`border-none shadow-sm bg-transparent ${className || ''}`}>
+      <AppCard className={className}>
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 pb-4 px-4 sticky left-0">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10 hidden sm:block">
@@ -186,11 +186,11 @@ export function DreTable({ className }: DreTableProps) {
           {!hasData ? (
             <EmptyDreState />
           ) : (
-            <div className="overflow-auto max-h-[70vh] border rounded-md relative">
+            <div className="overflow-auto max-h-[70vh] relative">
               <Table>
                 <TableHeader className={stickyHeaderClass}>
                   <TableRow className="hover:bg-transparent border-none">
-                    <TableHead className={`${stickyColClass} min-w-[200px] font-bold pl-6 text-primary`}>Categoria</TableHead>
+                    <TableHead className={`${stickyColClass} min-w-[200px] font-bold pl-6 text-primary bg-card`}>Categoria</TableHead>
                     <TableHead className="text-right min-w-[100px] font-semibold bg-primary/5 mx-0.5 border-r border-border/50">YTD</TableHead>
                     {MONTH_LABELS.map((label, i) => (
                       <TableHead key={i} className={`text-right min-w-[100px] font-medium ${i === currentMonthIndex ? 'bg-primary/10 text-primary font-bold border-x border-primary/20' : ''}`}>
@@ -204,8 +204,8 @@ export function DreTable({ className }: DreTableProps) {
                 </TableHeader>
                 <TableBody>
                   {/* SEÇÃO DE RECEITAS */}
-                  <TableRow className="bg-emerald-500/5 hover:bg-emerald-500/10 border-border">
-                    <TableCell colSpan={15} className={`font-bold text-emerald-600 dark:text-emerald-400 pl-6 ${paddingClass} ${stickyColClass} bg-emerald-500/5`}>
+                  <TableRow className="bg-emerald-500/15 hover:bg-emerald-500/20 border-border">
+                    <TableCell colSpan={15} className={`font-bold text-emerald-600 dark:text-emerald-400 pl-6 ${paddingClass} ${stickyColClass} bg-card`}>
                       <div className="flex items-center gap-2">
                         <TrendingUp className="w-4 h-4" />
                         (+) RECEITAS
@@ -214,7 +214,7 @@ export function DreTable({ className }: DreTableProps) {
                   </TableRow>
                   {revenueRows.map((row, idx) => (
                     <TableRow key={`rev-${idx}`} className={`hover:bg-muted/50 border-border transition-colors ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}>
-                      <TableCell className={`${paddingClass} pl-6 text-muted-foreground font-medium ${stickyColClass} transition-colors ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}>
+                      <TableCell className={`${paddingClass} pl-6 text-muted-foreground font-medium ${stickyColClass} transition-colors ${idx % 2 === 0 ? 'bg-card' : 'bg-card/50'}`}>
                         <div className="truncate max-w-[180px]" title={row.category}>{row.category}</div>
                       </TableCell>
                       <TableCell className={`${paddingClass} text-right tabular-nums bg-primary/5 font-medium border-r border-border/50`}>
@@ -246,8 +246,8 @@ export function DreTable({ className }: DreTableProps) {
                     </TableRow>
                   ))}
                   {/* Subtotal Receitas */}
-                  <TableRow className="bg-emerald-500/10 border-t-2 border-emerald-500/20 hover:bg-emerald-500/20 sticky bottom-0 z-10 shadow-sm font-medium">
-                    <TableCell className={`${paddingClass} font-bold text-emerald-700 dark:text-emerald-300 pl-6 ${stickyColClass} bg-emerald-100/80 dark:bg-emerald-900/80 backdrop-blur`}>
+                  <TableRow className="bg-emerald-500/15 border-t-2 border-emerald-500/20 hover:bg-emerald-500/20 sticky bottom-0 z-10 shadow-sm font-medium">
+                    <TableCell className={`${paddingClass} font-bold text-emerald-700 dark:text-emerald-300 pl-6 ${stickyColClass} bg-card`}>
                       = Total Receitas
                     </TableCell>
                     <TableCell className={`${paddingClass} text-right text-emerald-700 dark:text-emerald-300 tabular-nums bg-emerald-500/15 border-r border-emerald-500/30`}>
@@ -269,8 +269,8 @@ export function DreTable({ className }: DreTableProps) {
                   </TableRow>
 
                   {/* SEÇÃO DE DESPESAS */}
-                  <TableRow className="bg-rose-500/5 hover:bg-rose-500/10 border-border">
-                    <TableCell colSpan={15} className={`font-bold text-rose-600 dark:text-rose-400 pl-6 ${paddingClass} ${stickyColClass} bg-rose-500/5`}>
+                  <TableRow className="bg-rose-500/15 hover:bg-rose-500/20 border-border">
+                    <TableCell colSpan={15} className={`font-bold text-rose-600 dark:text-rose-400 pl-6 ${paddingClass} ${stickyColClass} bg-card`}>
                       <div className="flex items-center gap-2">
                         <TrendingDown className="w-4 h-4" />
                         (-) DESPESAS
@@ -279,7 +279,7 @@ export function DreTable({ className }: DreTableProps) {
                   </TableRow>
                   {expenseRows.map((row, idx) => (
                     <TableRow key={`exp-${idx}`} className={`hover:bg-muted/50 border-border transition-colors ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}>
-                      <TableCell className={`${paddingClass} pl-6 text-muted-foreground font-medium ${stickyColClass} transition-colors ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}>
+                      <TableCell className={`${paddingClass} pl-6 text-muted-foreground font-medium ${stickyColClass} transition-colors ${idx % 2 === 0 ? 'bg-card' : 'bg-card/50'}`}>
                         <div className="truncate max-w-[180px]" title={row.category}>{row.category}</div>
                       </TableCell>
                       <TableCell className={`${paddingClass} text-right tabular-nums bg-primary/5 font-medium border-r border-border/50`}>
@@ -311,8 +311,8 @@ export function DreTable({ className }: DreTableProps) {
                     </TableRow>
                   ))}
                   {/* Subtotal Despesas */}
-                  <TableRow className="bg-rose-500/10 border-t-2 border-rose-500/20 hover:bg-rose-500/20 font-medium">
-                    <TableCell className={`${paddingClass} font-bold text-rose-700 dark:text-rose-300 pl-6 ${stickyColClass} bg-rose-100/80 dark:bg-rose-900/80 backdrop-blur`}>
+                  <TableRow className="bg-rose-500/15 border-t-2 border-rose-500/20 hover:bg-rose-500/20 font-medium">
+                    <TableCell className={`${paddingClass} font-bold text-rose-700 dark:text-rose-300 pl-6 ${stickyColClass} bg-card`}>
                       = Total Despesas
                     </TableCell>
                     <TableCell className={`${paddingClass} text-right text-rose-700 dark:text-rose-300 tabular-nums bg-rose-500/15 border-r border-rose-500/30`}>
@@ -335,7 +335,7 @@ export function DreTable({ className }: DreTableProps) {
 
                   {/* RESULTADO LÍQUIDO */}
                   <TableRow className={`border-t-4 shadow-md ${summary.netResult >= 0 ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-rose-500/20 border-rose-500/40'}`}>
-                    <TableCell className={`${paddingClass} font-black text-lg pl-6 ${stickyColClass} ${summary.netResult >= 0 ? 'bg-emerald-100/90 dark:bg-emerald-900/90' : 'bg-rose-100/90 dark:bg-rose-900/90'}`}>
+                    <TableCell className={`${paddingClass} font-black text-lg pl-6 ${stickyColClass} ${summary.netResult >= 0 ? 'bg-emerald-500/20' : 'bg-rose-500/20'} bg-card`}>
                       <div className="flex items-center gap-2">
                         <Calculator className="w-5 h-5" />
                         RESULTADO
