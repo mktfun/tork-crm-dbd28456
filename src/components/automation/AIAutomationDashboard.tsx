@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Bot, Loader2, Settings } from 'lucide-react';
+import { Bot, Loader2 } from 'lucide-react';
 import { useCRMPipelines } from '@/hooks/useCRMPipelines';
 import { useCRMStages } from '@/hooks/useCRMDeals';
 import { useCrmAiSettings } from '@/hooks/useCrmAiSettings';
@@ -13,8 +13,8 @@ import { NewPipelineModal } from '@/components/crm/NewPipelineModal';
 import { NewStageModal } from '@/components/crm/NewStageModal';
 import { StageEditModal } from '@/components/crm/StageEditModal';
 import { PipelineEditModal } from '@/components/crm/PipelineEditModal';
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { IntegrationsPanel } from './IntegrationsPanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AutomationConfigTab } from './AutomationConfigTab';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
@@ -131,32 +131,27 @@ export function AIAutomationDashboard() {
 
   return (
     <div className="h-full flex flex-col bg-background">
-      {/* Header com Botão de Config Global */}
-      <div className="border-b px-6 py-3 bg-background flex justify-between items-center">
+      {/* Header */}
+      <div className="border-b px-6 py-3 bg-background">
         <h1 className="font-semibold text-lg flex items-center gap-2">
           <Bot className="h-5 w-5 text-primary" />
           Automação de Vendas
         </h1>
-
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Configurações Globais
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
-            <div className="mt-6">
-              <IntegrationsPanel />
-            </div>
-          </SheetContent>
-        </Sheet>
       </div>
 
-      {/* Main Content - Split View */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 min-h-0 overflow-hidden">
-        <div className="lg:col-span-3 min-h-0 overflow-hidden">
-          <SalesFlowTimeline
+      {/* Tabs */}
+      <Tabs defaultValue="etapas" className="flex-1 flex flex-col min-h-0">
+        <div className="border-b px-6">
+          <TabsList className="h-12">
+            <TabsTrigger value="etapas">Configurar Etapas</TabsTrigger>
+            <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="etapas" className="flex-1 m-0 p-4 overflow-hidden">
+          <div className="h-full grid grid-cols-1 lg:grid-cols-5 gap-4 min-h-0 overflow-hidden">
+            <div className="lg:col-span-3 min-h-0 overflow-hidden">
+              <SalesFlowTimeline
             pipelines={pipelines}
             selectedPipelineId={selectedPipelineId}
             onSelectPipeline={setSelectedPipelineId}
@@ -173,18 +168,26 @@ export function AIAutomationDashboard() {
             onEditPipeline={() => setEditingPipeline(selectedPipeline)}
             onAddStage={() => setShowNewStage(true)}
             onAddPipeline={() => setShowNewPipeline(true)}
-            isSaving={upsertSetting.isPending}
-          />
-        </div>
-        <div className="lg:col-span-2 min-h-0 overflow-hidden">
-          <AISandbox
+                isSaving={upsertSetting.isPending}
+              />
+            </div>
+            <div className="lg:col-span-2 min-h-0 overflow-hidden">
+              <AISandbox
             selectedStage={selectedStage}
             selectedPipeline={selectedPipeline}
             aiSetting={selectedAiSetting}
-            pipelineDefault={pipelineDefault}
-          />
-        </div>
-      </div>
+                pipelineDefault={pipelineDefault}
+              />
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="configuracoes" className="flex-1 m-0 overflow-y-auto">
+          <div className="max-w-5xl mx-auto p-6">
+            <AutomationConfigTab />
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Modals */}
       <NewPipelineModal open={showNewPipeline} onOpenChange={setShowNewPipeline} />

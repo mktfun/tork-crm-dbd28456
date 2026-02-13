@@ -6,8 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import { Copy, Check, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -47,7 +46,7 @@ export function IntegrationsPanel() {
                 </div>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6">
                 {/* Chatwoot Connection */}
                 <Card>
                     <CardHeader>
@@ -77,62 +76,6 @@ export function IntegrationsPanel() {
                         </Button>
                     </CardContent>
                 </Card>
-
-                {/* Global Model Settings */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Cérebro da IA</CardTitle>
-                        <CardDescription>Parâmetros globais do modelo.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label>Modelo</Label>
-                            <Select
-                                value={config?.model || 'gpt-4o'}
-                                onValueChange={(val) => handleSaveConfig('model', val)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecione o modelo" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="gpt-4o">GPT-4o (Recomendado)</SelectItem>
-                                    <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
-                                    <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo (Rápido)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <div className="flex justify-between">
-                                <Label>Criatividade (Temperatura): {config?.temperature ?? 0.7}</Label>
-                            </div>
-                            <Slider
-                                value={[config?.temperature ?? 0.7]}
-                                max={1.0}
-                                step={0.1}
-                                onValueChange={(vals) => handleSaveConfig('temperature', vals[0])}
-                            />
-                            <p className="text-xs text-muted-foreground pt-1">
-                                Valores mais altos tornam a IA mais criativa, mas menos previsível.
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* n8n Connection (Optional View) */}
-            <Card className="border-dashed">
-                <CardHeader>
-                    <CardTitle className="text-sm font-medium">Configuração Avançada (n8n)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                        O Webhook do n8n é configurado via Segredos do Supabase (Server-side) por motivos de segurança.
-                        <br />
-                        Para alterar, use o comando CLI: <code>npx supabase secrets set N8N_WEBHOOK_URL=...</code>
-                    </p>
-                </CardContent>
-            </Card>
         </div>
     );
 }
