@@ -45,13 +45,15 @@ serve(async (req) => {
       .eq('user_id', user.id);
 
     if (contact_id) {
-      clientQuery = clientQuery.eq('id', contact_id);
+      // Tenta por UUID (id) ou por chatwoot_contact_id (numérico)
+      const isUuid = contact_id.length > 10;
+      clientQuery = clientQuery.eq(isUuid ? 'id' : 'chatwoot_contact_id', isUuid ? contact_id : parseInt(contact_id));
     }
 
-    const { data: client, error: clientError } = await clientQuery.limit(1).single();
+    const { data: client, error: clientError } = await clientQuery.limit(1).maybeSingle();
 
     if (clientError || !client) {
-      throw new Error(contact_id ? 'Cliente não encontrado com o ID informado' : 'Nenhum cliente encontrado para teste');
+      throw new Error(contact_id ? 'Cliente não encontrado com o ID informado. Verifique se é um UUID válido ou chatwoot_contact_id.' : 'Nenhum cliente encontrado para teste');
     }
 
     // 2. Buscar um pipeline e etapa do usuário
