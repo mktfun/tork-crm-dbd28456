@@ -1,30 +1,24 @@
 import { useState, useMemo } from 'react';
 import { format, startOfDay, endOfDay } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import {
     TrendingUp,
     TrendingDown,
     Check,
     Clock,
     Info,
-    Plus
 } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 
-import { cn } from '@/lib/utils';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AppCard } from '@/components/ui/app-card';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-import { TransactionKpiCard, formatCurrency } from './shared/TransactionKpiCard';
+import { TransactionKpiCard } from './shared/TransactionKpiCard';
 import { TransactionsTable, Transaction } from './shared/TransactionsTable';
 import { NovaReceitaModal } from './NovaReceitaModal';
 import { NovaDespesaModal } from './NovaDespesaModal';
 import { TransactionDetailsSheet } from './TransactionDetailsSheet';
-// import { SettleTransactionModal } from './SettleTransactionModal';
 import { FaturamentoChart } from './faturamento/FaturamentoChart';
 import { FaturamentoBreakdown } from './faturamento/FaturamentoBreakdown';
 import { MetasCard } from './faturamento/MetasCard';
@@ -49,8 +43,6 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
     const [transactionType, setTransactionType] = useState<TransactionType>('receitas');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('efetivado');
     const [detailsId, setDetailsId] = useState<string | null>(null);
-    // const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    // const [settleModalOpen, setSettleModalOpen] = useState(false);
 
     // Datas normalizadas
     const { startDate, endDate } = useMemo(() => {
@@ -68,7 +60,7 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
     const { data: periodRevenue = [], isLoading: loadingPeriodRevenue } = useRevenueTransactions(startDate, endDate);
     const { data: allRevenue = [], isLoading: loadingAllRevenue } = useRevenueTransactions('2000-01-01', '2100-12-31');
 
-    // Despesas (já usa o hook correto, mas precisamos filtrar por período)
+    // Despesas
     const { data: allExpenses = [], isLoading: loadingExpenses } = useRecentTransactions('expense');
 
     // Summary e CashFlow
@@ -76,18 +68,17 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
     const { data: cashFlowData = [], isLoading: loadingCashFlow } = useCashFlowData(startDate, endDate);
 
     // ========== FILTERED TRANSACTIONS ==========
+    // Efetivado = reconciled === true (conciliado via aba Conciliação)
+    // Pendente  = reconciled === false (aguardando conciliação)
 
     const displayTransactions = useMemo((): Transaction[] => {
         if (transactionType === 'receitas') {
             if (statusFilter === 'pendente') {
-                // Todas as pendentes históricas
                 return allRevenue.filter(tx => !tx.reconciled);
             } else {
-                // Confirmadas do período
                 return periodRevenue.filter(tx => tx.reconciled);
             }
         } else {
-            // Despesas - filtrar por período para efetivadas
             const txDate = (tx: any) => tx.transaction_date ? new Date(tx.transaction_date) : null;
             const inPeriod = (d: Date | null) => {
                 if (!d) return false;
@@ -137,78 +128,16 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
         }
     }, [transactionType, periodRevenue, allExpenses, summary]);
 
-    // ========== SELECTION HANDLERS ==========
-
-    // ========== SELECTION HANDLERS ==========
-
-    // Selection logic removed per new requirements
-    /*
-    const selectableTransactions = displayTransactions.filter(tx => !tx.is_confirmed && tx.legacy_status === null);
-
-    const handleToggleSelect = (id: string) => {
-        const tx = displayTransactions.find(t => t.id === id);
-        if (tx?.is_confirmed || tx?.legacy_status !== null) return;
-
-        setSelectedIds(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) {
-                next.delete(id);
-            } else {
-                next.add(id);
-            }
-            return next;
-        });
-    };
-
-    const handleSelectAll = (checked: boolean) => {
-        if (checked) {
-            setSelectedIds(new Set(selectableTransactions.map(tx => tx.id)));
-        } else {
-            setSelectedIds(new Set());
-        }
-    };
-
-    const handleOpenSettleModal = () => {
-        if (selectedIds.size === 0) return;
-        setSettleModalOpen(true);
-    };
-
-    const handleSettleSuccess = () => {
-        setSelectedIds(new Set());
-    };
-    */
-
-    // Reset selection when switching tabs
-    const handleTypeChange = (type: TransactionType) => {
-        setTransactionType(type);
-        // setSelectedIds(new Set());
-    };
-
-    const handleStatusChange = (status: StatusFilter) => {
-        setStatusFilter(status);
-        // setSelectedIds(new Set());
-    };
-
-    // ========== COMPUTED VALUES ==========
-
-    /*
-    const selectedTotalAmount = useMemo(() => {
-        return displayTransactions
-            .filter(tx => selectedIds.has(tx.id))
-            .reduce((sum, tx) => sum + Math.abs(tx.amount || tx.total_amount || 0), 0);
-    }, [displayTransactions, selectedIds]);
-    */
+    // ========== COMPUTED ==========
 
     const syncedCount = displayTransactions.filter(tx => tx.legacy_status !== null && !tx.reconciled).length;
-
-    // const showSelection = statusFilter === 'pendente';
     const isPendente = statusFilter === 'pendente';
 
     return (
         <div className="space-y-6">
             {/* Header with Type Toggle */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <Tabs value={transactionType} onValueChange={(v) => handleTypeChange(v as TransactionType)} className="w-full sm:w-auto">
+                <Tabs value={transactionType} onValueChange={(v) => setTransactionType(v as TransactionType)} className="w-full sm:w-auto">
                     <TabsList className="grid grid-cols-2 w-full sm:w-[300px] bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl">
                         <TabsTrigger value="receitas" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
                             <TrendingUp className="w-4 h-4" />
@@ -228,11 +157,11 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
 
             {/* Status Toggle + KPIs */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <Tabs value={statusFilter} onValueChange={(val) => val && handleStatusChange(val as StatusFilter)} className="w-auto">
+                <Tabs value={statusFilter} onValueChange={(val) => val && setStatusFilter(val as StatusFilter)} className="w-auto">
                     <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-9">
                         <TabsTrigger value="efetivado" className="gap-2 text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
                             <Check className="w-4 h-4" />
-                            Efetivado
+                            Conciliado
                         </TabsTrigger>
                         <TabsTrigger value="pendente" className="gap-2 text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
                             <Clock className="w-4 h-4" />
@@ -275,7 +204,6 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                 </div>
             )}
 
-
             {/* Sync Info */}
             {syncedCount > 0 && isPendente && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 text-sm">
@@ -301,13 +229,13 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                         <div>
                             <CardTitle className="text-lg font-semibold text-foreground">
                                 {transactionType === 'receitas'
-                                    ? (isPendente ? 'Receitas Pendentes' : 'Receitas Confirmadas')
-                                    : (isPendente ? 'Despesas Pendentes' : 'Despesas Pagas')}
+                                    ? (isPendente ? 'Receitas Pendentes' : 'Receitas Conciliadas')
+                                    : (isPendente ? 'Despesas Pendentes' : 'Despesas Conciliadas')}
                             </CardTitle>
                             <CardDescription>
-                                {transactionType === 'receitas'
-                                    ? 'Gestão de entradas e recebimentos'
-                                    : 'Gestão de saídas e pagamentos'}
+                                {isPendente
+                                    ? 'Aguardando conciliação na aba Conciliação'
+                                    : 'Transações conciliadas no período selecionado'}
                             </CardDescription>
                         </div>
                     </div>
@@ -337,22 +265,6 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
                 open={!!detailsId}
                 onClose={() => setDetailsId(null)}
             />
-
-            {/* Settle Modal - Removed */}
-            {/* 
-            <SettleTransactionModal
-                open={settleModalOpen}
-                onClose={() => setSettleModalOpen(false)}
-                transactionIds={
-                    Array.from(selectedIds).map(id => {
-                        const tx = displayTransactions.find(t => t.id === id);
-                        return tx?.related_entity_id || id;
-                    })
-                }
-                totalAmount={selectedTotalAmount}
-                onSuccess={handleSettleSuccess}
-            />
-            */}
         </div>
     );
 }
