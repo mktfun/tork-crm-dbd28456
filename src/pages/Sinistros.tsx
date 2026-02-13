@@ -107,15 +107,15 @@ export default function Sinistros() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <ShieldAlert className="w-6 h-6" />
               Sinistros
             </h1>
-            <p className="text-white/60">Gerencie ocorrências e processos de sinistro</p>
+            <p className="text-foreground/60">Gerencie ocorrências e processos de sinistro</p>
           </div>
         </div>
 
-        <Alert className="border-red-500 bg-red-500/10">
+        <Alert className="border-destructive/50 bg-destructive/10">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             Erro ao carregar sinistros.
@@ -137,11 +137,11 @@ export default function Sinistros() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <ShieldAlert className="w-6 h-6" />
             Sinistros
           </h1>
-          <p className="text-white/60">Gerencie ocorrências e processos de sinistro</p>
+          <p className="text-foreground/60">Gerencie ocorrências e processos de sinistro</p>
         </div>
         <SinistroFormModal onSuccess={() => refetch()} />
       </div>
@@ -151,8 +151,8 @@ export default function Sinistros() {
         <AppCard className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-white/60">Total</p>
-              <p className="text-2xl font-bold text-white">{stats.total}</p>
+              <p className="text-sm text-foreground/60">Total</p>
+              <p className="text-2xl font-bold text-foreground">{stats.total}</p>
             </div>
             <ShieldAlert className="w-8 h-8 text-blue-400" />
           </div>
@@ -161,7 +161,7 @@ export default function Sinistros() {
         <AppCard className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-white/60">Abertos</p>
+              <p className="text-sm text-foreground/60">Abertos</p>
               <p className="text-2xl font-bold text-yellow-400">{stats.abertos}</p>
             </div>
             <AlertTriangle className="w-8 h-8 text-yellow-400" />
@@ -171,7 +171,7 @@ export default function Sinistros() {
         <AppCard className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-white/60">Em Análise</p>
+              <p className="text-sm text-foreground/60">Em Análise</p>
               <p className="text-2xl font-bold text-orange-400">{stats.emAnalise}</p>
             </div>
             <Clock className="w-8 h-8 text-orange-400" />
@@ -181,7 +181,7 @@ export default function Sinistros() {
         <AppCard className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-white/60">Aprovados</p>
+              <p className="text-sm text-foreground/60">Aprovados</p>
               <p className="text-2xl font-bold text-green-400">{stats.aprovados}</p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-400" />
@@ -191,8 +191,8 @@ export default function Sinistros() {
         <AppCard className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-white/60">Valor Total</p>
-              <p className="text-lg font-bold text-white">
+              <p className="text-sm text-foreground/60">Valor Total</p>
+              <p className="text-lg font-bold text-foreground">
                 {stats.valorTotal.toLocaleString('pt-BR', {
                   style: 'currency',
                   currency: 'BRL'
@@ -220,14 +220,14 @@ export default function Sinistros() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-white/60" />
-              <span className="text-sm text-white/60">Filtros:</span>
+              <Filter className="w-4 h-4 text-foreground/60" />
+              <span className="text-sm text-foreground/60">Filtros:</span>
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
-              <p className="text-sm text-white/60 mb-2">Status:</p>
+              <p className="text-sm text-foreground/60 mb-2">Status:</p>
               <div className="flex flex-wrap gap-2">
                 {statusOptions.map((status) => (
                   <Button
@@ -243,7 +243,7 @@ export default function Sinistros() {
             </div>
 
             <div className="flex-1">
-              <p className="text-sm text-white/60 mb-2">Tipo:</p>
+              <p className="text-sm text-foreground/60 mb-2">Tipo:</p>
               <div className="flex flex-wrap gap-2">
                 {typeOptions.slice(0, 6).map((type) => (
                   <Button
@@ -290,11 +290,11 @@ export default function Sinistros() {
       {!isLoading && (
         <div className="grid gap-4">
           {filteredSinistros.map((sinistro) => (
-            <AppCard key={sinistro.id} className="hover:bg-white/5 transition-colors">
+            <AppCard key={sinistro.id} className="hover:bg-muted transition-colors">
               <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
-                    <h3 className="font-semibold text-white text-lg">
+                    <h3 className="font-semibold text-foreground text-lg">
                       {sinistro.claim_number || `#${sinistro.id.slice(-8)}`}
                     </h3>
                     <Badge className={`${getStatusColor(sinistro.status)} text-white flex items-center gap-1`}>
@@ -313,31 +313,31 @@ export default function Sinistros() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm mb-4">
                     <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-white/40" />
+                      <User className="w-4 h-4 text-foreground/40" />
                       <div>
-                        <span className="text-white/60">Cliente:</span>
-                        <p className="text-white font-medium">{sinistro.client_name || 'N/A'}</p>
+                        <span className="text-foreground/60">Cliente:</span>
+                        <p className="text-foreground font-medium">{sinistro.client_name || 'N/A'}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-white/40" />
+                      <FileText className="w-4 h-4 text-foreground/40" />
                       <div>
-                        <span className="text-white/60">Apólice:</span>
-                        <p className="text-white font-medium">{sinistro.policy_number || 'N/A'}</p>
+                        <span className="text-foreground/60">Apólice:</span>
+                        <p className="text-foreground font-medium">{sinistro.policy_number || 'N/A'}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-white/40" />
+                      <AlertTriangle className="w-4 h-4 text-foreground/40" />
                       <div>
-                        <span className="text-white/60">Tipo:</span>
-                        <p className="text-white font-medium">{sinistro.claim_type}</p>
+                        <span className="text-foreground/60">Tipo:</span>
+                        <p className="text-foreground font-medium">{sinistro.claim_type}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-white/40" />
+                      <Calendar className="w-4 h-4 text-foreground/40" />
                       <div>
-                        <span className="text-white/60">Ocorrência:</span>
-                        <p className="text-white font-medium">
+                        <span className="text-foreground/60">Ocorrência:</span>
+                        <p className="text-foreground font-medium">
                           {formatDate(sinistro.occurrence_date)}
                         </p>
                       </div>
@@ -346,22 +346,22 @@ export default function Sinistros() {
 
                   {sinistro.location_occurrence && (
                     <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="w-4 h-4 text-white/40" />
-                      <span className="text-white/60 text-sm">Local:</span>
-                      <p className="text-white/80 text-sm">{sinistro.location_occurrence}</p>
+                      <MapPin className="w-4 h-4 text-foreground/40" />
+                      <span className="text-foreground/60 text-sm">Local:</span>
+                      <p className="text-foreground/80 text-sm">{sinistro.location_occurrence}</p>
                     </div>
                   )}
 
                   <div className="mb-3">
-                    <span className="text-white/60 text-sm">Descrição:</span>
-                    <p className="text-white/80 text-sm mt-1">{sinistro.description}</p>
+                    <span className="text-foreground/60 text-sm">Descrição:</span>
+                    <p className="text-foreground/80 text-sm mt-1">{sinistro.description}</p>
                   </div>
 
                   <div className="flex flex-wrap gap-4 text-sm">
                     {sinistro.claim_amount && (
                       <div className="flex items-center gap-1">
                         <DollarSign className="w-4 h-4 text-green-400" />
-                        <span className="text-white/60">Solicitado:</span>
+                        <span className="text-foreground/60">Solicitado:</span>
                         <span className="text-green-400 font-semibold">
                           {sinistro.claim_amount.toLocaleString('pt-BR', {
                             style: 'currency',
@@ -374,7 +374,7 @@ export default function Sinistros() {
                     {sinistro.approved_amount && (
                       <div className="flex items-center gap-1">
                         <CheckCircle className="w-4 h-4 text-blue-400" />
-                        <span className="text-white/60">Aprovado:</span>
+                        <span className="text-foreground/60">Aprovado:</span>
                         <span className="text-blue-400 font-semibold">
                           {sinistro.approved_amount.toLocaleString('pt-BR', {
                             style: 'currency',
@@ -386,8 +386,8 @@ export default function Sinistros() {
 
                     {sinistro.insurance_company && (
                       <div>
-                        <span className="text-white/60">Seguradora:</span>
-                        <span className="text-white ml-1">{sinistro.insurance_company}</span>
+                        <span className="text-foreground/60">Seguradora:</span>
+                        <span className="text-foreground ml-1">{sinistro.insurance_company}</span>
                       </div>
                     )}
                   </div>
@@ -423,13 +423,13 @@ export default function Sinistros() {
       {/* Estado vazio */}
       {!isLoading && filteredSinistros.length === 0 && (
         <AppCard className="text-center py-12">
-          <ShieldAlert className="w-12 h-12 text-white/20 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-white mb-2">
+          <ShieldAlert className="w-12 h-12 text-foreground/20 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">
             {sinistros.length === 0
               ? 'Nenhum sinistro registrado'
               : 'Nenhum sinistro encontrado'}
           </h3>
-          <p className="text-white/60 mb-6">
+          <p className="text-foreground/60 mb-6">
             {sinistros.length === 0
               ? 'Registre o primeiro sinistro para começar o gerenciamento.'
               : searchTerm || selectedStatus !== 'Todos' || selectedType !== 'Todos'

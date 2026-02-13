@@ -28,7 +28,7 @@ export default function ClientDetails() {
   const { policies, loading: policiesLoading } = usePolicies();
   const { transactions, loading: transactionsLoading } = useTransactions();
   const { transactionTypes } = useTransactionTypes();
-  
+
   const [client, setClient] = useState<Client | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedClient, setEditedClient] = useState<Client | null>(null);
@@ -76,7 +76,7 @@ export default function ClientDetails() {
     return (
       <div className="max-w-7xl mx-auto">
         <AppCard className="p-8 text-center">
-          <h3 className="text-lg font-medium text-white mb-2">
+          <h3 className="text-lg font-medium text-foreground mb-2">
             Carregando dados do cliente...
           </h3>
         </AppCard>
@@ -88,10 +88,10 @@ export default function ClientDetails() {
     return (
       <div className="max-w-7xl mx-auto">
         <AppCard className="p-8 text-center">
-          <h3 className="text-lg font-medium text-white mb-2">
+          <h3 className="text-lg font-medium text-foreground mb-2">
             Cliente não encontrado
           </h3>
-          <p className="text-slate-300 mb-4">
+          <p className="text-muted-foreground mb-4">
             O cliente solicitado não existe ou foi removido.
           </p>
           <Button onClick={() => navigate('/clients')}>
@@ -146,9 +146,9 @@ export default function ClientDetails() {
 
         <div className="lg:col-span-2 space-y-6">
           <ClientPoliciesHistory policies={clientPolicies} />
-          <ClientFinancialHistory 
-            transactions={clientTransactions} 
-            transactionTypes={mappedTransactionTypes} 
+          <ClientFinancialHistory
+            transactions={clientTransactions}
+            transactionTypes={mappedTransactionTypes}
           />
           <ClientInteractionsHistory />
         </div>

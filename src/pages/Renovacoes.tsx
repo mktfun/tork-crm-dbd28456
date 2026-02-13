@@ -16,7 +16,7 @@ import { ExportRenewalsModal } from '@/components/policies/ExportRenewalsModal';
 
 export default function Renovacoes() {
   usePageTitle('Renovações');
-  
+
   const { updatePolicy } = usePolicies();
   const { getCompanyName, loading: companiesLoading } = useCompanyNames();
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
@@ -24,13 +24,13 @@ export default function Renovacoes() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPeriod, setFilterPeriod] = useState<string>('60');
   const [currentPage, setCurrentPage] = useState(1);
-  
+
   const pageSize = 12; // 12 cards por página
 
   // Usar o novo hook especializado
   // Converter para número: "all" = -1, outros = parseInt
   const periodNumber = filterPeriod === 'all' ? -1 : parseInt(filterPeriod);
-  
+
   const { renewals, totalCount, loading, error, refetch } = useSupabaseRenewals(
     {
       period: periodNumber,
@@ -73,7 +73,7 @@ export default function Renovacoes() {
     if (diasParaVencer < 0 && status === 'Pendente') {
       return <Badge variant="destructive">Vencida - Pendente</Badge>;
     }
-    
+
     switch (status) {
       case 'Pendente':
         return <Badge variant="outline" className="text-yellow-400 border-yellow-500">Pendente</Badge>;
@@ -91,7 +91,7 @@ export default function Renovacoes() {
   };
 
   const getPriorityColor = (daysUntilExpiration: number) => {
-    if (daysUntilExpiration < 0) return 'border-red-500 bg-red-500/10';
+    if (daysUntilExpiration < 0) return 'border-destructive bg-destructive/10';
     if (daysUntilExpiration <= 15) return 'border-orange-500 bg-orange-500/10';
     if (daysUntilExpiration <= 30) return 'border-yellow-500 bg-yellow-500/10';
     return 'border-blue-500 bg-blue-500/10';
@@ -101,47 +101,47 @@ export default function Renovacoes() {
     <AppCard key={policy.id} className={`p-4 ${getPriorityColor(policy.diasParaVencer)}`}>
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="font-semibold text-white">{policy.policyNumber}</h3>
-          <p className="text-sm text-slate-400">{policy.clientName}</p>
+          <h3 className="font-semibold text-foreground">{policy.policyNumber}</h3>
+          <p className="text-sm text-muted-foreground">{policy.clientName}</p>
         </div>
         {getRenewalStatusBadge(policy.renewalStatus || 'Pendente', policy.diasParaVencer)}
       </div>
-      
+
       <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
         <div>
-          <p className="text-slate-400">Vencimento</p>
-          <p className="text-white font-medium">
+          <p className="text-muted-foreground">Vencimento</p>
+          <p className="text-foreground font-medium">
             {formatDate(policy.expirationDate)}
           </p>
         </div>
         <div>
-          <p className="text-slate-400">Dias restantes</p>
+          <p className="text-muted-foreground">Dias restantes</p>
           <p className={`font-bold ${policy.diasParaVencer < 0 ? 'text-red-400' : policy.diasParaVencer <= 15 ? 'text-orange-400' : 'text-blue-400'}`}>
             {policy.diasParaVencer < 0 ? `${Math.abs(policy.diasParaVencer)} dias atrasado` : `${policy.diasParaVencer} dias`}
           </p>
         </div>
         <div>
-          <p className="text-slate-400">Seguradora</p>
-          <p className="text-white font-medium">
+          <p className="text-muted-foreground">Seguradora</p>
+          <p className="text-foreground font-medium">
             {policy.companies?.name || 'Seguradora não especificada'}
           </p>
         </div>
         <div>
-          <p className="text-slate-400">Prêmio</p>
+          <p className="text-muted-foreground">Prêmio</p>
           <p className="text-green-400 font-bold">
             {policy.premiumValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
           </p>
         </div>
       </div>
-      
+
       <div className="space-y-3">
         <div>
-          <p className="text-xs text-slate-400">Status da Renovação</p>
+          <p className="text-xs text-muted-foreground">Status da Renovação</p>
           <Select
             value={policy.renewalStatus || 'Pendente'}
             onValueChange={(value) => updateRenewalStatus(policy.id, value as Policy['renewalStatus'])}
           >
-            <SelectTrigger className="w-full bg-slate-800 border-slate-600">
+            <SelectTrigger className="w-full bg-card border-border">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -158,7 +158,7 @@ export default function Renovacoes() {
         {policy.renewalStatus !== 'Renovada' && policy.renewalStatus !== 'Não Renovada' && (
           <Button
             onClick={() => handleRenewClick(policy)}
-            className="w-full bg-green-600 hover:bg-green-700 text-white text-sm py-2"
+            className="w-full bg-green-600 hover:bg-green-700 text-foreground text-sm py-2"
             size="sm"
           >
             <RotateCcw className="w-4 h-4 mr-2" />
@@ -177,8 +177,8 @@ export default function Renovacoes() {
             <div className="text-red-500 mb-4">
               <AlertTriangle size={48} className="mx-auto" />
             </div>
-            <h3 className="text-lg font-medium text-white mb-2">Erro ao carregar renovações</h3>
-            <p className="text-slate-400 mb-4">Não foi possível carregar os dados. Verifique sua conexão e tente novamente.</p>
+            <h3 className="text-lg font-medium text-foreground mb-2">Erro ao carregar renovações</h3>
+            <p className="text-muted-foreground mb-4">Não foi possível carregar os dados. Verifique sua conexão e tente novamente.</p>
             <Button onClick={refetch} variant="outline">
               Tentar novamente
             </Button>
@@ -192,8 +192,8 @@ export default function Renovacoes() {
     <div className="p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-white mb-2">Renovações</h1>
-          <p className="text-slate-400">Gerencie as renovações de apólices próximas ao vencimento</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Renovações</h1>
+          <p className="text-muted-foreground">Gerencie as renovações de apólices próximas ao vencimento</p>
         </div>
 
         {/* Filtros */}
@@ -202,14 +202,14 @@ export default function Renovacoes() {
             <div className="flex items-center gap-4 flex-wrap justify-between">
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-slate-400" />
-                  <span className="text-sm text-slate-300">Filtros:</span>
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Filtros:</span>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
-                  <label className="text-sm text-slate-400">Período:</label>
+                  <label className="text-sm text-muted-foreground">Período:</label>
                   <Select value={filterPeriod} onValueChange={(value) => handleFilterChange(value, 'period')}>
-                    <SelectTrigger className="w-32 bg-slate-800 border-slate-600">
+                    <SelectTrigger className="w-32 bg-card border-border">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -223,9 +223,9 @@ export default function Renovacoes() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="text-sm text-slate-400">Status:</label>
+                  <label className="text-sm text-muted-foreground">Status:</label>
                   <Select value={filterStatus} onValueChange={(value) => handleFilterChange(value, 'status')}>
-                    <SelectTrigger className="w-40 bg-slate-800 border-slate-600">
+                    <SelectTrigger className="w-40 bg-card border-border">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -240,7 +240,7 @@ export default function Renovacoes() {
                 </div>
 
                 {loading && (
-                  <div className="flex items-center gap-2 text-slate-400">
+                  <div className="flex items-center gap-2 text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span className="text-sm">Carregando...</span>
                   </div>
@@ -258,13 +258,13 @@ export default function Renovacoes() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, index) => (
               <AppCard key={index} className="p-4 animate-pulse">
-                <div className="h-4 bg-slate-700 rounded mb-2"></div>
-                <div className="h-3 bg-slate-700 rounded mb-4 w-2/3"></div>
+                <div className="h-4 bg-muted rounded mb-2"></div>
+                <div className="h-3 bg-muted rounded mb-4 w-2/3"></div>
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="h-3 bg-slate-700 rounded"></div>
-                  <div className="h-3 bg-slate-700 rounded"></div>
+                  <div className="h-3 bg-muted rounded"></div>
+                  <div className="h-3 bg-muted rounded"></div>
                 </div>
-                <div className="h-8 bg-slate-700 rounded"></div>
+                <div className="h-8 bg-muted rounded"></div>
               </AppCard>
             ))}
           </div>
@@ -280,7 +280,7 @@ export default function Renovacoes() {
                 <Pagination>
                   <PaginationContent>
                     <PaginationItem>
-                      <PaginationPrevious 
+                      <PaginationPrevious
                         href="#"
                         onClick={(e) => {
                           e.preventDefault();
@@ -289,7 +289,7 @@ export default function Renovacoes() {
                         className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
                       />
                     </PaginationItem>
-                    
+
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                       <PaginationItem key={page}>
                         <PaginationLink
@@ -304,9 +304,9 @@ export default function Renovacoes() {
                         </PaginationLink>
                       </PaginationItem>
                     ))}
-                    
+
                     <PaginationItem>
-                      <PaginationNext 
+                      <PaginationNext
                         href="#"
                         onClick={(e) => {
                           e.preventDefault();
@@ -322,20 +322,20 @@ export default function Renovacoes() {
           </>
         ) : (
           <AppCard className="p-8 text-center">
-            <div className="text-slate-600 mb-4">
+            <div className="text-muted-foreground mb-4">
               <CheckCircle size={48} className="mx-auto" />
             </div>
-            <h3 className="text-lg font-medium text-white mb-2">
+            <h3 className="text-lg font-medium text-foreground mb-2">
               Nenhuma renovação pendente
             </h3>
-            <p className="text-slate-400">
+            <p className="text-muted-foreground">
               Todas as apólices estão com renovações em dia ou não há apólices que atendem aos filtros selecionados.
             </p>
           </AppCard>
         )}
 
         {/* Modal de Renovação */}
-        <RenewPolicyModal 
+        <RenewPolicyModal
           policy={selectedPolicy}
           isOpen={isRenewModalOpen}
           onClose={() => setIsRenewModalOpen(false)}

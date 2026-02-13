@@ -37,13 +37,13 @@ export default function Tasks() {
   const pageSize = 10;
 
   // 🚀 **USAR O HOOK ATUALIZADO COM PAGINAÇÃO E ORDENAÇÃO**
-  const { 
-    tasks, 
-    totalCount, 
-    loading, 
-    addTask, 
-    updateTaskStatus, 
-    deleteTask 
+  const {
+    tasks,
+    totalCount,
+    loading,
+    addTask,
+    updateTaskStatus,
+    deleteTask
   } = useSupabaseTasks({
     pagination: { page: currentPage, pageSize },
     sortConfig
@@ -51,15 +51,15 @@ export default function Tasks() {
 
   const { clients } = useClients();
   const { policies } = usePolicies();
-  
+
   // Hook de filtros para a barra de pesquisa (aplicado no frontend)
-  const { 
-    searchTerm, 
-    setSearchTerm, 
-    statusFilter, 
-    setStatusFilter, 
-    priorityFilter, 
-    setPriorityFilter 
+  const {
+    searchTerm,
+    setSearchTerm,
+    statusFilter,
+    setStatusFilter,
+    priorityFilter,
+    setPriorityFilter
   } = useFilteredTasks();
 
   // Filtrar tarefas no frontend após receber do backend
@@ -67,13 +67,13 @@ export default function Tasks() {
     const matchesSearch = !searchTerm || task.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'todos' || task.status === statusFilter;
     const matchesPriority = priorityFilter === 'todas' || task.priority === priorityFilter;
-    
+
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
   // Calcular total de páginas baseado no total filtrado
   const totalPages = Math.ceil(totalCount / pageSize);
-  
+
   const form = useForm<TaskFormData>({
     defaultValues: {
       title: '',
@@ -93,7 +93,7 @@ export default function Tasks() {
       clientId: data.clientId === 'none' ? '' : data.clientId,
       policyId: data.policyId === 'none' ? '' : data.policyId,
     };
-    
+
     addTask(processedData);
     form.reset();
     setIsModalOpen(false);
@@ -123,7 +123,7 @@ export default function Tasks() {
     if (sortConfig.key !== key) {
       return <ArrowUpDown className="h-4 w-4 opacity-50" />;
     }
-    return sortConfig.direction === 'asc' 
+    return sortConfig.direction === 'asc'
       ? <ArrowUp className="h-4 w-4" />
       : <ArrowDown className="h-4 w-4" />;
   };
@@ -132,7 +132,7 @@ export default function Tasks() {
     <div className="container py-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Tarefas</h1>
-        
+
         <Button onClick={() => setIsModalOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Nova Tarefa
@@ -141,13 +141,13 @@ export default function Tasks() {
 
       {/* Barra de Filtros */}
       <div className="flex items-center gap-4 mb-6">
-        <Input 
-          placeholder="Buscar por título..." 
+        <Input
+          placeholder="Buscar por título..."
           className="max-w-xs"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
-        
+
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filtrar por Status" />
@@ -181,7 +181,7 @@ export default function Tasks() {
           </div>
         ) : filteredTasks.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">
-            {searchTerm || statusFilter !== 'todos' || priorityFilter !== 'todas' 
+            {searchTerm || statusFilter !== 'todos' || priorityFilter !== 'todas'
               ? 'Nenhuma tarefa encontrada com os filtros aplicados.'
               : 'Nenhuma tarefa cadastrada ainda. Clique em "Nova Tarefa" para começar.'
             }
@@ -190,11 +190,11 @@ export default function Tasks() {
           <>
             <Table>
               <TableHeader>
-                <TableRow className="border-b-slate-700">
+                <TableRow className="border-border">
                   <TableHead className="w-[50px]">Status</TableHead>
                   <TableHead>
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       onClick={() => handleSort('title')}
                       className="h-auto p-0 font-medium hover:bg-transparent"
                     >
@@ -204,8 +204,8 @@ export default function Tasks() {
                   </TableHead>
                   <TableHead>Cliente Associado</TableHead>
                   <TableHead>
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       onClick={() => handleSort('dueDate')}
                       className="h-auto p-0 font-medium hover:bg-transparent"
                     >
@@ -214,8 +214,8 @@ export default function Tasks() {
                     </Button>
                   </TableHead>
                   <TableHead>
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       onClick={() => handleSort('priority')}
                       className="h-auto p-0 font-medium hover:bg-transparent"
                     >
@@ -231,11 +231,11 @@ export default function Tasks() {
                 {filteredTasks.map(task => {
                   const cliente = clients.find(c => c.id === task.clientId);
                   const isOverdue = new Date(task.dueDate) < new Date() && task.status !== 'Concluída';
-                  
+
                   return (
-                    <TableRow key={task.id} className="border-b-slate-800">
+                    <TableRow key={task.id} className="border-muted">
                       <TableCell>
-                        <Checkbox 
+                        <Checkbox
                           checked={task.status === 'Concluída'}
                           onCheckedChange={(checked) => handleStatusChange(task.id, !!checked)}
                         />
@@ -257,8 +257,8 @@ export default function Tasks() {
                       </TableCell>
                       <TableCell>
                         {cliente ? (
-                          <Link 
-                            to={`/clients/${cliente.id}`} 
+                          <Link
+                            to={`/clients/${cliente.id}`}
                             className="text-blue-400 hover:underline"
                           >
                             {cliente.name}
@@ -278,8 +278,8 @@ export default function Tasks() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={
-                          task.priority === 'Alta' ? 'destructive' : 
-                          task.priority === 'Média' ? 'default' : 'secondary'
+                          task.priority === 'Alta' ? 'destructive' :
+                            task.priority === 'Média' ? 'default' : 'secondary'
                         }>
                           {task.priority}
                         </Badge>
@@ -301,8 +301,8 @@ export default function Tasks() {
                             <DropdownMenuItem onClick={() => handleStatusChange(task.id, task.status !== 'Concluída')}>
                               {task.status === 'Concluída' ? 'Reabrir' : 'Concluir'}
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="text-red-500" 
+                            <DropdownMenuItem
+                              className="text-red-500"
                               onClick={() => handleDeleteTask(task.id)}
                             >
                               Excluir
@@ -322,12 +322,12 @@ export default function Tasks() {
                 <Pagination>
                   <PaginationContent>
                     <PaginationItem>
-                      <PaginationPrevious 
+                      <PaginationPrevious
                         onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                         className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                       />
                     </PaginationItem>
-                    
+
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
                       <PaginationItem key={pageNum}>
                         <PaginationLink
@@ -339,9 +339,9 @@ export default function Tasks() {
                         </PaginationLink>
                       </PaginationItem>
                     ))}
-                    
+
                     <PaginationItem>
-                      <PaginationNext 
+                      <PaginationNext
                         onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                         className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                       />
@@ -360,10 +360,10 @@ export default function Tasks() {
           <DialogHeader>
             <DialogTitle>Nova Tarefa</DialogTitle>
           </DialogHeader>
-          
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              
+
               <FormField
                 control={form.control}
                 name="title"
@@ -385,10 +385,10 @@ export default function Tasks() {
                   <FormItem>
                     <FormLabel>Descrição</FormLabel>
                     <FormControl>
-                      <Textarea 
+                      <Textarea
                         placeholder="Descreva os detalhes da tarefa..."
                         className="min-h-[80px]"
-                        {...field} 
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />

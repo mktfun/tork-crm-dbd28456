@@ -6,11 +6,11 @@ import { BirthdayGreetingsModal } from '@/components/dashboard/BirthdayGreetings
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { DateRange } from 'react-day-picker';
-import { 
-  Users, 
-  AlertTriangle, 
-  DollarSign, 
-  FileText, 
+import {
+  Users,
+  AlertTriangle,
+  DollarSign,
+  FileText,
   Cake,
   Loader2
 } from 'lucide-react';
@@ -27,10 +27,10 @@ export function DashboardKpis({ dateRange }: DashboardKpisProps) {
   const [birthdayModalOpen, setBirthdayModalOpen] = useState(false);
 
   const formatCurrency = (value: number) => {
-    return value.toLocaleString('pt-BR', { 
-      style: 'currency', 
+    return value.toLocaleString('pt-BR', {
+      style: 'currency',
       currency: 'BRL',
-      minimumFractionDigits: 0 
+      minimumFractionDigits: 0
     });
   };
 
@@ -58,8 +58,8 @@ export function DashboardKpis({ dateRange }: DashboardKpisProps) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+          <div key={i} className="bg-card border border-border rounded-xl p-4 flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ))}
       </div>
@@ -68,7 +68,7 @@ export function DashboardKpis({ dateRange }: DashboardKpisProps) {
 
   // Determinar os títulos dos KPIs baseado se há filtro de data ou não
   const periodText = dateRange?.from && dateRange?.to ? 'Período' : 'Mês';
-  
+
   return (
     <>
       {/* KPIs ESTRATÉGICOS - GRID RESPONSIVO APRIMORADO */}
@@ -94,8 +94,8 @@ export function DashboardKpis({ dateRange }: DashboardKpisProps) {
         <KpiCard
           title="Comissão (Mês)"
           value={formatCurrency(metrics.comissaoMesAtual)}
-          comparison={metrics.comissaoMesAnterior > 0 ? 
-            `${((metrics.comissaoMesAtual - metrics.comissaoMesAnterior) / metrics.comissaoMesAnterior * 100).toFixed(0)}% vs. mês anterior` : 
+          comparison={metrics.comissaoMesAnterior > 0 ?
+            `${((metrics.comissaoMesAtual - metrics.comissaoMesAnterior) / metrics.comissaoMesAnterior * 100).toFixed(0)}% vs. mês anterior` :
             undefined
           }
           icon={<DollarSign className="h-5 w-5 text-green-400" />}

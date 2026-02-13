@@ -177,7 +177,7 @@ export default function PolicyDetails() {
             </Button>
           </div>
           <div className="text-center py-12">
-            <p className="text-slate-400">Registro não encontrado</p>
+            <p className="text-muted-foreground">Registro não encontrado</p>
           </div>
         </div>
       </div>
@@ -219,12 +219,12 @@ export default function PolicyDetails() {
                 ) : (
                   <FileText className="w-5 h-5 text-green-400" />
                 )}
-                <h1 className="text-2xl font-bold text-white">
+                <h1 className="text-2xl font-bold text-foreground">
                   {client?.name?.split(' ')[0] || 'Cliente'} - {policy.ramos?.nome || policy.type || 'Seguro'}
                   {policy.insuredAsset && ` (${policy.insuredAsset.split(' ').slice(0, 3).join(' ')})`} - {policy.companies?.name?.split(' ')[0] || 'Cia'}
                 </h1>
               </div>
-              <p className="text-slate-400">{isBudget ? 'Orçamento' : 'Apólice'} {policy.policyNumber || `ORÇ-${policy.id.slice(-8)}`}</p>
+              <p className="text-muted-foreground">{isBudget ? 'Orçamento' : 'Apólice'} {policy.policyNumber || `ORÇ-${policy.id.slice(-8)}`}</p>
             </div>
           </div>
 
@@ -233,12 +233,12 @@ export default function PolicyDetails() {
               variant={policy.status === 'Ativa' ? 'default' : 'secondary'}
               className={
                 policy.status === 'Ativa'
-                  ? 'bg-green-600/80 text-white hover:bg-green-700/80'
+                  ? 'bg-green-600/80 text-foreground hover:bg-green-700/80'
                   : policy.status === 'Orçamento'
-                    ? 'bg-blue-600/80 text-white hover:bg-blue-700/80'
+                    ? 'bg-blue-600/80 text-foreground hover:bg-blue-700/80'
                     : policy.status === 'Cancelada'
-                      ? 'bg-red-600/80 text-white hover:bg-red-700/80'
-                      : 'bg-yellow-600/80 text-white hover:bg-yellow-700/80'
+                      ? 'bg-red-600/80 text-foreground hover:bg-red-700/80'
+                      : 'bg-yellow-600/80 text-foreground hover:bg-yellow-700/80'
               }
             >
               {policy.status}
@@ -260,9 +260,9 @@ export default function PolicyDetails() {
           {/* Coluna Principal */}
           <div className="lg:col-span-2 space-y-6">
             {/* Informações da Apólice/Orçamento */}
-            <Card className="bg-slate-900/50 border-slate-700">
+            <Card className="bg-card/50 border-border">
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
+                <CardTitle className="text-foreground flex items-center gap-2">
                   {isBudget ? (
                     <>
                       <Calculator className="w-5 h-5" />
@@ -279,33 +279,33 @@ export default function PolicyDetails() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-muted-foreground">
                       {isBudget ? 'ID do Orçamento' : 'Número da Apólice'}
                     </p>
-                    <p className="font-medium text-white">
+                    <p className="font-medium text-foreground">
                       {policy.policyNumber || `ORÇ-${policy.id.slice(-8)}`}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-400">Seguradora</p>
-                    <p className="font-medium text-white">{policy.companies?.name || 'Seguradora não especificada'}</p>
+                    <p className="text-sm text-muted-foreground">Seguradora</p>
+                    <p className="font-medium text-foreground">{policy.companies?.name || 'Seguradora não especificada'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-400">Ramo</p>
-                    <p className="font-medium text-white">{policy.ramos?.nome || policy.type || 'Ramo não especificado'}</p>
+                    <p className="text-sm text-muted-foreground">Ramo</p>
+                    <p className="font-medium text-foreground">{policy.ramos?.nome || policy.type || 'Ramo não especificado'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-400">Status</p>
+                    <p className="text-sm text-muted-foreground">Status</p>
                     <Badge
                       variant={policy.status === 'Ativa' ? 'default' : 'secondary'}
                       className={
                         policy.status === 'Ativa'
-                          ? 'bg-green-600/80 text-white hover:bg-green-700/80'
+                          ? 'bg-green-600/80 text-foreground hover:bg-green-700/80'
                           : policy.status === 'Orçamento'
-                            ? 'bg-blue-600/80 text-white hover:bg-blue-700/80'
+                            ? 'bg-blue-600/80 text-foreground hover:bg-blue-700/80'
                             : policy.status === 'Cancelada'
-                              ? 'bg-red-600/80 text-white hover:bg-red-700/80'
-                              : 'bg-yellow-600/80 text-white hover:bg-yellow-700/80'
+                              ? 'bg-red-600/80 text-foreground hover:bg-red-700/80'
+                              : 'bg-yellow-600/80 text-foreground hover:bg-yellow-700/80'
                       }
                     >
                       {policy.status}
@@ -315,23 +315,23 @@ export default function PolicyDetails() {
 
                 {policy.insuredAsset && (
                   <div>
-                    <p className="text-sm text-slate-400">Bem Segurado</p>
-                    <p className="font-medium text-white">{policy.insuredAsset}</p>
+                    <p className="text-sm text-muted-foreground">Bem Segurado</p>
+                    <p className="font-medium text-foreground">{policy.insuredAsset}</p>
                   </div>
                 )}
 
                 {policy.producerId && (
                   <div>
-                    <p className="text-sm text-slate-400">Produtor</p>
-                    <p className="font-medium text-white">{getProducerName(policy.producerId)}</p>
+                    <p className="text-sm text-muted-foreground">Produtor</p>
+                    <p className="font-medium text-foreground">{getProducerName(policy.producerId)}</p>
                   </div>
                 )}
 
-                <Separator className="bg-slate-700" />
+                <Separator className="bg-muted" />
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-slate-400">Prêmio</p>
+                    <p className="text-sm text-muted-foreground">Prêmio</p>
                     <p className="font-bold text-green-400">
                       {policy.premiumValue.toLocaleString('pt-BR', {
                         style: 'currency',
@@ -340,10 +340,10 @@ export default function PolicyDetails() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-400">Comissão</p>
+                    <p className="text-sm text-muted-foreground">Comissão</p>
                     <p className="font-bold text-blue-400">
                       {policy.commissionRate}%
-                      <span className="text-sm text-slate-400 ml-2">
+                      <span className="text-sm text-muted-foreground ml-2">
                         ({(policy.premiumValue * policy.commissionRate / 100).toLocaleString('pt-BR', {
                           style: 'currency',
                           currency: 'BRL'
@@ -355,14 +355,14 @@ export default function PolicyDetails() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-slate-400">Data de Início</p>
-                    <p className="font-medium text-white">
+                    <p className="text-sm text-muted-foreground">Data de Início</p>
+                    <p className="font-medium text-foreground">
                       {policy.startDate ? formatDate(policy.startDate) : '-'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-400">Data de Vencimento</p>
-                    <p className="font-medium text-white">
+                    <p className="text-sm text-muted-foreground">Data de Vencimento</p>
+                    <p className="font-medium text-foreground">
                       {formatDate(policy.expirationDate)}
                     </p>
                   </div>
@@ -372,9 +372,9 @@ export default function PolicyDetails() {
 
             {/* Informações do Cliente */}
             {client && (
-              <Card className="bg-slate-900/50 border-slate-700">
+              <Card className="bg-card/50 border-border">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
+                  <CardTitle className="text-foreground flex items-center gap-2">
                     <User className="w-5 h-5" />
                     Cliente
                   </CardTitle>
@@ -382,8 +382,8 @@ export default function PolicyDetails() {
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-bold text-white text-lg">{client.name}</p>
-                      <div className="flex items-center gap-4 text-sm text-slate-400 mt-1">
+                      <p className="font-bold text-foreground text-lg">{client.name}</p>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                         <div className="flex items-center gap-1">
                           <Phone className="w-4 h-4" />
                           {client.phone}
@@ -402,7 +402,7 @@ export default function PolicyDetails() {
                   </div>
 
                   {client.address && (
-                    <div className="flex items-start gap-2 text-sm text-slate-400">
+                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
                       <MapPin className="w-4 h-4 mt-0.5" />
                       <div>
                         {client.address}, {client.number && `${client.number}, `}
@@ -423,9 +423,9 @@ export default function PolicyDetails() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Ações */}
-            <Card className="bg-slate-900/50 border-slate-700">
+            <Card className="bg-card/50 border-border">
               <CardHeader>
-                <CardTitle className="text-white">Ações</CardTitle>
+                <CardTitle className="text-foreground">Ações</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {isBudget ? (
@@ -469,7 +469,7 @@ export default function PolicyDetails() {
                           onChange={handleFileUpload}
                           className="hidden"
                         />
-                        <p className="text-xs text-slate-400 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           {policy.status === 'Aguardando Apólice'
                             ? 'Anexe a apólice em PDF para ativar (máx. 10MB)'
                             : 'Anexe o PDF da apólice (máx. 10MB)'
@@ -514,7 +514,7 @@ export default function PolicyDetails() {
                             <Button
                               asChild
                               variant="outline"
-                              className="w-full border-dashed border-slate-600"
+                              className="w-full border-dashed border-border"
                               disabled={isUploadingCarteirinha}
                             >
                               <span className="cursor-pointer">
@@ -542,20 +542,20 @@ export default function PolicyDetails() {
                             Cancelar Apólice
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent className="bg-slate-900 border-slate-700">
+                        <AlertDialogContent className="bg-slate-900 border-border">
                           <AlertDialogHeader>
-                            <AlertDialogTitle className="text-white">Cancelar Apólice</AlertDialogTitle>
+                            <AlertDialogTitle className="text-foreground">Cancelar Apólice</AlertDialogTitle>
                             <AlertDialogDescription className="text-slate-300">
                               Tem certeza que deseja cancelar esta apólice? Esta ação não pode ser desfeita.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel className="bg-slate-700 text-white hover:bg-slate-600">
+                            <AlertDialogCancel className="bg-muted text-foreground hover:bg-slate-600">
                               Cancelar
                             </AlertDialogCancel>
                             <AlertDialogAction
                               onClick={handleCancelPolicy}
-                              className="bg-red-600 text-white hover:bg-red-700"
+                              className="bg-red-600 text-foreground hover:bg-red-700"
                             >
                               Confirmar Cancelamento
                             </AlertDialogAction>
@@ -569,21 +569,21 @@ export default function PolicyDetails() {
             </Card>
 
             {/* Informações Adicionais */}
-            <Card className="bg-slate-900/50 border-slate-700">
+            <Card className="bg-card/50 border-border">
               <CardHeader>
-                <CardTitle className="text-white">Informa&ccedil;&otilde;es</CardTitle>
+                <CardTitle className="text-foreground">Informa&ccedil;&otilde;es</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <p className="text-sm text-slate-400">Criado em</p>
-                  <p className="text-sm text-white">
+                  <p className="text-sm text-muted-foreground">Criado em</p>
+                  <p className="text-sm text-foreground">
                     {new Date(policy.createdAt).toLocaleDateString('pt-BR')}
                   </p>
                 </div>
 
                 {policy.renewalStatus && (
                   <div>
-                    <p className="text-sm text-slate-400">Status da Renovação</p>
+                    <p className="text-sm text-muted-foreground">Status da Renovação</p>
                     <Badge variant="outline" className="text-xs">
                       {policy.renewalStatus}
                     </Badge>
@@ -592,17 +592,17 @@ export default function PolicyDetails() {
 
                 {policy.pdfAnexado && (
                   <div>
-                    <p className="text-sm text-slate-400">PDF Anexado</p>
-                    <p className="text-sm text-white">{policy.pdfAnexado.nome}</p>
+                    <p className="text-sm text-muted-foreground">PDF Anexado</p>
+                    <p className="text-sm text-foreground">{policy.pdfAnexado.nome}</p>
                   </div>
                 )}
               </CardContent>
             </Card>
 
             {/* Renovação Automática - abaixo de Informações */}
-            <Card className="bg-slate-900/50 border-slate-700">
+            <Card className="bg-card/50 border-border">
               <CardHeader>
-                <CardTitle className="text-white">Renova&ccedil;&atilde;o Autom&aacute;tica</CardTitle>
+                <CardTitle className="text-foreground">Renova&ccedil;&atilde;o Autom&aacute;tica</CardTitle>
               </CardHeader>
               <CardContent>
                 <PolicyRenewalSection
@@ -627,14 +627,14 @@ export default function PolicyDetails() {
 
           {isEditPolicyModalOpen && (
             <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
-              <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="bg-slate-900 border border-border rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-semibold text-white">Editar Apólice</h2>
+                  <h2 className="text-xl font-semibold text-foreground">Editar Apólice</h2>
                   <Button
                     onClick={() => setIsEditPolicyModalOpen(false)}
                     variant="ghost"
                     size="sm"
-                    className="text-slate-400 hover:text-white"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     ×
                   </Button>

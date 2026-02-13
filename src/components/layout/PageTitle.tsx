@@ -64,7 +64,7 @@ export const PageTitle = () => {
     }
   }, [location.pathname, manualTitle]);
 
-  return <h1 className="text-xl font-semibold text-white">{title}</h1>;
+  return <h1 className="text-xl font-semibold text-foreground">{title}</h1>;
 };
 
 export default PageTitle;

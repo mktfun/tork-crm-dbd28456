@@ -125,17 +125,17 @@ export default function Clients() {
 
       {/* Header e Busca Principal */}
       <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 md:space-x-4">
-        <div className="text-2xl font-bold text-white">
-          Clientes <span className="text-sm text-slate-400">({totalCount} total)</span>
+        <div className="text-2xl font-bold text-foreground">
+          Clientes <span className="text-sm text-muted-foreground">({totalCount} total)</span>
         </div>
 
         <div className="flex items-center space-x-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={20} />
             <Input
               type="search"
               placeholder="Buscar por nome, email, CPF..."
-              className="bg-slate-800 border-slate-700 text-white pl-10 w-80"
+              className="bg-card border-border text-foreground pl-10 w-80"
               value={localSearchTerm}
               onChange={(e) => setLocalSearchTerm(e.target.value)}
             />
@@ -167,12 +167,12 @@ export default function Clients() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-8 gap-4">
         {/* Status */}
         <div>
-          <Label htmlFor="status" className="text-slate-300">Status</Label>
+          <Label htmlFor="status" className="text-muted-foreground">Status</Label>
           <Select
             value={filters.status}
             onValueChange={(value) => setFilters({ ...filters, status: value })}
           >
-            <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+            <SelectTrigger className="bg-card border-border text-foreground">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
@@ -185,12 +185,12 @@ export default function Clients() {
 
         {/* Itens por página */}
         <div>
-          <Label htmlFor="limit" className="text-slate-300">Itens por pág.</Label>
+          <Label htmlFor="limit" className="text-muted-foreground">Itens por pág.</Label>
           <Select
             value={String(limit)}
             onValueChange={(value) => setLimit(Number(value))}
           >
-            <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+            <SelectTrigger className="bg-card border-border text-foreground">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -207,7 +207,7 @@ export default function Clients() {
           <Button
             onClick={resetFilters}
             variant="outline"
-            className="w-full bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
+            className="w-full bg-muted hover:bg-muted/80 text-foreground border-border"
           >
             Limpar Filtros
           </Button>
@@ -220,14 +220,14 @@ export default function Clients() {
           <div className="flex items-center justify-center py-12">
             <div className="flex flex-col items-center gap-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
-              <p className="text-white/60">Carregando clientes...</p>
+              <p className="text-foreground/60">Carregando clientes...</p>
             </div>
           </div>
         ) : clients.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <div className="flex flex-col items-center gap-4">
-              <Users size={48} className="text-white/40" />
-              <p className="text-white/60">
+              <Users size={48} className="text-foreground/40" />
+              <p className="text-foreground/60">
                 {filters.searchTerm || filters.status !== 'todos'
                   ? 'Nenhum cliente encontrado com os filtros aplicados'
                   : 'Nenhum cliente cadastrado ainda'}

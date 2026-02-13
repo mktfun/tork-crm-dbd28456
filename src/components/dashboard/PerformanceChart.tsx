@@ -191,10 +191,10 @@ export function PerformanceChart() {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-gray-900/95 backdrop-blur-sm p-3 border border-gray-700 rounded-lg shadow-lg">
+        <div className="bg-popover/95 backdrop-blur-sm p-3 border border-border rounded-lg shadow-lg">
           <p className="font-semibold text-foreground mb-2">{label}</p>
           {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm text-gray-200">
+            <p key={index} className="text-sm text-muted-foreground">
               <span className="font-medium" style={{ color: entry.color }}>
                 {entry.dataKey === 'comissao' ? 'Comissão' : 'Novas Apólices'}:
               </span> {entry.dataKey === 'comissao'
@@ -215,8 +215,8 @@ export function PerformanceChart() {
     return (
       <AppCard className="p-6">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-700 rounded mb-4 w-3/4"></div>
-          <div className="h-80 bg-gray-700 rounded"></div>
+          <div className="h-6 bg-muted rounded mb-4 w-3/4"></div>
+          <div className="h-80 bg-muted rounded"></div>
         </div>
       </AppCard>
     );
@@ -229,7 +229,7 @@ export function PerformanceChart() {
       </h3>
 
       {/* BARRA DE CONTROLES MODERNIZADA */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-2 rounded-lg border border-slate-800 bg-slate-900">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-2 rounded-lg border border-border bg-card">
 
         {/* FILTRO DE PERÍODO */}
         <DatePickerWithRange
@@ -244,7 +244,7 @@ export function PerformanceChart() {
             variant="outline"
             value={opcoesGrafico.series}
             onValueChange={(series) => series.length > 0 && setOpcoesGrafico(prev => ({ ...prev, series }))}
-            className="[&>button]:rounded-md [&>button]:border-slate-700"
+            className="[&>button]:rounded-md [&>button]:border-border"
           >
             <ToggleGroupItem value="comissao" className="text-blue-400">Comissão</ToggleGroupItem>
             <ToggleGroupItem value="novasApolices" className="text-green-400">Apólices</ToggleGroupItem>
@@ -256,7 +256,7 @@ export function PerformanceChart() {
             variant="outline"
             value={opcoesGrafico.tipoGrafico}
             onValueChange={(tipo) => tipo && setOpcoesGrafico(prev => ({ ...prev, tipoGrafico: tipo as 'bar' | 'line' | 'composed' }))}
-            className="[&>button]:rounded-md [&>button]:border-slate-700"
+            className="[&>button]:rounded-md [&>button]:border-border"
           >
             <ToggleGroupItem value="bar"><BarChartIcon className="h-4 w-4" /></ToggleGroupItem>
             <ToggleGroupItem value="line"><LineChartIcon className="h-4 w-4" /></ToggleGroupItem>
@@ -269,31 +269,31 @@ export function PerformanceChart() {
         {dadosParaGrafico.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <p className="text-slate-400 text-lg mb-2">📊 Nenhum dado encontrado</p>
-              <p className="text-slate-500 text-sm">Ajuste o período ou verifique se há transações/apólices no intervalo selecionado</p>
+              <p className="text-muted-foreground text-lg mb-2">📊 Nenhum dado encontrado</p>
+              <p className="text-muted-foreground text-sm">Ajuste o período ou verifique se há transações/apólices no intervalo selecionado</p>
             </div>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             {opcoesGrafico.tipoGrafico === 'composed' ? (
               <ComposedChart data={dadosParaGrafico} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis
                   dataKey="nome"
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                 />
                 <YAxis
                   yAxisId="left"
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                   tickFormatter={(value) => formatCurrency(value)}
                 />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                 />
                 <Tooltip content={<CustomTooltip />} />
                 {opcoesGrafico.series.includes('comissao') && (
@@ -320,15 +320,15 @@ export function PerformanceChart() {
               </ComposedChart>
             ) : opcoesGrafico.tipoGrafico === 'bar' ? (
               <BarChart data={dadosParaGrafico} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis
                   dataKey="nome"
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                 />
                 <YAxis
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                   tickFormatter={(value) => `${Math.abs(value) / 1000}k`}
                 />
                 <Tooltip content={<CustomTooltip />} />
@@ -341,15 +341,15 @@ export function PerformanceChart() {
               </BarChart>
             ) : (
               <LineChart data={dadosParaGrafico} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis
                   dataKey="nome"
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                 />
                 <YAxis
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                   tickFormatter={(value) => `${Math.abs(value) / 1000}k`}
                 />
                 <Tooltip content={<CustomTooltip />} />
