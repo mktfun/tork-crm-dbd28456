@@ -6,23 +6,30 @@
 @layer base {
   :root {
     /* ── LIGHT THEME ── */
-    --background: 0 0% 100%;          /* #ffffff */
-    --foreground: 240 10% 3.9%;       /* #09090b */
-    --card: 0 0% 98%;                 /* #fafafa */
+    --background: 0 0% 100%;
+    /* #ffffff */
+    --foreground: 240 10% 3.9%;
+    /* #09090b */
+    --card: 0 0% 98%;
+    /* #fafafa */
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 217 91% 60%;           /* blue-500 */
+    --primary: 217 91% 60%;
+    /* blue-500 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 96%;          /* zinc-100 */
+    --secondary: 240 5% 96%;
+    /* zinc-100 */
     --secondary-foreground: 240 6% 10%;
     --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;   /* zinc-500 */
+    --muted-foreground: 240 4% 46%;
+    /* zinc-500 */
     --accent: 217 91% 60%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 6% 90%;             /* zinc-200 */
+    --border: 240 6% 90%;
+    /* zinc-200 */
     --input: 240 6% 90%;
     --ring: 217 91% 60%;
     --chart-1: 217 91% 60%;
@@ -39,18 +46,23 @@
 
   .dark {
     /* ── DARK PREMIUM THEME (Zinc Fintech) ── */
-    --background: 240 10% 3.9%;       /* zinc-950 */
-    --foreground: 0 0% 98%;           /* #fafafa */
-    --card: 240 6% 10%;               /* zinc-900 */
+    --background: 240 10% 3.9%;
+    /* zinc-950 */
+    --foreground: 0 0% 98%;
+    /* #fafafa */
+    --card: 240 6% 10%;
+    /* zinc-900 */
     --card-foreground: 0 0% 98%;
     --popover: 240 6% 10%;
     --popover-foreground: 0 0% 98%;
     --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 16%;          /* zinc-800 */
+    --secondary: 240 4% 16%;
+    /* zinc-800 */
     --secondary-foreground: 0 0% 98%;
     --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 64%;   /* zinc-400 */
+    --muted-foreground: 240 5% 64%;
+    /* zinc-400 */
     --accent: 217 91% 60%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 62.8% 30.6%;
@@ -70,20 +82,21 @@
   * {
     @apply border-border;
   }
-  
-  html, body {
+
+  html,
+  body {
     height: 100%;
     width: 100%;
     overflow-x: hidden;
     margin: 0;
     padding: 0;
   }
-  
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
   }
-  
+
   #root {
     height: 100%;
     width: 100%;
@@ -146,10 +159,12 @@ DEPENDÊNCIAS CRÍTICAS:
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
 
-  border: 1px solid hsl(var(--border) / 0.3);
+  /* Border: foreground at low alpha = white glow in dark, dark edge in light */
+  border: 1px solid hsl(var(--foreground) / 0.08);
 
-  box-shadow: 
-    0 8px 32px hsl(var(--background) / 0.4),
+  /* Shadow: always dark for depth + subtle foreground inset highlight */
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 hsl(var(--foreground) / 0.05);
 
   border-radius: 16px;
@@ -290,6 +305,7 @@ DEPENDÊNCIAS CRÍTICAS:
     opacity: 0;
     transform: translateY(20px) scale(0.9);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -301,6 +317,7 @@ DEPENDÊNCIAS CRÍTICAS:
     opacity: 0;
     transform: translateY(8px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -333,18 +350,24 @@ DEPENDÊNCIAS CRÍTICAS:
   --fc-today-bg-color: hsl(var(--accent) / 0.3);
   color: hsl(var(--foreground));
 }
+
 .fc .fc-col-header-cell-cushion {
   color: hsl(var(--muted-foreground));
   font-weight: 600;
   text-decoration: none;
 }
-.fc .fc-daygrid-day-number, .fc .fc-list-day-text, .fc .fc-list-day-side-text {
+
+.fc .fc-daygrid-day-number,
+.fc .fc-list-day-text,
+.fc .fc-list-day-side-text {
   color: hsl(var(--foreground));
   text-decoration: none;
 }
+
 .fc .fc-day-other .fc-daygrid-day-number {
   color: hsl(var(--muted-foreground) / 0.5);
 }
+
 .fc .fc-daygrid-event {
   background-color: hsl(var(--primary) / 0.2);
   border: 1px solid hsl(var(--primary) / 0.5);
@@ -354,15 +377,20 @@ DEPENDÊNCIAS CRÍTICAS:
   font-weight: 500;
   color: hsl(var(--primary-foreground));
 }
+
 .fc .fc-event-title {
   color: hsl(var(--primary-foreground));
 }
+
 .fc-theme-standard .fc-scrollgrid {
   border: 1px solid hsl(var(--border));
 }
-.fc-theme-standard th, .fc-theme-standard td {
+
+.fc-theme-standard th,
+.fc-theme-standard td {
   border: 1px solid hsl(var(--border));
 }
+
 .fc .fc-list-event:hover td {
   background-color: hsl(var(--accent) / 0.3);
 }
@@ -370,40 +398,36 @@ DEPENDÊNCIAS CRÍTICAS:
 /* SISTEMA PREMIUM DE CABEÇALHOS DA AGENDA - VERSÃO GLASSMORPHISM 3.0 */
 .fc-theme-standard .fc-list-day-cushion {
   /* Glassmorphism Premium com Gradiente Duplo */
-  background: linear-gradient(
-    135deg,
-    rgba(40, 50, 80, 0.95) 0%,
-    rgba(30, 40, 70, 0.85) 50%,
-    rgba(35, 45, 75, 0.90) 100%
-  ) !important;
-  
+  background: linear-gradient(135deg,
+      rgba(40, 50, 80, 0.95) 0%,
+      rgba(30, 40, 70, 0.85) 50%,
+      rgba(35, 45, 75, 0.90) 100%) !important;
+
   /* Backdrop Filter Premium */
   -webkit-backdrop-filter: blur(16px) saturate(150%) !important;
   backdrop-filter: blur(16px) saturate(150%) !important;
-  
+
   /* Bordas com Efeito Holográfico */
   border: 1px solid transparent !important;
-  border-image: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.3) 0%,
-    rgba(100, 200, 255, 0.2) 50%,
-    rgba(255, 255, 255, 0.1) 100%
-  ) 1 !important;
-  
+  border-image: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.3) 0%,
+      rgba(100, 200, 255, 0.2) 50%,
+      rgba(255, 255, 255, 0.1) 100%) 1 !important;
+
   /* Sombras Múltiplas para Profundidade */
-  box-shadow: 
+  box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.15),
     inset 0 -1px 0 rgba(0, 0, 0, 0.1),
     0 4px 16px rgba(100, 200, 255, 0.1) !important;
-  
+
   /* Espaçamento Premium */
   padding: 16px 20px !important;
   margin: 0 !important;
-  
+
   /* Transições Suaves */
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  
+
   /* Posicionamento Relativo para Efeitos */
   position: relative !important;
   overflow: hidden !important;
@@ -417,12 +441,10 @@ DEPENDÊNCIAS CRÍTICAS:
   left: -100% !important;
   width: 100% !important;
   height: 100% !important;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.1),
-    transparent
-  ) !important;
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.1),
+      transparent) !important;
   transition: left 0.6s ease !important;
   pointer-events: none !important;
 }
@@ -433,50 +455,50 @@ DEPENDÊNCIAS CRÍTICAS:
 
 /* Efeito de Hover Premium */
 .fc-theme-standard .fc-list-day-cushion:hover {
-  background: linear-gradient(
-    135deg,
-    rgba(50, 60, 90, 0.95) 0%,
-    rgba(40, 50, 80, 0.90) 50%,
-    rgba(45, 55, 85, 0.95) 100%
-  ) !important;
-  
-  box-shadow: 
+  background: linear-gradient(135deg,
+      rgba(50, 60, 90, 0.95) 0%,
+      rgba(40, 50, 80, 0.90) 50%,
+      rgba(45, 55, 85, 0.95) 100%) !important;
+
+  box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
     inset 0 -1px 0 rgba(0, 0, 0, 0.15),
     0 6px 24px rgba(100, 200, 255, 0.15) !important;
-  
+
   transform: translateY(-1px) !important;
 }
 
 /* Tipografia Premium para Dias da Semana */
 .fc-theme-standard .fc-list-day-text {
-  color: #f1f5f9 !important; /* Branco Premium */
+  color: #f1f5f9 !important;
+  /* Branco Premium */
   font-weight: 700 !important;
   font-size: 1rem !important;
   text-transform: capitalize !important;
   letter-spacing: 0.025em !important;
-  
+
   /* Sombra de Texto Premium */
-  text-shadow: 
+  text-shadow:
     0 2px 4px rgba(0, 0, 0, 0.5),
     0 0 8px rgba(100, 200, 255, 0.3) !important;
-  
+
   /* Filtro para Brilho */
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.1)) !important;
 }
 
 /* Tipografia Premium para Datas */
 .fc-theme-standard .fc-list-day-side-text {
-  color: #e2e8f0 !important; /* Cinza Claro Premium */
+  color: #e2e8f0 !important;
+  /* Cinza Claro Premium */
   font-weight: 600 !important;
   font-size: 0.95rem !important;
-  
+
   /* Sombra de Texto Sutil */
-  text-shadow: 
+  text-shadow:
     0 1px 3px rgba(0, 0, 0, 0.4),
     0 0 6px rgba(100, 200, 255, 0.2) !important;
-  
+
   /* Efeito de Opacidade Dinâmica */
   opacity: 0.9 !important;
   transition: opacity 0.3s ease !important;
@@ -498,6 +520,7 @@ DEPENDÊNCIAS CRÍTICAS:
     opacity: 0;
     transform: translateX(-20px);
   }
+
   100% {
     opacity: 1;
     transform: translateX(0);
@@ -509,11 +532,11 @@ DEPENDÊNCIAS CRÍTICAS:
   .fc-theme-standard .fc-list-day-cushion {
     padding: 12px 16px !important;
   }
-  
+
   .fc-theme-standard .fc-list-day-text {
     font-size: 0.9rem !important;
   }
-  
+
   .fc-theme-standard .fc-list-day-side-text {
     font-size: 0.85rem !important;
   }
@@ -547,12 +570,15 @@ DEPENDÊNCIAS CRÍTICAS:
   0% {
     transform: translate(0px, 0px) scale(1);
   }
+
   33% {
     transform: translate(30px, -50px) scale(1.1);
   }
+
   66% {
     transform: translate(-20px, 20px) scale(0.9);
   }
+
   100% {
     transform: translate(0px, 0px) scale(1);
   }
@@ -609,10 +635,13 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 @keyframes glow-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.4;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.7;
     transform: scale(1.02);
@@ -639,18 +668,24 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 @keyframes iconBounce {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   20% {
     transform: translateY(-0.3em);
   }
+
   40% {
     transform: translateY(0);
   }
+
   60% {
     transform: translateY(-0.1em);
   }
+
   80% {
     transform: translateY(0);
   }
@@ -836,22 +871,18 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 .mobile-extra-screen-icon {
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.2) 0%,
-    rgba(147, 51, 234, 0.2) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(59, 130, 246, 0.2) 0%,
+      rgba(147, 51, 234, 0.2) 100%);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .mobile-extra-screen-item:hover .mobile-extra-screen-icon {
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.3) 0%,
-    rgba(147, 51, 234, 0.3) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(59, 130, 246, 0.3) 0%,
+      rgba(147, 51, 234, 0.3) 100%);
   box-shadow:
     0 4px 16px rgba(59, 130, 246, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -864,22 +895,23 @@ DEPENDÊNCIAS CRÍTICAS:
 
 /* Silver Glow Effects */
 .silver-glow {
-  box-shadow: 0 0 40px -10px rgba(255,255,255,0.1);
+  box-shadow: 0 0 40px -10px rgba(255, 255, 255, 0.1);
 }
 
 .silver-glow-hover:hover {
-  box-shadow: 0 0 50px -8px rgba(255,255,255,0.2);
+  box-shadow: 0 0 50px -8px rgba(255, 255, 255, 0.2);
 }
 
 /* Metallic Border Effect */
 .metallic-border {
   position: relative;
 }
+
 .metallic-border::before {
   content: '';
   position: absolute;
   inset: -1px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent 50%, rgba(255,255,255,0.05));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), transparent 50%, rgba(255, 255, 255, 0.05));
   border-radius: inherit;
   pointer-events: none;
 }
@@ -892,8 +924,13 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 /* Noise Texture - Subtle diagonal lines */
@@ -912,21 +949,23 @@ DEPENDÊNCIAS CRÍTICAS:
   background-color: #000000;
   position: relative;
 }
+
 .premium-black-bg::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at center, rgba(39,39,42,0.25) 0%, transparent 55%);
+  background: radial-gradient(ellipse at center, rgba(39, 39, 42, 0.25) 0%, transparent 55%);
   pointer-events: none;
 }
 
 /* Silver Button Glow */
 .silver-button-glow {
-  box-shadow: 0 0 20px -5px rgba(255,255,255,0.3);
+  box-shadow: 0 0 20px -5px rgba(255, 255, 255, 0.3);
   transition: all 0.3s ease;
 }
+
 .silver-button-glow:hover {
-  box-shadow: 0 0 30px -5px rgba(255,255,255,0.5);
+  box-shadow: 0 0 30px -5px rgba(255, 255, 255, 0.5);
 }
 
 /* Premium Card Glass Effect - Black & Silver */
@@ -934,8 +973,8 @@ DEPENDÊNCIAS CRÍTICAS:
   background: rgba(0, 0, 0, 0.70);
   backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 
-    0 0 60px -15px rgba(255,255,255,0.07),
-    inset 0 1px 0 0 rgba(255,255,255,0.05),
-    inset 1px 0 0 0 rgba(255,255,255,0.03);
+  box-shadow:
+    0 0 60px -15px rgba(255, 255, 255, 0.07),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
+    inset 1px 0 0 0 rgba(255, 255, 255, 0.03);
 }

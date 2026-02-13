@@ -113,31 +113,31 @@ export function GlassSidebar() {
   };
 
   return (
-    <div 
+    <div
       className={cn(
         "h-full transition-all duration-300 ease-out flex-shrink-0 relative",
-        "bg-zinc-950 border-r border-zinc-800",
+        "bg-background border-r border-border",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
       {/* Header com Logo */}
-      <div className="p-4 border-b border-zinc-800 flex items-center gap-3">
-        <img 
-          src="/tork_symbol_favicon.png" 
-          alt="Tork CRM" 
+      <div className="p-4 border-b border-border flex items-center gap-3">
+        <img
+          src="/tork_symbol_favicon.png"
+          alt="Tork CRM"
           className="w-8 h-8 rounded-lg flex-shrink-0"
         />
         {!isCollapsed && (
-          <h1 className="text-lg font-bold text-white">
+          <h1 className="text-lg font-bold text-foreground">
             Tork CRM
           </h1>
         )}
-        
+
         <button
           onClick={toggleSidebar}
           className={cn(
-            "p-2 rounded-md bg-zinc-800 hover:bg-zinc-700 transition-colors ml-auto",
-            "text-zinc-400 hover:text-white",
+            "p-2 rounded-md bg-secondary hover:bg-muted transition-colors ml-auto",
+            "text-muted-foreground hover:text-foreground",
             "focus:outline-none focus:ring-0 focus-visible:ring-0",
             isCollapsed && "mx-auto ml-0"
           )}
@@ -165,9 +165,9 @@ export function GlassSidebar() {
                   onClick={() => handleNavigation(item.path)}
                   className={cn(
                     "w-full flex items-center justify-center px-3 py-2.5 rounded-lg mx-1 transition-all duration-200 relative",
-                    "text-zinc-400 hover:text-white hover:bg-zinc-800/60",
+                    "text-muted-foreground hover:text-foreground hover:bg-secondary/60",
                     "focus:outline-none focus:ring-0 focus-visible:ring-0",
-                    isActive && "bg-zinc-800/80 text-white"
+                    isActive && "bg-secondary/80 text-foreground"
                   )}
                   title={item.name}
                 >
@@ -186,21 +186,21 @@ export function GlassSidebar() {
           </div>
         ) : (
           // Expanded mode - show accordion groups
-          <Accordion 
-            type="multiple" 
+          <Accordion
+            type="multiple"
             defaultValue={getActiveSections()}
             className="space-y-2"
           >
             {menuSections.map((section) => (
-              <AccordionItem 
-                key={section.id} 
-                value={section.id} 
+              <AccordionItem
+                key={section.id}
+                value={section.id}
                 className="border-none"
               >
-                <AccordionTrigger 
+                <AccordionTrigger
                   className={cn(
-                    "px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider",
-                    "hover:text-zinc-300 hover:no-underline rounded-md hover:bg-zinc-800/50",
+                    "px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider",
+                    "hover:text-foreground hover:no-underline rounded-md hover:bg-secondary/50",
                     "[&[data-state=open]>svg]:rotate-180"
                   )}
                 >
@@ -218,9 +218,9 @@ export function GlassSidebar() {
                           onClick={() => handleNavigation(item.path)}
                           className={cn(
                             "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 relative",
-                            "text-zinc-400 hover:text-white hover:bg-zinc-800/60",
+                            "text-muted-foreground hover:text-foreground hover:bg-secondary/60",
                             "focus:outline-none focus:ring-0 focus-visible:ring-0",
-                            isActive && "bg-zinc-800/80 text-white font-medium"
+                            isActive && "bg-secondary/80 text-foreground font-medium"
                           )}
                         >
                           {isActive && (

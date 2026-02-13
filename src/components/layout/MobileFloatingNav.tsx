@@ -1,7 +1,7 @@
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Users, 
+import {
+  LayoutDashboard,
+  FileText,
+  Users,
   Calendar,
   Building2,
   Menu
@@ -23,24 +23,24 @@ export function MobileFloatingNav() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50">
-      <div className="bg-zinc-900/90 backdrop-blur-xl border border-white/5 rounded-2xl p-2 shadow-xl">
+      <div className="bg-card/90 backdrop-blur-xl border border-border rounded-2xl p-2 shadow-xl">
         <div className="flex items-center justify-between">
           {/* Quick Navigation */}
           <div className="flex items-center gap-1">
             {quickNavItems.map((item) => {
               const isActive = location.pathname === item.path;
               const Icon = item.icon;
-              
+
               return (
                 <button
                   key={item.path}
                   onClick={() => navigate(item.path)}
                   className={cn(
                     "p-3 rounded-xl transition-all duration-200",
-                    "text-white/70 hover:text-white",
-                    isActive 
-                      ? "bg-white/20 text-white" 
-                      : "hover:bg-white/10"
+                    "text-muted-foreground hover:text-foreground",
+                    isActive
+                      ? "bg-foreground/20 text-foreground"
+                      : "hover:bg-foreground/10"
                   )}
                 >
                   <Icon className="w-5 h-5" />
