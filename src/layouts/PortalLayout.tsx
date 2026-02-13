@@ -57,10 +57,10 @@ export function PortalLayout() {
       const clientData = sessionStorage.getItem('portal_client');
       const storedSlug = sessionStorage.getItem('portal_brokerage_slug');
       const brokerageData = sessionStorage.getItem('portal_brokerage');
-      
+
       if (clientData && storedSlug === brokerageSlug) {
         setClient(JSON.parse(clientData));
-        
+
         // Load brokerage from session or fetch it
         if (brokerageData) {
           setBrokerage(JSON.parse(brokerageData));
@@ -89,11 +89,11 @@ export function PortalLayout() {
   // Loading state - Black & Silver
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(39,39,42,0.25)_0%,_transparent_55%)]" />
         <div className="relative flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
-          <p className="text-zinc-500 tracking-widest text-sm font-light">CARREGANDO</p>
+          <p className="text-muted-foreground tracking-widest text-sm font-light">CARREGANDO</p>
         </div>
       </div>
     );
@@ -114,101 +114,97 @@ export function PortalLayout() {
   const isActive = (path: string) => location.pathname === `/${brokerageSlug}/portal/${path}`;
 
   return (
-    <div className="min-h-screen bg-black pb-24">
+    <div className="min-h-screen bg-background pb-24">
       {/* Header - Black & Silver */}
-      <header className="bg-black/80 backdrop-blur-2xl border-b border-white/[0.06] p-4 sticky top-0 z-10">
+      <header className="bg-background/80 backdrop-blur-2xl border-b border-white/[0.06] p-4 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* Brokerage Logo */}
             {brokerage?.logo_url ? (
-              <img 
-                src={brokerage.logo_url} 
-                alt={brokerage.name} 
+              <img
+                src={brokerage.logo_url}
+                alt={brokerage.name}
                 className="h-10 object-contain"
               />
             ) : (
-              <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/[0.06] flex items-center justify-center">
-                <Shield className="w-5 h-5 text-zinc-400" />
+              <div className="w-10 h-10 rounded-xl bg-card border border-border flex items-center justify-center">
+                <Shield className="w-5 h-5 text-muted-foreground" />
               </div>
             )}
             <div>
-              <h1 className="text-zinc-200 font-light tracking-wide">
+              <h1 className="text-foreground font-light tracking-wide">
                 Olá, {client.name?.split(' ')[0]}
               </h1>
-              <p className="text-zinc-600 text-xs tracking-wide">
+              <p className="text-muted-foreground text-xs tracking-wide">
                 {brokerage?.name || 'Portal do Segurado'}
               </p>
             </div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleLogout}
-            className="text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06]"
+            className="text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
           >
             <LogOut className="w-5 h-5" />
           </Button>
         </div>
       </header>
-      
+
       {/* Main Content */}
       <main className="p-4 max-w-lg mx-auto">
         <Outlet />
       </main>
-      
+
       {/* Bottom Navigation - Black & Silver */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-2xl border-t border-white/[0.06] safe-area-pb">
+      <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-2xl border-t border-white/[0.06] safe-area-pb">
         <div className="max-w-lg mx-auto flex justify-around py-3">
-          <Button 
-            variant="ghost" 
-            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${
-              isActive('home') 
-                ? 'text-zinc-100' 
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
+          <Button
+            variant="ghost"
+            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${isActive('home')
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-zinc-300'
+              }`}
             onClick={() => navigate(`/${brokerageSlug}/portal/home`)}
           >
             <Home className="w-5 h-5" />
             <span className="text-xs tracking-wide">Início</span>
           </Button>
-          
+
           {portalConfig.show_policies && (
-            <Button 
-              variant="ghost" 
-              className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${
-                isActive('policies') 
-                  ? 'text-zinc-100' 
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
+            <Button
+              variant="ghost"
+              className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${isActive('policies')
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-zinc-300'
+                }`}
               onClick={() => navigate(`/${brokerageSlug}/portal/policies`)}
             >
               <FileText className="w-5 h-5" />
               <span className="text-xs tracking-wide">Seguros</span>
             </Button>
           )}
-          
+
           {portalConfig.show_cards && (
-            <Button 
-              variant="ghost" 
-              className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${
-                isActive('cards') 
-                  ? 'text-zinc-100' 
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
+            <Button
+              variant="ghost"
+              className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${isActive('cards')
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-zinc-300'
+                }`}
               onClick={() => navigate(`/${brokerageSlug}/portal/cards`)}
             >
               <CreditCard className="w-5 h-5" />
               <span className="text-xs tracking-wide">Carteirinhas</span>
             </Button>
           )}
-          
-          <Button 
-            variant="ghost" 
-            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${
-              isActive('profile') 
-                ? 'text-zinc-100' 
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}
+
+          <Button
+            variant="ghost"
+            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${isActive('profile')
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-zinc-300'
+              }`}
             onClick={() => navigate(`/${brokerageSlug}/portal/profile`)}
           >
             <User className="w-5 h-5" />

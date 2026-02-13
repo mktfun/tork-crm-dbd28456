@@ -396,8 +396,8 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 /* SISTEMA PREMIUM DE CABEÇALHOS DA AGENDA - VERSÃO GLASSMORPHISM 3.0 */
-.fc-theme-standard .fc-list-day-cushion {
-  /* Glassmorphism Premium com Gradiente Duplo */
+.dark .fc-theme-standard .fc-list-day-cushion {
+  /* Glassmorphism Premium com Gradiente Duplo - DARK MODE ONLY */
   background: linear-gradient(135deg,
       rgba(40, 50, 80, 0.95) 0%,
       rgba(30, 40, 70, 0.85) 50%,
@@ -454,7 +454,7 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 /* Efeito de Hover Premium */
-.fc-theme-standard .fc-list-day-cushion:hover {
+.dark .fc-theme-standard .fc-list-day-cushion:hover {
   background: linear-gradient(135deg,
       rgba(50, 60, 90, 0.95) 0%,
       rgba(40, 50, 80, 0.90) 50%,
@@ -470,7 +470,7 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 /* Tipografia Premium para Dias da Semana */
-.fc-theme-standard .fc-list-day-text {
+.dark .fc-theme-standard .fc-list-day-text {
   color: #f1f5f9 !important;
   /* Branco Premium */
   font-weight: 700 !important;
@@ -488,7 +488,7 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 /* Tipografia Premium para Datas */
-.fc-theme-standard .fc-list-day-side-text {
+.dark .fc-theme-standard .fc-list-day-side-text {
   color: #e2e8f0 !important;
   /* Cinza Claro Premium */
   font-weight: 600 !important;
