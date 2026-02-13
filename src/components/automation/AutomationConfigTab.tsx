@@ -29,6 +29,7 @@ export function AutomationConfigTab() {
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [testInboxId, setTestInboxId] = useState('');
+  const [testContactId, setTestContactId] = useState('');
   
   const [settings, setSettings] = useState<AutomationSettings>({
     chatwoot_url: '',
@@ -192,7 +193,8 @@ export function AutomationConfigTab() {
       const { data, error } = await supabase.functions.invoke('test-n8n-webhook', {
         body: { 
           inbox_id: testInboxId,
-          n8n_webhook_url: settings.n8n_webhook_url
+          n8n_webhook_url: settings.n8n_webhook_url,
+          contact_id: testContactId || undefined
         }
       });
 
@@ -396,17 +398,32 @@ export function AutomationConfigTab() {
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="test_inbox_id">Inbox ID (para teste)</Label>
-            <Input
-              id="test_inbox_id"
-              placeholder="123"
-              value={testInboxId}
-              onChange={(e) => setTestInboxId(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              ID de um inbox válido para enviar dados de teste
-            </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="test_inbox_id">Inbox ID (para teste)</Label>
+              <Input
+                id="test_inbox_id"
+                placeholder="123"
+                value={testInboxId}
+                onChange={(e) => setTestInboxId(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                ID de um inbox válido para enviar dados de teste
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="test_contact_id">Contact ID (opcional)</Label>
+              <Input
+                id="test_contact_id"
+                placeholder="uuid do cliente"
+                value={testContactId}
+                onChange={(e) => setTestContactId(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                ID de um cliente específico (se vazio, usa qualquer um)
+              </p>
+            </div>
           </div>
 
           <div className="flex gap-3">

@@ -1380,6 +1380,7 @@ export type Database = {
           chatwoot_webhook_secret: string | null
           created_at: string
           id: string
+          n8n_webhook_url: string | null
           updated_at: string
           user_id: string
         }
@@ -1390,6 +1391,7 @@ export type Database = {
           chatwoot_webhook_secret?: string | null
           created_at?: string
           id?: string
+          n8n_webhook_url?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1400,6 +1402,7 @@ export type Database = {
           chatwoot_webhook_secret?: string | null
           created_at?: string
           id?: string
+          n8n_webhook_url?: string | null
           updated_at?: string
           user_id?: string
         }
