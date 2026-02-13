@@ -76,6 +76,7 @@ export function IntegrationsPanel() {
                         </Button>
                     </CardContent>
                 </Card>
+            </div>
         </div>
     );
 }

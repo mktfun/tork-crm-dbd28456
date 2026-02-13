@@ -40,7 +40,7 @@ serve(async (req) => {
     // Buscar dados de teste do CRM
     // 1. Buscar um cliente válido do usuário
     const { data: client, error: clientError } = await supabaseClient
-      .from('crm_clients')
+      .from('clientes')
       .select('id, name, email, phone')
       .eq('user_id', user.id)
       .limit(1)
