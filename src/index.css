@@ -5,27 +5,27 @@
 
 @layer base {
   :root {
-    /* TORK CRM - Dark Premium Theme (Zinc-based Fintech Style) */
-    --background: 240 10% 3.9%;       /* zinc-950: #09090b */
-    --foreground: 0 0% 98%;           /* White: #fafafa */
-    --card: 240 6% 10%;               /* zinc-900: #18181b */
-    --card-foreground: 0 0% 98%;
-    --popover: 240 6% 10%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 217 91% 60%;           /* blue-500: #3b82f6 - Cor de destaque vibrante */
+    /* ── LIGHT THEME ── */
+    --background: 0 0% 100%;          /* #ffffff */
+    --foreground: 240 10% 3.9%;       /* #09090b */
+    --card: 0 0% 98%;                 /* #fafafa */
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 217 91% 60%;           /* blue-500 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 16%;          /* zinc-800: #27272a */
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 64%;   /* zinc-400: #a1a1aa - Texto metálico */
+    --secondary: 240 5% 96%;          /* zinc-100 */
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;   /* zinc-500 */
     --accent: 217 91% 60%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
+    --border: 240 6% 90%;             /* zinc-200 */
+    --input: 240 6% 90%;
     --ring: 217 91% 60%;
-    --chart-1: 217 91% 60%;           /* blue-500 */
+    --chart-1: 217 91% 60%;
     --chart-2: 160 60% 45%;
     --chart-3: 38 92% 50%;
     --chart-4: 280 65% 60%;
@@ -38,19 +38,19 @@
   }
 
   .dark {
-    /* TORK CRM - Dark Premium Theme (Zinc-based Fintech Style) */
-    --background: 240 10% 3.9%;       /* zinc-950: #09090b */
-    --foreground: 0 0% 98%;           /* White: #fafafa */
-    --card: 240 6% 10%;               /* zinc-900: #18181b */
+    /* ── DARK PREMIUM THEME (Zinc Fintech) ── */
+    --background: 240 10% 3.9%;       /* zinc-950 */
+    --foreground: 0 0% 98%;           /* #fafafa */
+    --card: 240 6% 10%;               /* zinc-900 */
     --card-foreground: 0 0% 98%;
     --popover: 240 6% 10%;
     --popover-foreground: 0 0% 98%;
-    --primary: 217 91% 60%;           /* blue-500: #3b82f6 */
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 16%;          /* zinc-800: #27272a */
+    --secondary: 240 4% 16%;          /* zinc-800 */
     --secondary-foreground: 0 0% 98%;
     --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 64%;   /* zinc-400: #a1a1aa */
+    --muted-foreground: 240 5% 64%;   /* zinc-400 */
     --accent: 217 91% 60%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 62.8% 30.6%;
@@ -96,18 +96,18 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+    background: hsl(var(--muted) / 0.3);
     border-radius: 4px;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: hsl(var(--muted-foreground) / 0.3);
     border-radius: 4px;
     transition: background 0.2s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: hsl(var(--muted-foreground) / 0.5);
   }
 
   ::-webkit-scrollbar-corner {
@@ -117,7 +117,7 @@
   /* Firefox scrollbar styling */
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--muted) / 0.3);
   }
 }
 
@@ -140,22 +140,18 @@ DEPENDÊNCIAS CRÍTICAS:
 */
 
 .glass-component {
-  /* 🎯 FUNDO ZINC-900 PREMIUM COM TRANSPARÊNCIA */
-  background: rgba(24, 24, 27, 0.65);
+  /* REACTIVE GLASS — adapts to light/dark via CSS vars */
+  background: hsl(var(--card) / 0.65);
 
-  /* 🎯 BLUR CRÍTICO PARA EFEITO GLASS - NÃO ALTERAR */
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
 
-  /* 🎯 BORDAS GLASS PREMIUM - MAIS SUTIS */
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid hsl(var(--border) / 0.3);
 
-  /* 🎯 SOMBRA PROFUNDA PARA PREMIUM FEEL */
   box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 8px 32px hsl(var(--background) / 0.4),
+    inset 0 1px 0 hsl(var(--foreground) / 0.05);
 
-  /* 🎯 ESTRUTURA BÁSICA - NÃO ALTERAR */
   border-radius: 16px;
   position: relative;
   overflow: hidden;
@@ -175,7 +171,7 @@ DEPENDÊNCIAS CRÍTICAS:
   height: 300px;
 
   /* 🎯 GRADIENTE RADIAL MÁGICO - NÃO ALTERAR */
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 70%);
+  background: radial-gradient(circle, hsl(var(--foreground) / 0.08) 0%, hsl(var(--foreground) / 0) 70%);
 
   opacity: 0;
   transition: opacity 0.4s ease;
@@ -188,13 +184,13 @@ DEPENDÊNCIAS CRÍTICAS:
 
 /* 🔒🔒🔒 FIM DA SEÇÃO PROTEGIDA 🔒🔒🔒 */
 
-/* ENTERPRISE SIDEBAR SYSTEM - TORK CRM FLAT DARK THEME */
+/* ENTERPRISE SIDEBAR SYSTEM — REACTIVE */
 .glass-sidebar-premium {
-  background: #09090b; /* zinc-950 solid */
-  border-right: 1px solid #27272a; /* zinc-800 */
+  background: hsl(var(--background));
+  border-right: 1px solid hsl(var(--border));
 }
 
-/* ENTERPRISE MENU ITEMS - Clean and Simple */
+/* ENTERPRISE MENU ITEMS */
 .glass-menu-item {
   position: relative;
   transition: all 0.2s ease;
@@ -202,11 +198,11 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 .glass-menu-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: hsl(var(--muted) / 0.5);
 }
 
 .glass-menu-item.active {
-  background: #27272a; /* zinc-800 solid */
+  background: hsl(var(--secondary));
 }
 
 .glass-menu-item.active::after {
@@ -216,14 +212,14 @@ DEPENDÊNCIAS CRÍTICAS:
   top: 25%;
   bottom: 25%;
   width: 3px;
-  background: #3b82f6; /* primary blue */
+  background: hsl(var(--primary));
   border-radius: 0 2px 2px 0;
 }
 
 /* SIDEBAR HEADER */
 .glass-sidebar-header {
   padding: 1.5rem 1rem;
-  border-bottom: 1px solid #27272a;
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 /* SIDEBAR FOOTER */
@@ -231,21 +227,21 @@ DEPENDÊNCIAS CRÍTICAS:
   margin: 1rem;
   padding: 1rem;
   border-radius: 8px;
-  background: #18181b; /* zinc-900 */
-  border: 1px solid #27272a;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
 }
 
 /* TOGGLE BUTTON */
 .glass-toggle-btn {
-  background: #27272a;
-  border: 1px solid #3f3f46;
+  background: hsl(var(--secondary));
+  border: 1px solid hsl(var(--border));
   border-radius: 6px;
   padding: 0.5rem;
   transition: all 0.2s ease;
 }
 
 .glass-toggle-btn:hover {
-  background: #3f3f46;
+  background: hsl(var(--muted));
 }
 
 /* ICON STYLES */
@@ -278,13 +274,13 @@ DEPENDÊNCIAS CRÍTICAS:
 
 /* GLASS BACKGROUND UTILITIES */
 .glass-bg {
-  background: #18181b;
-  border: 1px solid #27272a;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
 }
 
 .glass-card {
-  background: #18181b;
-  border: 1px solid #27272a;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
 }
 
 

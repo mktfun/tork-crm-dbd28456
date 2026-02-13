@@ -1,3 +1,4 @@
+import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -76,111 +77,113 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <div className="min-h-screen">
-              <Routes>
-                {/* Rota principal - Landing page para não autenticados */}
-                <Route path="/" element={<Landing />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/auth/confirm" element={<AuthConfirm />} />
-                <Route path="/auth/reset-password" element={<AuthConfirm />} />
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <TooltipProvider>
+              <div className="min-h-screen">
+                <Routes>
+                  {/* Rota principal - Landing page para não autenticados */}
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/confirm" element={<AuthConfirm />} />
+                  <Route path="/auth/reset-password" element={<AuthConfirm />} />
 
-                {/* Redirects for legacy/direct route access */}
-                <Route path="/appointments" element={<Navigate to="/dashboard/appointments" replace />} />
-                <Route path="/policies" element={<Navigate to="/dashboard/policies" replace />} />
-                <Route path="/policies/:id" element={<ParamRedirect toBase="/dashboard/policies" />} />
-                <Route path="/clients" element={<Navigate to="/dashboard/clients" replace />} />
-                <Route path="/clients/:id" element={<ParamRedirect toBase="/dashboard/clients" />} />
-                <Route path="/tasks" element={<Navigate to="/dashboard/tasks" replace />} />
-                <Route path="/faturamento" element={<Navigate to="/dashboard/financeiro" replace />} />
-                <Route path="/renovacoes" element={<Navigate to="/dashboard/renovacoes" replace />} />
-                <Route path="/sinistros" element={<Navigate to="/dashboard/sinistros" replace />} />
-                <Route path="/reports" element={<Navigate to="/dashboard/reports" replace />} />
+                  {/* Redirects for legacy/direct route access */}
+                  <Route path="/appointments" element={<Navigate to="/dashboard/appointments" replace />} />
+                  <Route path="/policies" element={<Navigate to="/dashboard/policies" replace />} />
+                  <Route path="/policies/:id" element={<ParamRedirect toBase="/dashboard/policies" />} />
+                  <Route path="/clients" element={<Navigate to="/dashboard/clients" replace />} />
+                  <Route path="/clients/:id" element={<ParamRedirect toBase="/dashboard/clients" />} />
+                  <Route path="/tasks" element={<Navigate to="/dashboard/tasks" replace />} />
+                  <Route path="/faturamento" element={<Navigate to="/dashboard/financeiro" replace />} />
+                  <Route path="/renovacoes" element={<Navigate to="/dashboard/renovacoes" replace />} />
+                  <Route path="/sinistros" element={<Navigate to="/dashboard/sinistros" replace />} />
+                  <Route path="/reports" element={<Navigate to="/dashboard/reports" replace />} />
 
-                {/* Super Admin Login - Public route */}
-                <Route path="/super-admin/login" element={<SuperAdminLogin />} />
+                  {/* Super Admin Login - Public route */}
+                  <Route path="/super-admin/login" element={<SuperAdminLogin />} />
 
-                {/* Todas as rotas do sistema são protegidas */}
-                <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <RootLayout />
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<Dashboard />} />
-                  <Route path="policies" element={<Policies />} />
-                  <Route path="policies/:id" element={<PolicyDetails />} />
-                  <Route path="clients" element={<Clients />} />
-                  <Route path="clients/:id" element={<ClientDetails />} />
-                  <Route path="appointments" element={<Appointments />} />
-                  <Route path="financeiro" element={<Financeiro />} />
-                  {/* Tesouraria and Conciliacao are now tabs in FinanceiroERP */}
-                  <Route path="tasks" element={<Tasks />} />
-                  <Route path="renovacoes" element={<Renovacoes />} />
-                  <Route path="sinistros" element={<Sinistros />} />
-                  <Route path="reports" element={<Reports />} />
-                  <Route path="novidades" element={<Novidades />} />
-                  <Route path="crm" element={<CRM />} />
-                  <Route path="crm/automation" element={<AIAutomation />} />
-                  <Route path="documentacao" element={<Documentation />} />
+                  {/* Todas as rotas do sistema são protegidas */}
+                  <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                      <RootLayout />
+                    </ProtectedRoute>
+                  }>
+                    <Route index element={<Dashboard />} />
+                    <Route path="policies" element={<Policies />} />
+                    <Route path="policies/:id" element={<PolicyDetails />} />
+                    <Route path="clients" element={<Clients />} />
+                    <Route path="clients/:id" element={<ClientDetails />} />
+                    <Route path="appointments" element={<Appointments />} />
+                    <Route path="financeiro" element={<Financeiro />} />
+                    {/* Tesouraria and Conciliacao are now tabs in FinanceiroERP */}
+                    <Route path="tasks" element={<Tasks />} />
+                    <Route path="renovacoes" element={<Renovacoes />} />
+                    <Route path="sinistros" element={<Sinistros />} />
+                    <Route path="reports" element={<Reports />} />
+                    <Route path="novidades" element={<Novidades />} />
+                    <Route path="crm" element={<CRM />} />
+                    <Route path="crm/automation" element={<AIAutomation />} />
+                    <Route path="documentacao" element={<Documentation />} />
 
-                  {/* Super Admin routes moved outside - see below */}
-                  <Route path="demo/mobile-menu" element={<ModernMobileMenuDemo />} />
+                    {/* Super Admin routes moved outside - see below */}
+                    <Route path="demo/mobile-menu" element={<ModernMobileMenuDemo />} />
 
-                  {/* Rotas de configurações com layout próprio */}
-                  <Route path="settings" element={<SettingsLayout />}>
-                    <Route index element={<Navigate to="/dashboard/settings/profile" replace />} />
-                    <Route path="profile" element={<ProfileSettings />} />
-                    <Route path="brokerages" element={<BrokerageSettings />} />
-                    <Route path="producers" element={<ProducerSettings />} />
-                    <Route path="companies" element={<CompanySettings />} />
-                    <Route path="ramos" element={<RamoSettings />} />
-                    <Route path="transactions" element={<TransactionSettings />} />
-                    <Route path="chat-tork" element={<ChatTorkSettings />} />
-                    <Route path="portal" element={<PortalSettings />} />
+                    {/* Rotas de configurações com layout próprio */}
+                    <Route path="settings" element={<SettingsLayout />}>
+                      <Route index element={<Navigate to="/dashboard/settings/profile" replace />} />
+                      <Route path="profile" element={<ProfileSettings />} />
+                      <Route path="brokerages" element={<BrokerageSettings />} />
+                      <Route path="producers" element={<ProducerSettings />} />
+                      <Route path="companies" element={<CompanySettings />} />
+                      <Route path="ramos" element={<RamoSettings />} />
+                      <Route path="transactions" element={<TransactionSettings />} />
+                      <Route path="chat-tork" element={<ChatTorkSettings />} />
+                      <Route path="portal" element={<PortalSettings />} />
+                    </Route>
                   </Route>
-                </Route>
 
-                {/* Portal do Cliente - Rotas dinâmicas por corretora */}
-                {/* Legacy routes redirect to portal not found */}
-                <Route path="/portal" element={<PortalNotFound />} />
-                <Route path="/portal/*" element={<PortalNotFound />} />
+                  {/* Portal do Cliente - Rotas dinâmicas por corretora */}
+                  {/* Legacy routes redirect to portal not found */}
+                  <Route path="/portal" element={<PortalNotFound />} />
+                  <Route path="/portal/*" element={<PortalNotFound />} />
 
-                {/* Dynamic portal routes with brokerage slug */}
-                <Route path="/:brokerageSlug/portal" element={<PortalLogin />} />
-                <Route path="/:brokerageSlug/portal/onboarding" element={<PortalOnboarding />} />
-                <Route path="/:brokerageSlug/portal/change-password" element={<PortalChangePassword />} />
-                <Route path="/:brokerageSlug/portal" element={<PortalLayout />}>
-                  <Route path="home" element={<PortalHome />} />
-                  <Route path="policies" element={<PortalPolicies />} />
-                  <Route path="cards" element={<PortalCards />} />
-                  <Route path="profile" element={<PortalProfile />} />
-                </Route>
+                  {/* Dynamic portal routes with brokerage slug */}
+                  <Route path="/:brokerageSlug/portal" element={<PortalLogin />} />
+                  <Route path="/:brokerageSlug/portal/onboarding" element={<PortalOnboarding />} />
+                  <Route path="/:brokerageSlug/portal/change-password" element={<PortalChangePassword />} />
+                  <Route path="/:brokerageSlug/portal" element={<PortalLayout />}>
+                    <Route path="home" element={<PortalHome />} />
+                    <Route path="policies" element={<PortalPolicies />} />
+                    <Route path="cards" element={<PortalCards />} />
+                    <Route path="profile" element={<PortalProfile />} />
+                  </Route>
 
-                {/* Área Global de Administração - ISOLADA DO LAYOUT OPERACIONAL */}
-                <Route
-                  path="/dashboard/super-admin"
-                  element={
-                    <AdminProtectedRoute>
-                      <SuperAdminLayout />
-                    </AdminProtectedRoute>
-                  }
-                >
-                  <Route index element={<SuperAdmin />} />
-                  <Route path="organizations/:id" element={<OrganizationDetails />} />
-                </Route>
+                  {/* Área Global de Administração - ISOLADA DO LAYOUT OPERACIONAL */}
+                  <Route
+                    path="/dashboard/super-admin"
+                    element={
+                      <AdminProtectedRoute>
+                        <SuperAdminLayout />
+                      </AdminProtectedRoute>
+                    }
+                  >
+                    <Route index element={<SuperAdmin />} />
+                    <Route path="organizations/:id" element={<OrganizationDetails />} />
+                  </Route>
 
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </div>
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </div>
 
-            {/* Toast components */}
-            <Toaster />
-            <Sonner />
-          </TooltipProvider>
-        </AuthProvider>
-      </QueryClientProvider>
+              {/* Toast components */}
+              <Toaster />
+              <Sonner />
+            </TooltipProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }
