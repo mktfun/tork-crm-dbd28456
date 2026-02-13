@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -57,6 +57,7 @@ import {
     type PaginatedStatementItem
 } from '@/hooks/useReconciliation';
 import { formatCurrency } from '@/utils/formatCurrency';
+import { TransactionKpiCard } from '../shared/TransactionKpiCard';
 import { StatementImporter } from './StatementImporter';
 
 const PAGE_SIZE = 20;
@@ -122,6 +123,23 @@ export function ReconciliationPage() {
     const items = statementData?.items || [];
     const totalCount = statementData?.totalCount || 0;
     const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+    // KPI computations
+    const kpis = useMemo(() => {
+        let totalPending = 0;
+        let totalReconciled = 0;
+        let countPending = 0;
+        for (const item of items) {
+            const amount = Number(item.amount) || 0;
+            if (item.reconciled) {
+                totalReconciled += amount;
+            } else {
+                totalPending += amount;
+                countPending++;
+            }
+        }
+        return { totalPending, totalReconciled, countPending };
+    }, [items]);
 
     // Mutations
     const reconcileMutation = useReconcileTransactionDirectly();
@@ -281,10 +299,10 @@ export function ReconciliationPage() {
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-muted-foreground">Status:</span>
                             <Tabs value={statusFilter} onValueChange={(v) => v && setStatusFilter(v)} className="w-auto">
-                                <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-8">
-                                    <TabsTrigger value="todas" className="text-xs px-3 h-6 data-[state=active]:bg-white/10 data-[state=active]:text-white">Todas</TabsTrigger>
-                                    <TabsTrigger value="pendente" className="text-xs px-3 h-6 data-[state=active]:bg-white/10 data-[state=active]:text-white">Pendentes</TabsTrigger>
-                                    <TabsTrigger value="conciliado" className="text-xs px-3 h-6 data-[state=active]:bg-white/10 data-[state=active]:text-white">Conciliados</TabsTrigger>
+                                <TabsList className="h-8">
+                                    <TabsTrigger value="todas" className="text-xs px-3 h-6">Todas</TabsTrigger>
+                                    <TabsTrigger value="pendente" className="text-xs px-3 h-6">Pendentes</TabsTrigger>
+                                    <TabsTrigger value="conciliado" className="text-xs px-3 h-6">Conciliados</TabsTrigger>
                                 </TabsList>
                             </Tabs>
                         </div>
@@ -294,10 +312,10 @@ export function ReconciliationPage() {
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-muted-foreground">Tipo:</span>
                             <Tabs value={typeFilter} onValueChange={(v) => v && setTypeFilter(v)} className="w-auto">
-                                <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-8">
-                                    <TabsTrigger value="todos" className="text-xs px-3 h-6 data-[state=active]:bg-white/10 data-[state=active]:text-white">Todos</TabsTrigger>
-                                    <TabsTrigger value="receita" className="text-xs px-3 h-6 data-[state=active]:bg-white/10 data-[state=active]:text-white">Receitas</TabsTrigger>
-                                    <TabsTrigger value="despesa" className="text-xs px-3 h-6 data-[state=active]:bg-white/10 data-[state=active]:text-white">Despesas</TabsTrigger>
+                                <TabsList className="h-8">
+                                    <TabsTrigger value="todos" className="text-xs px-3 h-6">Todos</TabsTrigger>
+                                    <TabsTrigger value="receita" className="text-xs px-3 h-6">Receitas</TabsTrigger>
+                                    <TabsTrigger value="despesa" className="text-xs px-3 h-6">Despesas</TabsTrigger>
                                 </TabsList>
                             </Tabs>
                         </div>
@@ -309,9 +327,31 @@ export function ReconciliationPage() {
                 </div>
             </AppCard>
 
+            {/* KPI Cards */}
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <TransactionKpiCard
+                    title="Total Pendente"
+                    value={kpis.totalPending}
+                    variant="warning"
+                    icon={AlertCircle}
+                />
+                <TransactionKpiCard
+                    title="Total Conciliado"
+                    value={kpis.totalReconciled}
+                    variant="success"
+                    icon={CheckCircle2}
+                />
+                <TransactionKpiCard
+                    title="Qtd. Pendentes"
+                    value={kpis.countPending}
+                    variant="danger"
+                    icon={GitCompare}
+                />
+            </section>
+
             {/* Main Content */}
             <AppCard className="overflow-hidden">
-                <div className="p-4 border-b bg-muted/30 flex items-center justify-between">
+                <div className="p-4 border-b bg-transparent flex items-center justify-between">
                     {selectedIds.length > 0 ? (
                         <div className="flex items-center gap-2 text-primary font-medium bg-primary/10 px-3 py-1 rounded-full animate-in fade-in">
                             <CheckCircle2 className="w-4 h-4" />
@@ -434,13 +474,13 @@ export function ReconciliationPage() {
                                             {item.type === 'revenue' ? '+' : '-'} {formatCurrency(item.amount)}
                                         </TableCell>
                                         <TableCell>
-                                            {item.status_display === 'Conciliado' ? (
-                                                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none text-xs">
+                                            {item.reconciled ? (
+                                                <Badge variant="secondary" className="text-xs">
                                                     Conciliado
                                                 </Badge>
                                             ) : (
-                                                <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none text-xs">
-                                                    {item.status_display}
+                                                <Badge variant="outline" className="text-xs">
+                                                    Pendente
                                                 </Badge>
                                             )}
                                         </TableCell>
@@ -457,9 +497,9 @@ export function ReconciliationPage() {
                                                 </Button>
                                             ) : (
                                                 <Button
+                                                    variant="secondary"
                                                     size="sm"
-                                                    variant="outline"
-                                                    className="h-7 text-xs gap-1 border-primary/20 hover:bg-primary/5 hover:text-primary"
+                                                    className="h-7 text-xs gap-1 font-medium"
                                                     onClick={() => handleReconcile(item)}
                                                 >
                                                     <CheckCircle2 className="w-3 h-3" />
