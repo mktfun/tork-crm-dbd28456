@@ -18,7 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
+import { AppCard } from '@/components/ui/app-card';
+import { CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { ProjectedCashFlowChart } from './ProjectedCashFlowChart';
@@ -86,7 +87,7 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-card p-3 rounded-lg border shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-card p-3 rounded-lg border">
           {/* Controle de Horizonte */}
           <div className="flex items-center gap-2">
             <Label htmlFor="horizon" className="text-sm font-medium flex items-center gap-1.5 min-w-fit">
@@ -125,14 +126,14 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
               Agrupar:
             </Label>
             <Tabs value={granularity} onValueChange={(v) => v && setGranularity(v as GranularityOption)} className="w-auto">
-              <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-9">
-                <TabsTrigger value="day" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+              <TabsList className="h-9">
+                <TabsTrigger value="day" className="text-xs px-3 h-7">
                   Dia
                 </TabsTrigger>
-                <TabsTrigger value="week" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                <TabsTrigger value="week" className="text-xs px-3 h-7">
                   Semana
                 </TabsTrigger>
-                <TabsTrigger value="month" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                <TabsTrigger value="month" className="text-xs px-3 h-7">
                   Mês
                 </TabsTrigger>
               </TabsList>
@@ -143,23 +144,23 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
 
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="shadow-sm">
+        <AppCard>
           <CardContent className="p-4 flex flex-col gap-1">
             <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
               <TrendingUp className="w-4 h-4 text-emerald-500" /> Receita Projetada
             </span>
             <span className="text-2xl font-bold text-emerald-600">{formatCurrency(summary.income)}</span>
           </CardContent>
-        </Card>
-        <Card className="shadow-sm">
+        </AppCard>
+        <AppCard>
           <CardContent className="p-4 flex flex-col gap-1">
             <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
               <TrendingDown className="w-4 h-4 text-rose-500" /> Despesa Projetada
             </span>
             <span className="text-2xl font-bold text-rose-600">{formatCurrency(summary.expense)}</span>
           </CardContent>
-        </Card>
-        <Card className="shadow-sm border-l-4 border-l-primary/50">
+        </AppCard>
+        <AppCard>
           <CardContent className="p-4 flex flex-col gap-1">
             <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
               <Wallet className="w-4 h-4 text-primary" /> Saldo Final Projetado
@@ -168,7 +169,7 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
               {formatCurrency(summary.balance)}
             </span>
           </CardContent>
-        </Card>
+        </AppCard>
       </div>
 
       {/* Gráfico de Ponte de Caixa */}

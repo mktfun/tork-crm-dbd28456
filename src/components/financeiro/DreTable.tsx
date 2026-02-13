@@ -155,8 +155,8 @@ export function DreTable({ className }: DreTableProps) {
 
   const hasData = rows.length > 0;
   const paddingClass = compactMode ? "py-1 px-2" : "py-3 px-4";
-  const stickyColClass = "sticky left-0 z-20 bg-background border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]";
-  const stickyHeaderClass = "sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border shadow-sm";
+  const stickyColClass = "sticky left-0 z-20 bg-card border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]";
+  const stickyHeaderClass = "sticky top-0 z-30 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60 border-b border-border shadow-sm";
 
   return (
     <TooltipProvider delayDuration={300}>
