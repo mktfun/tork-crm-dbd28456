@@ -3185,26 +3185,15 @@ export type Database = {
         }[]
       }
       get_admin_metrics: { Args: never; Returns: Json }
-      get_aging_report:
-        | {
-            Args: { p_reference_date?: string; p_user_id: string }
-            Returns: {
-              bucket_amount: number
-              bucket_color: string
-              bucket_count: number
-              bucket_range: string
-            }[]
-          }
-        | {
-            Args: { p_type?: string; p_user_id: string }
-            Returns: {
-              bucket_amount: number
-              bucket_color: string
-              bucket_count: number
-              bucket_range: string
-              bucket_sort_order: number
-            }[]
-          }
+      get_aging_report: {
+        Args: { p_reference_date?: string; p_type?: string; p_user_id: string }
+        Returns: {
+          bucket_amount: number
+          bucket_color: string
+          bucket_count: number
+          bucket_range: string
+        }[]
+      }
       get_bank_account_statement: {
         Args: { p_bank_account_id: string }
         Returns: {
