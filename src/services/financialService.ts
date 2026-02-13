@@ -598,30 +598,6 @@ export async function getRevenueTotals(params: {
   };
 }
 
-// ============ BAIXA EM LOTE ============
-
-interface BulkConfirmResult {
-  confirmedCount: number;
-  skippedCount: number;
-  success: boolean;
-  message?: string;
-}
-
-export async function bulkConfirmReceipts(transactionIds: string[]): Promise<BulkConfirmResult> {
-  const { data, error } = await supabase.rpc('bulk_confirm_receipts', {
-    p_transaction_ids: transactionIds
-  });
-
-  if (error) throw error;
-
-  const result = data as any;
-  return {
-    confirmedCount: result?.confirmed_count ?? 0,
-    skippedCount: result?.skipped_count ?? 0,
-    success: result?.success ?? false,
-    message: result?.message
-  };
-}
 
 // ============ LIQUIDAÇÃO (BAIXA) DE COMISSÕES ============
 

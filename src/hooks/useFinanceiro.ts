@@ -305,24 +305,6 @@ export function useRevenueTotals(startDate: string, endDate: string) {
   });
 }
 
-// ============ HOOKS PARA BAIXA EM LOTE ============
-
-/**
- * Hook para baixa em lote de receitas
- */
-export function useBulkConfirmReceipts() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: financialService.bulkConfirmReceipts,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['revenue-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
-    }
-  });
-}
-
 /**
  * Hook para liquidar (dar baixa em) comissão pendente
  */

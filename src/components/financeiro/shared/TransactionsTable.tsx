@@ -28,7 +28,7 @@ export interface Transaction {
     amount: number | null;
     total_amount?: number;
     is_confirmed: boolean;
-    reconciled?: boolean;
+    reconciled: boolean;
     legacy_status?: string | null;
     related_entity_id?: string | null;
     related_entity_type?: string | null;
