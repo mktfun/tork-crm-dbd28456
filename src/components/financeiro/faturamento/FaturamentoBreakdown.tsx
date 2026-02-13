@@ -106,16 +106,16 @@ export function FaturamentoBreakdown({ dateRange }: FaturamentoBreakdownProps) {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="produtor" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl">
-            <TabsTrigger value="produtor" className="gap-1 text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white">
+          <TabsList className="grid w-full grid-cols-3 bg-foreground/5 backdrop-blur-md border border-foreground/10 p-1 rounded-xl">
+            <TabsTrigger value="produtor" className="gap-1 text-xs data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">
               <Users className="w-3 h-3" />
               Produtor
             </TabsTrigger>
-            <TabsTrigger value="ramo" className="gap-1 text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white">
+            <TabsTrigger value="ramo" className="gap-1 text-xs data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">
               <PieChart className="w-3 h-3" />
               Ramo
             </TabsTrigger>
-            <TabsTrigger value="seguradora" className="gap-1 text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white">
+            <TabsTrigger value="seguradora" className="gap-1 text-xs data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">
               <Building2 className="w-3 h-3" />
               Seguradora
             </TabsTrigger>

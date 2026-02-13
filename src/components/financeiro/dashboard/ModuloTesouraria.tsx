@@ -8,12 +8,12 @@ import { ptBR } from "date-fns/locale";
 const AgingBar = ({ item }: { item: any }) => (
   <div className="space-y-1">
     <div className="flex items-center justify-between text-xs">
-      <span className="text-zinc-400">{item.bucketRange}</span>
-      <span className="text-zinc-300 font-medium">
+      <span className="text-muted-foreground">{item.bucketRange}</span>
+      <span className="text-foreground/80 font-medium">
         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.bucketAmount)}
       </span>
     </div>
-    <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
+    <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
       <div
         className={cn("h-full rounded-full transition-all")}
         style={{ width: `${Math.min(100, (item.bucketCount / 10) * 100)}%`, backgroundColor: item.bucketColor }}
@@ -104,13 +104,13 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
   return (
     <Card
       className={cn(
-        "h-full bg-zinc-900/50 border-zinc-800 transition-all duration-200",
-        onClick && "cursor-pointer hover:bg-zinc-900/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+        "h-full bg-card/50 border-border transition-all duration-200",
+        onClick && "cursor-pointer hover:bg-card/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
       )}
       onClick={onClick}
     >
       <CardHeader className="pb-2">
-        <CardTitle className="text-white flex items-center justify-between text-base">
+        <CardTitle className="text-foreground flex items-center justify-between text-base">
           <span className="flex items-center gap-2">
             <Wallet className="h-5 w-5 text-primary" />
             Tesouraria & Contas
@@ -140,7 +140,7 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
                   <p className="text-lg font-bold text-emerald-400">
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalsData?.receivable || 0)}
                   </p>
-                  <p className="text-xs text-zinc-500">Total Aberto</p>
+                  <p className="text-xs text-muted-foreground">Total Aberto</p>
                 </div>
 
                 {/* A Pagar */}
@@ -152,15 +152,15 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
                   <p className="text-lg font-bold text-rose-400">
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalsData?.payable || 0)}
                   </p>
-                  <p className="text-xs text-zinc-500">Total Aberto</p>
+                  <p className="text-xs text-muted-foreground">Total Aberto</p>
                 </div>
               </div>
 
               {/* Próximos Vencimentos */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-4 w-4 text-zinc-500" />
-                  <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Próximos Vencimentos
                   </h4>
                 </div>
@@ -168,16 +168,16 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
                   {upcomingData && upcomingData.length > 0 ? upcomingData.slice(0, 5).map((tx, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between py-1.5 border-b border-zinc-800 last:border-0"
+                      className="flex items-center justify-between py-1.5 border-b border-border last:border-0"
                     >
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                        <span className="text-xs text-zinc-300 truncate max-w-[120px]" title={tx.description}>
+                        <span className="text-xs text-foreground/80 truncate max-w-[120px]" title={tx.description}>
                           {tx.description}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="text-zinc-500">
+                        <span className="text-muted-foreground">
                           {format(new Date(tx.dueDate), 'dd/MM', { locale: ptBR })}
                         </span>
                         <span className="font-medium text-emerald-400">
@@ -186,7 +186,7 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
                       </div>
                     </div>
                   )) : (
-                    <p className="text-xs text-zinc-500 py-2 text-center">Nenhum recebimento previsto.</p>
+                    <p className="text-xs text-muted-foreground py-2 text-center">Nenhum recebimento previsto.</p>
                   )}
                 </div>
               </div>
@@ -194,14 +194,14 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
 
             {/* Coluna Direita: Aging Report */}
             <div className="space-y-3">
-              <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Inadimplência por Período
               </h4>
               <div className="space-y-3">
                 {agingData && agingData.length > 0 ? agingData.map((item, index) => (
                   <AgingBar key={index} item={item} />
                 )) : (
-                  <p className="text-xs text-zinc-500 py-2 text-center">Nenhuma inadimplência registrada.</p>
+                  <p className="text-xs text-muted-foreground py-2 text-center">Nenhuma inadimplência registrada.</p>
                 )}
               </div>
 

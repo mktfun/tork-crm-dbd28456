@@ -14,11 +14,11 @@ interface RelatorioFaturamentoProps {
   intervalo: DateRange | undefined;
 }
 
-export function RelatorioFaturamento({ 
-  apolices, 
-  clientes, 
+export function RelatorioFaturamento({
+  apolices,
+  clientes,
   transactions,
-  intervalo 
+  intervalo
 }: RelatorioFaturamentoProps) {
   // Cálculos dos KPIs financeiros
   const totalFaturado = apolices.reduce((sum, p) => sum + (p.premiumValue || 0), 0);
@@ -105,7 +105,7 @@ export function RelatorioFaturamento({
   };
 
   // Determinar qual granularidade está sendo usada para mostrar ao usuário
-  const granularidadeAtiva = intervalo?.from && intervalo?.to && 
+  const granularidadeAtiva = intervalo?.from && intervalo?.to &&
     differenceInDays(intervalo.to, intervalo.from) <= 31 ? 'Diária' : 'Mensal';
 
   const metrics = [
@@ -142,7 +142,7 @@ export function RelatorioFaturamento({
   return (
     <AppCard className="p-6">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-white mb-2">Análise Financeira</h2>
+        <h2 className="text-xl font-semibold text-foreground mb-2">Análise Financeira</h2>
         <p className="text-slate-400">Métricas de faturamento e rentabilidade</p>
       </div>
 
@@ -155,11 +155,11 @@ export function RelatorioFaturamento({
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <p className="text-sm font-medium text-slate-400 mb-1">{metric.title}</p>
-                  <p className="text-2xl font-bold text-white">{metric.value}</p>
+                  <p className="text-2xl font-bold text-foreground">{metric.value}</p>
                   <p className="text-xs text-slate-500 mt-1">{metric.description}</p>
                 </div>
                 <div className={`p-3 rounded-lg ${metric.bgColor}`}>
-                  <Icon className="w-6 h-6 text-white" />
+                  <Icon className="w-6 h-6 text-foreground" />
                 </div>
               </div>
             </div>
@@ -170,7 +170,7 @@ export function RelatorioFaturamento({
       {/* GRÁFICO DE EVOLUÇÃO DE COMISSÕES */}
       <div className="mt-8">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Evolução de Comissões</h3>
+          <h3 className="text-lg font-semibold text-foreground">Evolução de Comissões</h3>
           <span className="text-sm text-slate-400 bg-slate-800 px-3 py-1 rounded-full">
             Visualização: {granularidadeAtiva}
           </span>
@@ -185,16 +185,16 @@ export function RelatorioFaturamento({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="p-4 rounded-lg bg-slate-800">
             <p className="text-sm text-slate-400 mb-2">Prêmio Médio por Apólice</p>
-            <p className="text-xl font-bold text-white">
+            <p className="text-xl font-bold text-foreground">
               {formatCurrency(apolices.length > 0 ? totalFaturado / apolices.length : 0)}
             </p>
             <p className="text-xs text-slate-500">Valor médio de prêmio</p>
           </div>
-          
+
           <div className="p-4 rounded-lg bg-slate-800">
             <p className="text-sm text-slate-400 mb-2">Taxa de Comissão Média</p>
-            <p className="text-xl font-bold text-white">
-              {apolices.length > 0 ? 
+            <p className="text-xl font-bold text-foreground">
+              {apolices.length > 0 ?
                 (apolices.reduce((sum, p) => sum + (p.commissionRate || 0), 0) / apolices.length).toFixed(1) : 0
               }%
             </p>
@@ -203,7 +203,7 @@ export function RelatorioFaturamento({
 
           <div className="p-4 rounded-lg bg-slate-800">
             <p className="text-sm text-slate-400 mb-2">Faturamento por Cliente</p>
-            <p className="text-xl font-bold text-white">
+            <p className="text-xl font-bold text-foreground">
               {formatCurrency(clientes.length > 0 ? totalFaturado / clientes.length : 0)}
             </p>
             <p className="text-xs text-slate-500">Valor médio de faturamento por cliente</p>

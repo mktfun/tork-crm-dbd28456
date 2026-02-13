@@ -38,7 +38,7 @@ export function EnhancedProducerPerformanceChart({ data, insight }: EnhancedProd
     badge: index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '',
     progressoMeta: (producer.valorTotal / metaIndividual) * 100,
     statusPerformance: producer.valorTotal >= metaIndividual * 0.8 ? 'Excelente' :
-                     producer.valorTotal >= metaIndividual * 0.6 ? 'Bom' : 'Atenção'
+      producer.valorTotal >= metaIndividual * 0.6 ? 'Bom' : 'Atenção'
   }));
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -48,12 +48,12 @@ export function EnhancedProducerPerformanceChart({ data, insight }: EnhancedProd
         <div className="bg-gray-900/95 backdrop-blur-lg border border-gray-700 rounded-lg p-4 shadow-xl">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-2xl">{data.badge}</span>
-            <p className="text-white font-semibold">{label}</p>
+            <p className="text-foreground font-semibold">{label}</p>
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-slate-400">Ranking:</span>
-              <span className="text-white font-medium">#{data.ranking}</span>
+              <span className="text-foreground font-medium">#{data.ranking}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-blue-400">Volume Total:</span>
@@ -74,17 +74,16 @@ export function EnhancedProducerPerformanceChart({ data, insight }: EnhancedProd
             <div className="mt-3 pt-2 border-t border-gray-600">
               <div className="flex justify-between items-center">
                 <span className="text-slate-400">Progresso da Meta:</span>
-                <span className={`font-medium ${
-                  data.progressoMeta >= 80 ? 'text-green-400' : 
-                  data.progressoMeta >= 60 ? 'text-yellow-400' : 'text-red-400'
-                }`}>
+                <span className={`font-medium ${data.progressoMeta >= 80 ? 'text-green-400' :
+                    data.progressoMeta >= 60 ? 'text-yellow-400' : 'text-red-400'
+                  }`}>
                   {data.progressoMeta.toFixed(0)}%
                 </span>
               </div>
               <div className="mt-1">
-                <ProgressBar 
-                  value={data.valorTotal} 
-                  max={metaIndividual} 
+                <ProgressBar
+                  value={data.valorTotal}
+                  max={metaIndividual}
                   size="sm"
                   color={data.progressoMeta >= 80 ? 'green' : data.progressoMeta >= 60 ? 'amber' : 'red'}
                   showPercentage={false}
@@ -102,8 +101,8 @@ export function EnhancedProducerPerformanceChart({ data, insight }: EnhancedProd
     return (
       <AppCard className="p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Users className="w-5 h-5 text-white" />
-          <h3 className="text-lg font-semibold text-white">
+          <Users className="w-5 h-5 text-foreground" />
+          <h3 className="text-lg font-semibold text-foreground">
             Performance por Produtor
           </h3>
         </div>
@@ -121,21 +120,21 @@ export function EnhancedProducerPerformanceChart({ data, insight }: EnhancedProd
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <Users className="w-5 h-5 text-white" />
-          <h3 className="text-lg font-semibold text-white">
+          <Users className="w-5 h-5 text-foreground" />
+          <h3 className="text-lg font-semibold text-foreground">
             Ranking de Performance - Produtores
           </h3>
         </div>
-        
+
         <div className="flex gap-2">
-          <AlertBadge 
-            type="success" 
-            text="Top Performer" 
+          <AlertBadge
+            type="success"
+            text="Top Performer"
             count={1}
           />
-          <AlertBadge 
-            type="warning" 
-            text="Necessita Atenção" 
+          <AlertBadge
+            type="warning"
+            text="Necessita Atenção"
             count={dataWithRankings.filter(p => p.statusPerformance === 'Atenção').length}
           />
         </div>
@@ -151,7 +150,7 @@ export function EnhancedProducerPerformanceChart({ data, insight }: EnhancedProd
           trend="up"
           trendValue={`R$ ${(totalGeral / data.length / 1000).toFixed(0)}k/prod`}
         />
-        
+
         <KpiCard
           title="Comissões Totais"
           value={`R$ ${(totalComissoes / 1000).toFixed(0)}k`}
@@ -160,7 +159,7 @@ export function EnhancedProducerPerformanceChart({ data, insight }: EnhancedProd
           trend="up"
           trendValue={`${((totalComissoes / totalGeral) * 100).toFixed(1)}% do volume`}
         />
-        
+
         <KpiCard
           title="Ticket Médio Geral"
           value={`R$ ${(mediaTicket / 1000).toFixed(0)}k`}
@@ -193,23 +192,23 @@ export function EnhancedProducerPerformanceChart({ data, insight }: EnhancedProd
           </div>
         </div>
       )}
-      
+
       {/* Gráfico */}
       <div className="h-80 mb-4">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={dataWithRankings}
-            layout="horizontal" 
+            layout="horizontal"
             margin={{ top: 20, right: 30, left: 120, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-            <XAxis 
+            <XAxis
               type="number"
               tick={{ fill: '#9CA3AF', fontSize: 12 }}
               axisLine={{ stroke: '#4B5563' }}
               tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
             />
-            <YAxis 
+            <YAxis
               type="category"
               dataKey="nome"
               tick={{ fill: '#9CA3AF', fontSize: 12 }}
@@ -221,8 +220,8 @@ export function EnhancedProducerPerformanceChart({ data, insight }: EnhancedProd
               }}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Bar 
-              dataKey="valorTotal" 
+            <Bar
+              dataKey="valorTotal"
               fill="#3B82F6"
               radius={[0, 4, 4, 0]}
               name="Volume Total"

@@ -95,11 +95,11 @@ export function AgingReportCard({ defaultType = 'receivables' }: AgingReportCard
               </div>
             </div>
             <Tabs value={type} onValueChange={(v) => v && setType(v as 'receivables' | 'payables')} className="w-auto">
-              <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-9">
-                <TabsTrigger value="receivables" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+              <TabsList className="bg-foreground/5 backdrop-blur-md border border-foreground/10 p-1 rounded-xl h-9">
+                <TabsTrigger value="receivables" className="text-xs px-3 h-7 data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">
                   A Receber
                 </TabsTrigger>
-                <TabsTrigger value="payables" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                <TabsTrigger value="payables" className="text-xs px-3 h-7 data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">
                   A Pagar
                 </TabsTrigger>
               </TabsList>

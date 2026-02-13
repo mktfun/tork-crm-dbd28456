@@ -22,11 +22,11 @@ export function ExpirationCalendarChart({ data, insight }: ExpirationCalendarCha
     if (active && payload && payload.length) {
       return (
         <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-lg">
-          <p className="text-white font-medium mb-2">{label}</p>
+          <p className="text-foreground font-medium mb-2">{label}</p>
           {payload.map((entry: any, index: number) => (
             <div key={index} className="flex items-center gap-2 text-sm">
-              <div 
-                className="w-3 h-3 rounded-full" 
+              <div
+                className="w-3 h-3 rounded-full"
                 style={{ backgroundColor: entry.color }}
               />
               <span className="text-slate-300">
@@ -44,10 +44,10 @@ export function ExpirationCalendarChart({ data, insight }: ExpirationCalendarCha
     <AppCard className="p-6">
       <div className="flex items-center gap-3 mb-6">
         <div className="p-2 rounded-lg bg-gradient-to-r from-red-500 to-rose-600 bg-opacity-20">
-          <Calendar className="w-5 h-5 text-white" />
+          <Calendar className="w-5 h-5 text-foreground" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-white">Calendário de Vencimentos Críticos</h3>
+          <h3 className="text-lg font-semibold text-foreground">Calendário de Vencimentos Críticos</h3>
           <p className="text-sm text-slate-400">Timeline dos vencimentos mais importantes</p>
         </div>
       </div>
@@ -73,42 +73,42 @@ export function ExpirationCalendarChart({ data, insight }: ExpirationCalendarCha
                 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis 
-                  dataKey="periodo" 
+                <XAxis
+                  dataKey="periodo"
                   stroke="#9CA3AF"
                   fontSize={12}
                 />
-                <YAxis 
+                <YAxis
                   stroke="#9CA3AF"
                   fontSize={12}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend 
+                <Legend
                   wrapperStyle={{ color: '#9CA3AF' }}
                 />
-                <Bar 
-                  dataKey="vencidas" 
+                <Bar
+                  dataKey="vencidas"
                   stackId="vencimentos"
                   name="Vencidas"
                   fill="#EF4444"
                   radius={[0, 0, 0, 0]}
                 />
-                <Bar 
-                  dataKey="vencendoEm30Dias" 
+                <Bar
+                  dataKey="vencendoEm30Dias"
                   stackId="vencimentos"
                   name="30 dias"
                   fill="#F59E0B"
                   radius={[0, 0, 0, 0]}
                 />
-                <Bar 
-                  dataKey="vencendoEm60Dias" 
+                <Bar
+                  dataKey="vencendoEm60Dias"
                   stackId="vencimentos"
                   name="60 dias"
                   fill="#10B981"
                   radius={[0, 0, 0, 0]}
                 />
-                <Bar 
-                  dataKey="vencendoEm90Dias" 
+                <Bar
+                  dataKey="vencendoEm90Dias"
                   stackId="vencimentos"
                   name="90 dias"
                   fill="#3B82F6"
@@ -118,8 +118,8 @@ export function ExpirationCalendarChart({ data, insight }: ExpirationCalendarCha
             </ResponsiveContainer>
           </div>
 
-          <ChartInsight 
-            icon={AlertTriangle} 
+          <ChartInsight
+            icon={AlertTriangle}
             text={insight}
           />
         </>

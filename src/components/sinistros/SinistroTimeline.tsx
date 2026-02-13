@@ -4,12 +4,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle, 
-  FileText, 
+import {
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  FileText,
   User,
   Plus,
   MessageSquare,
@@ -84,7 +84,7 @@ const getActivityIcon = (type: string) => {
     case 'Atualização':
       return <Edit className="w-4 h-4 text-blue-400" />;
     default:
-      return <Clock className="w-4 h-4 text-gray-400" />;
+      return <Clock className="w-4 h-4 text-muted-foreground" />;
   }
 };
 
@@ -160,13 +160,13 @@ export function SinistroTimeline({ sinistroId, currentStatus, activities, onRefr
       if (activityError) throw activityError;
 
       toast.success('Atividade adicionada com sucesso!');
-      
+
       // Reset form
       setActivityType('');
       setDescription('');
       setNewStatus('');
       setIsAddingActivity(false);
-      
+
       // Refresh data
       onRefresh?.();
 
@@ -219,8 +219,8 @@ export function SinistroTimeline({ sinistroId, currentStatus, activities, onRefr
   return (
     <div className="space-y-6">
       {/* Quick Actions */}
-      <div className="bg-white/5 rounded-lg p-4">
-        <h4 className="text-white font-medium mb-3">Ações Rápidas</h4>
+      <div className="bg-card rounded-lg p-4">
+        <h4 className="text-foreground font-medium mb-3">Ações Rápidas</h4>
         <div className="flex flex-wrap gap-2">
           {statusOptions
             .filter(status => status !== currentStatus)
@@ -231,7 +231,7 @@ export function SinistroTimeline({ sinistroId, currentStatus, activities, onRefr
                 size="sm"
                 onClick={() => quickStatusChange(status)}
                 disabled={isSubmitting}
-                className={`${getStatusColor(status)} border-none text-white hover:opacity-80`}
+                className={`${getStatusColor(status)} border-none text-foreground hover:opacity-80`}
               >
                 {isSubmitting ? (
                   <Loader2 className="w-4 h-4 mr-1 animate-spin" />
@@ -243,9 +243,9 @@ export function SinistroTimeline({ sinistroId, currentStatus, activities, onRefr
       </div>
 
       {/* Add Activity Form */}
-      <div className="bg-white/5 rounded-lg p-4">
+      <div className="bg-card rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-white font-medium">Adicionar Atividade</h4>
+          <h4 className="text-foreground font-medium">Adicionar Atividade</h4>
           <Button
             variant="outline"
             size="sm"
@@ -320,8 +320,8 @@ export function SinistroTimeline({ sinistroId, currentStatus, activities, onRefr
 
       {/* Timeline */}
       <div className="space-y-4">
-        <h4 className="text-white font-medium">Histórico de Atividades</h4>
-        
+        <h4 className="text-foreground font-medium">Histórico de Atividades</h4>
+
         {activities.length === 0 ? (
           <Alert>
             <Clock className="h-4 w-4" />
@@ -335,43 +335,43 @@ export function SinistroTimeline({ sinistroId, currentStatus, activities, onRefr
               <div key={activity.id} className="relative">
                 {/* Timeline Line */}
                 {index < activities.length - 1 && (
-                  <div className="absolute left-6 top-12 w-0.5 h-full bg-white/10" />
+                  <div className="absolute left-6 top-12 w-0.5 h-full bg-border" />
                 )}
-                
+
                 <div className="flex gap-4">
                   {/* Icon */}
-                  <div className="flex-shrink-0 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center">
+                  <div className="flex-shrink-0 w-12 h-12 bg-border rounded-full flex items-center justify-center">
                     {getActivityIcon(activity.activity_type)}
                   </div>
-                  
+
                   {/* Content */}
-                  <div className="flex-1 bg-white/5 rounded-lg p-4">
+                  <div className="flex-1 bg-card rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs">
                           {activity.activity_type}
                         </Badge>
-                        <span className="text-xs text-white/60">
+                        <span className="text-xs text-muted-foreground">
                           {formatDateTime(activity.created_at)}
                         </span>
                       </div>
                     </div>
-                    
-                    <p className="text-white/80 text-sm mb-2">
+
+                    <p className="text-muted-foreground text-sm mb-2">
                       {activity.description}
                     </p>
 
                     {/* Show old/new values for status changes */}
                     {activity.old_values && activity.new_values && (
-                      <div className="grid grid-cols-2 gap-4 text-xs bg-white/5 rounded p-2">
+                      <div className="grid grid-cols-2 gap-4 text-xs bg-card rounded p-2">
                         <div>
-                          <span className="text-white/60">Anterior:</span>
+                          <span className="text-muted-foreground">Anterior:</span>
                           <p className="text-red-400">
                             {JSON.stringify(activity.old_values)}
                           </p>
                         </div>
                         <div>
-                          <span className="text-white/60">Novo:</span>
+                          <span className="text-muted-foreground">Novo:</span>
                           <p className="text-green-400">
                             {JSON.stringify(activity.new_values)}
                           </p>

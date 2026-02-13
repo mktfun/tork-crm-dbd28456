@@ -29,7 +29,7 @@ const CustomTooltip = ({ active, payload }: any) => {
     const data = payload[0].payload;
     return (
       <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-lg">
-        <p className="text-white font-medium">{data.status}</p>
+        <p className="text-foreground font-medium">{data.status}</p>
         <p className="text-slate-300">
           <span className="font-semibold">{data.count}</span> apólices
         </p>
@@ -44,18 +44,18 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 const CustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percentage }: any) => {
   if (percentage < 5) return null; // Não mostrar labels para fatias muito pequenas
-  
+
   const RADIAN = Math.PI / 180;
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
   return (
-    <text 
-      x={x} 
-      y={y} 
-      fill="white" 
-      textAnchor={x > cx ? 'start' : 'end'} 
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor={x > cx ? 'start' : 'end'}
       dominantBaseline="central"
       fontSize="12"
       fontWeight="500"
@@ -72,10 +72,10 @@ export function RenewalStatusChart({ data, insight }: RenewalStatusChartProps) {
     <AppCard className="p-6">
       <div className="flex items-center gap-3 mb-6">
         <div className="p-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 bg-opacity-20">
-          <PieChartIcon className="w-5 h-5 text-white" />
+          <PieChartIcon className="w-5 h-5 text-foreground" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-white">Distribuição de Renovações por Status</h3>
+          <h3 className="text-lg font-semibold text-foreground">Distribuição de Renovações por Status</h3>
           <p className="text-sm text-slate-400">
             Funil de renovações por status atual • {totalRenewals} apólices no período
           </p>
@@ -98,15 +98,15 @@ export function RenewalStatusChart({ data, insight }: RenewalStatusChartProps) {
               stroke="none"
             >
               {data.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
-                  fill={STATUS_COLORS[entry.status as keyof typeof STATUS_COLORS] || '#6b7280'} 
+                <Cell
+                  key={`cell-${index}`}
+                  fill={STATUS_COLORS[entry.status as keyof typeof STATUS_COLORS] || '#6b7280'}
                 />
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip />} />
-            <Legend 
-              verticalAlign="bottom" 
+            <Legend
+              verticalAlign="bottom"
               height={36}
               iconType="circle"
               wrapperStyle={{

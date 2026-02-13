@@ -69,7 +69,7 @@ export function RecentTransactionsCard({ onViewDetails }: RecentTransactionsCard
                     <div className="p-2 bg-primary/10 rounded-lg">
                         <History className="w-5 h-5 text-primary" aria-hidden="true" />
                     </div>
-                    <h3 className="text-base font-semibold text-white">Últimas Movimentações</h3>
+                    <h3 className="text-base font-semibold text-foreground">Últimas Movimentações</h3>
                 </div>
                 <div className="space-y-3">
                     {[1, 2, 3, 4, 5].map((i) => (
@@ -88,7 +88,7 @@ export function RecentTransactionsCard({ onViewDetails }: RecentTransactionsCard
                     <div className="p-2 bg-primary/10 rounded-lg">
                         <History className="w-5 h-5 text-primary" aria-hidden="true" />
                     </div>
-                    <h3 className="text-base font-semibold text-white">Últimas Movimentações</h3>
+                    <h3 className="text-base font-semibold text-foreground">Últimas Movimentações</h3>
                 </div>
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                     <CalendarClock className="w-12 h-12 opacity-40 mb-2" />
@@ -106,7 +106,7 @@ export function RecentTransactionsCard({ onViewDetails }: RecentTransactionsCard
                 <div className="p-2 bg-primary/10 rounded-lg">
                     <History className="w-5 h-5 text-primary" aria-hidden="true" />
                 </div>
-                <h3 className="text-base font-semibold text-white">Últimas Movimentações</h3>
+                <h3 className="text-base font-semibold text-foreground">Últimas Movimentações</h3>
             </div>
 
             {/* Table */}

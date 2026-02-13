@@ -263,17 +263,17 @@ export function AccountsPayableReceivableTable() {
       <CardContent className="p-0">
         <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as 'receber' | 'pagar')} className="w-full">
           <div className="px-4 pb-4">
-            <TabsList className="grid w-full grid-cols-2 bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-10">
+            <TabsList className="grid w-full grid-cols-2 bg-foreground/5 backdrop-blur-md border border-foreground/10 p-1 rounded-xl h-10">
               <TabsTrigger
                 value="receber"
-                className="data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:hover:bg-white/5 gap-2"
+                className="data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground data-[state=inactive]:bg-transparent data-[state=inactive]:hover:bg-foreground/5 gap-2"
               >
                 <ArrowUpRight className="w-4 h-4 text-emerald-500" />
                 A Receber ({receivableCount})
               </TabsTrigger>
               <TabsTrigger
                 value="pagar"
-                className="data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=inactive]:bg-transparent data-[state=inactive]:hover:bg-white/5 gap-2"
+                className="data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground data-[state=inactive]:bg-transparent data-[state=inactive]:hover:bg-foreground/5 gap-2"
               >
                 <ArrowDownRight className="w-4 h-4 text-rose-500" />
                 A Pagar ({payableCount})

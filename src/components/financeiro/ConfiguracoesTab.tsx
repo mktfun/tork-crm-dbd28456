@@ -432,9 +432,9 @@ export function ConfiguracoesTab() {
 
       {/* Tabs */}
       <Tabs defaultValue="automacao" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl">
-          <TabsTrigger value="automacao" className="data-[state=active]:bg-white/10 data-[state=active]:text-white">Automação</TabsTrigger>
-          <TabsTrigger value="plano-contas" className="data-[state=active]:bg-white/10 data-[state=active]:text-white">Plano de Contas</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 bg-foreground/5 backdrop-blur-md border border-foreground/10 p-1 rounded-xl">
+          <TabsTrigger value="automacao" className="data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">Automação</TabsTrigger>
+          <TabsTrigger value="plano-contas" className="data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">Plano de Contas</TabsTrigger>
         </TabsList>
 
         {/* Tab: Automação */}

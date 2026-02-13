@@ -88,12 +88,12 @@ export function CaixaTab({ dateRange }: CaixaTabProps) {
 
       {/* Grid de Contas Bancárias */}
       {accounts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-zinc-800 rounded-lg">
-          <Landmark className="h-12 w-12 text-zinc-700 mb-4" />
-          <h3 className="text-lg font-semibold text-zinc-300 mb-2">
+        <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-border rounded-lg">
+          <Landmark className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold text-foreground/80 mb-2">
             Nenhuma conta bancária cadastrada
           </h3>
-          <p className="text-sm text-zinc-500 mb-4 max-w-md">
+          <p className="text-sm text-muted-foreground mb-4 max-w-md">
             Adicione suas contas bancárias para gerenciar saldos e movimentações.
             Você também poderá atribuir transações existentes a estas contas.
           </p>

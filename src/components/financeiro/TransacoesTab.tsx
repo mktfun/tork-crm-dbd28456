@@ -138,12 +138,12 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
             {/* Header with Type Toggle */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <Tabs value={transactionType} onValueChange={(v) => setTransactionType(v as TransactionType)} className="w-full sm:w-auto">
-                    <TabsList className="grid grid-cols-2 w-full sm:w-[300px] bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl">
-                        <TabsTrigger value="receitas" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                    <TabsList className="grid grid-cols-2 w-full sm:w-[300px] bg-foreground/5 backdrop-blur-md border border-foreground/10 p-1 rounded-xl">
+                        <TabsTrigger value="receitas" className="gap-2 data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">
                             <TrendingUp className="w-4 h-4" />
                             Receitas
                         </TabsTrigger>
-                        <TabsTrigger value="despesas" className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                        <TabsTrigger value="despesas" className="gap-2 data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">
                             <TrendingDown className="w-4 h-4" />
                             Despesas
                         </TabsTrigger>
@@ -158,12 +158,12 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
             {/* Status Toggle + KPIs */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <Tabs value={statusFilter} onValueChange={(val) => val && setStatusFilter(val as StatusFilter)} className="w-auto">
-                    <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-9">
-                        <TabsTrigger value="efetivado" className="gap-2 text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                    <TabsList className="bg-foreground/5 backdrop-blur-md border border-foreground/10 p-1 rounded-xl h-9">
+                        <TabsTrigger value="efetivado" className="gap-2 text-xs px-3 h-7 data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">
                             <Check className="w-4 h-4" />
                             Conciliado
                         </TabsTrigger>
-                        <TabsTrigger value="pendente" className="gap-2 text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                        <TabsTrigger value="pendente" className="gap-2 text-xs px-3 h-7 data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">
                             <Clock className="w-4 h-4" />
                             {transactionType === 'receitas' ? 'A Receber' : 'A Pagar'}
                         </TabsTrigger>

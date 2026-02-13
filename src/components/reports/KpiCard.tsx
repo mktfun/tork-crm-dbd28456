@@ -12,14 +12,14 @@ interface KpiCardProps {
   className?: string;
 }
 
-export function KpiCard({ 
-  title, 
-  value, 
-  subtitle, 
-  icon: Icon, 
-  trend, 
-  trendValue, 
-  className 
+export function KpiCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  trend,
+  trendValue,
+  className
 }: KpiCardProps) {
   const getTrendColor = () => {
     if (!trend) return '';
@@ -45,9 +45,9 @@ export function KpiCard({
           </span>
         )}
       </div>
-      
+
       <div className="space-y-1">
-        <p className="text-2xl font-bold text-white">{value}</p>
+        <p className="text-2xl font-bold text-foreground">{value}</p>
         <p className="text-xs text-slate-400 uppercase tracking-wide">{title}</p>
         {subtitle && (
           <p className="text-xs text-slate-500">{subtitle}</p>

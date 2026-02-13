@@ -32,7 +32,7 @@ type SinistroFormData = z.infer<typeof sinistroSchema>;
 
 const claimTypes = [
   'Colisão',
-  'Roubo', 
+  'Roubo',
   'Furto',
   'Incêndio',
   'Danos Elétricos',
@@ -122,7 +122,7 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
           </Button>
         )}
       </DialogTrigger>
-      
+
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -187,10 +187,10 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
                 <FormItem>
                   <FormLabel>Descrição da Ocorrência *</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Descreva detalhadamente o que aconteceu..."
                       className="min-h-[100px]"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -267,9 +267,9 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
                 <FormItem>
                   <FormLabel>Circunstâncias Detalhadas</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Detalhe as circunstâncias, condições climáticas, testemunhas, etc..."
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -286,11 +286,11 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
                   <FormItem>
                     <FormLabel>Valor Estimado (R$)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="0,00" 
-                        {...field} 
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0,00"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -306,11 +306,11 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
                   <FormItem>
                     <FormLabel>Franquia (R$)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="0,00" 
-                        {...field} 
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0,00"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -320,15 +320,15 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
             </div>
 
             {/* Seção de Vinculação (Opcional) */}
-            <div className="border-t border-white/10 pt-6">
-              <h4 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+            <div className="border-t border-border pt-6">
+              <h4 className="text-lg font-medium text-foreground mb-4 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-blue-400" />
                 Vinculação (Opcional)
               </h4>
-              <p className="text-sm text-white/60 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 Você pode vincular este sinistro a uma apólice e cliente específicos. Esta informação pode ser adicionada posteriormente.
               </p>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Apólice com busca - Agora opcional */}
                 <FormField
@@ -432,46 +432,45 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <div>
-                        <span className="text-white/60 text-sm">Número:</span>
-                        <p className="text-white font-medium">
+                        <span className="text-muted-foreground text-sm">Número:</span>
+                        <p className="text-foreground font-medium">
                           {selectedPolicy.policyNumber || `Orçamento #${selectedPolicy.id.slice(-4)}`}
                         </p>
                       </div>
                       <div>
-                        <span className="text-white/60 text-sm">Seguradora:</span>
-                        <p className="text-white">{selectedPolicy.companies?.name || 'Seguradora não especificada'}</p>
+                        <span className="text-muted-foreground text-sm">Seguradora:</span>
+                        <p className="text-foreground">{selectedPolicy.companies?.name || 'Seguradora não especificada'}</p>
                       </div>
                       <div>
-                        <span className="text-white/60 text-sm">Tipo:</span>
-                        <p className="text-white">{selectedPolicy.ramos?.nome || selectedPolicy.type}</p>
+                        <span className="text-muted-foreground text-sm">Tipo:</span>
+                        <p className="text-foreground">{selectedPolicy.ramos?.nome || selectedPolicy.type}</p>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <div>
-                        <span className="text-white/60 text-sm flex items-center gap-1">
+                        <span className="text-muted-foreground text-sm flex items-center gap-1">
                           <User className="w-3 h-3" />
                           Cliente:
                         </span>
-                        <p className="text-white font-medium">{selectedPolicy.client?.name}</p>
+                        <p className="text-foreground font-medium">{selectedPolicy.client?.name}</p>
                         {selectedPolicy.client?.phone && (
-                          <p className="text-white/80 text-sm">{selectedPolicy.client.phone}</p>
+                          <p className="text-muted-foreground text-sm">{selectedPolicy.client.phone}</p>
                         )}
                       </div>
                       <div>
-                        <span className="text-white/60 text-sm">Vigência:</span>
-                        <p className="text-white">
+                        <span className="text-muted-foreground text-sm">Vigência:</span>
+                        <p className="text-foreground">
                           {selectedPolicy.expirationDate &&
                             formatDate(selectedPolicy.expirationDate)}
                         </p>
                       </div>
                       <div>
-                        <span className="text-white/60 text-sm">Status:</span>
-                        <span className={`inline-block px-2 py-1 rounded text-xs font-medium ml-2 ${
-                          selectedPolicy.status === 'Ativa' ? 'bg-green-500/20 text-green-400' :
+                        <span className="text-muted-foreground text-sm">Status:</span>
+                        <span className={`inline-block px-2 py-1 rounded text-xs font-medium ml-2 ${selectedPolicy.status === 'Ativa' ? 'bg-green-500/20 text-green-400' :
                           selectedPolicy.status === 'Orçamento' ? 'bg-orange-500/20 text-orange-400' :
-                          selectedPolicy.status === 'Aguardando Apólice' ? 'bg-blue-500/20 text-blue-400' :
-                          'bg-gray-500/20 text-gray-400'
-                        }`}>
+                            selectedPolicy.status === 'Aguardando Apólice' ? 'bg-blue-500/20 text-blue-400' :
+                              'bg-gray-500/20 text-gray-400'
+                          }`}>
                           {selectedPolicy.status}
                         </span>
                       </div>
@@ -483,16 +482,16 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
 
             {/* Botões */}
             <div className="flex justify-end gap-3 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => setOpen(false)}
                 disabled={createSinistro.isPending}
               >
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={createSinistro.isPending}
                 className="bg-blue-600 hover:bg-blue-700"
               >
