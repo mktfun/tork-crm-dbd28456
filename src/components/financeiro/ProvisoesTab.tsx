@@ -31,6 +31,8 @@ interface ProvisoesTabProps {
 
 type GranularityOption = 'day' | 'week' | 'month';
 
+console.log('[ANTIGRAVITY] ProvisoesTab GLASS v2 LOADED');
+
 export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
   const [granularity, setGranularity] = useState<GranularityOption>('day');
   const [horizonMonths, setHorizonMonths] = useState(3);

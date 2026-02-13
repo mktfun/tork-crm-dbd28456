@@ -62,6 +62,8 @@ import { StatementImporter } from './StatementImporter';
 
 const PAGE_SIZE = 20;
 
+console.log('[ANTIGRAVITY] ReconciliationPage SILVER-GLASS v2 LOADED');
+
 export function ReconciliationPage() {
     // State
     const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);

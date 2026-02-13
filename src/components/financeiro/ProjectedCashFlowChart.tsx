@@ -94,6 +94,8 @@ const MIN_VIEWPORT = 7;
 const MAX_VIEWPORT = 90;
 const INITIAL_VIEWPORT = 30;
 
+console.log('[ANTIGRAVITY] ProjectedCashFlowChart MAPS-LIKE v2 LOADED');
+
 export function ProjectedCashFlowChart({
   data,
   isLoading,
