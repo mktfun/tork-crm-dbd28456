@@ -382,8 +382,13 @@ export async function getFinancialSummary(params: {
     netResult: Number(row.netResult) || 0,
     pendingIncome: Number(row.pendingIncome) || 0,
     pendingExpense: Number(row.pendingExpense) || 0,
+    completedTransactionCount: Number(row.completedTransactionCount) || 0,
+    pendingTransactionCount: Number(row.pendingTransactionCount) || 0,
     transactionCount: Number(row.transactionCount) || 0,
-    cashBalance: Number(row.cashBalance) || 0
+    cashBalance: Number(row.cashBalance) || 0,
+    globalPendingIncome: Number(row.globalPendingIncome) || 0,
+    globalPendingExpense: Number(row.globalPendingExpense) || 0,
+    globalPendingCount: Number(row.globalPendingCount) || 0,
   };
 }
 

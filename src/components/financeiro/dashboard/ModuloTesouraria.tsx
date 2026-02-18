@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpCircle, ArrowDownCircle, Wallet, Calendar, ArrowRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAgingReport, useUpcomingReceivables } from "@/hooks/useFinanceiro";
-import { format } from "date-fns";
+import { useAgingReport, useUpcomingReceivables, useFinancialSummary } from "@/hooks/useFinanceiro";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 const AgingBar = ({ item }: { item: any }) => (
@@ -26,80 +26,17 @@ interface ModuloTesourariaProps {
   onClick?: () => void;
 }
 
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-
 export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
   const { data: agingData, isLoading: isLoadingAging } = useAgingReport();
   const { data: upcomingData, isLoading: isLoadingUpcoming } = useUpcomingReceivables(30);
 
-  // Query para A RECEBER (receitas pendentes)
-  const { data: receivableData, isLoading: isLoadingReceivable } = useQuery({
-    queryKey: ['tesouraria-receivable'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('financial_ledger')
-        .select(`
-          amount,
-          financial_transactions!inner(
-            id,
-            status,
-            is_void,
-            user_id
-          ),
-          financial_accounts!inner(
-            type
-          )
-        `)
-        .eq('financial_transactions.status', 'pending')
-        .eq('financial_transactions.is_void', false)
-        .eq('financial_accounts.type', 'revenue');
+  // Usa o mesmo hook do dashboard para garantir consistência
+  const now = new Date();
+  const startDate = format(startOfMonth(now), 'yyyy-MM-dd');
+  const endDate = format(endOfMonth(now), 'yyyy-MM-dd');
+  const { data: summary, isLoading: isLoadingSummary } = useFinancialSummary(startDate, endDate);
 
-      if (error) throw error;
-
-      // Sum absolute amounts
-      const total = data?.reduce((acc, item) => acc + Math.abs(item.amount), 0) || 0;
-      return total;
-    }
-  });
-
-  // Query para A PAGAR (despesas pendentes)
-  const { data: payableData, isLoading: isLoadingPayable } = useQuery({
-    queryKey: ['tesouraria-payable'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('financial_ledger')
-        .select(`
-          amount,
-          financial_transactions!inner(
-            id,
-            status,
-            is_void,
-            user_id
-          ),
-          financial_accounts!inner(
-            type
-          )
-        `)
-        .eq('financial_transactions.status', 'pending')
-        .eq('financial_transactions.is_void', false)
-        .eq('financial_accounts.type', 'expense');
-
-      if (error) throw error;
-
-      // Sum absolute amounts
-      const total = data?.reduce((acc, item) => acc + Math.abs(item.amount), 0) || 0;
-      return total;
-    }
-  });
-
-  const totalsData = {
-    receivable: receivableData || 0,
-    payable: payableData || 0
-  };
-  const isLoadingTotals = isLoadingReceivable || isLoadingPayable;
-
-  const isLoading = isLoadingAging || isLoadingUpcoming || isLoadingTotals;
+  const isLoading = isLoadingAging || isLoadingUpcoming || isLoadingSummary;
 
   return (
     <Card
@@ -138,7 +75,7 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
                     <span className="text-xs font-medium">A Receber</span>
                   </div>
                   <p className="text-lg font-bold text-emerald-400">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalsData?.receivable || 0)}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary?.globalPendingIncome || 0)}
                   </p>
                   <p className="text-xs text-muted-foreground">Total Aberto</p>
                 </div>
@@ -150,7 +87,7 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
                     <span className="text-xs font-medium">A Pagar</span>
                   </div>
                   <p className="text-lg font-bold text-rose-400">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalsData?.payable || 0)}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary?.globalPendingExpense || 0)}
                   </p>
                   <p className="text-xs text-muted-foreground">Total Aberto</p>
                 </div>
