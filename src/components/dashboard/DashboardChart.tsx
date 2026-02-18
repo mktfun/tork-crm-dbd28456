@@ -109,7 +109,7 @@ export function DashboardChart() {
       <h3 className="text-lg font-semibold text-foreground mb-4">Análise de Performance</h3>
 
       {/* A NOVA BARRA DE FERRAMENTAS COMPLETA */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-2 rounded-lg border border-slate-800 bg-slate-900">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-2 rounded-lg border border-border bg-card">
 
         {/* FILTRO DE PERÍODO */}
         <DatePickerWithRange

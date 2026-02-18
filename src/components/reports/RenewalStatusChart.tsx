@@ -15,25 +15,24 @@ interface RenewalStatusChartProps {
   insight: string;
 }
 
-// Cores para cada status de renovação
 const STATUS_COLORS = {
-  'Pendente': '#ef4444', // red-500
-  'Em Contato': '#f59e0b', // amber-500
-  'Proposta Enviada': '#3b82f6', // blue-500
-  'Renovada': '#10b981', // emerald-500
-  'Não Renovada': '#6b7280', // gray-500
+  'Pendente': '#ef4444',
+  'Em Contato': '#f59e0b',
+  'Proposta Enviada': '#3b82f6',
+  'Renovada': '#10b981',
+  'Não Renovada': '#6b7280',
 };
 
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-lg">
+      <div style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }} className="border rounded-lg p-3 shadow-lg">
         <p className="text-foreground font-medium">{data.status}</p>
-        <p className="text-slate-300">
+        <p className="text-muted-foreground">
           <span className="font-semibold">{data.count}</span> apólices
         </p>
-        <p className="text-slate-400 text-sm">
+        <p className="text-muted-foreground text-sm">
           {data.percentage.toFixed(1)}% do total
         </p>
       </div>
@@ -43,7 +42,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 };
 
 const CustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percentage }: any) => {
-  if (percentage < 5) return null; // Não mostrar labels para fatias muito pequenas
+  if (percentage < 5) return null;
 
   const RADIAN = Math.PI / 180;
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
@@ -70,16 +69,16 @@ export function RenewalStatusChart({ data, insight }: RenewalStatusChartProps) {
 
   return (
     <AppCard className="p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 bg-opacity-20">
-          <PieChartIcon className="w-5 h-5 text-foreground" />
-        </div>
-        <div>
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <PieChartIcon className="w-5 h-5 text-primary" />
+          </div>
           <h3 className="text-lg font-semibold text-foreground">Distribuição de Renovações por Status</h3>
-          <p className="text-sm text-slate-400">
-            Funil de renovações por status atual • {totalRenewals} apólices no período
-          </p>
         </div>
+        <p className="text-sm text-muted-foreground ml-12">
+          Funil de renovações por status atual • {totalRenewals} apólices no período
+        </p>
       </div>
 
       <div className="h-80">
@@ -112,9 +111,8 @@ export function RenewalStatusChart({ data, insight }: RenewalStatusChartProps) {
               wrapperStyle={{
                 paddingTop: '20px',
                 fontSize: '14px',
-                color: '#cbd5e1'
               }}
-              formatter={(value) => <span style={{ color: '#cbd5e1' }}>{value}</span>}
+              formatter={(value) => <span className="text-muted-foreground">{value}</span>}
             />
           </PieChart>
         </ResponsiveContainer>
