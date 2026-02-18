@@ -109,9 +109,13 @@ export const ModuloFaturamento = ({ onClick, dateRange }: ModuloFaturamentoProps
     );
   }
 
-  const faturamentoMes = summary?.totalIncome || 0;
-  const operacoes = summary?.transactionCount || 0;
+  const faturamentoMes = summary?.current?.totalIncome || 0;
+  const operacoes = summary?.current?.transactionCount || 0;
   const ticketMedio = operacoes > 0 ? faturamentoMes / operacoes : 0;
+
+  // Trend calculation
+  const prevIncome = summary?.previous?.totalIncome || 0;
+  const incomeTrend = prevIncome > 0 ? ((faturamentoMes - prevIncome) / prevIncome) * 100 : undefined;
 
   return (
     <Card
@@ -138,7 +142,7 @@ export const ModuloFaturamento = ({ onClick, dateRange }: ModuloFaturamentoProps
           <StatItem
             label="Receita Confirmada"
             value={formatCurrency(faturamentoMes)}
-            // percent removed as we don't have real historical data here easily
+            percent={incomeTrend !== undefined ? Math.round(incomeTrend) : undefined}
             icon={<DollarSign className="h-5 w-5" />}
             isHero
           />
