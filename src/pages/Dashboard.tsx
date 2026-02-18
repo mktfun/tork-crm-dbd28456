@@ -120,10 +120,7 @@ export default function Dashboard() {
 
       {/* CARD DE INSIGHT GLOBAL ESTRATÉGICO */}
       <div className="dashboard-global-insight">
-        <DashboardGlobalInsight
-          insight={metrics.dashboardGlobalInsight}
-          isLoading={metrics.isLoading}
-        />
+        <DashboardGlobalInsight />
       </div>
 
       {/* DEMO: INTEGRAÇÃO DE RACIOCÍNIO IA */}

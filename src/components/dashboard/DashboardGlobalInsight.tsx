@@ -1,45 +1,106 @@
-
-import { TrendingUp, Info } from 'lucide-react';
-import { GlassCard } from '@/components/ui/glass-card';
+import { useState } from 'react';
+import { Sparkles, RefreshCw, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useStrategicSummary } from '@/hooks/useStrategicSummary';
+import { cn } from '@/lib/utils';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface DashboardGlobalInsightProps {
-  insight: string;
-  isLoading?: boolean;
+  focus?: 'general' | 'finance' | 'crm';
 }
 
-export function DashboardGlobalInsight({ insight, isLoading }: DashboardGlobalInsightProps) {
-  if (isLoading) {
-    return (
-      <GlassCard className="p-4 animate-pulse">
-        <div className="flex items-start gap-3">
-          <div className="w-5 h-5 bg-foreground/20 rounded"></div>
-          <div className="flex-1 space-y-2">
-            <div className="h-4 bg-foreground/20 rounded w-3/4"></div>
-            <div className="h-4 bg-foreground/20 rounded w-1/2"></div>
-          </div>
-        </div>
-      </GlassCard>
-    );
-  }
+const scopeLabels = { day: 'Dia', week: 'Semana', month: 'Mês' } as const;
+
+export function DashboardGlobalInsight({ focus = 'general' }: DashboardGlobalInsightProps) {
+  const {
+    summary,
+    createdAt,
+    isCached,
+    isLoading,
+    isFetching,
+    scope,
+    setScope,
+    refresh,
+  } = useStrategicSummary(focus);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const formattedTime = createdAt
+    ? format(parseISO(createdAt), "HH:mm", { locale: ptBR })
+    : '--:--';
+
+  const formattedDate = createdAt
+    ? format(parseISO(createdAt), "'Hoje às' HH:mm", { locale: ptBR })
+    : 'Aguardando...';
 
   return (
-    <GlassCard className="p-4 hover:bg-foreground/15 transition-all duration-200">
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 mt-0.5">
-          <TrendingUp className="h-5 w-5 text-blue-400" />
+    <div className="glass-component p-6 border-l-4 border-l-primary bg-card/50 backdrop-blur-xl shadow-lg">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Sparkles className="w-5 h-5 text-yellow-400 animate-pulse" />
+          <h3 className="font-semibold text-foreground">Resumo Estratégico IA</h3>
         </div>
-        <div className="flex-1">
-          <h3 className="text-sm font-medium text-foreground/90 mb-1">
-            Resumo Estratégico
-          </h3>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {insight}
-          </p>
-        </div>
-        <div className="flex-shrink-0 mt-0.5">
-          <Info className="h-4 w-4 text-muted-foreground" />
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={handleRefresh}
+            disabled={isRefreshing || isFetching}
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5 text-muted-foreground", (isRefreshing || isFetching) && "animate-spin")} />
+          </Button>
+
+          <div className="flex bg-muted/20 rounded-lg p-0.5">
+            {(Object.keys(scopeLabels) as Array<keyof typeof scopeLabels>).map((key) => (
+              <button
+                key={key}
+                onClick={() => setScope(key)}
+                className={cn(
+                  "px-2.5 py-1 text-xs rounded-md transition-all duration-150",
+                  scope === key
+                    ? "bg-primary/20 text-primary font-medium"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {scopeLabels[key]}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-    </GlassCard>
+
+      {/* Content */}
+      <div className="mt-3 text-sm text-foreground/80 leading-relaxed min-h-[40px]">
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Analisando dados do sistema...
+          </div>
+        ) : summary ? (
+          <p>{summary}</p>
+        ) : (
+          <p className="text-muted-foreground">Sem dados suficientes para análise.</p>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="mt-4 text-xs text-muted-foreground flex justify-between items-center">
+        <span>
+          {isCached ? `Cache • Atualizado: ${formattedDate}` : `Atualizado: ${formattedDate}`}
+        </span>
+      </div>
+    </div>
   );
 }

@@ -228,6 +228,36 @@ export type Database = {
           },
         ]
       }
+      ai_summaries: {
+        Row: {
+          content: string
+          created_at: string
+          focus: string
+          id: string
+          scope: string
+          summary_date: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          focus?: string
+          id?: string
+          scope?: string
+          summary_date?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          focus?: string
+          id?: string
+          scope?: string
+          summary_date?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_usage_logs: {
         Row: {
           brokerage_id: number | null
