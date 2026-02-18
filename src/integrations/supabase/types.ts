@@ -1786,6 +1786,7 @@ export type Database = {
           created_by: string
           description: string
           document_number: string | null
+          due_date: string | null
           id: string
           insurance_company_id: string | null
           is_confirmed: boolean
@@ -1817,6 +1818,7 @@ export type Database = {
           created_by: string
           description: string
           document_number?: string | null
+          due_date?: string | null
           id?: string
           insurance_company_id?: string | null
           is_confirmed?: boolean
@@ -1848,6 +1850,7 @@ export type Database = {
           created_by?: string
           description?: string
           document_number?: string | null
+          due_date?: string | null
           id?: string
           insurance_company_id?: string | null
           is_confirmed?: boolean
