@@ -48,8 +48,8 @@ export function EnhancedExpirationCalendarChart({ data, insight }: EnhancedExpir
       const total = payload.reduce((sum: number, entry: any) => sum + entry.value, 0);
       
       return (
-        <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 shadow-lg">
-          <p className="text-white font-medium mb-3">{label}</p>
+          <div style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }} className="border rounded-lg p-4 shadow-lg">
+          <p className="text-foreground font-medium mb-3">{label}</p>
           {payload.map((entry: any, index: number) => {
             const getIcon = (name: string) => {
               switch (name) {
@@ -65,18 +65,18 @@ export function EnhancedExpirationCalendarChart({ data, insight }: EnhancedExpir
               <div key={index} className="flex items-center justify-between gap-4 text-sm mb-1">
                 <div className="flex items-center gap-2">
                   <span>{getIcon(entry.name)}</span>
-                  <span className="text-slate-300">{entry.name}:</span>
+                  <span className="text-muted-foreground">{entry.name}:</span>
                 </div>
-                <span className="text-white font-medium">{entry.value} apólices</span>
+                <span className="text-foreground font-medium">{entry.value} apólices</span>
               </div>
             );
           })}
-          <div className="border-t border-slate-600 mt-2 pt-2">
+            <div className="border-t border-border mt-2 pt-2">
             <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Total:</span>
-              <span className="text-white font-medium">{total} apólices</span>
+              <span className="text-muted-foreground">Total:</span>
+              <span className="text-foreground font-medium">{total} apólices</span>
             </div>
-            <div className="flex justify-between text-xs text-slate-500 mt-1">
+            <div className="flex justify-between text-xs text-muted-foreground mt-1">
               <span>Valor estimado:</span>
               <span>R$ {(total * valorMedioApolice).toLocaleString('pt-BR')}</span>
             </div>
@@ -93,11 +93,11 @@ export function EnhancedExpirationCalendarChart({ data, insight }: EnhancedExpir
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-r from-red-500 to-rose-600 bg-opacity-20">
-            <Calendar className="w-5 h-5 text-white" />
+            <Calendar className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">Sistema de Alerta - Vencimentos</h3>
-            <p className="text-sm text-slate-400">Timeline crítica de renovações</p>
+            <h3 className="text-lg font-semibold text-foreground">Sistema de Alerta - Vencimentos</h3>
+            <p className="text-sm text-muted-foreground">Timeline crítica de renovações</p>
           </div>
         </div>
 
@@ -145,20 +145,20 @@ export function EnhancedExpirationCalendarChart({ data, insight }: EnhancedExpir
       {/* Lista de Ações Urgentes */}
       {acoesUrgentes.length > 0 && (
         <div className="mb-6">
-          <h4 className="text-sm font-medium text-white mb-3">🚨 Ações Prioritárias</h4>
+          <h4 className="text-sm font-medium text-foreground mb-3">🚨 Ações Prioritárias</h4>
           <div className="space-y-2">
             {acoesUrgentes.map((acao, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+              <div key={index} className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg border border-border">
                 <div className="flex items-center gap-3">
                   <div className={`w-2 h-2 rounded-full ${
                     acao.prioridade === 'alta' ? 'bg-red-500' : 
                     acao.prioridade === 'média' ? 'bg-yellow-500' : 'bg-green-500'
                   }`} />
-                  <span className="text-slate-300 text-sm">{acao.tipo}</span>
+                  <span className="text-muted-foreground text-sm">{acao.tipo}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-white font-medium">{acao.count}</span>
-                  <span className="text-xs text-slate-500">clientes</span>
+                  <span className="text-foreground font-medium">{acao.count}</span>
+                  <span className="text-xs text-muted-foreground">clientes</span>
                 </div>
               </div>
             ))}
@@ -168,7 +168,7 @@ export function EnhancedExpirationCalendarChart({ data, insight }: EnhancedExpir
 
       {/* Progresso de Resolução */}
       <div className="mb-6">
-        <h4 className="text-sm font-medium text-white mb-3">Progresso de Resolução</h4>
+        <h4 className="text-sm font-medium text-foreground mb-3">Progresso de Resolução</h4>
         <div className="space-y-3">
           <ProgressBar
             label="Situações Críticas Resolvidas"
@@ -178,12 +178,12 @@ export function EnhancedExpirationCalendarChart({ data, insight }: EnhancedExpir
           />
           
           <div className="grid grid-cols-2 gap-4 text-xs">
-            <div className="bg-slate-800/30 p-2 rounded">
-              <span className="text-slate-400">Meta: Reduzir críticas para </span>
-              <span className="text-white font-medium">{'< 5%'}</span>
+            <div className="bg-secondary/30 p-2 rounded">
+              <span className="text-muted-foreground">Meta: Reduzir críticas para </span>
+              <span className="text-foreground font-medium">{'< 5%'}</span>
             </div>
-            <div className="bg-slate-800/30 p-2 rounded">
-              <span className="text-slate-400">Atual: </span>
+            <div className="bg-secondary/30 p-2 rounded">
+              <span className="text-muted-foreground">Atual: </span>
               <span className={`font-medium ${
                 totalGeral > 0 && (totalCriticas / totalGeral) * 100 < 5 ? 'text-green-400' : 
                 totalGeral > 0 && (totalCriticas / totalGeral) * 100 < 15 ? 'text-yellow-400' : 'text-red-400'
@@ -196,10 +196,10 @@ export function EnhancedExpirationCalendarChart({ data, insight }: EnhancedExpir
       </div>
 
       {data.length === 0 ? (
-        <div className="h-80 flex items-center justify-center border-2 border-dashed border-slate-600 rounded-lg">
+        <div className="h-80 flex items-center justify-center border border-dashed border-border rounded-lg">
           <div className="text-center">
-            <Calendar className="w-12 h-12 text-slate-500 mx-auto mb-2" />
-            <p className="text-slate-500 text-sm">Nenhuma apólice com vencimentos no período</p>
+            <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+            <p className="text-muted-foreground text-sm">Nenhuma apólice com vencimentos no período</p>
           </div>
         </div>
       ) : (
@@ -211,18 +211,22 @@ export function EnhancedExpirationCalendarChart({ data, insight }: EnhancedExpir
                 data={data}
                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                 <XAxis 
                   dataKey="periodo" 
-                  stroke="#9CA3AF"
+                  stroke="hsl(var(--muted-foreground))"
                   fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
                 />
                 <YAxis 
-                  stroke="#9CA3AF"
+                  stroke="hsl(var(--muted-foreground))"
                   fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ color: '#9CA3AF' }} />
+                <Legend wrapperStyle={{ fontSize: '14px' }} formatter={(value: string) => <span className="text-muted-foreground">{value}</span>} />
                 <Bar 
                   dataKey="vencidas" 
                   stackId="vencimentos"

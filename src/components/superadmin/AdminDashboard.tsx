@@ -1,5 +1,4 @@
 import { KpiCard } from '@/components/policies/KpiCard';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdminMetrics, formatBytes } from '@/hooks/useSuperAdminData';
 import { useAIUsageByDay } from '@/hooks/useSuperAdminStats';
@@ -33,15 +32,15 @@ export function AdminDashboard() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Dashboard Administrativo</h1>
-        <p className="text-sm text-zinc-400 mt-1">Visão geral do sistema Tork com dados em tempo real</p>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard Administrativo</h1>
+        <p className="text-sm text-muted-foreground mt-1">Visão geral do sistema Tork com dados em tempo real</p>
       </div>
 
       {/* KPIs */}
       {metricsLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-32 bg-zinc-800" />
+            <Skeleton key={i} className="h-32 bg-muted" />
           ))}
         </div>
       ) : metricsError ? (
@@ -103,106 +102,97 @@ export function AdminDashboard() {
         </div>
       )}
 
-      {/* AI Usage Chart */}
-      <Card className="bg-zinc-900/50 border-zinc-800">
-        <CardHeader>
-          <CardTitle className="text-zinc-100">Uso de IA - Últimos 7 dias</CardTitle>
-          <CardDescription>Comparativo de tokens por provedor</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {aiLoading ? (
-            <Skeleton className="h-80 bg-zinc-800" />
-          ) : (
-            <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={aiUsage || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                <XAxis 
-                  dataKey="date" 
-                  tickFormatter={formatDate}
-                  stroke="#71717a"
-                  fontSize={12}
-                />
-                <YAxis 
-                  stroke="#71717a"
-                  fontSize={12}
-                  tickFormatter={(value) => value.toLocaleString()}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#18181b',
-                    border: '1px solid #27272a',
-                    borderRadius: '8px',
-                  }}
-                  labelFormatter={formatDate}
-                  formatter={(value: number) => [value.toLocaleString(), 'Tokens']}
-                />
-                <Legend />
-                <Bar 
-                  dataKey="gemini" 
-                  name="Gemini (Assistente)" 
-                  fill="#10b981" 
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar 
-                  dataKey="mistral" 
-                  name="Mistral (OCR)" 
-                  fill="#f59e0b" 
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar 
-                  dataKey="openai" 
-                  name="OpenAI" 
-                  fill="#6366f1" 
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
+      <div className="glass-component p-6 shadow-lg border-border bg-card">
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Brain className="w-5 h-5 text-primary" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground">Uso de IA - Últimos 7 dias</h3>
+          </div>
+          <p className="text-sm text-muted-foreground ml-12">Comparativo de tokens por provedor</p>
+        </div>
+        {aiLoading ? (
+          <Skeleton className="h-80 bg-muted" />
+        ) : (
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={aiUsage || []}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis 
+                dataKey="date" 
+                tickFormatter={formatDate}
+                stroke="hsl(var(--muted-foreground))"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis 
+                stroke="hsl(var(--muted-foreground))"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => value.toLocaleString()}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--card))',
+                  borderColor: 'hsl(var(--border))',
+                  borderRadius: '8px',
+                  color: 'hsl(var(--foreground))',
+                }}
+                labelFormatter={formatDate}
+                formatter={(value: number) => [value.toLocaleString(), 'Tokens']}
+              />
+              <Legend formatter={(value) => <span className="text-muted-foreground">{value}</span>} />
+              <Bar dataKey="gemini" name="Gemini (Assistente)" fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="mistral" name="Mistral (OCR)" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="openai" name="OpenAI" fill="#6366f1" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
 
-      {/* Infrastructure Health */}
-      <Card className="bg-zinc-900/50 border-zinc-800">
-        <CardHeader>
-          <CardTitle className="text-zinc-100 flex items-center gap-2">
-            <HardDrive className="h-5 w-5" />
-            Saúde do Banco de Dados
-          </CardTitle>
-          <CardDescription>Métricas de infraestrutura do Supabase</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {metricsLoading ? (
-            <Skeleton className="h-24 bg-zinc-800" />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-foreground/10">
-                    <Database className="h-5 w-5 text-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Uso de Disco (Database)</p>
-                    <p className="text-2xl md:text-3xl font-bold text-foreground">
-                      {formatBytes(metrics?.db_size_bytes || 0)}
-                    </p>
-                  </div>
+      <div className="glass-component p-6 shadow-lg border-border bg-card">
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <HardDrive className="w-5 h-5 text-primary" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground">Saúde do Banco de Dados</h3>
+          </div>
+          <p className="text-sm text-muted-foreground ml-12">Métricas de infraestrutura do Supabase</p>
+        </div>
+        {metricsLoading ? (
+          <Skeleton className="h-24 bg-muted" />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-foreground/10">
+                  <Database className="h-5 w-5 text-foreground" />
                 </div>
-              </div>
-              <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-foreground/10">
-                    <Activity className="h-5 w-5 text-emerald-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Status de Conexão</p>
-                    <p className="text-2xl md:text-3xl font-bold text-foreground">Conectado</p>
-                  </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Uso de Disco (Database)</p>
+                  <p className="text-2xl md:text-3xl font-bold text-foreground">
+                    {formatBytes(metrics?.db_size_bytes || 0)}
+                  </p>
                 </div>
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-foreground/10">
+                  <Activity className="h-5 w-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Status de Conexão</p>
+                  <p className="text-2xl md:text-3xl font-bold text-foreground">Conectado</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
