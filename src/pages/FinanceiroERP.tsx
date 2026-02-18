@@ -13,17 +13,11 @@ import {
   CalendarClock,
   Landmark,
   Clock,
-  Info,
   LineChart,
   GitCompare,
-  CheckCircle2
 } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { CashFlowChart } from '@/components/financeiro/CashFlowChart';
 import { DreTable } from '@/components/financeiro/DreTable';
@@ -41,6 +35,7 @@ import { ModuloFaturamento } from '@/components/financeiro/dashboard/ModuloFatur
 import { ModuloTesouraria } from '@/components/financeiro/dashboard/ModuloTesouraria';
 import { ModuloMultiBancos } from '@/components/financeiro/dashboard/ModuloMultiBancos';
 import { RecentTransactionsCard } from '@/components/financeiro/dashboard/RecentTransactionsCard';
+import { GlassKpiCard } from '@/components/financeiro/shared/GlassKpiCard';
 import { PageDebugger } from '@/components/shared/PageDebugger';
 import {
   useFinancialAccountsWithDefaults,
@@ -51,8 +46,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 
 import { cn } from '@/lib/utils';
 
-
-// ============ KPI CONFIGURATION ============
+// ============ HELPERS ============
 
 function formatCurrency(value: number): string {
   const safeValue = typeof value === 'number' && !isNaN(value) ? value : 0;
@@ -62,86 +56,11 @@ function formatCurrency(value: number): string {
   }).format(safeValue);
 }
 
-function calcTrend(current: number, previous: number): number | undefined {
-  if (!previous || previous === 0) return undefined;
-  return Math.round(((current - previous) / previous) * 100);
-}
-
-// ============ GLASSMORPHISM KPI CARD ============
-
-interface GlassKpiCardProps {
-  title: string;
-  value: number;
-  icon: React.ElementType;
-  iconGlow: string;
-  isLoading?: boolean;
-  subtitle?: string;
-  tooltip?: string;
-  trend?: number;
-  onClick?: () => void;
-}
-
-function GlassKpiCard({ title, value, icon: Icon, iconGlow, isLoading, subtitle, tooltip, trend, onClick }: GlassKpiCardProps) {
-  const cardContent = (
-    <div
-      onClick={onClick}
-      className={cn(
-        "bg-black/40 backdrop-blur-md border border-white/10 shadow-xl shadow-black/20 rounded-lg transition-all duration-300",
-        "hover:border-white/20 hover:scale-[1.02] hover:shadow-2xl",
-        onClick && "cursor-pointer"
-      )}
-    >
-      <div className="p-5">
-        <div className="flex items-center gap-4">
-          <div className={cn('p-3 rounded-lg bg-white/5', iconGlow)}>
-            <Icon className="w-5 h-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1">
-              <p className="text-sm text-muted-foreground">{title}</p>
-              {tooltip && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="w-3.5 h-3.5 text-muted-foreground/50" />
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-xs">
-                      <p className="text-sm">{tooltip}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
-            {isLoading ? (
-              <Skeleton className="h-7 w-24 mt-1" />
-            ) : (
-              <>
-                <p className="text-xl font-bold text-foreground">
-                  {formatCurrency(value)}
-                </p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {subtitle && (
-                    <span className="text-xs text-muted-foreground">{subtitle}</span>
-                  )}
-                  {trend !== undefined && trend !== 0 && (
-                    <span className={cn(
-                      'text-xs font-medium flex items-center gap-0.5',
-                      trend > 0 ? 'text-emerald-400' : 'text-rose-400'
-                    )}>
-                      {trend > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                      {trend > 0 ? '+' : ''}{trend}% vs anterior
-                    </span>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  return cardContent;
+function calcTrend(current: number, previous: number): { value: number; label: string } | null {
+  if (!previous || previous === 0) return null;
+  const pct = Math.round(((current - previous) / previous) * 100);
+  if (pct === 0) return null;
+  return { value: pct, label: 'vs anterior' };
 }
 
 // ============ KPI SECTION ============
@@ -158,55 +77,40 @@ function KpiSection({ startDate, endDate }: KpiSectionProps) {
   const current = summary?.current;
   const previous = summary?.previous;
 
-  // Debug logging
-  if (!isLoading && current) {
-    console.log('[KPI] current summary:', JSON.stringify(current).substring(0, 300));
-    if (current.pendingIncome === 0) {
-      console.warn('[KPI] pendingIncome is 0 — verify get_financial_summary RPC');
-    }
-    if (current.operationalPendingIncome === 0) {
-      console.warn('[KPI] operationalPendingIncome is 0 — verify get_financial_summary RPC');
-    }
-  }
-
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <GlassKpiCard
         title="Recebido no Mês"
-        value={current?.totalIncome ?? 0}
+        value={formatCurrency(current?.totalIncome ?? 0)}
         icon={TrendingUp}
-        iconGlow="text-emerald-400 drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]"
+        iconClassName="text-emerald-400 drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]"
         isLoading={isLoading}
         trend={calcTrend(current?.totalIncome ?? 0, previous?.totalIncome ?? 0)}
-        tooltip="Receitas confirmadas no período selecionado."
         onClick={() => navigate('/dashboard/financeiro?tab=transacoes&type=revenue')}
       />
       <GlassKpiCard
         title="Despesas do Mês"
-        value={current?.totalExpense ?? 0}
+        value={formatCurrency(current?.totalExpense ?? 0)}
         icon={TrendingDown}
-        iconGlow="text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.4)]"
+        iconClassName="text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.4)]"
         isLoading={isLoading}
         trend={calcTrend(current?.totalExpense ?? 0, previous?.totalExpense ?? 0)}
-        tooltip="Despesas confirmadas no período selecionado."
         onClick={() => navigate('/dashboard/financeiro?tab=transacoes&type=expense')}
       />
       <GlassKpiCard
         title="Vencendo este Mês"
-        value={current?.pendingIncome ?? 0}
+        value={formatCurrency(current?.pendingIncome ?? 0)}
         icon={CalendarClock}
-        iconGlow="text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]"
+        iconClassName="text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]"
         isLoading={isLoading}
-        tooltip="Receitas pendentes com vencimento no período filtrado."
         onClick={() => navigate('/dashboard/financeiro?tab=tesouraria&status=pending')}
       />
       <GlassKpiCard
         title="Total Geral a Receber"
-        value={current?.operationalPendingIncome ?? 0}
+        value={formatCurrency(current?.operationalPendingIncome ?? 0)}
         icon={Clock}
-        iconGlow="text-sky-400 drop-shadow-[0_0_6px_rgba(56,189,248,0.4)]"
+        iconClassName="text-sky-400 drop-shadow-[0_0_6px_rgba(56,189,248,0.4)]"
         isLoading={isLoading}
-        tooltip="Total operacional a receber (vencidos + próximos 30 dias)."
         onClick={() => navigate('/dashboard/financeiro?tab=tesouraria&view=operational')}
       />
     </div>
@@ -252,23 +156,11 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
 
   return (
     <div className="space-y-6">
-      {/* Gráfico de Fluxo de Caixa - PRIMEIRO */}
-      <CashFlowChart
-        data={cashFlowData}
-        isLoading={cashFlowLoading}
-        granularity="day"
-      />
-
-      {/* Faturamento & Vendas | Saldos Bancários */}
+      <CashFlowChart data={cashFlowData} isLoading={cashFlowLoading} granularity="day" />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ModuloFaturamento
-          onClick={() => onTabChange('transacoes')}
-          dateRange={dateRange}
-        />
+        <ModuloFaturamento onClick={() => onTabChange('transacoes')} dateRange={dateRange} />
         <ModuloMultiBancos onClick={() => onTabChange('caixa')} />
       </div>
-
-      {/* Tesouraria & Contas - Largura Total */}
       <ModuloTesouraria onClick={() => onTabChange('tesouraria')} />
     </div>
   );
@@ -290,27 +182,22 @@ function DreTab() {
   );
 }
 
-
-
 // ============ MAIN COMPONENT ============
 
 export default function FinanceiroERP() {
   usePageTitle('Financeiro');
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Estado global de filtro de datas
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
   });
 
-  // Estado para controle da aba e detalhes
   const [activeTab, setActiveTab] = useState('visao-geral');
   const [detailsTransactionId, setDetailsTransactionId] = useState<string | null>(null);
   const [isLegacyLookup, setIsLegacyLookup] = useState(false);
   const navigate = useNavigate();
 
-  // Datas normalizadas para queries
   const { startDate, endDate } = useMemo(() => {
     const from = dateRange?.from || startOfMonth(new Date());
     const to = dateRange?.to || endOfMonth(new Date());
@@ -320,7 +207,6 @@ export default function FinanceiroERP() {
     };
   }, [dateRange]);
 
-   // Handlers
   const handleViewTransactionDetails = (id: string) => {
     setDetailsTransactionId(id);
     setIsLegacyLookup(false);
@@ -340,7 +226,7 @@ export default function FinanceiroERP() {
         <ImportTransactionsModal />
       </div>
 
-      {/* KPIs - powered by get_financial_summary */}
+      {/* KPIs - Glass Design */}
       <KpiSection startDate={startDate} endDate={endDate} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -419,7 +305,6 @@ export default function FinanceiroERP() {
         </TabsContent>
       </Tabs>
 
-      {/* Deep Link Details Sheet */}
       <TransactionDetailsSheet
         transactionId={detailsTransactionId}
         isLegacyId={isLegacyLookup}
@@ -427,7 +312,6 @@ export default function FinanceiroERP() {
         onClose={handleCloseDetails}
       />
 
-      {/* Protocolo de Sanidade - Debug Mode */}
       <PageDebugger context={activeTab} />
     </div>
   );

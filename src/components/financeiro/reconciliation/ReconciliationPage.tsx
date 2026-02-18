@@ -69,7 +69,16 @@ import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 20;
 
-// ============ PREMIUM KPI CARD ============
+// ============ PREMIUM KPI CARD (Glass Design Unificado) ============
+import { GlassKpiCard } from '@/components/financeiro/shared/GlassKpiCard';
+
+const variantIconConfig: Record<string, string> = {
+    pending: 'text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]',
+    reconciled: 'text-emerald-400 drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]',
+    count: 'text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.4)]',
+    progress: 'text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.4)]',
+};
+
 interface PremiumKpiProps {
     title: string;
     value: string;
@@ -80,66 +89,17 @@ interface PremiumKpiProps {
     onClick?: () => void;
 }
 
-const variantConfig = {
-    pending: {
-        iconBg: 'bg-amber-500/15',
-        iconColor: 'text-amber-400',
-        glow: 'drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]',
-        border: 'border-amber-500/20',
-    },
-    reconciled: {
-        iconBg: 'bg-emerald-500/15',
-        iconColor: 'text-emerald-400',
-        glow: 'drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]',
-        border: 'border-emerald-500/20',
-    },
-    count: {
-        iconBg: 'bg-rose-500/15',
-        iconColor: 'text-rose-400',
-        glow: 'drop-shadow-[0_0_6px_rgba(244,63,94,0.4)]',
-        border: 'border-rose-500/20',
-    },
-    progress: {
-        iconBg: 'bg-primary/15',
-        iconColor: 'text-primary',
-        glow: 'drop-shadow-[0_0_6px_hsl(var(--primary)/0.4)]',
-        border: 'border-primary/20',
-    },
-};
-
-function PremiumKpiCard({ title, value, subtitle, icon: Icon, variant, trend, onClick }: PremiumKpiProps) {
-    const config = variantConfig[variant];
+function PremiumKpiCard({ title, value, subtitle, icon, variant, trend, onClick }: PremiumKpiProps) {
     return (
-        <AppCard
-            className={cn(
-                'border backdrop-blur-md transition-all duration-300 hover:scale-[1.02] hover:shadow-xl',
-                config.border,
-                onClick && 'cursor-pointer'
-            )}
+        <GlassKpiCard
+            title={title}
+            value={value}
+            subtitle={subtitle}
+            icon={icon}
+            iconClassName={variantIconConfig[variant]}
+            trend={trend}
             onClick={onClick}
-        >
-            <div className="p-5">
-                <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
-                        <p className="text-2xl font-bold text-foreground">{value}</p>
-                        {trend && trend.value !== 0 && (
-                            <p className={cn(
-                                'text-xs font-medium flex items-center gap-1',
-                                trend.value > 0 ? 'text-emerald-400' : 'text-rose-400'
-                            )}>
-                                {trend.value > 0 ? '▲' : '▼'} {Math.abs(trend.value).toFixed(0)}%
-                                <span className="text-muted-foreground font-normal">{trend.label}</span>
-                            </p>
-                        )}
-                        {subtitle && !trend && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-                    </div>
-                    <div className={cn('p-2.5 rounded-xl', config.iconBg)}>
-                        <Icon className={cn('w-5 h-5', config.iconColor, config.glow)} />
-                    </div>
-                </div>
-            </div>
-        </AppCard>
+        />
     );
 }
 
@@ -164,11 +124,14 @@ function ReconciliationProgressCard({ progress, reconciledCount, totalCount }: {
     };
 
     return (
-        <AppCard className="border border-primary/20 backdrop-blur-md">
+        <div className={cn(
+            'rounded-xl border border-white/10 bg-black/40 backdrop-blur-md shadow-lg shadow-black/20',
+            'transition-all duration-300 hover:border-white/20 hover:bg-white/5'
+        )}>
             <div className="p-5">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                        <div className="p-2.5 rounded-xl bg-primary/15">
+                        <div className="p-2.5 rounded-xl bg-white/5">
                             <TrendingUp className="w-5 h-5 text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.4)]" />
                         </div>
                         <div>
@@ -185,7 +148,7 @@ function ReconciliationProgressCard({ progress, reconciledCount, totalCount }: {
                     {reconciledCount} de {totalCount} conciliados
                 </p>
             </div>
-        </AppCard>
+        </div>
     );
 }
 

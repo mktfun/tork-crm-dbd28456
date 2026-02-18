@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { useAgingReport, useUpcomingReceivables, useFinancialSummary } from "@/hooks/useFinanceiro";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { GlassKpiCard } from "@/components/financeiro/shared/GlassKpiCard";
 
 const AgingBar = ({ item }: { item: any }) => (
   <div className="space-y-1">
@@ -30,13 +31,15 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
   const { data: agingData, isLoading: isLoadingAging } = useAgingReport();
   const { data: upcomingData, isLoading: isLoadingUpcoming } = useUpcomingReceivables(30);
 
-  // Usa o mesmo hook do dashboard para garantir consistência
   const now = new Date();
   const startDate = format(startOfMonth(now), 'yyyy-MM-dd');
   const endDate = format(endOfMonth(now), 'yyyy-MM-dd');
   const { data: summary, isLoading: isLoadingSummary } = useFinancialSummary(startDate, endDate);
 
   const isLoading = isLoadingAging || isLoadingUpcoming || isLoadingSummary;
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   return (
     <Card
@@ -66,31 +69,22 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Coluna Esquerda: Liquidez */}
             <div className="space-y-4">
-              {/* Cards de Saldo */}
+              {/* Cards Glass de Saldo */}
               <div className="grid grid-cols-2 gap-3">
-                {/* A Receber */}
-                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3">
-                  <div className="flex items-center gap-2 text-emerald-500 mb-1">
-                    <ArrowUpCircle className="h-4 w-4" />
-                    <span className="text-xs font-medium">A Receber</span>
-                  </div>
-                  <p className="text-lg font-bold text-emerald-400">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary?.current?.operationalPendingIncome || 0)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Vencidos + 30 dias</p>
-                </div>
-
-                {/* A Pagar */}
-                <div className="rounded-lg bg-rose-500/10 border border-rose-500/20 p-3">
-                  <div className="flex items-center gap-2 text-rose-500 mb-1">
-                    <ArrowDownCircle className="h-4 w-4" />
-                    <span className="text-xs font-medium">A Pagar</span>
-                  </div>
-                  <p className="text-lg font-bold text-rose-400">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary?.current?.operationalPendingExpense || 0)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Vencidos + 30 dias</p>
-                </div>
+                <GlassKpiCard
+                  title="A Receber"
+                  value={formatCurrency(summary?.current?.operationalPendingIncome || 0)}
+                  subtitle="Vencidos + 30 dias"
+                  icon={ArrowUpCircle}
+                  iconClassName="text-emerald-400 drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]"
+                />
+                <GlassKpiCard
+                  title="A Pagar"
+                  value={formatCurrency(summary?.current?.operationalPendingExpense || 0)}
+                  subtitle="Vencidos + 30 dias"
+                  icon={ArrowDownCircle}
+                  iconClassName="text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.4)]"
+                />
               </div>
 
               {/* Próximos Vencimentos */}
@@ -118,7 +112,7 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
                           {format(new Date(tx.dueDate), 'dd/MM', { locale: ptBR })}
                         </span>
                         <span className="font-medium text-emerald-400">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(tx.amount)}
+                          {formatCurrency(tx.amount)}
                         </span>
                       </div>
                     </div>
@@ -141,8 +135,6 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
                   <p className="text-xs text-muted-foreground py-2 text-center">Nenhuma inadimplência registrada.</p>
                 )}
               </div>
-
-              {/* Resumo Aging (Opcional, removido hardcoded 5%) */}
             </div>
           </div>
         )}
