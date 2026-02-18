@@ -679,6 +679,39 @@ export function useApplyMatchSuggestions() {
     });
 }
 
+// ============ BULK RECONCILE ============
+
+export function useBulkReconcile() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ transactionIds, bankAccountId }: { transactionIds: string[]; bankAccountId?: string }) => {
+            const { data, error } = await (supabase.rpc as any)('bulk_manual_reconcile', {
+                p_transaction_ids: transactionIds,
+                p_bank_account_id: bankAccountId || null,
+            });
+
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-detailed'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['account-balances'] });
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard-financial-kpis'] });
+            toast.success(`${variables.transactionIds.length} transações conciliadas em massa!`);
+        },
+        onError: (error: Error) => {
+            toast.error(`Erro na conciliação em massa: ${error.message}`);
+        },
+    });
+}
+
 // ============ KPIs DE CONCILIAÇÃO (RPC) ============
 
 export interface ReconciliationKpis {

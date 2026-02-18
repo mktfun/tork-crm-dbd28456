@@ -3051,6 +3051,11 @@ export type Database = {
         Args: { p_transactions: Json }
         Returns: Json
       }
+      bulk_manual_reconcile: {
+        Args: { p_bank_account_id?: string; p_transaction_ids: string[] }
+        Returns: Json
+      }
+      bulk_unreconcile: { Args: { p_transaction_ids: string[] }; Returns: Json }
       calculate_projected_cash_flow: {
         Args: { p_days?: number }
         Returns: {
