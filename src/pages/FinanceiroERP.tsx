@@ -15,7 +15,8 @@ import {
   Clock,
   Info,
   LineChart,
-  GitCompare
+  GitCompare,
+  CheckCircle2
 } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -44,68 +45,47 @@ import { PageDebugger } from '@/components/shared/PageDebugger';
 import {
   useFinancialAccountsWithDefaults,
   useCashFlowData,
+  useFinancialSummary,
 } from '@/hooks/useFinanceiro';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
 import { cn } from '@/lib/utils';
 
 
-// ============ KPI CONFIGURATION - 4 KPIS SIMPLES ============
-
-const FIXED_KPIS = [
-  { id: 'totalIncome', label: 'Recebido no Mês' },
-  { id: 'totalExpense', label: 'Despesas do Mês' },
-  { id: 'pendingThisMonth', label: 'Vencendo este Mês' },
-  { id: 'totalPending', label: 'Total Geral a Receber' },
-] as const;
+// ============ KPI CONFIGURATION ============
 
 function formatCurrency(value: number): string {
+  const safeValue = typeof value === 'number' && !isNaN(value) ? value : 0;
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL'
-  }).format(value);
+  }).format(safeValue);
 }
 
-// ============ 3 KPIs GLOBAIS NO HEADER ============
+function calcTrend(current: number, previous: number): number | undefined {
+  if (!previous || previous === 0) return undefined;
+  return Math.round(((current - previous) / previous) * 100);
+}
 
-interface GlobalKpiCardProps {
+// ============ GLASSMORPHISM KPI CARD ============
+
+interface GlassKpiCardProps {
   title: string;
   value: number;
   icon: React.ElementType;
-  variant: 'primary' | 'success' | 'danger' | 'warning' | 'info';
+  iconGlow: string;
   isLoading?: boolean;
   subtitle?: string;
   tooltip?: string;
+  trend?: number;
 }
 
-function GlobalKpiCard({ title, value, icon: Icon, variant, isLoading, subtitle, tooltip }: GlobalKpiCardProps) {
-  const styles = {
-    primary: 'from-primary/10 to-primary/5 border-primary/20',
-    success: 'from-emerald-500/10 to-emerald-600/5 border-emerald-500/20',
-    danger: 'from-rose-500/10 to-rose-600/5 border-rose-500/20',
-    warning: 'from-amber-500/10 to-amber-600/5 border-amber-500/20',
-    info: 'from-sky-500/10 to-sky-600/5 border-sky-500/20',
-  };
-  const iconStyles = {
-    primary: 'bg-primary/20 text-primary',
-    success: 'bg-emerald-500/20 text-emerald-500',
-    danger: 'bg-rose-500/20 text-rose-500',
-    warning: 'bg-amber-500/20 text-amber-500',
-    info: 'bg-sky-500/20 text-sky-500',
-  };
-  const valueStyles = {
-    primary: 'text-foreground',
-    success: 'text-emerald-500',
-    danger: 'text-rose-500',
-    warning: 'text-amber-500',
-    info: 'text-sky-500',
-  };
-
+function GlassKpiCard({ title, value, icon: Icon, iconGlow, isLoading, subtitle, tooltip, trend }: GlassKpiCardProps) {
   const cardContent = (
-    <Card className={cn('bg-gradient-to-br border', styles[variant])}>
+    <Card className="bg-black/40 backdrop-blur-md border border-white/10 shadow-xl shadow-black/20 hover:border-white/20 transition-all duration-300">
       <CardContent className="p-5">
         <div className="flex items-center gap-4">
-          <div className={cn('p-3 rounded-lg', iconStyles[variant])}>
+          <div className={cn('p-3 rounded-lg bg-white/5', iconGlow)}>
             <Icon className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
@@ -119,12 +99,23 @@ function GlobalKpiCard({ title, value, icon: Icon, variant, isLoading, subtitle,
               <Skeleton className="h-7 w-24 mt-1" />
             ) : (
               <>
-                <p className={cn('text-xl font-bold', valueStyles[variant])}>
+                <p className="text-xl font-bold text-foreground">
                   {formatCurrency(value)}
                 </p>
-                {subtitle && (
-                  <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-                )}
+                <div className="flex items-center gap-2 mt-0.5">
+                  {subtitle && (
+                    <span className="text-xs text-muted-foreground">{subtitle}</span>
+                  )}
+                  {trend !== undefined && trend !== 0 && (
+                    <span className={cn(
+                      'text-xs font-medium flex items-center gap-0.5',
+                      trend > 0 ? 'text-emerald-400' : 'text-rose-400'
+                    )}>
+                      {trend > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                      {trend > 0 ? '+' : ''}{trend}%
+                    </span>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -151,66 +142,65 @@ function GlobalKpiCard({ title, value, icon: Icon, variant, isLoading, subtitle,
   return cardContent;
 }
 
-// ============ SIMPLE 4 KPI SECTION ============
+// ============ KPI SECTION ============
 
 interface KpiSectionProps {
-  summary: {
-    totalIncome?: number;
-    totalExpense?: number;
-  } | null | undefined;
-  pendingThisMonth: { total_amount: number; pending_count: number } | undefined;
-  totalPending: { total_amount: number; pending_count: number } | undefined;
-  isLoading: boolean;
+  startDate: string;
+  endDate: string;
 }
 
-function KpiSection({ summary, pendingThisMonth, totalPending, isLoading }: KpiSectionProps) {
-  const kpis = [
-    {
-      title: 'Recebido no Mês',
-      value: summary?.totalIncome ?? 0,
-      icon: TrendingUp,
-      variant: 'success' as const,
-      tooltip: 'Receitas confirmadas no período selecionado. Apenas transações com status "completed" são contabilizadas.',
-    },
-    {
-      title: 'Despesas do Mês',
-      value: summary?.totalExpense ?? 0,
-      icon: TrendingDown,
-      variant: 'danger' as const,
-      tooltip: 'Despesas confirmadas no período selecionado. Apenas transações com status "completed" são contabilizadas.',
-    },
-    {
-      title: 'Vencendo este Mês',
-      value: pendingThisMonth?.total_amount ?? 0,
-      icon: CalendarClock,
-      variant: 'warning' as const,
-      subtitle: pendingThisMonth?.pending_count ? `${pendingThisMonth.pending_count} parcelas` : undefined,
-      tooltip: 'Receitas pendentes (a receber) com vencimento no mês atual. Baseado na data de vencimento (due_date).',
-    },
-    {
-      title: 'Total Geral a Receber',
-      value: totalPending?.total_amount ?? 0,
-      icon: Clock,
-      variant: 'info' as const,
-      subtitle: totalPending?.pending_count ? `${totalPending.pending_count} parcelas` : undefined,
-      tooltip: 'Total histórico de receitas pendentes (a receber), independente da data. Não é filtrado pelo período selecionado.',
-    },
-  ];
+function KpiSection({ startDate, endDate }: KpiSectionProps) {
+  const { data: summary, isLoading } = useFinancialSummary(startDate, endDate);
+
+  const current = summary?.current;
+  const previous = summary?.previous;
+
+  // Debug logging
+  if (!isLoading && current) {
+    if (current.pendingIncome === 0) {
+      console.warn('[KPI] pendingIncome is 0 — verify get_financial_summary RPC');
+    }
+    if (current.operationalPendingIncome === 0) {
+      console.warn('[KPI] operationalPendingIncome is 0 — verify get_financial_summary RPC');
+    }
+  }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {kpis.map((kpi) => (
-        <GlobalKpiCard
-          key={kpi.title}
-          title={kpi.title}
-          value={kpi.value}
-          icon={kpi.icon}
-          variant={kpi.variant}
-          isLoading={isLoading}
-          subtitle={kpi.subtitle}
-          tooltip={kpi.tooltip}
-        />
-      ))}
+      <GlassKpiCard
+        title="Recebido no Mês"
+        value={current?.totalIncome ?? 0}
+        icon={TrendingUp}
+        iconGlow="text-emerald-400 drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]"
+        isLoading={isLoading}
+        trend={calcTrend(current?.totalIncome ?? 0, previous?.totalIncome ?? 0)}
+        tooltip="Receitas confirmadas no período selecionado."
+      />
+      <GlassKpiCard
+        title="Despesas do Mês"
+        value={current?.totalExpense ?? 0}
+        icon={TrendingDown}
+        iconGlow="text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.4)]"
+        isLoading={isLoading}
+        trend={calcTrend(current?.totalExpense ?? 0, previous?.totalExpense ?? 0)}
+        tooltip="Despesas confirmadas no período selecionado."
+      />
+      <GlassKpiCard
+        title="Vencendo este Mês"
+        value={current?.pendingIncome ?? 0}
+        icon={CalendarClock}
+        iconGlow="text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]"
+        isLoading={isLoading}
+        tooltip="Receitas pendentes com vencimento no período filtrado."
+      />
+      <GlassKpiCard
+        title="Total Geral a Receber"
+        value={current?.operationalPendingIncome ?? 0}
+        icon={Clock}
+        iconGlow="text-sky-400 drop-shadow-[0_0_6px_rgba(56,189,248,0.4)]"
+        isLoading={isLoading}
+        tooltip="Total operacional a receber (vencidos + próximos 30 dias)."
+      />
     </div>
   );
 }
@@ -322,24 +312,7 @@ export default function FinanceiroERP() {
     };
   }, [dateRange]);
 
-  // Cash flow data for KPIs
-  const { data: cashFlowData = [], isLoading: cashFlowLoading } = useCashFlowData(
-    startDate,
-    endDate,
-    'day'
-  );
-
-  const summary = useMemo(() => {
-    if (!cashFlowData || cashFlowData.length === 0) return null;
-    return cashFlowData.reduce((acc, item) => ({
-      totalIncome: (acc.totalIncome || 0) + (item.income || 0),
-      totalExpense: (acc.totalExpense || 0) + (item.expense || 0),
-    }), { totalIncome: 0, totalExpense: 0 });
-  }, [cashFlowData]);
-
-  const summaryLoading = cashFlowLoading;
-
-  // Handlers
+   // Handlers
   const handleViewTransactionDetails = (id: string) => {
     setDetailsTransactionId(id);
     setIsLegacyLookup(false);
@@ -350,15 +323,6 @@ export default function FinanceiroERP() {
     setIsLegacyLookup(false);
   };
 
-  // KPIs adicionais - pendentes (Desativados temporariamente pois dependem de RPCs com erro de due_date)
-  // const { data: pendingThisMonth, isLoading: pendingThisMonthLoading } = usePendingThisMonth();
-  // const { data: totalPending, isLoading: totalPendingLoading } = useTotalPendingReceivables();
-
-  const pendingThisMonth = { total_amount: 0, pending_count: 0 };
-  const totalPending = { total_amount: 0, pending_count: 0 };
-  const pendingThisMonthLoading = false;
-  const totalPendingLoading = false;
-
   return (
     <div className="space-y-6">
       {/* Action Bar */}
@@ -368,13 +332,8 @@ export default function FinanceiroERP() {
         <ImportTransactionsModal />
       </div>
 
-      {/* KPIs Fixos - 4 Cards Simples */}
-      <KpiSection
-        summary={summary}
-        pendingThisMonth={pendingThisMonth}
-        totalPending={totalPending}
-        isLoading={summaryLoading || pendingThisMonthLoading || totalPendingLoading}
-      />
+      {/* KPIs - powered by get_financial_summary */}
+      <KpiSection startDate={startDate} endDate={endDate} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-muted/50 backdrop-blur-md border border-border/50 p-1 rounded-xl">
