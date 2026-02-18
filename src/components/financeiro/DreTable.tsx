@@ -9,7 +9,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AppCard } from '@/components/ui/app-card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -161,14 +160,14 @@ export function DreTable({ className }: DreTableProps) {
   return (
     <TooltipProvider delayDuration={300}>
       <AppCard className={className}>
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 pb-4 px-4 sticky left-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 pb-4 px-4 sticky left-0 p-6">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10 hidden sm:block">
               <Calculator className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-xl">Demonstrativo de Resultado (DRE)</CardTitle>
-              <CardDescription>Análise detalhada de receitas e despesas</CardDescription>
+              <h3 className="text-xl font-semibold text-foreground">Demonstrativo de Resultado (DRE)</h3>
+              <p className="text-sm text-muted-foreground">Análise detalhada de receitas e despesas</p>
             </div>
           </div>
           <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
@@ -181,8 +180,8 @@ export function DreTable({ className }: DreTableProps) {
             </div>
             <YearSelector value={selectedYear} onChange={setSelectedYear} />
           </div>
-        </CardHeader>
-        <CardContent className="p-0 relative">
+        </div>
+        <div className="p-0 relative">
           {!hasData ? (
             <EmptyDreState />
           ) : (
@@ -368,7 +367,7 @@ export function DreTable({ className }: DreTableProps) {
               </Table>
             </div>
           )}
-        </CardContent>
+        </div>
       </AppCard>
     </TooltipProvider>
   );

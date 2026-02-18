@@ -12,7 +12,6 @@ import {
     RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -175,20 +174,15 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
             </div>
 
             {/* Card de Saldo Principal */}
-            <Card
-                className="overflow-hidden border-border bg-card"
-                style={{
-                    borderTop: `4px solid ${displayColor || 'hsl(var(--primary))'}`
-                }}
+            <div
+                className="glass-component p-0 shadow-lg border-border bg-card overflow-hidden"
+                style={{ borderTop: `4px solid ${displayColor || 'hsl(var(--primary))'}` }}
             >
-                <CardContent className="p-6">
+                <div className="p-6">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-muted-foreground mb-1">Saldo Atual</p>
-                            <p
-                                className="text-4xl font-bold"
-                                style={{ color: displayColor || 'hsl(var(--primary))' }}
-                            >
+                            <p className="text-4xl font-bold" style={{ color: displayColor || 'hsl(var(--primary))' }}>
                                 {formatCurrency(displayBalance)}
                             </p>
                             {!isConsolidated && currentBank && (
@@ -207,8 +201,8 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                             </div>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </div>
 
             {/* KPIs */}
             {loadingTransactions ? (
@@ -219,63 +213,59 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                 </div>
             ) : transactionsData && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="border-emerald-500/30 bg-emerald-500/5">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-2 text-emerald-500 mb-2">
-                                <TrendingUp className="w-5 h-5" />
-                                <span className="text-sm font-medium">Receitas</span>
-                            </div>
-                            <p className="text-2xl font-bold text-emerald-500">
-                                {formatCurrency(clientTotalIncome)}
-                            </p>
-                        </CardContent>
-                    </Card>
+                    <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
+                        <div className="flex items-center gap-2 text-emerald-500 mb-2">
+                            <TrendingUp className="w-5 h-5" />
+                            <span className="text-sm font-medium text-muted-foreground">Receitas</span>
+                        </div>
+                        <p className="text-2xl md:text-3xl font-bold text-emerald-500">
+                            {formatCurrency(clientTotalIncome)}
+                        </p>
+                    </div>
 
-                    <Card className="border-red-500/30 bg-red-500/5">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-2 text-red-500 mb-2">
-                                <TrendingDown className="w-5 h-5" />
-                                <span className="text-sm font-medium">Despesas</span>
-                            </div>
-                            <p className="text-2xl font-bold text-red-500">
-                                {formatCurrency(clientTotalExpense)}
-                            </p>
-                        </CardContent>
-                    </Card>
+                    <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
+                        <div className="flex items-center gap-2 text-red-500 mb-2">
+                            <TrendingDown className="w-5 h-5" />
+                            <span className="text-sm font-medium text-muted-foreground">Despesas</span>
+                        </div>
+                        <p className="text-2xl md:text-3xl font-bold text-red-500">
+                            {formatCurrency(clientTotalExpense)}
+                        </p>
+                    </div>
 
-                    <Card className="border-border bg-muted/30">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                                <Hash className="w-5 h-5" />
-                                <span className="text-sm font-medium">Transações</span>
-                            </div>
-                            <p className="text-2xl font-bold text-foreground">
-                                {clientTotalCount}
-                            </p>
-                        </CardContent>
-                    </Card>
+                    <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                            <Hash className="w-5 h-5" />
+                            <span className="text-sm font-medium text-muted-foreground">Transações</span>
+                        </div>
+                        <p className="text-2xl md:text-3xl font-bold text-foreground">
+                            {clientTotalCount}
+                        </p>
+                    </div>
                 </div>
             )}
 
             {/* Histórico de Transações */}
-            <Card className="border-border bg-card">
-                <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                    <CardTitle className="text-lg">Histórico de Movimentações</CardTitle>
+            <div className="glass-component p-0 shadow-lg border-border bg-card">
+                <div className="flex flex-col space-y-1.5 p-6 pb-3 flex-row items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                            <Landmark className="w-5 h-5 text-primary" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-foreground">Histórico de Movimentações</h3>
+                    </div>
                     <div className="w-64">
                         <input
                             type="text"
                             placeholder="Pesquisar..."
                             value={search}
-                            onChange={(e) => {
-                                setSearch(e.target.value);
-                                setPage(1);
-                            }}
+                            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                             className="w-full px-3 py-1.5 text-sm rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-input"
                         />
                     </div>
-                </CardHeader>
+                </div>
                 <Separator className="bg-border" />
-                <CardContent className="p-0">
+                <div className="p-0">
                     {loadingTransactions ? (
                         <div className="p-4 space-y-3">
                             {[...Array(5)].map((_, i) => (
@@ -353,8 +343,8 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                             </div>
                         </>
                     )}
-                </CardContent>
-            </Card>
+                </div>
+            </div>
 
             {/* Modal de detalhes da transação */}
             <TransactionDetailsSheet
