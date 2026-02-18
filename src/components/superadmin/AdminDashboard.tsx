@@ -175,27 +175,27 @@ export function AdminDashboard() {
             <Skeleton className="h-24 bg-zinc-800" />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+              <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-blue-500/20">
-                    <Database className="h-5 w-5 text-blue-400" />
+                  <div className="p-2 rounded-lg bg-foreground/10">
+                    <Database className="h-5 w-5 text-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm text-zinc-400">Uso de Disco (Database)</p>
-                    <p className="text-xl font-semibold text-zinc-100">
+                    <p className="text-sm font-medium text-muted-foreground">Uso de Disco (Database)</p>
+                    <p className="text-2xl md:text-3xl font-bold text-foreground">
                       {formatBytes(metrics?.db_size_bytes || 0)}
                     </p>
                   </div>
                 </div>
               </div>
-              <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+              <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-emerald-500/20">
+                  <div className="p-2 rounded-lg bg-foreground/10">
                     <Activity className="h-5 w-5 text-emerald-400" />
                   </div>
                   <div>
-                    <p className="text-sm text-zinc-400">Status de Conexão</p>
-                    <p className="text-xl font-semibold text-emerald-400">Conectado</p>
+                    <p className="text-sm font-medium text-muted-foreground">Status de Conexão</p>
+                    <p className="text-2xl md:text-3xl font-bold text-foreground">Conectado</p>
                   </div>
                 </div>
               </div>
