@@ -724,6 +724,25 @@ export interface ReconciliationKpis {
     pending_amount: number;
 }
 
+export interface ReconciliationKpisWithComparison {
+    current: ReconciliationKpis;
+    previous: ReconciliationKpis;
+}
+
+function parseKpiRow(row: any): ReconciliationKpis {
+    return {
+        total_count: Number(row?.total_count) || 0,
+        reconciled_count: Number(row?.reconciled_count) || 0,
+        pending_count: Number(row?.pending_count) || 0,
+        ignored_count: Number(row?.ignored_count) || 0,
+        total_amount: Number(row?.total_amount) || 0,
+        reconciled_amount: Number(row?.reconciled_amount) || 0,
+        pending_amount: Number(row?.pending_amount) || 0,
+    };
+}
+
+const emptyKpis: ReconciliationKpis = { total_count: 0, reconciled_count: 0, pending_count: 0, ignored_count: 0, total_amount: 0, reconciled_amount: 0, pending_amount: 0 };
+
 export function useReconciliationKpis(
     bankAccountId: string | null,
     startDate?: string,
@@ -734,27 +753,45 @@ export function useReconciliationKpis(
 
     return useQuery({
         queryKey: ['reconciliation-kpis', user?.id, bankAccountId, startDate, endDate, searchTerm],
-        queryFn: async (): Promise<ReconciliationKpis> => {
-            if (!user) return { total_count: 0, reconciled_count: 0, pending_count: 0, ignored_count: 0, total_amount: 0, reconciled_amount: 0, pending_amount: 0 };
+        queryFn: async (): Promise<ReconciliationKpisWithComparison> => {
+            if (!user) return { current: emptyKpis, previous: emptyKpis };
 
-            const { data, error } = await (supabase.rpc as any)('get_reconciliation_kpis', {
-                p_bank_account_id: (!bankAccountId || bankAccountId === 'all') ? null : bankAccountId,
+            const safeBankId = (!bankAccountId || bankAccountId === 'all') ? null : bankAccountId;
+
+            // Calculate previous period (same duration shifted back)
+            let prevStart: string | null = null;
+            let prevEnd: string | null = null;
+            if (startDate && endDate) {
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                const durationMs = end.getTime() - start.getTime();
+                const prevEndDate = new Date(start.getTime() - 1); // day before current start
+                const prevStartDate = new Date(prevEndDate.getTime() - durationMs);
+                prevStart = prevStartDate.toISOString().split('T')[0];
+                prevEnd = prevEndDate.toISOString().split('T')[0];
+            }
+
+            const currentPromise = (supabase.rpc as any)('get_reconciliation_kpis', {
+                p_bank_account_id: safeBankId,
                 p_start_date: startDate || null,
                 p_end_date: endDate || null,
                 p_search_term: searchTerm || null
             });
 
-            if (error) throw error;
+            const previousPromise = prevStart ? (supabase.rpc as any)('get_reconciliation_kpis', {
+                p_bank_account_id: safeBankId,
+                p_start_date: prevStart,
+                p_end_date: prevEnd,
+                p_search_term: searchTerm || null
+            }) : Promise.resolve({ data: null, error: null });
 
-            const row = data as any || {};
+            const [currentResult, previousResult] = await Promise.all([currentPromise, previousPromise]);
+
+            if (currentResult.error) throw currentResult.error;
+
             return {
-                total_count: Number(row.total_count) || 0,
-                reconciled_count: Number(row.reconciled_count) || 0,
-                pending_count: Number(row.pending_count) || 0,
-                ignored_count: Number(row.ignored_count) || 0,
-                total_amount: Number(row.total_amount) || 0,
-                reconciled_amount: Number(row.reconciled_amount) || 0,
-                pending_amount: Number(row.pending_amount) || 0,
+                current: parseKpiRow(currentResult.data),
+                previous: parseKpiRow(previousResult.data),
             };
         },
         enabled: !!user,
