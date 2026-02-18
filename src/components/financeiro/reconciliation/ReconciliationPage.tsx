@@ -76,6 +76,8 @@ interface PremiumKpiProps {
     subtitle?: string;
     icon: React.ElementType;
     variant: 'pending' | 'reconciled' | 'count' | 'progress';
+    trend?: { value: number; label: string } | null;
+    onClick?: () => void;
 }
 
 const variantConfig = {
@@ -105,19 +107,32 @@ const variantConfig = {
     },
 };
 
-function PremiumKpiCard({ title, value, subtitle, icon: Icon, variant }: PremiumKpiProps) {
+function PremiumKpiCard({ title, value, subtitle, icon: Icon, variant, trend, onClick }: PremiumKpiProps) {
     const config = variantConfig[variant];
     return (
-        <AppCard className={cn(
-            'border backdrop-blur-md transition-all duration-300 hover:scale-[1.02] hover:shadow-xl',
-            config.border
-        )}>
+        <AppCard
+            className={cn(
+                'border backdrop-blur-md transition-all duration-300 hover:scale-[1.02] hover:shadow-xl',
+                config.border,
+                onClick && 'cursor-pointer'
+            )}
+            onClick={onClick}
+        >
             <div className="p-5">
                 <div className="flex items-start justify-between">
                     <div className="space-y-2">
                         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
                         <p className="text-2xl font-bold text-foreground">{value}</p>
-                        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+                        {trend && trend.value !== 0 && (
+                            <p className={cn(
+                                'text-xs font-medium flex items-center gap-1',
+                                trend.value > 0 ? 'text-emerald-400' : 'text-rose-400'
+                            )}>
+                                {trend.value > 0 ? '▲' : '▼'} {Math.abs(trend.value).toFixed(0)}%
+                                <span className="text-muted-foreground font-normal">{trend.label}</span>
+                            </p>
+                        )}
+                        {subtitle && !trend && <p className="text-xs text-muted-foreground">{subtitle}</p>}
                     </div>
                     <div className={cn('p-2.5 rounded-xl', config.iconBg)}>
                         <Icon className={cn('w-5 h-5', config.iconColor, config.glow)} />
@@ -246,18 +261,37 @@ export function ReconciliationPage() {
     const totalCount = statementData?.totalCount || 0;
     const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
+    const currentKpis = kpisData?.current;
+    const previousKpis = kpisData?.previous;
+
     const kpis = {
-        totalPending: kpisData?.pending_amount || 0,
-        totalReconciled: kpisData?.reconciled_amount || 0,
-        countPending: kpisData?.pending_count || 0,
-        totalCount: kpisData?.total_count || 0,
-        reconciledCount: kpisData?.reconciled_count || 0,
+        totalPending: currentKpis?.pending_amount || 0,
+        totalReconciled: currentKpis?.reconciled_amount || 0,
+        countPending: currentKpis?.pending_count || 0,
+        totalCount: currentKpis?.total_count || 0,
+        reconciledCount: currentKpis?.reconciled_count || 0,
     };
+
+    // Calculate trends
+    const calcTrend = (current: number, previous: number) => {
+        if (!previous || previous === 0) return null;
+        return ((current - previous) / previous) * 100;
+    };
+
+    const pendingTrend = calcTrend(kpis.totalPending, previousKpis?.pending_amount || 0);
+    const reconciledTrend = calcTrend(kpis.totalReconciled, previousKpis?.reconciled_amount || 0);
+    const countTrend = calcTrend(kpis.countPending, previousKpis?.pending_count || 0);
 
     const progress = useMemo(() => {
         if (kpis.totalCount === 0) return 0;
         return (kpis.reconciledCount / kpis.totalCount) * 100;
     }, [kpis.reconciledCount, kpis.totalCount]);
+
+    // Card click -> filter list
+    const handleCardFilter = (status: string) => {
+        setStatusFilter(status);
+        setPage(1);
+    };
 
     // Mutations
     const reconcileMutation = useReconcileTransactionDirectly();
@@ -450,6 +484,8 @@ export function ReconciliationPage() {
                     subtitle={`${kpis.countPending} transações`}
                     icon={Clock}
                     variant="pending"
+                    trend={pendingTrend !== null ? { value: pendingTrend, label: 'vs período anterior' } : null}
+                    onClick={() => handleCardFilter('pendente')}
                 />
                 <PremiumKpiCard
                     title="Total Conciliado"
@@ -457,6 +493,8 @@ export function ReconciliationPage() {
                     subtitle={`${kpis.reconciledCount} transações`}
                     icon={CheckCircle2}
                     variant="reconciled"
+                    trend={reconciledTrend !== null ? { value: reconciledTrend, label: 'vs período anterior' } : null}
+                    onClick={() => handleCardFilter('conciliado')}
                 />
                 <PremiumKpiCard
                     title="Qtd. Pendentes"
@@ -464,6 +502,8 @@ export function ReconciliationPage() {
                     subtitle="aguardando conciliação"
                     icon={AlertCircle}
                     variant="count"
+                    trend={countTrend !== null ? { value: countTrend, label: 'vs período anterior' } : null}
+                    onClick={() => handleCardFilter('pendente')}
                 />
                 <ReconciliationProgressCard
                     progress={progress}
