@@ -78,12 +78,20 @@ interface GlassKpiCardProps {
   subtitle?: string;
   tooltip?: string;
   trend?: number;
+  onClick?: () => void;
 }
 
-function GlassKpiCard({ title, value, icon: Icon, iconGlow, isLoading, subtitle, tooltip, trend }: GlassKpiCardProps) {
+function GlassKpiCard({ title, value, icon: Icon, iconGlow, isLoading, subtitle, tooltip, trend, onClick }: GlassKpiCardProps) {
   const cardContent = (
-    <Card className="bg-black/40 backdrop-blur-md border border-white/10 shadow-xl shadow-black/20 hover:border-white/20 transition-all duration-300">
-      <CardContent className="p-5">
+    <div
+      onClick={onClick}
+      className={cn(
+        "bg-black/40 backdrop-blur-md border border-white/10 shadow-xl shadow-black/20 rounded-lg transition-all duration-300",
+        "hover:border-white/20 hover:scale-[1.02] hover:shadow-2xl",
+        onClick && "cursor-pointer"
+      )}
+    >
+      <div className="p-5">
         <div className="flex items-center gap-4">
           <div className={cn('p-3 rounded-lg bg-white/5', iconGlow)}>
             <Icon className="w-5 h-5" />
@@ -92,7 +100,16 @@ function GlassKpiCard({ title, value, icon: Icon, iconGlow, isLoading, subtitle,
             <div className="flex items-center gap-1">
               <p className="text-sm text-muted-foreground">{title}</p>
               {tooltip && (
-                <Info className="w-3.5 h-3.5 text-muted-foreground/50" />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-3.5 h-3.5 text-muted-foreground/50" />
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <p className="text-sm">{tooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
             {isLoading ? (
@@ -112,7 +129,7 @@ function GlassKpiCard({ title, value, icon: Icon, iconGlow, isLoading, subtitle,
                       trend > 0 ? 'text-emerald-400' : 'text-rose-400'
                     )}>
                       {trend > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                      {trend > 0 ? '+' : ''}{trend}%
+                      {trend > 0 ? '+' : ''}{trend}% vs anterior
                     </span>
                   )}
                 </div>
@@ -120,24 +137,9 @@ function GlassKpiCard({ title, value, icon: Icon, iconGlow, isLoading, subtitle,
             )}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
-
-  if (tooltip) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            {cardContent}
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-xs">
-            <p className="text-sm">{tooltip}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
 
   return cardContent;
 }
@@ -151,12 +153,14 @@ interface KpiSectionProps {
 
 function KpiSection({ startDate, endDate }: KpiSectionProps) {
   const { data: summary, isLoading } = useFinancialSummary(startDate, endDate);
+  const navigate = useNavigate();
 
   const current = summary?.current;
   const previous = summary?.previous;
 
   // Debug logging
   if (!isLoading && current) {
+    console.log('[KPI] current summary:', JSON.stringify(current).substring(0, 300));
     if (current.pendingIncome === 0) {
       console.warn('[KPI] pendingIncome is 0 — verify get_financial_summary RPC');
     }
@@ -175,6 +179,7 @@ function KpiSection({ startDate, endDate }: KpiSectionProps) {
         isLoading={isLoading}
         trend={calcTrend(current?.totalIncome ?? 0, previous?.totalIncome ?? 0)}
         tooltip="Receitas confirmadas no período selecionado."
+        onClick={() => navigate('/dashboard/financeiro?tab=transacoes&type=revenue')}
       />
       <GlassKpiCard
         title="Despesas do Mês"
@@ -184,6 +189,7 @@ function KpiSection({ startDate, endDate }: KpiSectionProps) {
         isLoading={isLoading}
         trend={calcTrend(current?.totalExpense ?? 0, previous?.totalExpense ?? 0)}
         tooltip="Despesas confirmadas no período selecionado."
+        onClick={() => navigate('/dashboard/financeiro?tab=transacoes&type=expense')}
       />
       <GlassKpiCard
         title="Vencendo este Mês"
@@ -192,6 +198,7 @@ function KpiSection({ startDate, endDate }: KpiSectionProps) {
         iconGlow="text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]"
         isLoading={isLoading}
         tooltip="Receitas pendentes com vencimento no período filtrado."
+        onClick={() => navigate('/dashboard/financeiro?tab=tesouraria&status=pending')}
       />
       <GlassKpiCard
         title="Total Geral a Receber"
@@ -200,6 +207,7 @@ function KpiSection({ startDate, endDate }: KpiSectionProps) {
         iconGlow="text-sky-400 drop-shadow-[0_0_6px_rgba(56,189,248,0.4)]"
         isLoading={isLoading}
         tooltip="Total operacional a receber (vencidos + próximos 30 dias)."
+        onClick={() => navigate('/dashboard/financeiro?tab=tesouraria&view=operational')}
       />
     </div>
   );

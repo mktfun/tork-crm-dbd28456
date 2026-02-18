@@ -377,20 +377,29 @@ export async function getFinancialSummary(params: {
   }
 
   const raw = data as any || {};
+
+  console.log('[getFinancialSummary] RAW response:', JSON.stringify(raw).substring(0, 500));
   
-  const parseSummary = (obj: any): FinancialSummary => ({
-    totalIncome: Number(obj?.totalIncome) || 0,
-    totalExpense: Number(obj?.totalExpense) || 0,
-    netResult: Number(obj?.netResult) || 0,
-    pendingIncome: Number(obj?.pendingIncome) || 0,
-    pendingExpense: Number(obj?.pendingExpense) || 0,
-    transactionCount: Number(obj?.transactionCount) || 0,
-    cashBalance: Number(obj?.cashBalance) || 0,
-    globalPendingIncome: Number(obj?.globalPendingIncome) || 0,
-    globalPendingExpense: Number(obj?.globalPendingExpense) || 0,
-    operationalPendingIncome: Number(obj?.operationalPendingIncome) || 0,
-    operationalPendingExpense: Number(obj?.operationalPendingExpense) || 0,
-  });
+  const parseSummary = (obj: any): FinancialSummary => {
+    if (!obj) return { totalIncome: 0, totalExpense: 0, netResult: 0, pendingIncome: 0, pendingExpense: 0, transactionCount: 0, cashBalance: 0, operationalPendingIncome: 0, operationalPendingExpense: 0, globalPendingIncome: 0, globalPendingExpense: 0 };
+    
+    // Support both camelCase and snake_case keys from RPC
+    const get = (camel: string, snake: string) => Number(obj[camel] ?? obj[snake]) || 0;
+    
+    return {
+      totalIncome: get('totalIncome', 'total_income'),
+      totalExpense: get('totalExpense', 'total_expense'),
+      netResult: get('netResult', 'net_result'),
+      pendingIncome: get('pendingIncome', 'pending_income'),
+      pendingExpense: get('pendingExpense', 'pending_expense'),
+      transactionCount: get('transactionCount', 'transaction_count'),
+      cashBalance: get('cashBalance', 'cash_balance'),
+      globalPendingIncome: get('globalPendingIncome', 'global_pending_income'),
+      globalPendingExpense: get('globalPendingExpense', 'global_pending_expense'),
+      operationalPendingIncome: get('operationalPendingIncome', 'operational_pending_income'),
+      operationalPendingExpense: get('operationalPendingExpense', 'operational_pending_expense'),
+    };
+  };
 
   // Handle both old (flat) and new ({ current, previous }) formats
   if (raw.current) {
