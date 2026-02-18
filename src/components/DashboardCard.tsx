@@ -1,8 +1,7 @@
-
-import { ReactNode } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { AppCard } from '@/components/ui/app-card';
 
 interface DashboardCardProps {
   title: string;
@@ -24,40 +23,30 @@ export function DashboardCard({
   className
 }: DashboardCardProps) {
   const variantStyles = {
-    default: 'hover:bg-muted border-border',
-    warning: 'hover:bg-yellow-50 border-yellow-200 bg-yellow-50/30',
-    critical: 'hover:bg-red-50 border-red-200 bg-red-50/30',
-    success: 'hover:bg-green-50 border-green-200 bg-green-50/30',
-  };
-
-  const iconStyles = {
-    default: 'text-muted-foreground',
-    warning: 'text-warning',
-    critical: 'text-critical',
-    success: 'text-success',
+    default: 'border-border bg-card hover:bg-secondary/70',
+    warning: 'border-yellow-500/50 bg-yellow-900/20 hover:bg-yellow-900/30',
+    critical: 'border-red-500/50 bg-red-900/20 hover:bg-red-900/30',
+    success: 'border-green-500/50 bg-green-900/20 hover:bg-green-900/30',
   };
 
   return (
     <Link to={href} className="block">
-      <div className={cn(
-        "bg-card border rounded-xl p-6 transition-all duration-200 hover:shadow-lg hover:scale-105 cursor-pointer",
+      <AppCard className={cn(
+        "flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer",
         variantStyles[variant],
         className
       )}>
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <p className="text-sm font-medium text-muted-foreground mb-2">{title}</p>
-            <p className="text-3xl font-bold text-foreground mb-1">{value}</p>
+            <p className="text-2xl md:text-3xl font-bold text-foreground mb-1">{value}</p>
             <p className="text-sm text-muted-foreground">{description}</p>
           </div>
-          <div className={cn(
-            "p-3 rounded-lg bg-foreground/10",
-            iconStyles[variant]
-          )}>
+          <div className="p-2 rounded-lg bg-foreground/10">
             <Icon size={24} />
           </div>
         </div>
-      </div>
+      </AppCard>
     </Link>
   );
 }

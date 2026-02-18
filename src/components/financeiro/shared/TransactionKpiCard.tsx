@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils';
-import { CardContent } from '@/components/ui/card';
 import { AppCard } from '@/components/ui/app-card';
 
 function formatCurrency(value: number | null | undefined): string {
@@ -17,10 +16,10 @@ interface TransactionKpiCardProps {
     icon: React.ElementType;
 }
 
-const styles = {
-    success: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600',
-    warning: 'bg-amber-500/10 border-amber-500/20 text-amber-600',
-    danger: 'bg-rose-500/10 border-rose-500/20 text-rose-600'
+const variantStyles = {
+    success: 'border-emerald-500/30 bg-emerald-500/5',
+    warning: 'border-amber-500/30 bg-amber-500/5',
+    danger: 'border-rose-500/30 bg-rose-500/5'
 };
 
 const iconStyles = {
@@ -31,18 +30,19 @@ const iconStyles = {
 
 export function TransactionKpiCard({ title, value, variant, icon: Icon }: TransactionKpiCardProps) {
     return (
-        <AppCard className={cn('border', styles[variant])}>
-            <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                    <div className={cn('p-2 rounded-lg', iconStyles[variant])}>
-                        <Icon className="w-4 h-4" />
-                    </div>
-                    <div>
-                        <p className="text-xs text-muted-foreground">{title}</p>
-                        <p className="text-lg font-bold">{formatCurrency(value)}</p>
-                    </div>
+        <AppCard className={cn(
+            'flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer hover:bg-secondary/70',
+            variantStyles[variant]
+        )}>
+            <div className="flex items-center gap-3">
+                <div className={cn('p-2 rounded-lg', iconStyles[variant])}>
+                    <Icon className="w-4 h-4" />
                 </div>
-            </CardContent>
+                <div>
+                    <p className="text-sm font-medium text-muted-foreground">{title}</p>
+                    <p className="text-2xl font-bold text-foreground">{formatCurrency(value)}</p>
+                </div>
+            </div>
         </AppCard>
     );
 }

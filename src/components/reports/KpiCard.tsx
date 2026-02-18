@@ -1,6 +1,6 @@
-
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AppCard } from '@/components/ui/app-card';
 
 interface KpiCardProps {
   title: string;
@@ -23,7 +23,7 @@ export function KpiCard({
 }: KpiCardProps) {
   const getTrendColor = () => {
     if (!trend) return '';
-    return trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-gray-400';
+    return trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-muted-foreground';
   };
 
   const getTrendIcon = () => {
@@ -32,12 +32,14 @@ export function KpiCard({
   };
 
   return (
-    <div className={cn(
-      "bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-lg p-4",
+    <AppCard className={cn(
+      "flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70",
       className
     )}>
       <div className="flex items-center justify-between mb-2">
-        <Icon className="w-5 h-5 text-blue-400" />
+        <div className="p-2 rounded-lg bg-foreground/10">
+          <Icon className="w-5 h-5 text-foreground" />
+        </div>
         {trend && trendValue && (
           <span className={cn("text-xs font-medium flex items-center gap-1", getTrendColor())}>
             <span>{getTrendIcon()}</span>
@@ -47,12 +49,12 @@ export function KpiCard({
       </div>
 
       <div className="space-y-1">
-        <p className="text-2xl font-bold text-foreground">{value}</p>
-        <p className="text-xs text-slate-400 uppercase tracking-wide">{title}</p>
+        <p className="text-2xl md:text-3xl font-bold text-foreground">{value}</p>
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
         {subtitle && (
-          <p className="text-xs text-slate-500">{subtitle}</p>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
         )}
       </div>
-    </div>
+    </AppCard>
   );
 }
