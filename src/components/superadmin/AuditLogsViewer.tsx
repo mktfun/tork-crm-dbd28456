@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useAuditLogs } from '@/hooks/useAuditLogs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,18 +13,16 @@ export function AuditLogsViewer() {
 
   if (isLoading) {
     return (
-      <Card className="bg-zinc-900/50 border-zinc-800">
-        <CardHeader>
-          <Skeleton className="h-6 w-48 bg-zinc-800" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-16 bg-zinc-800" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="glass-component p-0 shadow-lg border-border bg-card">
+        <div className="flex flex-col space-y-1.5 p-6 pb-4">
+          <Skeleton className="h-6 w-48" />
+        </div>
+        <div className="p-6 pt-0 space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-16" />
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -34,42 +31,49 @@ export function AuditLogsViewer() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <Card className="bg-zinc-900/50 border-zinc-800">
-      <CardHeader>
-        <CardTitle className="text-zinc-100 flex items-center gap-2">
-          <Activity className="h-5 w-5" />
-          Logs de Auditoria
-        </CardTitle>
-        <CardDescription>Histórico de operações do assistente de IA</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <div className="glass-component p-0 shadow-lg border-border bg-card">
+      {/* Header padronizado */}
+      <div className="flex flex-col space-y-1.5 p-6 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Activity className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">Logs de Auditoria</h3>
+            <p className="text-sm text-muted-foreground">Histórico de operações do assistente de IA</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Conteúdo */}
+      <div className="p-0">
         {logs.length > 0 ? (
           <>
             <Table>
               <TableHeader>
-                <TableRow className="border-zinc-800 hover:bg-transparent">
-                  <TableHead className="text-zinc-400">Data/Hora</TableHead>
-                  <TableHead className="text-zinc-400">Usuário</TableHead>
-                  <TableHead className="text-zinc-400">Operação</TableHead>
-                  <TableHead className="text-zinc-400">Tool</TableHead>
-                  <TableHead className="text-zinc-400">Status</TableHead>
-                  <TableHead className="text-zinc-400">Tempo (ms)</TableHead>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-muted-foreground">Data/Hora</TableHead>
+                  <TableHead className="text-muted-foreground">Usuário</TableHead>
+                  <TableHead className="text-muted-foreground">Operação</TableHead>
+                  <TableHead className="text-muted-foreground">Tool</TableHead>
+                  <TableHead className="text-muted-foreground">Status</TableHead>
+                  <TableHead className="text-muted-foreground">Tempo (ms)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {logs.map((log) => (
-                  <TableRow key={log.id} className="border-zinc-800 hover:bg-zinc-800/50">
-                    <TableCell className="text-zinc-300 text-sm">
+                  <TableRow key={log.id} className="border-border hover:bg-muted/50">
+                    <TableCell className="text-muted-foreground text-sm">
                       {new Date(log.created_at).toLocaleString('pt-BR')}
                     </TableCell>
-                    <TableCell className="text-zinc-300">
+                    <TableCell className="text-foreground">
                       <div>
                         <p className="text-sm">{log.user?.nome_completo || 'N/A'}</p>
-                        <p className="text-xs text-zinc-500">{log.user?.email}</p>
+                        <p className="text-xs text-muted-foreground">{log.user?.email}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="text-zinc-300 font-mono text-sm">{log.operation_type}</TableCell>
-                    <TableCell className="text-zinc-300 font-mono text-sm">{log.tool_name}</TableCell>
+                    <TableCell className="text-foreground font-mono text-sm">{log.operation_type}</TableCell>
+                    <TableCell className="text-foreground font-mono text-sm">{log.tool_name}</TableCell>
                     <TableCell>
                       {log.success ? (
                         <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
@@ -83,7 +87,7 @@ export function AuditLogsViewer() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-zinc-300 text-sm">
+                    <TableCell className="text-muted-foreground text-sm">
                       {log.execution_time_ms || 'N/A'}
                     </TableCell>
                   </TableRow>
@@ -92,8 +96,8 @@ export function AuditLogsViewer() {
             </Table>
 
             {/* Paginação */}
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-sm text-zinc-400">
+            <div className="flex items-center justify-between border-t border-border p-4">
+              <p className="text-sm text-muted-foreground">
                 Mostrando {page * limit + 1} a {Math.min((page + 1) * limit, total)} de {total} logs
               </p>
               <div className="flex gap-2">
@@ -102,7 +106,6 @@ export function AuditLogsViewer() {
                   size="sm"
                   onClick={() => setPage(Math.max(0, page - 1))}
                   disabled={page === 0}
-                  className="border-zinc-700"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -111,7 +114,6 @@ export function AuditLogsViewer() {
                   size="sm"
                   onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                   disabled={page >= totalPages - 1}
-                  className="border-zinc-700"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -119,12 +121,12 @@ export function AuditLogsViewer() {
             </div>
           </>
         ) : (
-          <div className="text-center py-8 text-zinc-400">
+          <div className="text-center py-8 text-muted-foreground">
             <Activity className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p>Nenhum log de auditoria encontrado</p>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

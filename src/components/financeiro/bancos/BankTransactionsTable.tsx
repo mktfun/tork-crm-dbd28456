@@ -7,7 +7,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ArrowDownRight, ArrowUpRight, Landmark } from "lucide-react";
@@ -49,25 +48,22 @@ export function BankTransactionsTable({
     }
   };
 
-  const getReconciliationBadge = (status?: TableTransaction['reconciliationStatus']) => {
-    const variants = {
-      conciliado: { className: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none", label: "Conciliado" },
-      pendente: { className: "bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none", label: "Pendente" },
-      divergente: { className: "bg-rose-100 text-rose-700 hover:bg-rose-100 border-none", label: "Divergente" },
-    };
-    const config = variants[status || 'pendente'];
-    return <Badge className={config.className}>{config.label}</Badge>;
-  };
-
   return (
-    <Card className="border-none shadow-sm bg-transparent">
-      <CardHeader className="pb-3 px-4">
-        <div className="flex items-center gap-2">
-          <Landmark className="w-5 h-5 text-primary" />
-          <CardTitle className="text-base font-semibold text-foreground">Movimentações Recentes</CardTitle>
+    <div className="glass-component p-0 shadow-lg border-border bg-card">
+      {/* Header padronizado */}
+      <div className="flex flex-col space-y-1.5 p-6 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Landmark className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">Movimentações Recentes</h3>
+          </div>
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
+      </div>
+
+      {/* Tabela */}
+      <div className="p-0">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
@@ -125,7 +121,7 @@ export function BankTransactionsTable({
             ))}
           </TableBody>
         </Table>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
