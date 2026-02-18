@@ -4,6 +4,7 @@ import {
   FinancialAccountType,
   CashFlowDataPoint,
   FinancialSummary,
+  FinancialSummaryWithComparison,
   DreRow,
   BulkImportPayload,
   BulkImportResult
@@ -364,7 +365,7 @@ export async function getCashFlowData(params: {
 export async function getFinancialSummary(params: {
   startDate: string;
   endDate: string;
-}): Promise<FinancialSummary> {
+}): Promise<FinancialSummaryWithComparison> {
   const { data, error } = await supabase.rpc('get_financial_summary', {
     p_start_date: params.startDate,
     p_end_date: params.endDate
@@ -375,22 +376,34 @@ export async function getFinancialSummary(params: {
     throw error;
   }
 
-  const row = data as any || {};
+  const raw = data as any || {};
+  
+  const parseSummary = (obj: any): FinancialSummary => ({
+    totalIncome: Number(obj?.totalIncome) || 0,
+    totalExpense: Number(obj?.totalExpense) || 0,
+    netResult: Number(obj?.netResult) || 0,
+    pendingIncome: Number(obj?.pendingIncome) || 0,
+    pendingExpense: Number(obj?.pendingExpense) || 0,
+    transactionCount: Number(obj?.transactionCount) || 0,
+    cashBalance: Number(obj?.cashBalance) || 0,
+    globalPendingIncome: Number(obj?.globalPendingIncome) || 0,
+    globalPendingExpense: Number(obj?.globalPendingExpense) || 0,
+    operationalPendingIncome: Number(obj?.operationalPendingIncome) || 0,
+    operationalPendingExpense: Number(obj?.operationalPendingExpense) || 0,
+  });
+
+  // Handle both old (flat) and new ({ current, previous }) formats
+  if (raw.current) {
+    return {
+      current: parseSummary(raw.current),
+      previous: parseSummary(raw.previous),
+    };
+  }
+
+  // Fallback for old flat format
   return {
-    totalIncome: Number(row.totalIncome) || 0,
-    totalExpense: Number(row.totalExpense) || 0,
-    netResult: Number(row.netResult) || 0,
-    pendingIncome: Number(row.pendingIncome) || 0,
-    pendingExpense: Number(row.pendingExpense) || 0,
-    completedTransactionCount: Number(row.completedTransactionCount) || 0,
-    pendingTransactionCount: Number(row.pendingTransactionCount) || 0,
-    transactionCount: Number(row.transactionCount) || 0,
-    cashBalance: Number(row.cashBalance) || 0,
-    globalPendingIncome: Number(row.globalPendingIncome) || 0,
-    globalPendingExpense: Number(row.globalPendingExpense) || 0,
-    globalPendingCount: Number(row.globalPendingCount) || 0,
-    operationalPendingIncome: Number(row.operationalPendingIncome) || 0,
-    operationalPendingExpense: Number(row.operationalPendingExpense) || 0,
+    current: parseSummary(raw),
+    previous: parseSummary({}),
   };
 }
 

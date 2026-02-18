@@ -116,7 +116,7 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
             const confirmadas = periodRevenue.filter(tx => tx.reconciled);
             return {
                 efetivado: confirmadas.reduce((sum, tx) => sum + (tx.amount || 0), 0),
-                pendente: summary?.pendingIncome ?? 0
+                pendente: summary?.current?.pendingIncome ?? 0
             };
         } else {
             const efetivadas = allExpenses.filter(tx => tx.reconciled);

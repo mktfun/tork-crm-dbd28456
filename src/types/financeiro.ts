@@ -248,6 +248,14 @@ export interface FinancialSummary {
   periodEnd?: string;
 }
 
+/**
+ * Wrapper com comparação de período anterior
+ */
+export interface FinancialSummaryWithComparison {
+  current: FinancialSummary;
+  previous: FinancialSummary;
+}
+
 // ============ TIPOS PARA DRE (FASE 4) ============
 
 /**
