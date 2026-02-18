@@ -226,6 +226,15 @@ export interface FinancialSummary {
   /** Saldo atual total em caixa (não filtrado por período) */
   cashBalance: number;
   
+  /** Total global de receitas pendentes (sem filtro de período) */
+  globalPendingIncome?: number;
+  
+  /** Total global de despesas pendentes (sem filtro de período) */
+  globalPendingExpense?: number;
+  
+  /** Quantidade global de transações pendentes (sem filtro de período) */
+  globalPendingCount?: number;
+  
   /** Data inicial do período (para referência) */
   periodStart?: string;
   
