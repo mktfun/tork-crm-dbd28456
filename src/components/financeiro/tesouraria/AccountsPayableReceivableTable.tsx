@@ -21,10 +21,11 @@ import {
 import { usePayableReceivableTransactions } from "@/hooks/useFinanceiro";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowUpRight, ArrowDownRight, AlertCircle, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, AlertCircle, Filter, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function AccountsPayableReceivableTable() {
   const [activeTab, setActiveTab] = useState<'receber' | 'pagar'>('receber');
@@ -36,6 +37,12 @@ export function AccountsPayableReceivableTable() {
     activeTab,
     statusFilter
   );
+
+  // Independent queries for tab counts (not dependent on active tab)
+  const { data: allReceivables } = usePayableReceivableTransactions('receber', statusFilter);
+  const { data: allPayables } = usePayableReceivableTransactions('pagar', statusFilter);
+  const receivableCount = allReceivables?.length || 0;
+  const payableCount = allPayables?.length || 0;
 
   // Reset page when filters change
   const handleTabChange = (tab: 'receber' | 'pagar') => {
@@ -228,8 +235,6 @@ export function AccountsPayableReceivableTable() {
     );
   };
 
-  const receivableCount = transactions?.filter(t => t.transactionType === 'receber').length || 0;
-  const payableCount = transactions?.filter(t => t.transactionType === 'pagar').length || 0;
 
   return (
     <AppCard>
@@ -270,6 +275,16 @@ export function AccountsPayableReceivableTable() {
               >
                 <ArrowUpRight className="w-4 h-4 text-emerald-500" />
                 A Receber ({receivableCount})
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p className="text-xs max-w-[200px]">Inclui recebimentos futuros (recorrentes)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </TabsTrigger>
               <TabsTrigger
                 value="pagar"
