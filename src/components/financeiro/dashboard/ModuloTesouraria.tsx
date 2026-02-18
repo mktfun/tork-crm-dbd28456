@@ -75,9 +75,9 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
                     <span className="text-xs font-medium">A Receber</span>
                   </div>
                   <p className="text-lg font-bold text-emerald-400">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary?.globalPendingIncome || 0)}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary?.operationalPendingIncome || 0)}
                   </p>
-                  <p className="text-xs text-muted-foreground">Total Aberto</p>
+                  <p className="text-xs text-muted-foreground">Vencidos + 30 dias</p>
                 </div>
 
                 {/* A Pagar */}
@@ -87,9 +87,9 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
                     <span className="text-xs font-medium">A Pagar</span>
                   </div>
                   <p className="text-lg font-bold text-rose-400">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary?.globalPendingExpense || 0)}
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary?.operationalPendingExpense || 0)}
                   </p>
-                  <p className="text-xs text-muted-foreground">Total Aberto</p>
+                  <p className="text-xs text-muted-foreground">Vencidos + 30 dias</p>
                 </div>
               </div>
 

@@ -389,6 +389,8 @@ export async function getFinancialSummary(params: {
     globalPendingIncome: Number(row.globalPendingIncome) || 0,
     globalPendingExpense: Number(row.globalPendingExpense) || 0,
     globalPendingCount: Number(row.globalPendingCount) || 0,
+    operationalPendingIncome: Number(row.operationalPendingIncome) || 0,
+    operationalPendingExpense: Number(row.operationalPendingExpense) || 0,
   };
 }
 

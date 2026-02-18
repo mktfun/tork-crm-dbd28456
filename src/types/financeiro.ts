@@ -235,6 +235,12 @@ export interface FinancialSummary {
   /** Quantidade global de transações pendentes (sem filtro de período) */
   globalPendingCount?: number;
   
+  /** Receitas pendentes operacionais (vencidas + próximos 30 dias) */
+  operationalPendingIncome?: number;
+  
+  /** Despesas pendentes operacionais (vencidas + próximos 30 dias) */
+  operationalPendingExpense?: number;
+  
   /** Data inicial do período (para referência) */
   periodStart?: string;
   
