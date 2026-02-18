@@ -730,14 +730,16 @@ export interface ReconciliationKpisWithComparison {
 }
 
 function parseKpiRow(row: any): ReconciliationKpis {
+    // Handle case where RPC now returns { current, previous } wrapper
+    const data = row?.current || row;
     return {
-        total_count: Number(row?.total_count) || 0,
-        reconciled_count: Number(row?.reconciled_count) || 0,
-        pending_count: Number(row?.pending_count) || 0,
-        ignored_count: Number(row?.ignored_count) || 0,
-        total_amount: Number(row?.total_amount) || 0,
-        reconciled_amount: Number(row?.reconciled_amount) || 0,
-        pending_amount: Number(row?.pending_amount) || 0,
+        total_count: Number(data?.total_count) || 0,
+        reconciled_count: Number(data?.reconciled_count) || 0,
+        pending_count: Number(data?.pending_count) || 0,
+        ignored_count: Number(data?.ignored_count) || 0,
+        total_amount: Number(data?.total_amount) || 0,
+        reconciled_amount: Number(data?.reconciled_amount) || 0,
+        pending_amount: Number(data?.pending_amount) || 0,
     };
 }
 
