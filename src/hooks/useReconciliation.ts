@@ -760,40 +760,39 @@ export function useReconciliationKpis(
 
             const safeBankId = (!bankAccountId || bankAccountId === 'all') ? null : bankAccountId;
 
-            // Calculate previous period (same duration shifted back)
-            let prevStart: string | null = null;
-            let prevEnd: string | null = null;
-            if (startDate && endDate) {
-                const start = new Date(startDate);
-                const end = new Date(endDate);
-                const durationMs = end.getTime() - start.getTime();
-                const prevEndDate = new Date(start.getTime() - 1); // day before current start
-                const prevStartDate = new Date(prevEndDate.getTime() - durationMs);
-                prevStart = prevStartDate.toISOString().split('T')[0];
-                prevEnd = prevEndDate.toISOString().split('T')[0];
-            }
-
-            const currentPromise = (supabase.rpc as any)('get_reconciliation_kpis', {
+            const { data, error } = await (supabase.rpc as any)('get_reconciliation_kpis', {
                 p_bank_account_id: safeBankId,
                 p_start_date: startDate || null,
                 p_end_date: endDate || null,
                 p_search_term: searchTerm || null
             });
 
-            const previousPromise = prevStart ? (supabase.rpc as any)('get_reconciliation_kpis', {
-                p_bank_account_id: safeBankId,
-                p_start_date: prevStart,
-                p_end_date: prevEnd,
-                p_search_term: searchTerm || null
-            }) : Promise.resolve({ data: null, error: null });
+            if (error) throw error;
 
-            const [currentResult, previousResult] = await Promise.all([currentPromise, previousPromise]);
-
-            if (currentResult.error) throw currentResult.error;
+            // RPC returns JSON { current: {...}, previous: {...} }
+            const result = data || {};
+            const currentData = result.current || result;
+            const previousData = result.previous || {};
 
             return {
-                current: parseKpiRow(currentResult.data),
-                previous: parseKpiRow(previousResult.data),
+                current: {
+                    total_count: Number(currentData.total_count) || 0,
+                    reconciled_count: Number(currentData.reconciled_count) || 0,
+                    pending_count: Number(currentData.pending_count) || 0,
+                    ignored_count: Number(currentData.ignored_count) || 0,
+                    total_amount: Number(currentData.total_amount) || 0,
+                    reconciled_amount: Number(currentData.reconciled_amount) || 0,
+                    pending_amount: Number(currentData.pending_amount) || 0,
+                },
+                previous: {
+                    total_count: Number(previousData.total_count) || 0,
+                    reconciled_count: Number(previousData.reconciled_count) || 0,
+                    pending_count: Number(previousData.pending_count) || 0,
+                    ignored_count: Number(previousData.ignored_count) || 0,
+                    total_amount: Number(previousData.total_amount) || 0,
+                    reconciled_amount: Number(previousData.reconciled_amount) || 0,
+                    pending_amount: Number(previousData.pending_amount) || 0,
+                },
             };
         },
         enabled: !!user,
