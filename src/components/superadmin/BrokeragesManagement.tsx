@@ -205,53 +205,58 @@ export function BrokeragesManagement() {
       </div>
 
       {/* Table */}
-      <Card className="bg-zinc-900/50 border-zinc-800">
-        <CardHeader>
-          <CardTitle className="text-zinc-100">Corretoras Cadastradas</CardTitle>
-          <CardDescription>
-            {filteredBrokerages.length} corretora(s) encontrada(s)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="glass-component p-0 shadow-lg border-border bg-card">
+        <div className="flex flex-col space-y-1.5 p-6 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Settings2 className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-foreground">Corretoras Cadastradas</h3>
+              <p className="text-sm text-muted-foreground">{filteredBrokerages.length} corretora(s) encontrada(s)</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-0">
           {isLoading ? (
-            <div className="space-y-3">
+            <div className="p-6 space-y-3">
               {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 bg-zinc-800" />
+                <Skeleton key={i} className="h-12" />
               ))}
             </div>
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="border-zinc-800 hover:bg-transparent">
-                  <TableHead className="text-zinc-400">Nome</TableHead>
-                  <TableHead className="text-zinc-400">Slug</TableHead>
-                  <TableHead className="text-zinc-400">CNPJ</TableHead>
-                  <TableHead className="text-zinc-400">Chatwoot</TableHead>
-                  <TableHead className="text-zinc-400">Portal</TableHead>
-                  <TableHead className="text-zinc-400">Criado em</TableHead>
-                  <TableHead className="text-zinc-400 text-right">Ações</TableHead>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-muted-foreground">Nome</TableHead>
+                  <TableHead className="text-muted-foreground">Slug</TableHead>
+                  <TableHead className="text-muted-foreground">CNPJ</TableHead>
+                  <TableHead className="text-muted-foreground">Chatwoot</TableHead>
+                  <TableHead className="text-muted-foreground">Portal</TableHead>
+                  <TableHead className="text-muted-foreground">Criado em</TableHead>
+                  <TableHead className="text-muted-foreground text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredBrokerages.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-zinc-500 py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       Nenhuma corretora encontrada
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredBrokerages.map((brokerage) => (
-                    <TableRow 
-                      key={brokerage.id} 
-                      className="border-zinc-800 hover:bg-zinc-800/50"
+                    <TableRow
+                      key={brokerage.id}
+                      className="border-border hover:bg-muted/50"
                     >
-                      <TableCell className="font-medium text-zinc-100">
+                      <TableCell className="font-medium text-foreground">
                         {brokerage.name}
                       </TableCell>
-                      <TableCell className="text-zinc-300 font-mono text-sm">
+                      <TableCell className="text-foreground font-mono text-sm">
                         {brokerage.slug}
                       </TableCell>
-                      <TableCell className="text-zinc-300">
+                      <TableCell className="text-foreground">
                         {brokerage.cnpj || '-'}
                       </TableCell>
                       <TableCell>
@@ -259,7 +264,7 @@ export function BrokeragesManagement() {
                           className={
                             (brokerage as any).chatwoot_token
                               ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                              : 'bg-zinc-700 text-zinc-400'
+                              : 'bg-muted text-muted-foreground'
                           }
                         >
                           {(brokerage as any).chatwoot_token ? 'Configurado' : 'Não Config.'}
@@ -270,13 +275,13 @@ export function BrokeragesManagement() {
                           className={
                             brokerage.portal_enabled
                               ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                              : 'bg-zinc-700 text-zinc-400'
+                              : 'bg-muted text-muted-foreground'
                           }
                         >
                           {brokerage.portal_enabled ? 'Ativo' : 'Inativo'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-zinc-400 text-sm">
+                      <TableCell className="text-muted-foreground text-sm">
                         {format(new Date(brokerage.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                       </TableCell>
                       <TableCell className="text-right">
@@ -286,31 +291,22 @@ export function BrokeragesManagement() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800">
-                            <DropdownMenuItem 
-                              className="text-zinc-300 focus:bg-zinc-800 focus:text-zinc-100"
-                              onClick={() => {/* TODO: Open edit modal */}}
-                            >
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => {/* TODO: Open edit modal */}}>
                               <Pencil className="h-4 w-4 mr-2" />
                               Editar
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-zinc-300 focus:bg-zinc-800 focus:text-zinc-100"
-                              onClick={() => handleOpenIntegration(brokerage)}
-                            >
+                            <DropdownMenuItem onClick={() => handleOpenIntegration(brokerage)}>
                               <Settings2 className="h-4 w-4 mr-2" />
                               Configurar Integrações
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-zinc-300 focus:bg-zinc-800 focus:text-zinc-100"
-                              onClick={() => handleImpersonate(brokerage.id, brokerage.name)}
-                            >
+                            <DropdownMenuItem onClick={() => handleImpersonate(brokerage.id, brokerage.name)}>
                               <UserCheck className="h-4 w-4 mr-2" />
                               Personificar
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-zinc-800" />
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              className="text-amber-400 focus:bg-amber-500/10 focus:text-amber-300"
+                              className="text-amber-400 focus:text-amber-300"
                               onClick={() => handleToggleStatus(brokerage.id, brokerage.portal_enabled)}
                             >
                               <Ban className="h-4 w-4 mr-2" />
@@ -325,8 +321,8 @@ export function BrokeragesManagement() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Integration Modal */}
       <BrokerageIntegrationModal
