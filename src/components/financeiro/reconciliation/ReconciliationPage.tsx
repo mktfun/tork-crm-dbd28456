@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     GitCompare,
     RefreshCw,
@@ -16,6 +17,9 @@ import {
     ArrowDownRight,
     Search,
     X,
+    Clock,
+    TrendingUp,
+    Zap,
 } from 'lucide-react';
 import { DatePickerWithRange } from '@/components/ui/date-picker-with-range';
 import { Input } from '@/components/ui/input';
@@ -27,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AppCard } from '@/components/ui/app-card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
 import {
     Table,
     TableBody,
@@ -55,15 +60,121 @@ import {
     useReconcileTransactionDirectly,
     useUnreconcileTransaction,
     useReconciliationKpis,
+    useBulkReconcile,
     type PaginatedStatementItem
 } from '@/hooks/useReconciliation';
 import { formatCurrency } from '@/utils/formatCurrency';
-import { TransactionKpiCard } from '../shared/TransactionKpiCard';
 import { StatementImporter } from './StatementImporter';
+import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 20;
 
-console.log('[ANTIGRAVITY] ReconciliationPage SILVER-GLASS v2 LOADED');
+// ============ PREMIUM KPI CARD ============
+interface PremiumKpiProps {
+    title: string;
+    value: string;
+    subtitle?: string;
+    icon: React.ElementType;
+    variant: 'pending' | 'reconciled' | 'count' | 'progress';
+}
+
+const variantConfig = {
+    pending: {
+        iconBg: 'bg-amber-500/15',
+        iconColor: 'text-amber-400',
+        glow: 'drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]',
+        border: 'border-amber-500/20',
+    },
+    reconciled: {
+        iconBg: 'bg-emerald-500/15',
+        iconColor: 'text-emerald-400',
+        glow: 'drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]',
+        border: 'border-emerald-500/20',
+    },
+    count: {
+        iconBg: 'bg-rose-500/15',
+        iconColor: 'text-rose-400',
+        glow: 'drop-shadow-[0_0_6px_rgba(244,63,94,0.4)]',
+        border: 'border-rose-500/20',
+    },
+    progress: {
+        iconBg: 'bg-primary/15',
+        iconColor: 'text-primary',
+        glow: 'drop-shadow-[0_0_6px_hsl(var(--primary)/0.4)]',
+        border: 'border-primary/20',
+    },
+};
+
+function PremiumKpiCard({ title, value, subtitle, icon: Icon, variant }: PremiumKpiProps) {
+    const config = variantConfig[variant];
+    return (
+        <AppCard className={cn(
+            'border backdrop-blur-md transition-all duration-300 hover:scale-[1.02] hover:shadow-xl',
+            config.border
+        )}>
+            <div className="p-5">
+                <div className="flex items-start justify-between">
+                    <div className="space-y-2">
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
+                        <p className="text-2xl font-bold text-foreground">{value}</p>
+                        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+                    </div>
+                    <div className={cn('p-2.5 rounded-xl', config.iconBg)}>
+                        <Icon className={cn('w-5 h-5', config.iconColor, config.glow)} />
+                    </div>
+                </div>
+            </div>
+        </AppCard>
+    );
+}
+
+// ============ PROGRESS RING ============
+function ReconciliationProgressCard({ progress, reconciledCount, totalCount }: { progress: number; reconciledCount: number; totalCount: number }) {
+    const getColor = () => {
+        if (progress >= 80) return 'text-emerald-400';
+        if (progress >= 50) return 'text-amber-400';
+        return 'text-rose-400';
+    };
+
+    const getIndicatorColor = () => {
+        if (progress >= 80) return 'bg-emerald-500';
+        if (progress >= 50) return 'bg-amber-500';
+        return 'bg-rose-500';
+    };
+
+    const getLabel = () => {
+        if (progress >= 80) return 'Excelente';
+        if (progress >= 50) return 'Atenção';
+        return 'Crítico';
+    };
+
+    return (
+        <AppCard className="border border-primary/20 backdrop-blur-md">
+            <div className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        <div className="p-2.5 rounded-xl bg-primary/15">
+                            <TrendingUp className="w-5 h-5 text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.4)]" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Progresso</p>
+                            <p className={cn('text-2xl font-bold', getColor())}>{progress.toFixed(0)}%</p>
+                        </div>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">
+                        {getLabel()}
+                    </Badge>
+                </div>
+                <Progress value={progress} className="h-2" indicatorClassName={getIndicatorColor()} />
+                <p className="text-xs text-muted-foreground mt-2">
+                    {reconciledCount} de {totalCount} conciliados
+                </p>
+            </div>
+        </AppCard>
+    );
+}
+
+// ============ MAIN PAGE ============
 
 export function ReconciliationPage() {
     // State
@@ -122,6 +233,7 @@ export function ReconciliationPage() {
         statusFilter,
         typeFilter
     );
+
     // KPIs from dedicated RPC (not paginated)
     const { data: kpisData } = useReconciliationKpis(
         selectedBankAccountId,
@@ -138,12 +250,19 @@ export function ReconciliationPage() {
         totalPending: kpisData?.pending_amount || 0,
         totalReconciled: kpisData?.reconciled_amount || 0,
         countPending: kpisData?.pending_count || 0,
+        totalCount: kpisData?.total_count || 0,
+        reconciledCount: kpisData?.reconciled_count || 0,
     };
+
+    const progress = useMemo(() => {
+        if (kpis.totalCount === 0) return 0;
+        return (kpis.reconciledCount / kpis.totalCount) * 100;
+    }, [kpis.reconciledCount, kpis.totalCount]);
 
     // Mutations
     const reconcileMutation = useReconcileTransactionDirectly();
     const unreconcileMutation = useUnreconcileTransaction();
-    const batchReconcileMutation = useReconcileTransactionDirectly();
+    const bulkReconcileMutation = useBulkReconcile();
 
     // Handlers
     const handleReconcile = (item: PaginatedStatementItem) => {
@@ -158,15 +277,12 @@ export function ReconciliationPage() {
     const handleBatchReconcile = async () => {
         if (selectedIds.length === 0) return;
 
-        const count = selectedIds.length;
-        for (const id of selectedIds) {
-            const item = items.find(i => i.id === id);
-            if (item && item.bank_account_id) {
-                await batchReconcileMutation.mutateAsync({ transactionId: id });
-            }
-        }
-        setSelectedIds([]);
-        toast.success(`${count} transações processadas.`);
+        // Use bulk RPC if available, falling back to individual calls
+        const bankId = !isConsolidated ? selectedBankAccountId : undefined;
+        bulkReconcileMutation.mutate(
+            { transactionIds: selectedIds, bankAccountId: bankId || undefined },
+            { onSuccess: () => setSelectedIds([]) }
+        );
     };
 
     const handleToggleSelect = (id: string) => {
@@ -326,48 +442,43 @@ export function ReconciliationPage() {
                 </div>
             </AppCard>
 
-            {/* KPI Cards */}
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <TransactionKpiCard
+            {/* Premium KPI Cards */}
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <PremiumKpiCard
                     title="Total Pendente"
-                    value={kpis.totalPending}
-                    variant="warning"
-                    icon={AlertCircle}
+                    value={formatCurrency(kpis.totalPending)}
+                    subtitle={`${kpis.countPending} transações`}
+                    icon={Clock}
+                    variant="pending"
                 />
-                <TransactionKpiCard
+                <PremiumKpiCard
                     title="Total Conciliado"
-                    value={kpis.totalReconciled}
-                    variant="success"
+                    value={formatCurrency(kpis.totalReconciled)}
+                    subtitle={`${kpis.reconciledCount} transações`}
                     icon={CheckCircle2}
+                    variant="reconciled"
                 />
-                <TransactionKpiCard
+                <PremiumKpiCard
                     title="Qtd. Pendentes"
-                    value={kpis.countPending}
-                    variant="danger"
-                    icon={GitCompare}
+                    value={String(kpis.countPending)}
+                    subtitle="aguardando conciliação"
+                    icon={AlertCircle}
+                    variant="count"
+                />
+                <ReconciliationProgressCard
+                    progress={progress}
+                    reconciledCount={kpis.reconciledCount}
+                    totalCount={kpis.totalCount}
                 />
             </section>
 
             {/* Main Content */}
             <AppCard className="overflow-hidden">
                 <div className="p-4 border-b bg-transparent flex items-center justify-between">
-                    {selectedIds.length > 0 ? (
-                        <div className="flex items-center gap-2 text-primary font-medium bg-primary/10 px-3 py-1 rounded-full animate-in fade-in">
-                            <CheckCircle2 className="w-4 h-4" />
-                            {selectedIds.length} selecionados
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <CalendarIcon className="w-4 h-4" />
-                            <span>Período: {dateRange?.from ? format(dateRange.from, 'dd/MM/yyyy') : ''} - {dateRange?.to ? format(dateRange.to, 'dd/MM/yyyy') : ''}</span>
-                        </div>
-                    )}
-
-                    {selectedIds.length > 0 && (
-                        <Button size="sm" onClick={handleBatchReconcile} disabled={batchReconcileMutation.isPending}>
-                            {batchReconcileMutation.isPending ? 'Processando...' : 'Conciliar Selecionados'}
-                        </Button>
-                    )}
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CalendarIcon className="w-4 h-4" />
+                        <span>Período: {dateRange?.from ? format(dateRange.from, 'dd/MM/yyyy') : ''} - {dateRange?.to ? format(dateRange.to, 'dd/MM/yyyy') : ''}</span>
+                    </div>
                 </div>
 
                 <div className="relative overflow-x-auto">
@@ -526,6 +637,51 @@ export function ReconciliationPage() {
                     </div>
                 )}
             </AppCard>
+
+            {/* ============ FLOATING ACTION BAR ============ */}
+            <AnimatePresence>
+                {selectedIds.length > 0 && (
+                    <motion.div
+                        initial={{ y: 80, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 80, opacity: 0 }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+                    >
+                        <div className="flex items-center gap-4 px-6 py-3 rounded-2xl border border-primary/30 bg-card/95 backdrop-blur-xl shadow-2xl shadow-primary/10">
+                            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                                <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-bold">
+                                    {selectedIds.length}
+                                </div>
+                                <span>selecionados</span>
+                            </div>
+
+                            <div className="h-6 w-px bg-border" />
+
+                            <Button
+                                size="sm"
+                                className="gap-2 font-semibold"
+                                onClick={handleBatchReconcile}
+                                disabled={bulkReconcileMutation.isPending}
+                            >
+                                <Zap className="w-4 h-4" />
+                                {bulkReconcileMutation.isPending
+                                    ? 'Processando...'
+                                    : `Conciliar ${selectedIds.length}`}
+                            </Button>
+
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-foreground"
+                                onClick={() => setSelectedIds([])}
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Dialog: Seleção de Banco para Vínculo Tardio */}
             <Dialog open={!!bankBindingTarget} onOpenChange={(open) => !open && setBankBindingTarget(null)}>
