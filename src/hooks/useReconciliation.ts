@@ -394,6 +394,7 @@ export function useReconcileManual() {
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['match-suggestions'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
             toast.success('Transações conciliadas com sucesso!');
         },
         onError: (error: Error) => {
@@ -429,6 +430,7 @@ export function useReconcileTransactionDirectly() {
             queryClient.invalidateQueries({ queryKey: ['dashboard-financial-kpis'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
             queryClient.invalidateQueries({ queryKey: ['account-balances'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-detailed'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
@@ -466,6 +468,7 @@ export function useUnreconcileTransaction() {
             queryClient.invalidateQueries({ queryKey: ['dashboard-financial-kpis'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
             queryClient.invalidateQueries({ queryKey: ['account-balances'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-detailed'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
@@ -510,6 +513,7 @@ export function useIgnoreEntry() {
             queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
             toast.success('Entrada marcada como ignorada');
         },
         onError: (error: Error) => {
@@ -553,6 +557,7 @@ export function useCreateFromStatement() {
             queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
             queryClient.invalidateQueries({ queryKey: ['account-balances'] });
             toast.success('Transação criada e conciliada!');
         },
@@ -614,6 +619,7 @@ export function useImportStatementEntries() {
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
             toast.success(`${result.imported} transações importadas com sucesso!`);
         },
         onError: (error: Error) => {
@@ -658,6 +664,7 @@ export function useApplyMatchSuggestions() {
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['match-suggestions'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
 
             if (result.successCount > 0) {
                 toast.success(`${result.successCount} transações conciliadas automaticamente!`);
@@ -669,5 +676,54 @@ export function useApplyMatchSuggestions() {
         onError: (error: Error) => {
             toast.error(`Erro ao aplicar sugestões: ${error.message}`);
         },
+    });
+}
+
+// ============ KPIs DE CONCILIAÇÃO (RPC) ============
+
+export interface ReconciliationKpis {
+    total_count: number;
+    reconciled_count: number;
+    pending_count: number;
+    ignored_count: number;
+    total_amount: number;
+    reconciled_amount: number;
+    pending_amount: number;
+}
+
+export function useReconciliationKpis(
+    bankAccountId: string | null,
+    startDate?: string,
+    endDate?: string,
+    searchTerm?: string
+) {
+    const { user } = useAuth();
+
+    return useQuery({
+        queryKey: ['reconciliation-kpis', user?.id, bankAccountId, startDate, endDate, searchTerm],
+        queryFn: async (): Promise<ReconciliationKpis> => {
+            if (!user) return { total_count: 0, reconciled_count: 0, pending_count: 0, ignored_count: 0, total_amount: 0, reconciled_amount: 0, pending_amount: 0 };
+
+            const { data, error } = await (supabase.rpc as any)('get_reconciliation_kpis', {
+                p_bank_account_id: (!bankAccountId || bankAccountId === 'all') ? null : bankAccountId,
+                p_start_date: startDate || null,
+                p_end_date: endDate || null,
+                p_search_term: searchTerm || null
+            });
+
+            if (error) throw error;
+
+            const row = data as any || {};
+            return {
+                total_count: Number(row.total_count) || 0,
+                reconciled_count: Number(row.reconciled_count) || 0,
+                pending_count: Number(row.pending_count) || 0,
+                ignored_count: Number(row.ignored_count) || 0,
+                total_amount: Number(row.total_amount) || 0,
+                reconciled_amount: Number(row.reconciled_amount) || 0,
+                pending_amount: Number(row.pending_amount) || 0,
+            };
+        },
+        enabled: !!user,
     });
 }
