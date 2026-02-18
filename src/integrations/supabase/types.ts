@@ -3675,6 +3675,15 @@ export type Database = {
           type: string
         }[]
       }
+      get_reconciliation_kpis: {
+        Args: {
+          p_bank_account_id: string
+          p_end_date: string
+          p_search_term?: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
       get_revenue_by_dimension: {
         Args: {
           p_dimension: string

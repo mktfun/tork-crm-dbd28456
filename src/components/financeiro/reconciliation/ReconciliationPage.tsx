@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -54,6 +54,7 @@ import {
     useBankStatementPaginated,
     useReconcileTransactionDirectly,
     useUnreconcileTransaction,
+    useReconciliationKpis,
     type PaginatedStatementItem
 } from '@/hooks/useReconciliation';
 import { formatCurrency } from '@/utils/formatCurrency';
@@ -121,27 +122,23 @@ export function ReconciliationPage() {
         statusFilter,
         typeFilter
     );
+    // KPIs from dedicated RPC (not paginated)
+    const { data: kpisData } = useReconciliationKpis(
+        selectedBankAccountId,
+        dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined,
+        dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined,
+        debouncedSearch || undefined
+    );
 
     const items = statementData?.items || [];
     const totalCount = statementData?.totalCount || 0;
     const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-    // KPI computations
-    const kpis = useMemo(() => {
-        let totalPending = 0;
-        let totalReconciled = 0;
-        let countPending = 0;
-        for (const item of items) {
-            const amount = Number(item.amount) || 0;
-            if (item.reconciled) {
-                totalReconciled += amount;
-            } else {
-                totalPending += amount;
-                countPending++;
-            }
-        }
-        return { totalPending, totalReconciled, countPending };
-    }, [items]);
+    const kpis = {
+        totalPending: kpisData?.pending_amount || 0,
+        totalReconciled: kpisData?.reconciled_amount || 0,
+        countPending: kpisData?.pending_count || 0,
+    };
 
     // Mutations
     const reconcileMutation = useReconcileTransactionDirectly();
