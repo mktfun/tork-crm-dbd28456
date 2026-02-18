@@ -1,6 +1,6 @@
-import React from 'react';
 import { LucideIcon } from 'lucide-react';
-import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import { AppCard } from '@/components/ui/app-card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface KpiCardProps {
@@ -20,51 +20,54 @@ export function KpiCard({
   variant = 'default',
   isLoading = false,
 }: KpiCardProps) {
-  const getVariantStyles = () => {
+  const getVariantClasses = () => {
     switch (variant) {
       case 'warning':
         return 'border-yellow-600/50 bg-yellow-600/10';
       case 'success':
         return 'border-green-600/50 bg-green-600/10';
       default:
-        return 'border-slate-700 bg-slate-800/50';
+        return 'border-border bg-card';
     }
   };
 
   if (isLoading) {
     return (
-      <Card className="border-slate-700 bg-slate-800/50 p-6">
+      <AppCard className="flex flex-col justify-between border-border bg-card">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col space-y-2 flex-1">
-            <Skeleton className="h-4 w-32 bg-slate-700" />
-            <Skeleton className="h-8 w-24 bg-slate-700" />
-            <Skeleton className="h-3 w-20 bg-slate-700" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-3 w-20" />
           </div>
-          <Skeleton className="h-10 w-10 rounded-full bg-slate-700 flex-shrink-0" />
+          <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
         </div>
-      </Card>
+      </AppCard>
     );
   }
 
   return (
-    <Card className={`${getVariantStyles()} p-6 transition-all hover:border-slate-600`}>
+    <AppCard className={cn(
+      "flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer hover:bg-secondary/70",
+      getVariantClasses()
+    )}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col space-y-1 flex-1 min-w-0 overflow-hidden">
-          <p className="text-sm font-medium text-slate-400">{title}</p>
-          <p 
-            className="text-2xl font-bold text-white whitespace-nowrap truncate" 
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p
+            className="text-2xl md:text-3xl font-bold text-foreground whitespace-nowrap truncate"
             title={String(value)}
           >
             {value}
           </p>
           {subtitle && (
-            <p className="text-xs text-slate-500">{subtitle}</p>
+            <p className="text-xs text-muted-foreground">{subtitle}</p>
           )}
         </div>
-        <div className="rounded-full bg-slate-700/50 p-3 flex-shrink-0">
-          <Icon className="h-5 w-5 text-slate-300" />
+        <div className="p-2 rounded-lg bg-foreground/10 flex-shrink-0">
+          <Icon className="h-5 w-5 text-foreground" />
         </div>
       </div>
-    </Card>
+    </AppCard>
   );
 }

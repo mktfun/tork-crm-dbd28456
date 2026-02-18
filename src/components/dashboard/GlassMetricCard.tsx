@@ -1,7 +1,7 @@
-
 import { Link } from 'react-router-dom';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AppCard } from '@/components/ui/app-card';
 
 interface GlassMetricCardProps {
   title: string;
@@ -27,10 +27,9 @@ export function GlassMetricCard({
   };
 
   return (
-    <Link to={href} className="block group">
-      <div className={cn(
-        "glass-card p-6 transition-all duration-300 hover:scale-105 hover:shadow-2xl",
-        "hover:bg-foreground/20 cursor-pointer",
+    <Link to={href} className="block">
+      <AppCard className={cn(
+        "flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70",
         className
       )}>
         <div className="flex items-center justify-between mb-4">
@@ -44,15 +43,13 @@ export function GlassMetricCard({
           </div>
         </div>
 
-        <div className="space-y-1">
-          <div className={cn(
-            "text-3xl font-bold transition-colors",
-            trendColors[trend]
-          )}>
-            {value}
-          </div>
+        <div className={cn(
+          "text-2xl md:text-3xl font-bold transition-colors",
+          trendColors[trend]
+        )}>
+          {value}
         </div>
-      </div>
+      </AppCard>
     </Link>
   );
 }
