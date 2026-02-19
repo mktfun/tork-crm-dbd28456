@@ -1,92 +1,56 @@
 
+# Prompt 21: Workbench Matching UI & "Sem Banco" Visibility
 
-# Fix Reconciliation Sign Mismatch (Final Resolution)
+## Summary
+Enhance the Reconciliation Workbench to display rich policy details (Customer, Insurer, Branch, Item) on system transaction cards, show a value breakdown (Full / Paid / Remaining), and improve the "Tripod" balance bar. The database RPC is already updated -- this is purely a frontend change.
 
-## Root Cause
+## Changes
 
-The frontend hook `usePendingReconciliation` (lines 144-159 of `useReconciliation.ts`) already has correct sign-forcing logic:
+### 1. New `SystemEntryCard` component in `ReconciliationWorkbench.tsx`
+Replace the generic `EntryCard` usage for the **right panel (System)** with a richer card layout:
 
-```
-const itemType = item.type || (item.amount < 0 ? 'expense' : 'revenue');
-const signedAmount = (itemType === 'expense') ? -Math.abs(item.amount) : Math.abs(item.amount);
-```
+- **Title**: `customer_name` (bold, large) with fallback to `description`
+- **Badges row**: `branch_name` | `insurer_name` | `item_name` (only rendered if non-null)
+- **Value breakdown** (3 inline items):
+  - "Cheio: R$ X" (muted)
+  - "Baixado: R$ Y" (green)
+  - "Faltante: R$ Z" (red, bold -- this is `remaining_amount`)
+- **"Sem Banco" badge**: Retained for items where `bank_account_id` is null
+- **Date** shown below badges
 
-**However**, the RPC `get_transactions_for_reconciliation` does NOT return a `type` column. Since `item.type` is always `undefined` and the amount is stored as a positive magnitude, the fallback `item.amount < 0 ? 'expense' : 'revenue'` always evaluates to `'revenue'`. This is why every transaction appears green/positive.
+### 2. Update `systemSum` calculation
+Currently uses `item.amount`. Change to use `item.remaining_amount ?? Math.abs(item.amount)` so the Tripod difference indicator correctly reflects remaining balances.
 
-## Solution
+### 3. Tripod Balance Bar refinement
+The existing balance bar already has the correct 3-column layout (Extrato / Diferenca / Sistema). Minor label and visual polish:
+- Add a delta symbol to the difference display
+- Keep existing green/red logic
 
-### Step 1: Database Migration -- Update the RPC
+### 4. Left panel (Statement) -- no changes
+The `EntryCard` for statement items remains as-is since bank statement entries don't have policy details.
 
-Replace `get_transactions_for_reconciliation` with a version that joins `financial_ledger` and `financial_accounts` to determine the actual transaction type (`expense` or `revenue`).
+## Technical Details
 
-```sql
-CREATE OR REPLACE FUNCTION get_transactions_for_reconciliation(p_bank_account_id UUID)
-RETURNS TABLE (
-    id UUID,
-    transaction_date DATE,
-    description TEXT,
-    amount NUMERIC,
-    type TEXT,
-    status TEXT
-) 
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_user_id uuid;
-BEGIN
-  v_user_id := auth.uid();
+### File: `src/components/financeiro/reconciliation/ReconciliationWorkbench.tsx`
 
-  RETURN QUERY
-  SELECT
-      ft.id,
-      ft.transaction_date,
-      ft.description,
-      ABS(fl.amount) as amount,
-      fa.type::TEXT as type,
-      ft.status
-  FROM financial_transactions ft
-  JOIN financial_ledger fl ON ft.id = fl.transaction_id
-  JOIN financial_accounts fa ON fl.account_id = fa.id
-  WHERE
-      fa.type IN ('expense', 'revenue')
-      AND ft.user_id = v_user_id
-      AND NOT COALESCE(ft.is_void, FALSE)
-      AND (ft.reconciled = false OR ft.reconciled IS NULL)
-      AND EXISTS (
-          SELECT 1 FROM financial_ledger fl2
-          JOIN financial_accounts fa2 ON fl2.account_id = fa2.id
-          WHERE fl2.transaction_id = ft.id
-            AND fa2.type = 'asset'
-      )
-  ORDER BY ft.transaction_date DESC;
-END;
-$$;
-```
+**New `SystemEntryCard` component** (added alongside existing `EntryCard`):
+- Accepts `PendingReconciliationItem` with the rich fields
+- Renders customer name as primary title
+- Shows badge row for branch/insurer/item
+- Shows value breakdown using `total_amount`, `paid_amount`, `remaining_amount`
+- Fallback: if `customer_name` is null, renders like the standard `EntryCard`
 
-Key differences from the old RPC:
-- Returns a `type` column (`'expense'` or `'revenue'`) derived from `financial_accounts.type`
-- Returns a `status` column
-- Joins through `financial_ledger` to `financial_accounts` to get the actual account type
-- Filters to only expense/revenue legs (not asset/liability legs)
-- Keeps `SECURITY DEFINER` and `user_id` check for RLS
+**Right panel render** (lines ~336-347):
+- Replace `EntryCard` with `SystemEntryCard` for system items
 
-### Step 2: No Frontend Changes Needed
+**`systemSum` calculation** (lines ~161-163):
+- Use `remaining_amount` (absolute value) instead of `amount` for more accurate difference calculation
 
-The existing frontend code in `useReconciliation.ts` (lines 144-159) already:
-1. Reads `item.type` from the RPC response
-2. Falls back to amount-based detection only if `type` is missing
-3. Forces negative sign for expenses via `-Math.abs(item.amount)`
+### File: `src/hooks/useReconciliation.ts`
+- No changes needed -- the `PendingReconciliationItem` interface already includes all rich fields (`total_amount`, `paid_amount`, `remaining_amount`, `customer_name`, `insurer_name`, `branch_name`, `item_name`) and the mapping logic is already in place.
 
-The `ReconciliationWorkbench.tsx` `EntryCard` (line 49) uses `item.amount >= 0` for color logic, which will work correctly once expenses have negative amounts.
+### File: `src/components/financeiro/conciliacao/SystemTransactionList.tsx`
+- No changes needed -- the "Sem Banco" badge is already implemented here from Prompt 19.
 
-### Summary
-
-| Component | Change |
-|-----------|--------|
-| RPC `get_transactions_for_reconciliation` | Database migration: add `type` and `status` columns to return table |
-| `useReconciliation.ts` | No change (already handles `type` correctly) |
-| `ReconciliationWorkbench.tsx` | No change (sign detection via `amount >= 0` works with signed data) |
-
-This is a **database-only fix**. One migration, zero code changes.
+## No Database Changes
+The `get_transactions_for_reconciliation` RPC has already been updated with the JOINs and new columns as specified.
