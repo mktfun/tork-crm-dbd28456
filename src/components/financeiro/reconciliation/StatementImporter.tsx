@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { X, Upload, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { X, Upload, FileText, AlertCircle, CheckCircle2, FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppCard } from '@/components/ui/app-card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -207,6 +207,36 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
         reader.readAsText(file, initialEncoding);
     }, []);
 
+    const handleGenerateTestData = useCallback(() => {
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        const testEntries: ParsedEntry[] = [
+            {
+                transaction_date: today.toISOString().split('T')[0],
+                description: 'Recebimento Cliente A',
+                amount: 5000.00,
+                reference_number: 'TEST-001',
+            },
+            {
+                transaction_date: today.toISOString().split('T')[0],
+                description: 'Pgto Fornecedor B',
+                amount: -1200.50,
+                reference_number: 'TEST-002',
+            },
+            {
+                transaction_date: yesterday.toISOString().split('T')[0],
+                description: 'Tarifa Bancária',
+                amount: -15.90,
+                reference_number: 'TEST-003',
+            },
+        ];
+
+        setParsedEntries(testEntries);
+        setError(null);
+    }, []);
+
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
@@ -278,6 +308,15 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
                                     <label htmlFor="file-input" className="cursor-pointer">
                                         Selecionar Arquivo
                                     </label>
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="mt-2 gap-1.5 text-muted-foreground"
+                                    onClick={handleGenerateTestData}
+                                >
+                                    <FlaskConical className="w-4 h-4" />
+                                    Gerar Dados de Teste
                                 </Button>
                             </div>
 
