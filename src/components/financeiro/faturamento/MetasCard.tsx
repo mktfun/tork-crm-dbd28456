@@ -1,8 +1,8 @@
 import { AppCard } from "@/components/ui/app-card";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Target, TrendingUp, TrendingDown, AlertCircle, Settings } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { GaugeChart } from "./GaugeChart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
@@ -166,36 +166,18 @@ export function MetasCard({ faturamentoAtual }: MetasCardProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Progresso */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Progresso</span>
-              <span className={cn(
-                "font-bold text-lg",
-                isAcimaDaMeta ? "text-emerald-600" : isProximoDaMeta ? "text-amber-600" : "text-foreground"
-              )}>
-                {Math.round(percentualAtingido)}%
-              </span>
-            </div>
-            <Progress
-              value={Math.min(percentualAtingido, 100)}
-              className={cn(
-                "h-3",
-                isAcimaDaMeta && "[&>div]:bg-emerald-600",
-                isProximoDaMeta && "[&>div]:bg-amber-600"
-              )}
-            />
-          </div>
+          {/* Gauge 180° */}
+          <GaugeChart percentage={percentualAtingido} />
 
-          {/* Valores */}
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <div className="space-y-1">
+          {/* Footer com Valores Monetários */}
+          <div className="flex justify-between pt-4 border-t border-border/50">
+            <div>
               <p className="text-xs text-muted-foreground">Faturamento Atual</p>
               <p className="text-lg font-bold text-foreground">
                 {formatCurrency(faturamentoRealizado)}
               </p>
             </div>
-            <div className="space-y-1">
+            <div className="text-right">
               <p className="text-xs text-muted-foreground">Meta do Mês</p>
               <p className="text-lg font-bold text-foreground">
                 {formatCurrency(metaMensal)}
