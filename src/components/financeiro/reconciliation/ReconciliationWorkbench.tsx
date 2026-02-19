@@ -33,12 +33,15 @@ import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
 import { PartialReconciliationModal } from './PartialReconciliationModal';
 
+interface BankAccountOption {
+    id: string;
+    bankName: string;
+}
+
 interface ReconciliationWorkbenchProps {
-    bankAccountId: string;
+    bankAccountId: string | null;
     dateRange?: DateRange;
-    targetLinkingBankId?: string;
-    targetLinkingBankName?: string;
-    onChangeTargetBank?: () => void;
+    bankAccounts?: BankAccountOption[];
 }
 
 // Compact card for statement/system items
@@ -202,7 +205,7 @@ function SystemEntryCard({
     );
 }
 
-export function ReconciliationWorkbench({ bankAccountId, dateRange, targetLinkingBankId, targetLinkingBankName, onChangeTargetBank }: ReconciliationWorkbenchProps) {
+export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts = [] }: ReconciliationWorkbenchProps) {
     const [selectedStatementIds, setSelectedStatementIds] = useState<string[]>([]);
     const [selectedSystemIds, setSelectedSystemIds] = useState<string[]>([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -211,13 +214,17 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, targetLinkin
     const [systemSearch, setSystemSearch] = useState('');
     const [showPartialModal, setShowPartialModal] = useState(false);
     const [showUnassigned, setShowUnassigned] = useState(false);
+    
+    // On-demand bank selection modal state
+    const [showBankModal, setShowBankModal] = useState(false);
+    const [selectedBankForMatch, setSelectedBankForMatch] = useState('');
 
     // Data
     const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined;
     const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined;
 
-    const effectiveBankId = targetLinkingBankId || bankAccountId;
-    const { data: pendingData, isLoading } = usePendingReconciliation(bankAccountId, startDate, endDate, showUnassigned || !!targetLinkingBankId);
+    const isConsolidated = !bankAccountId;
+    const { data: pendingData, isLoading } = usePendingReconciliation(bankAccountId, startDate, endDate, showUnassigned);
     const { data: suggestions = [] } = useMatchSuggestions(bankAccountId);
     const { data: accounts } = useFinancialAccounts();
 
@@ -276,19 +283,31 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, targetLinkin
     const isPerfectMatch = hasBothSides && Math.abs(diff) < 0.01;
     const isMissingTransaction = hasLeftSelection && !hasRightSelection;
 
-    // Reconcile handler (1:1 or N:M via multiple calls)
-    // Uses reconcile_transaction_partial with targetBankId for bank auto-linking
-    const handleReconcile = async () => {
-        // If mismatch detected, open partial modal instead
-        if (!isPerfectMatch && hasBothSides) {
-            setShowPartialModal(true);
-            return;
-        }
+    // Determine the target bank for reconciliation
+    const getTargetBankId = (): string | null => {
+        // If a specific bank is selected (Mode B), use it
+        if (bankAccountId) return bankAccountId;
+        
+        // Check if any selected statement item has a bank
+        const selectedStmts = statementItems.filter(i => selectedStatementIds.includes(i.id));
+        const stmtWithBank = selectedStmts.find(i => i.bank_account_id);
+        if (stmtWithBank?.bank_account_id) return stmtWithBank.bank_account_id;
+        
+        // Check if any selected system item has a bank
+        const selectedSys = systemItems.filter(i => selectedSystemIds.includes(i.id));
+        const sysWithBank = selectedSys.find(i => i.bank_account_id);
+        if (sysWithBank?.bank_account_id) return sysWithBank.bank_account_id;
+        
+        return null; // Both sides unassigned
+    };
+
+    // Execute reconciliation with a given bankId
+    const executeReconcile = async (targetBankId: string) => {
         if (selectedStatementIds.length === 1 && selectedSystemIds.length === 1) {
             await reconcilePartial.mutateAsync({
                 statementEntryId: selectedStatementIds[0],
                 systemTransactionId: selectedSystemIds[0],
-                targetBankId: effectiveBankId,
+                targetBankId,
             });
         } else {
             for (const stmtId of selectedStatementIds) {
@@ -297,7 +316,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, targetLinkin
                         await reconcilePartial.mutateAsync({
                             statementEntryId: stmtId,
                             systemTransactionId: sysId,
-                            targetBankId: effectiveBankId,
+                            targetBankId,
                         });
                     } catch { /* skip duplicates */ }
                 }
@@ -307,13 +326,45 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, targetLinkin
         setSelectedSystemIds([]);
     };
 
+    // Reconcile handler (1:1 or N:M via multiple calls)
+    const handleReconcile = async () => {
+        // If mismatch detected, open partial modal instead
+        if (!isPerfectMatch && hasBothSides) {
+            setShowPartialModal(true);
+            return;
+        }
+        
+        const targetBankId = getTargetBankId();
+        if (!targetBankId) {
+            // Both sides unassigned -> ask user which bank
+            setSelectedBankForMatch('');
+            setShowBankModal(true);
+            return;
+        }
+        
+        await executeReconcile(targetBankId);
+    };
+
+    const handleBankModalConfirm = async () => {
+        if (!selectedBankForMatch) return;
+        setShowBankModal(false);
+        await executeReconcile(selectedBankForMatch);
+    };
+
     const handlePartialReconcile = async (amount: number) => {
         if (selectedStatementIds.length < 1 || selectedSystemIds.length < 1) return;
+        const targetBankId = getTargetBankId();
+        if (!targetBankId) {
+            // For partial reconcile with no bank, we also need to ask
+            setSelectedBankForMatch('');
+            setShowBankModal(true);
+            return;
+        }
         await reconcilePartial.mutateAsync({
             statementEntryId: selectedStatementIds[0],
             systemTransactionId: selectedSystemIds[0],
             amountToReconcile: amount,
-            targetBankId: effectiveBankId,
+            targetBankId,
         });
         setShowPartialModal(false);
         setSelectedStatementIds([]);
@@ -353,23 +404,18 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, targetLinkin
 
     return (
         <div className="space-y-4">
-            {/* Target Linking Banner */}
-            {targetLinkingBankId && targetLinkingBankName && (
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 border border-primary/30">
-                    <Landmark className="w-5 h-5 text-primary shrink-0" />
+            {/* Consolidated Mode Info Banner */}
+            {isConsolidated && (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-muted/50 border border-border">
+                    <Landmark className="w-5 h-5 text-muted-foreground shrink-0" />
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground">
-                            🔵 MODO DE VINCULAÇÃO: {targetLinkingBankName}
+                            Visão Consolidada
                         </p>
                         <p className="text-xs text-muted-foreground">
-                            Arraste transações sem banco para conciliar neste banco.
+                            Exibindo itens sem banco vinculado. Ao conciliar, o sistema perguntará o banco de destino.
                         </p>
                     </div>
-                    {onChangeTargetBank && (
-                        <Button variant="outline" size="sm" onClick={onChangeTargetBank} className="shrink-0">
-                            Alterar
-                        </Button>
-                    )}
                 </div>
             )}
             {/* Balance Bar */}
@@ -692,6 +738,46 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, targetLinkin
                     customerName: (systemItems.find(i => i.id === selectedSystemIds[0]))?.customer_name || undefined,
                 }}
             />
+
+            {/* On-Demand Bank Selection Modal */}
+            <Dialog open={showBankModal} onOpenChange={setShowBankModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Landmark className="w-5 h-5 text-primary" />
+                            Para qual banco deseja vincular esta conciliação?
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Ambos os itens não possuem banco vinculado. Selecione o banco de destino:
+                        </p>
+                        <Select value={selectedBankForMatch} onValueChange={setSelectedBankForMatch}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione o banco..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {bankAccounts.map((account) => (
+                                    <SelectItem key={account.id} value={account.id}>
+                                        {account.bankName}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setShowBankModal(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            disabled={!selectedBankForMatch || reconcilePartial.isPending}
+                            onClick={handleBankModalConfirm}
+                        >
+                            {reconcilePartial.isPending ? 'Conciliando...' : 'Vincular e Conciliar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -113,24 +113,41 @@ export function usePendingReconciliation(
 ) {
     const { user } = useAuth();
 
+    const isConsolidated = !bankAccountId;
+
     return useQuery({
         queryKey: ['pending-reconciliation', user?.id, bankAccountId, startDate, endDate, includeUnassigned],
         queryFn: async () => {
-            if (!user || !bankAccountId) return { statement: [], system: [] };
+            if (!user) return { statement: [], system: [] };
 
-            // 1. Buscar transações do sistema (RPC nova)
-            const systemPromise = (supabase.rpc as any)('get_transactions_for_reconciliation', {
-                p_bank_account_id: bankAccountId,
-                p_include_unassigned: includeUnassigned
-            });
+            let systemPromise: any;
+            let statementQuery: any;
 
-            // 2. Buscar entradas do extrato (Tabela direta)
-            // Include entries for this bank OR unassigned entries (bank_account_id IS NULL)
-            let statementQuery = supabase
-                .from('bank_statement_entries')
-                .select('*')
-                .eq('reconciliation_status', 'pending')
-                .or(`bank_account_id.eq.${bankAccountId},bank_account_id.is.null`);
+            if (isConsolidated) {
+                // Mode A: Consolidated - fetch ALL items where bank_account_id IS NULL
+                systemPromise = (supabase.rpc as any)('get_transactions_for_reconciliation', {
+                    p_bank_account_id: null,
+                    p_include_unassigned: true
+                });
+
+                statementQuery = supabase
+                    .from('bank_statement_entries')
+                    .select('*')
+                    .eq('reconciliation_status', 'pending')
+                    .is('bank_account_id', null);
+            } else {
+                // Mode B: Specific bank - fetch items for that bank + optionally unassigned
+                systemPromise = (supabase.rpc as any)('get_transactions_for_reconciliation', {
+                    p_bank_account_id: bankAccountId,
+                    p_include_unassigned: includeUnassigned
+                });
+
+                statementQuery = supabase
+                    .from('bank_statement_entries')
+                    .select('*')
+                    .eq('reconciliation_status', 'pending')
+                    .or(`bank_account_id.eq.${bankAccountId},bank_account_id.is.null`);
+            }
 
             if (startDate && endDate) {
                 statementQuery = statementQuery
@@ -151,7 +168,6 @@ export function usePendingReconciliation(
                 throw statementResult.error;
             }
 
-            // Mapear Sistema (nomes simplificados)
             // Mapear Sistema (nomes simplificados)
             const systemItems: PendingReconciliationItem[] = (systemResult.data || []).map((item: any) => {
                 const itemType = item.type || (item.amount < 0 ? 'expense' : 'revenue');
@@ -199,7 +215,7 @@ export function usePendingReconciliation(
                 system: systemItems,
             };
         },
-        enabled: !!user && !!bankAccountId,
+        enabled: !!user,
         staleTime: 30 * 1000,
     });
 }
