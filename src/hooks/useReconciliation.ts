@@ -712,6 +712,69 @@ export function useBulkReconcile() {
     });
 }
 
+// ============ IMPORT HISTORY ============
+
+export interface ImportHistoryItem {
+    id: string;
+    bank_account_id: string | null;
+    imported_at: string;
+    imported_by: string | null;
+    total_transactions: number;
+    total_amount: number;
+    status: string;
+    auditor_name: string | null;
+    file_name: string | null;
+    error_message: string | null;
+}
+
+export function useImportHistory(bankAccountId: string | null) {
+    const { user } = useAuth();
+
+    return useQuery({
+        queryKey: ['import-history', user?.id, bankAccountId],
+        queryFn: async () => {
+            if (!user) return [];
+
+            let query = supabase
+                .from('bank_import_history')
+                .select('*')
+                .order('imported_at', { ascending: false })
+                .limit(50);
+
+            if (bankAccountId && bankAccountId !== 'all') {
+                query = query.eq('bank_account_id', bankAccountId);
+            }
+
+            const { data, error } = await query;
+            if (error) throw error;
+            return (data || []) as ImportHistoryItem[];
+        },
+        enabled: !!user,
+        staleTime: 30 * 1000,
+    });
+}
+
+export function useImportBatchEntries(batchId: string | null) {
+    const { user } = useAuth();
+
+    return useQuery({
+        queryKey: ['import-batch-entries', user?.id, batchId],
+        queryFn: async () => {
+            if (!user || !batchId) return [];
+
+            const { data, error } = await supabase
+                .from('bank_statement_entries')
+                .select('*')
+                .eq('import_batch_id', batchId)
+                .order('transaction_date', { ascending: true });
+
+            if (error) throw error;
+            return (data || []) as BankStatementEntry[];
+        },
+        enabled: !!user && !!batchId,
+    });
+}
+
 // ============ KPIs DE CONCILIAÇÃO (RPC) ============
 
 export interface ReconciliationKpis {

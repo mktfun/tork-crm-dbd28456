@@ -1,10 +1,15 @@
 import { useState, useCallback } from 'react';
-import { X, Upload, FileText, AlertCircle, CheckCircle2, FlaskConical, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import { X, Upload, FileText, AlertCircle, CheckCircle2, FlaskConical, ArrowLeft, ArrowRight, Loader2, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppCard } from '@/components/ui/app-card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Stepper } from '@/components/ui/stepper';
-import { useImportStatementEntries } from '@/hooks/useReconciliation';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { cn } from '@/lib/utils';
 
@@ -21,16 +26,19 @@ interface ParsedEntry {
     reference_number?: string;
 }
 
-const WIZARD_STEPS = ['Upload', 'Revisão', 'Confirmação'];
+const WIZARD_STEPS = ['Upload', 'Revisão', 'Auditoria', 'Confirmação'];
 
 export function StatementImporter({ bankAccountId, onClose, onSuccess }: StatementImporterProps) {
     const [wizardStep, setWizardStep] = useState(1);
     const [parsedEntries, setParsedEntries] = useState<ParsedEntry[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [auditorName, setAuditorName] = useState('');
+    const [isImporting, setIsImporting] = useState(false);
     const [importResult, setImportResult] = useState<{ count: number; total: number } | null>(null);
 
-    const importMutation = useImportStatementEntries();
+    const { user } = useAuth();
+    const queryClient = useQueryClient();
 
     // Parser simples para CSV
     const parseCSV = (content: string): ParsedEntry[] => {
@@ -221,13 +229,62 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
     };
 
     const handleImport = async () => {
-        const totalAmount = parsedEntries.reduce((s, e) => s + Math.abs(e.amount), 0);
-        const result = await importMutation.mutateAsync({
-            bankAccountId,
-            entries: parsedEntries,
-        });
-        setImportResult({ count: parsedEntries.length, total: totalAmount });
-        setWizardStep(3);
+        if (!user || !auditorName.trim()) return;
+        setIsImporting(true);
+
+        try {
+            const batchId = crypto.randomUUID();
+            const totalAmount = parsedEntries.reduce((s, e) => s + Math.abs(e.amount), 0);
+
+            // 1. Insert into bank_import_history
+            const { error: historyError } = await supabase
+                .from('bank_import_history')
+                .insert({
+                    id: batchId,
+                    bank_account_id: bankAccountId,
+                    imported_by: user.id,
+                    auditor_name: auditorName.trim(),
+                    total_transactions: parsedEntries.length,
+                    total_amount: totalAmount,
+                    status: 'completed',
+                });
+
+            if (historyError) throw historyError;
+
+            // 2. Insert all entries with shared batch ID
+            const entriesToInsert = parsedEntries.map(entry => ({
+                user_id: user.id,
+                bank_account_id: bankAccountId,
+                transaction_date: entry.transaction_date,
+                description: entry.description,
+                amount: entry.amount,
+                reference_number: entry.reference_number || null,
+                reconciliation_status: 'pending',
+                import_batch_id: batchId,
+            }));
+
+            const { error: entriesError } = await (supabase as any)
+                .from('bank_statement_entries')
+                .insert(entriesToInsert);
+
+            if (entriesError) throw entriesError;
+
+            // Invalidate queries
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['import-history'] });
+
+            setImportResult({ count: parsedEntries.length, total: totalAmount });
+            setWizardStep(4);
+            toast.success(`${parsedEntries.length} transações importadas com sucesso!`);
+        } catch (err: any) {
+            setError(err.message || 'Erro ao importar transações.');
+            toast.error(`Erro na importação: ${err.message}`);
+        } finally {
+            setIsImporting(false);
+        }
     };
 
     const totalRevenue = parsedEntries.filter(e => e.amount > 0).reduce((s, e) => s + e.amount, 0);
@@ -349,15 +406,66 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
                         </>
                     )}
 
-                    {/* Step 3: Confirmation */}
-                    {wizardStep === 3 && importResult && (
+                    {/* Step 3: Audit Info */}
+                    {wizardStep === 3 && (
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
+                                <UserCheck className="w-8 h-8 text-primary shrink-0" />
+                                <div>
+                                    <h4 className="font-semibold text-foreground">Informações de Auditoria</h4>
+                                    <p className="text-sm text-muted-foreground">
+                                        Registre quem está realizando esta importação para fins de rastreabilidade.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="auditor-name">Quem está auditando esta importação? *</Label>
+                                <Input
+                                    id="auditor-name"
+                                    placeholder="Ex: Maria Silva"
+                                    value={auditorName}
+                                    onChange={(e) => setAuditorName(e.target.value)}
+                                    maxLength={100}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Este nome será registrado no histórico de importações.
+                                </p>
+                            </div>
+
+                            <div className="p-4 bg-muted/50 rounded-lg border border-border space-y-2">
+                                <p className="text-sm font-medium text-foreground">Resumo da importação:</p>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <span className="text-muted-foreground">Transações:</span>
+                                    <span className="font-semibold text-right">{parsedEntries.length}</span>
+                                    <span className="text-muted-foreground">Entradas:</span>
+                                    <span className="font-semibold text-emerald-400 text-right">+{formatCurrency(totalRevenue)}</span>
+                                    <span className="text-muted-foreground">Saídas:</span>
+                                    <span className="font-semibold text-red-400 text-right">{formatCurrency(totalExpense)}</span>
+                                </div>
+                            </div>
+
+                            {error && (
+                                <Alert variant="destructive">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertDescription>{error}</AlertDescription>
+                                </Alert>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Step 4: Confirmation */}
+                    {wizardStep === 4 && importResult && (
                         <div className="flex flex-col items-center justify-center py-8 text-center">
                             <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
                                 <CheckCircle2 className="w-8 h-8 text-emerald-400" />
                             </div>
                             <h4 className="text-lg font-bold text-foreground mb-2">Importação Concluída!</h4>
-                            <p className="text-muted-foreground mb-4">
+                            <p className="text-muted-foreground mb-1">
                                 <span className="font-semibold text-foreground">{importResult.count}</span> transações importadas
+                            </p>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Auditor: <span className="font-medium text-foreground">{auditorName}</span>
                             </p>
                             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 border border-border">
                                 <span className="text-sm text-muted-foreground">Volume total:</span>
@@ -370,15 +478,22 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
                 {/* Footer */}
                 <div className="flex justify-between gap-2 p-4 border-t border-border">
                     <div>
-                        {wizardStep === 2 && (
-                            <Button variant="outline" onClick={() => { setWizardStep(1); setParsedEntries([]); }}>
+                        {(wizardStep === 2 || wizardStep === 3) && (
+                            <Button variant="outline" onClick={() => {
+                                if (wizardStep === 2) {
+                                    setWizardStep(1);
+                                    setParsedEntries([]);
+                                } else {
+                                    setWizardStep(2);
+                                }
+                            }}>
                                 <ArrowLeft className="w-4 h-4 mr-1" />
                                 Voltar
                             </Button>
                         )}
                     </div>
                     <div className="flex gap-2">
-                        {wizardStep === 3 ? (
+                        {wizardStep === 4 ? (
                             <Button onClick={() => { onSuccess(); }}>
                                 Fechar
                             </Button>
@@ -388,12 +503,18 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
                                     Cancelar
                                 </Button>
                                 {wizardStep === 2 && (
+                                    <Button onClick={() => setWizardStep(3)} className="gap-2">
+                                        Continuar
+                                        <ArrowRight className="w-4 h-4" />
+                                    </Button>
+                                )}
+                                {wizardStep === 3 && (
                                     <Button
                                         onClick={handleImport}
-                                        disabled={importMutation.isPending}
+                                        disabled={isImporting || !auditorName.trim()}
                                         className="gap-2"
                                     >
-                                        {importMutation.isPending ? (
+                                        {isImporting ? (
                                             <>
                                                 <Loader2 className="w-4 h-4 animate-spin" />
                                                 Importando...
