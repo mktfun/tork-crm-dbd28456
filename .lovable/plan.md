@@ -1,132 +1,69 @@
 
-# The Complete Reconciliation Suite: Audit History + Workbench Overhaul
 
-## Overview
+# Fix Settings (Chart of Accounts) + Reconciliation Sign Bug
 
-Upgrade the reconciliation module with two major enhancements:
-1. **Import History Tab** -- auditable timeline of all imports with detail drill-down
-2. **Enhanced Import Wizard** -- adds a mandatory "Auditor Name" step before processing
-3. **Workbench polish** -- the existing side-by-side workbench is already built; we refine integration with the new import flow
+## Two Issues
 
-No database changes needed -- the `bank_import_history` table already exists with the required schema.
+### Issue 1: ConfiguracoesTab -- "Contas Bancarias" showing ledger accounts instead of real banks
 
----
+**Problem:** The left column in "Plano de Contas" tab uses `AccountListSection` with `assetAccounts` (from `financial_accounts` table), showing ledger entries like "Contas a Receber" instead of real bank accounts (Itau, Nubank, etc.).
 
-## 1. StatementImporter Wizard Upgrade (4-Step Flow)
+**Fix:** Replace the `AccountListSection` for "Contas Bancarias" with the already-imported-but-unused `BankAccountsSection` component, which correctly queries the `bank_accounts` table.
 
-**File:** `src/components/financeiro/reconciliation/StatementImporter.tsx`
+Additionally, add a "Restaurar Padroes" button next to the Categories section that seeds standard categories if missing.
 
-Current wizard: Upload (1) -> Review (2) -> Confirmation (3)
+### Issue 2: Reconciliation sign mismatch -- expenses appear as positive on system side
 
-New wizard: **Upload (1) -> Review (2) -> Audit Info (3) -> Confirmation (4)**
+**Problem:** As shown in the screenshot, bank side shows `-R$ 150,00` for an expense but system side shows `+R$ 150,00`. The `usePendingReconciliation` hook maps system items with raw `item.amount` (which is stored as a positive magnitude for expenses). This causes a `R$ 300` mismatch instead of `R$ 0`.
 
-| Step | Name | What Happens |
-|------|------|-------------|
-| 1 | Upload | Current drag-and-drop + test data generator (unchanged) |
-| 2 | Revisao | Preview grid with totals (unchanged) |
-| 3 | Auditoria | New step: mandatory text field "Quem esta auditando esta importacao?" |
-| 4 | Confirmacao | Shows import result with count + total volume |
-
-**Key changes:**
-- Add `auditorName` state (string)
-- Step 3: Simple form with a required text input for auditor name
-- On "Importar" click (step 3 -> 4):
-  1. Generate a shared `import_batch_id` (UUID)
-  2. Insert a row into `bank_import_history` with: bank_account_id, auditor_name, total_transactions, total_amount, status='completed'
-  3. Insert all entries into `bank_statement_entries` with the same `import_batch_id`
-  4. Move to step 4 showing results
-- Update `WIZARD_STEPS` to `['Upload', 'Revisao', 'Auditoria', 'Confirmacao']`
-- Pass `onSuccessWithBatchId` callback so the parent can highlight the batch in workbench
+**Fix:** In the system items mapping, force negative sign when `type === 'expense'`.
 
 ---
 
-## 2. Import History Tab
+## Changes
 
-**File:** `src/components/financeiro/reconciliation/ReconciliationPage.tsx`
+### 1. `src/components/financeiro/ConfiguracoesTab.tsx`
 
-Add a third view mode tab: "Lista" | "Workbench" | "Historico"
+**Left column fix (lines 448-458):**
+- Replace `AccountListSection` for "Contas Bancarias" with `<BankAccountsSection />`
+- Remove the now-unnecessary `assetAccounts` filter (but keep it for `CommissionTargetSection`)
 
-### History View Content:
-- Query `bank_import_history` table ordered by `imported_at DESC`
-- Filter by selected bank account (or show all if consolidated)
-- Each import shown as a card:
+**Right column enhancement (lines 460-469):**
+- Add a "Restaurar Padroes" button next to "Adicionar" in the Categories section header
+- The button calls a function that checks for standard category names and creates any that are missing using `createAccount` from `financialService`
+- Standard categories to seed:
+  - Expense: "Despesas Administrativas", "Marketing", "Pessoal", "Impostos e Taxas"
+  - Revenue: "Receita de Vendas", "Receita de Servicos", "Comissoes"
 
-```text
-+----------------------------------------------------+
-| 19/02/2026 14:30  |  Auditor: Maria Silva          |
-| Banco Itau        |  30 transacoes | R$ 45.200,00   |
-| Status: Concluido                   [Ver Detalhes]  |
-+----------------------------------------------------+
-```
+### 2. `src/hooks/useReconciliation.ts` (line 144-154)
 
-- "Ver Detalhes" opens a Dialog listing all `bank_statement_entries` where `import_batch_id` matches
+**Fix system items amount sign:**
+- Change the amount mapping from `amount: item.amount` to:
+  ```
+  amount: (item.type === 'expense' || item.type === 'despesa')
+    ? -Math.abs(item.amount)
+    : Math.abs(item.amount)
+  ```
+- This ensures expenses are negative (matching bank statement convention) and revenues are positive
 
-### New Hook:
-Add `useImportHistory(bankAccountId)` to `useReconciliation.ts`:
-- Queries `bank_import_history` table with optional bank_account_id filter
-- Returns list sorted by imported_at DESC
+### 3. `src/components/financeiro/reconciliation/ReconciliationWorkbench.tsx` (line 49)
 
-Add `useImportBatchEntries(batchId)` for the detail modal:
-- Queries `bank_statement_entries` where `import_batch_id = batchId`
+**Fix EntryCard sign detection:**
+- Currently uses `item.amount >= 0` to determine revenue/expense visuals
+- After the sign fix, this will work correctly since expenses will now be negative
 
----
+### 4. `src/components/financeiro/conciliacao/SystemTransactionList.tsx`
 
-## 3. Workbench Integration
-
-**File:** `src/components/financeiro/reconciliation/ReconciliationPage.tsx`
-
-After a successful import:
-- Auto-switch to "Workbench" tab
-- The workbench already handles pending items correctly via `usePendingReconciliation`
-- New imports will appear automatically in the left panel (bank statement entries)
+**No changes needed** -- it already handles sign display correctly via `isExpense` check on `transaction.type` and applies manual `-`/`+` prefixes with `Math.abs`. After the hook fix, `transaction.amount` will be signed, so the `Math.abs` in `formatCurrency` will still work correctly for display.
 
 ---
 
-## 4. File Changes Summary
+## Technical Summary
 
 | File | Change |
 |------|--------|
-| `StatementImporter.tsx` | Add step 3 (Audit Info), write to `bank_import_history`, generate shared batch ID |
-| `ReconciliationPage.tsx` | Add "Historico" tab with timeline view + detail dialog |
-| `useReconciliation.ts` | Add `useImportHistory` and `useImportBatchEntries` hooks |
+| `ConfiguracoesTab.tsx` | Replace left column with `BankAccountsSection`; add "Restaurar Padroes" button for categories |
+| `useReconciliation.ts` | Force signed amounts in `usePendingReconciliation` system items mapping |
+| `ReconciliationWorkbench.tsx` | No change needed (sign detection already uses `amount >= 0`) |
+| `SystemTransactionList.tsx` | No change needed (already uses type-based detection) |
 
-No new files. No database migrations. No new dependencies.
-
----
-
-## Technical Details
-
-### Import Flow (StatementImporter)
-
-```text
-Step 1: User uploads OFX/CSV -> entries parsed
-Step 2: User reviews parsed entries -> clicks "Continuar"
-Step 3: User enters auditor name -> clicks "Importar"
-Step 4: System executes:
-   a) const batchId = crypto.randomUUID()
-   b) INSERT into bank_import_history (bank_account_id, auditor_name, total_transactions, total_amount, status, imported_by)
-   c) INSERT into bank_statement_entries (all entries with import_batch_id = batchId)
-   d) Show confirmation screen
-```
-
-### Import History Hook
-
-```text
-useImportHistory(bankAccountId):
-  SELECT * FROM bank_import_history
-  WHERE bank_account_id = :bankAccountId (or all if null)
-  ORDER BY imported_at DESC
-  LIMIT 50
-
-useImportBatchEntries(batchId):
-  SELECT * FROM bank_statement_entries
-  WHERE import_batch_id = :batchId
-  ORDER BY transaction_date ASC
-```
-
-### View Mode Tabs (ReconciliationPage)
-
-Current: `viewMode: 'lista' | 'workbench'`
-New: `viewMode: 'lista' | 'workbench' | 'historico'`
-
-The "Historico" tab is always available (not bank-dependent like Workbench).
