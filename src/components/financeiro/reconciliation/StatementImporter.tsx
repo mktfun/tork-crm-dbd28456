@@ -36,6 +36,7 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
     const [auditorName, setAuditorName] = useState('');
     const [isImporting, setIsImporting] = useState(false);
     const [importResult, setImportResult] = useState<{ count: number; total: number } | null>(null);
+    const [uploadedFileName, setUploadedFileName] = useState<string>('manual_import');
 
     const { user } = useAuth();
     const queryClient = useQueryClient();
@@ -151,6 +152,7 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
 
     const handleFile = useCallback((file: File) => {
         setError(null);
+        setUploadedFileName(file.name);
         const isOFX = file.name.toLowerCase().endsWith('.ofx');
         const initialEncoding = isOFX ? 'iso-8859-1' : 'utf-8';
 
@@ -244,6 +246,7 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
                     bank_account_id: bankAccountId,
                     imported_by: user.id,
                     auditor_name: auditorName.trim(),
+                    file_name: uploadedFileName,
                     total_transactions: parsedEntries.length,
                     total_amount: totalAmount,
                     status: 'completed',
