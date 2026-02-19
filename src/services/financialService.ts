@@ -207,6 +207,68 @@ export async function registerRevenue(payload: {
   return data;
 }
 
+// ============ FIND OR CREATE COUNTERPART ACCOUNT ============
+
+async function findOrCreateCounterpartAccount(type: 'expense' | 'revenue'): Promise<string> {
+  const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+
+  if (type === 'expense') {
+    // Liability account for expenses
+    const { data: allLiability } = await supabase
+      .from('financial_accounts')
+      .select('id, name')
+      .eq('status', 'active')
+      .eq('type', 'liability')
+      .order('name');
+
+    const accounts = allLiability || [];
+
+    // Priority 1: Case-insensitive match for known names
+    const knownNames = ['contas a pagar', 'contas à pagar', 'a pagar'];
+    const exact = accounts.find(a => knownNames.includes(a.name.toLowerCase().trim()));
+    if (exact) return exact.id;
+
+    // Priority 2: Any liability with "pagar" in name
+    const partial = accounts.find(a => normalize(a.name).includes('pagar'));
+    if (partial) return partial.id;
+
+    // Priority 3: First liability account
+    if (accounts.length > 0) return accounts[0].id;
+
+    // Priority 4: Auto-create
+    const created = await createAccount({ name: 'Contas a Pagar', type: 'liability' as FinancialAccountType });
+    return created.id;
+  } else {
+    // Asset account for revenue
+    const { data: allAsset } = await supabase
+      .from('financial_accounts')
+      .select('id, name')
+      .eq('status', 'active')
+      .eq('type', 'asset')
+      .order('name');
+
+    const accounts = allAsset || [];
+
+    // Priority 1: Case-insensitive match for known names
+    const knownNames = ['contas a receber', 'contas à receber', 'a receber', 'comissões a receber'];
+    const exact = accounts.find(a => knownNames.includes(a.name.toLowerCase().trim()));
+    if (exact) return exact.id;
+
+    // Priority 2: Any asset with "receber" in name
+    const partial = accounts.find(a => normalize(a.name).includes('receber'));
+    if (partial) return partial.id;
+
+    // Priority 3: First asset account (prefer non-Caixa)
+    const nonCaixa = accounts.find(a => !normalize(a.name).includes('caixa'));
+    if (nonCaixa) return nonCaixa.id;
+    if (accounts.length > 0) return accounts[0].id;
+
+    // Priority 4: Auto-create
+    const created = await createAccount({ name: 'Contas a Receber', type: 'asset' as FinancialAccountType });
+    return created.id;
+  }
+}
+
 export async function createFinancialMovement(payload: {
   description: string;
   amount: number;
@@ -221,62 +283,8 @@ export async function createFinancialMovement(payload: {
   insurance_company_id?: string;
   producer_id?: string;
 }) {
-  // Find the correct counterpart account based on transaction type
-  let assetAccountId = '';
-
-  if (payload.type === 'expense') {
-    // For expenses without a bank: use "Contas a Pagar" (liability)
-    const { data: liabilityAccounts } = await supabase
-      .from('financial_accounts')
-      .select('id, name')
-      .eq('status', 'active')
-      .eq('type', 'liability')
-      .ilike('name', '%contas a pagar%')
-      .limit(1);
-
-    if (liabilityAccounts && liabilityAccounts.length > 0) {
-      assetAccountId = liabilityAccounts[0].id;
-    } else {
-      // Fallback: any active liability account
-      const { data: fallback } = await supabase
-        .from('financial_accounts')
-        .select('id')
-        .eq('status', 'active')
-        .eq('type', 'liability')
-        .limit(1);
-      if (fallback && fallback.length > 0) {
-        assetAccountId = fallback[0].id;
-      } else {
-        throw new Error('Conta "Contas a Pagar" não encontrada. Verifique o plano de contas.');
-      }
-    }
-  } else {
-    // For revenue without a bank: use "Contas a Receber" (asset)
-    const { data: assetAccounts } = await supabase
-      .from('financial_accounts')
-      .select('id, name')
-      .eq('status', 'active')
-      .eq('type', 'asset')
-      .ilike('name', '%contas a receber%')
-      .limit(1);
-
-    if (assetAccounts && assetAccounts.length > 0) {
-      assetAccountId = assetAccounts[0].id;
-    } else {
-      // Fallback: any active asset account
-      const { data: fallback } = await supabase
-        .from('financial_accounts')
-        .select('id')
-        .eq('status', 'active')
-        .eq('type', 'asset')
-        .limit(1);
-      if (fallback && fallback.length > 0) {
-        assetAccountId = fallback[0].id;
-      } else {
-        throw new Error('Conta "Contas a Receber" não encontrada. Verifique o plano de contas.');
-      }
-    }
-  }
+  // Find the correct counterpart account with robust "find or create" logic
+  const assetAccountId = await findOrCreateCounterpartAccount(payload.type);
 
   if (payload.type === 'expense') {
     return registerExpense({
