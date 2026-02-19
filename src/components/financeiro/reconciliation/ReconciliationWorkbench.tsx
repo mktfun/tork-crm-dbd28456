@@ -5,6 +5,8 @@ import {
     ArrowUpRight, ArrowDownRight, CheckCircle2, AlertTriangle,
     Plus, X, Zap, Wand2, Loader2, Search, Unlink
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -205,12 +207,13 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
     const [bankSearch, setBankSearch] = useState('');
     const [systemSearch, setSystemSearch] = useState('');
     const [showPartialModal, setShowPartialModal] = useState(false);
+    const [showUnassigned, setShowUnassigned] = useState(false);
 
     // Data
     const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined;
     const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined;
 
-    const { data: pendingData, isLoading } = usePendingReconciliation(bankAccountId, startDate, endDate);
+    const { data: pendingData, isLoading } = usePendingReconciliation(bankAccountId, startDate, endDate, showUnassigned);
     const { data: suggestions = [] } = useMatchSuggestions(bankAccountId);
     const { data: accounts } = useFinancialAccounts();
 
@@ -441,6 +444,17 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
                                         value={systemSearch}
                                         onChange={(e) => setSystemSearch(e.target.value)}
                                     />
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                    <Switch
+                                        id="show-unassigned"
+                                        checked={showUnassigned}
+                                        onCheckedChange={setShowUnassigned}
+                                        className="scale-75"
+                                    />
+                                    <Label htmlFor="show-unassigned" className="text-[10px] text-muted-foreground cursor-pointer whitespace-nowrap">
+                                        Sem Banco
+                                    </Label>
                                 </div>
                                 <span className="text-xs text-muted-foreground shrink-0">{filteredSystem.length}</span>
                             </div>

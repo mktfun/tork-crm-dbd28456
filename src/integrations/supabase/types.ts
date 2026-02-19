@@ -3811,24 +3811,43 @@ export type Database = {
             Args: { p_legacy_id?: string; p_transaction_id?: string }
             Returns: Json
           }
-      get_transactions_for_reconciliation: {
-        Args: { p_bank_account_id: string }
-        Returns: {
-          amount: number
-          branch_name: string
-          customer_name: string
-          description: string
-          id: string
-          insurer_name: string
-          item_name: string
-          paid_amount: number
-          remaining_amount: number
-          status: string
-          total_amount: number
-          transaction_date: string
-          type: string
-        }[]
-      }
+      get_transactions_for_reconciliation:
+        | {
+            Args: { p_bank_account_id: string }
+            Returns: {
+              amount: number
+              branch_name: string
+              customer_name: string
+              description: string
+              id: string
+              insurer_name: string
+              item_name: string
+              paid_amount: number
+              remaining_amount: number
+              status: string
+              total_amount: number
+              transaction_date: string
+              type: string
+            }[]
+          }
+        | {
+            Args: { p_bank_account_id: string; p_include_unassigned?: boolean }
+            Returns: {
+              amount: number
+              branch_name: string
+              customer_name: string
+              description: string
+              id: string
+              insurer_name: string
+              item_name: string
+              paid_amount: number
+              remaining_amount: number
+              status: string
+              total_amount: number
+              transaction_date: string
+              type: string
+            }[]
+          }
       get_unbanked_transactions: {
         Args: { p_limit?: number; p_user_id: string }
         Returns: {
