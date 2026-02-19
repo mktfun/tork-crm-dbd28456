@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     GitCompare,
-    RefreshCw,
     Calendar as CalendarIcon,
     CheckCircle2,
     Undo2,
@@ -26,6 +25,7 @@ import {
     FileText,
     UserCheck,
     Sparkles,
+    UploadCloud,
 } from 'lucide-react';
 import { DatePickerWithRange } from '@/components/ui/date-picker-with-range';
 import { Input } from '@/components/ui/input';
@@ -221,6 +221,8 @@ export function ReconciliationPage() {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     const [showImporter, setShowImporter] = useState(false);
+    const [showImportDialog, setShowImportDialog] = useState(false);
+    const [importBankId, setImportBankId] = useState<string>('');
     const [viewMode, setViewMode] = useState<'lista' | 'workbench' | 'historico'>('lista');
     const [page, setPage] = useState(1);
 
@@ -460,19 +462,17 @@ export function ReconciliationPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
-                        {!isConsolidated && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1"
-                                onClick={() => setShowImporter(true)}
-                            >
-                                <Upload className="w-4 h-4" />
-                                Importar
-                            </Button>
-                        )}
-                        <Button variant="outline" size="icon" onClick={() => refetch()} title="Atualizar">
-                            <RefreshCw className="w-4 h-4" />
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => {
+                                setImportBankId('');
+                                setShowImportDialog(true);
+                            }}
+                        >
+                            <UploadCloud className="w-4 h-4" />
+                            Nova Importação
                         </Button>
                     </div>
                 </div>
@@ -985,15 +985,60 @@ export function ReconciliationPage() {
                 </DialogContent>
             </Dialog>
 
+            {/* Import Bank Selection Dialog */}
+            <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <UploadCloud className="w-5 h-5 text-primary" />
+                            Nova Importação de Extrato
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Selecione a conta bancária para importar o extrato:
+                        </p>
+                        <Select value={importBankId} onValueChange={setImportBankId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione o banco..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {bankAccounts?.accounts?.map((account) => (
+                                    <SelectItem key={account.id} value={account.id}>
+                                        {account.bankName}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            disabled={!importBankId}
+                            onClick={() => {
+                                setShowImportDialog(false);
+                                setSelectedBankAccountId(importBankId);
+                                setShowImporter(true);
+                            }}
+                        >
+                            Continuar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Modal de Importação */}
-            {showImporter && selectedBankAccountId && !isConsolidated && (
+            {showImporter && importBankId && (
                 <StatementImporter
-                    bankAccountId={selectedBankAccountId}
+                    bankAccountId={importBankId}
                     onClose={() => setShowImporter(false)}
                     onSuccess={async () => {
                         setShowImporter(false);
+                        // Redirect to that bank's view
+                        setSelectedBankAccountId(importBankId);
                         refetch();
-                        // Auto-switch to workbench after import
                         setViewMode('workbench');
                         // Auto-check for matches after import
                         const result = await refetchSuggestions();
