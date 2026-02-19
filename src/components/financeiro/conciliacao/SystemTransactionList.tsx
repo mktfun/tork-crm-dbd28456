@@ -5,10 +5,16 @@ import { Badge } from "@/components/ui/badge";
 import { PendingReconciliationItem } from "@/hooks/useReconciliation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Database } from "lucide-react";
+import { Database, Unlink } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface SystemTransactionListProps {
-  transactions: PendingReconciliationItem[];
+  transactions: (PendingReconciliationItem & { bank_account_id?: string | null })[];
   selectedIds: string[];
   onSelect: (id: string) => void;
 }
@@ -55,6 +61,7 @@ export function SystemTransactionList({
             {transactions.map((transaction) => {
               const isExpense = transaction.type === 'expense' || transaction.type === 'despesa';
               const isMatched = transaction.status === 'reconciled' || transaction.status === 'conciliado' || transaction.matched_id;
+              const isUnassigned = !transaction.bank_account_id;
 
               return (
                 <div
@@ -78,6 +85,21 @@ export function SystemTransactionList({
                         <Badge variant="default" className="text-xs">
                           Conciliado
                         </Badge>
+                      )}
+                      {isUnassigned && !isMatched && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-xs gap-1 text-amber-500 border-amber-500/30">
+                                <Unlink className="w-3 h-3" />
+                                Sem Banco
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Provisão sem conta bancária vinculada</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
