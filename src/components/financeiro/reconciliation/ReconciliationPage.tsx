@@ -688,7 +688,7 @@ export function ReconciliationPage() {
                 </AppCard>
             ) : viewMode === 'workbench' && (targetLinkingBankId || (selectedBankAccountId && !isConsolidated)) ? (
                 <ReconciliationWorkbench
-                    bankAccountId={targetLinkingBankId || selectedBankAccountId!}
+                    bankAccountId={targetLinkingBankId ? '' : selectedBankAccountId!}
                     dateRange={dateRange}
                     targetLinkingBankId={targetLinkingBankId || undefined}
                     targetLinkingBankName={
