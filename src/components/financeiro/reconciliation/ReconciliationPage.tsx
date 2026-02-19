@@ -20,6 +20,7 @@ import {
     Clock,
     TrendingUp,
     Zap,
+    Wand2,
 } from 'lucide-react';
 import { DatePickerWithRange } from '@/components/ui/date-picker-with-range';
 import { Input } from '@/components/ui/input';
@@ -61,7 +62,10 @@ import {
     useUnreconcileTransaction,
     useReconciliationKpis,
     useBulkReconcile,
-    type PaginatedStatementItem
+    useMatchSuggestions,
+    useReconcileManual,
+    type PaginatedStatementItem,
+    type MatchSuggestion
 } from '@/hooks/useReconciliation';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { StatementImporter } from './StatementImporter';
@@ -212,7 +216,7 @@ export function ReconciliationPage() {
     // State for bank selection dialog (late binding)
     const [bankBindingTarget, setBankBindingTarget] = useState<PaginatedStatementItem | null>(null);
     const [selectedBankForBinding, setSelectedBankForBinding] = useState<string>('');
-
+    const [showMatchReview, setShowMatchReview] = useState(false);
     const isConsolidated = !selectedBankAccountId || selectedBankAccountId === 'all';
 
     // Queries
@@ -295,6 +299,23 @@ export function ReconciliationPage() {
     const reconcileMutation = useReconcileTransactionDirectly();
     const unreconcileMutation = useUnreconcileTransaction();
     const bulkReconcileMutation = useBulkReconcile();
+    const reconcileManualMutation = useReconcileManual();
+
+    // Match Suggestions
+    const { data: matchSuggestions = [], refetch: refetchSuggestions } = useMatchSuggestions(
+        isConsolidated ? null : selectedBankAccountId
+    );
+
+    // Set of system transaction IDs that have high-confidence matches
+    const highConfidenceMatchMap = useMemo(() => {
+        const map = new Map<string, MatchSuggestion>();
+        matchSuggestions.forEach(s => {
+            if (s.confidence >= 0.8) {
+                map.set(s.system_transaction_id, s);
+            }
+        });
+        return map;
+    }, [matchSuggestions]);
 
     // Handlers
     const handleReconcile = (item: PaginatedStatementItem) => {
@@ -635,27 +656,60 @@ export function ReconciliationPage() {
                                             )}
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            {item.reconciled ? (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7 text-muted-foreground hover:text-red-500"
-                                                    onClick={() => handleUnreconcile(item.id)}
-                                                    title="Desfazer Conciliação"
-                                                >
-                                                    <Undo2 className="w-4 h-4" />
-                                                </Button>
-                                            ) : (
-                                                <Button
-                                                    variant="secondary"
-                                                    size="sm"
-                                                    className="h-7 text-xs gap-1 font-medium"
-                                                    onClick={() => handleReconcile(item)}
-                                                >
-                                                    <CheckCircle2 className="w-3 h-3" />
-                                                    Conciliar
-                                                </Button>
-                                            )}
+                                            <div className="flex items-center justify-center gap-1">
+                                                {item.reconciled ? (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                                                        onClick={() => handleUnreconcile(item.id)}
+                                                        title="Desfazer Conciliação"
+                                                    >
+                                                        <Undo2 className="w-4 h-4" />
+                                                    </Button>
+                                                ) : (
+                                                    <>
+                                                        {highConfidenceMatchMap.has(item.id) && (
+                                                            <TooltipProvider>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-7 w-7 text-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+                                                                            onClick={() => {
+                                                                                const match = highConfidenceMatchMap.get(item.id)!;
+                                                                                reconcileManualMutation.mutate({
+                                                                                    statementEntryId: match.statement_entry_id,
+                                                                                    systemTransactionId: match.system_transaction_id,
+                                                                                });
+                                                                            }}
+                                                                            title="Match automático encontrado"
+                                                                        >
+                                                                            <Wand2 className="w-4 h-4" />
+                                                                        </Button>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        <p>Match automático: {highConfidenceMatchMap.get(item.id)?.statement_description}</p>
+                                                                        <p className="text-xs text-muted-foreground">
+                                                                            Confiança: {((highConfidenceMatchMap.get(item.id)?.confidence || 0) * 100).toFixed(0)}%
+                                                                        </p>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                        )}
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            className="h-7 text-xs gap-1 font-medium"
+                                                            onClick={() => handleReconcile(item)}
+                                                        >
+                                                            <CheckCircle2 className="w-3 h-3" />
+                                                            Conciliar
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))
@@ -777,12 +831,81 @@ export function ReconciliationPage() {
                 <StatementImporter
                     bankAccountId={selectedBankAccountId}
                     onClose={() => setShowImporter(false)}
-                    onSuccess={() => {
+                    onSuccess={async () => {
                         setShowImporter(false);
                         refetch();
+                        // Auto-check for matches after import
+                        const result = await refetchSuggestions();
+                        if (result.data && result.data.length > 0) {
+                            setShowMatchReview(true);
+                        }
                     }}
                 />
             )}
+
+            {/* Match Review Dialog (Post-Import) */}
+            <Dialog open={showMatchReview} onOpenChange={setShowMatchReview}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Wand2 className="w-5 h-5 text-amber-500" />
+                            Correspondências Encontradas
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <p className="text-sm text-muted-foreground">
+                            Encontramos <span className="font-semibold text-foreground">{matchSuggestions.length}</span> possíveis correspondências entre o extrato importado e as transações do sistema.
+                        </p>
+                        <div className="max-h-60 overflow-auto space-y-2">
+                            {matchSuggestions.slice(0, 10).map((s, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border text-sm">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-foreground truncate">{s.statement_description}</p>
+                                        <p className="text-xs text-muted-foreground truncate">↔ {s.system_description}</p>
+                                    </div>
+                                    <div className="text-right shrink-0 ml-3">
+                                        <p className={cn('font-semibold', s.statement_amount >= 0 ? 'text-emerald-500' : 'text-rose-500')}>
+                                            {formatCurrency(s.statement_amount)}
+                                        </p>
+                                        <Badge variant="secondary" className="text-[10px]">
+                                            {(s.confidence * 100).toFixed(0)}%
+                                        </Badge>
+                                    </div>
+                                </div>
+                            ))}
+                            {matchSuggestions.length > 10 && (
+                                <p className="text-xs text-muted-foreground text-center">
+                                    +{matchSuggestions.length - 10} correspondências adicionais
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setShowMatchReview(false)}>
+                            Revisar Manualmente
+                        </Button>
+                        <Button
+                            className="gap-2"
+                            onClick={async () => {
+                                for (const s of matchSuggestions) {
+                                    try {
+                                        await reconcileManualMutation.mutateAsync({
+                                            statementEntryId: s.statement_entry_id,
+                                            systemTransactionId: s.system_transaction_id,
+                                        });
+                                    } catch { /* skip failed ones */ }
+                                }
+                                setShowMatchReview(false);
+                                toast.success(`${matchSuggestions.length} correspondências processadas!`);
+                            }}
+                            disabled={reconcileManualMutation.isPending}
+                        >
+                            <Wand2 className="w-4 h-4" />
+                            {reconcileManualMutation.isPending ? 'Processando...' : 'Confirmar Tudo'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
