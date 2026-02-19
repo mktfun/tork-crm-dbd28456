@@ -1,168 +1,132 @@
 
-
-# Professional Side-by-Side Reconciliation Workbench
+# The Complete Reconciliation Suite: Audit History + Workbench Overhaul
 
 ## Overview
 
-Replace the current flat table-based reconciliation with an enterprise-grade **side-by-side workbench** where users match bank statement entries (left) against system transactions (right), with strict sum-validation before allowing reconciliation. No database changes required -- all existing RPCs are reused.
+Upgrade the reconciliation module with two major enhancements:
+1. **Import History Tab** -- auditable timeline of all imports with detail drill-down
+2. **Enhanced Import Wizard** -- adds a mandatory "Auditor Name" step before processing
+3. **Workbench polish** -- the existing side-by-side workbench is already built; we refine integration with the new import flow
+
+No database changes needed -- the `bank_import_history` table already exists with the required schema.
 
 ---
 
-## Architecture
-
-The current single-table view in `ReconciliationPage.tsx` will be restructured into two modes:
-- **List Mode** (existing): The current table view for browsing/filtering all transactions (kept as a tab)
-- **Workbench Mode** (new): The side-by-side matching interface (new default tab when a bank is selected)
-
-The `StatementImporter.tsx` will be upgraded with a 3-step wizard flow.
-
----
-
-## 1. StatementImporter Wizard Upgrade
+## 1. StatementImporter Wizard Upgrade (4-Step Flow)
 
 **File:** `src/components/financeiro/reconciliation/StatementImporter.tsx`
 
-Replace the current single-screen importer with a 3-step wizard:
+Current wizard: Upload (1) -> Review (2) -> Confirmation (3)
 
-| Step | Name | Description |
+New wizard: **Upload (1) -> Review (2) -> Audit Info (3) -> Confirmation (4)**
+
+| Step | Name | What Happens |
 |------|------|-------------|
-| 1 | Upload | Drag-and-drop zone + "Gerar Dados de Teste" button (already exists) |
-| 2 | Preview | Editable grid showing parsed rows with totals summary |
-| 3 | Confirm | Import result feedback: "Importado R$ X | 30 Entradas" |
+| 1 | Upload | Current drag-and-drop + test data generator (unchanged) |
+| 2 | Revisao | Preview grid with totals (unchanged) |
+| 3 | Auditoria | New step: mandatory text field "Quem esta auditando esta importacao?" |
+| 4 | Confirmacao | Shows import result with count + total volume |
 
 **Key changes:**
-- Add `wizardStep` state (1, 2, 3)
-- Reuse existing `Stepper` component from `src/components/ui/stepper.tsx`
-- Step 1: Current upload zone (no changes)
-- Step 2: Current preview grid, but user must explicitly click "Continuar" to proceed
-- Step 3: Shows import result with success animation, then "Fechar" button
-- Import button moves from footer to Step 2 -> Step 3 transition
-- Back button available on steps 2 and 3
+- Add `auditorName` state (string)
+- Step 3: Simple form with a required text input for auditor name
+- On "Importar" click (step 3 -> 4):
+  1. Generate a shared `import_batch_id` (UUID)
+  2. Insert a row into `bank_import_history` with: bank_account_id, auditor_name, total_transactions, total_amount, status='completed'
+  3. Insert all entries into `bank_statement_entries` with the same `import_batch_id`
+  4. Move to step 4 showing results
+- Update `WIZARD_STEPS` to `['Upload', 'Revisao', 'Auditoria', 'Confirmacao']`
+- Pass `onSuccessWithBatchId` callback so the parent can highlight the batch in workbench
 
 ---
 
-## 2. Workbench Layout (ReconciliationPage.tsx)
+## 2. Import History Tab
 
 **File:** `src/components/financeiro/reconciliation/ReconciliationPage.tsx`
 
-### 2a. Add Tabs: "Lista" vs "Workbench"
+Add a third view mode tab: "Lista" | "Workbench" | "Historico"
 
-Below the KPI cards, add a tab switcher:
-- "Lista" tab: Shows the existing table view (current code, untouched)
-- "Workbench" tab: Shows the new side-by-side matching UI
-
-The Workbench tab is only enabled when a specific bank account is selected (not "Consolidado").
-
-### 2b. Balance Bar (Top of Workbench)
-
-A horizontal bar showing three values:
+### History View Content:
+- Query `bank_import_history` table ordered by `imported_at DESC`
+- Filter by selected bank account (or show all if consolidated)
+- Each import shown as a card:
 
 ```text
-+---------------------------+-------------------+---------------------------+
-|  Extrato (Banco)          |    Diferenca      |    Sistema (ERP)          |
-|  R$ 12.500,00             |    R$ 0,00        |    R$ 12.500,00           |
-|  3 itens selecionados     |    (green/red)    |    2 itens selecionados   |
-+---------------------------+-------------------+---------------------------+
++----------------------------------------------------+
+| 19/02/2026 14:30  |  Auditor: Maria Silva          |
+| Banco Itau        |  30 transacoes | R$ 45.200,00   |
+| Status: Concluido                   [Ver Detalhes]  |
++----------------------------------------------------+
 ```
 
-- Left total = sum of selected bank statement entries (or total pending if none selected)
-- Right total = sum of selected system transactions (or total pending if none selected)
-- Center = Left - Right (green if 0, red otherwise)
+- "Ver Detalhes" opens a Dialog listing all `bank_statement_entries` where `import_batch_id` matches
 
-### 2c. Split Panels
+### New Hook:
+Add `useImportHistory(bankAccountId)` to `useReconciliation.ts`:
+- Queries `bank_import_history` table with optional bank_account_id filter
+- Returns list sorted by imported_at DESC
 
-Use `react-resizable-panels` (already installed) for a resizable left/right split:
-
-**Left Panel - "Extrato (Banco)":**
-- Fetches `bank_statement_entries` with `reconciliation_status = 'pending'` using existing `usePendingReconciliation` hook (`.statement` property)
-- Each entry rendered as a compact card showing: date, description, amount
-- Click to toggle selection (turns blue/primary border)
-- Multi-select supported
-
-**Right Panel - "Sistema (ERP)":**
-- Fetches pending system transactions using existing `usePendingReconciliation` hook (`.system` property)
-- Same compact card style
-- Click to toggle selection
-
-### 2d. Selection State
-
-```
-selectedStatementIds: string[]   // Left column selections
-selectedSystemIds: string[]      // Right column selections
-```
-
-Computed values:
-- `bankSum` = sum of amounts from selected statement entries
-- `systemSum` = sum of amounts from selected system transactions  
-- `diff` = bankSum - systemSum
-
-### 2e. Floating Action Bar (Bottom)
-
-Appears when any items are selected. Three scenarios:
-
-| Scenario | Condition | Action |
-|----------|-----------|--------|
-| Perfect Match | `diff === 0` and both sides have selections | Show "Conciliar" button (green). Calls `reconcile_transactions` RPC for each pair, or `bulk_manual_reconcile` if 1:many |
-| Mismatch | `diff !== 0` and both sides have selections | Show warning: "Valores nao batem (Diff: R$ X)" with disabled button |
-| Missing Transaction | Left has selection, Right is empty | Show "Criar Lancamento" button. Opens a pre-filled dialog to create a system transaction from the bank entry |
-
-### 2f. "Criar Lancamento" Modal
-
-When user selects bank items but no system items, a modal opens pre-filled with:
-- Date from bank entry
-- Description from bank entry
-- Amount from bank entry
-- User selects: Category (required)
-
-On submit: uses existing `useCreateFromStatement` hook (which calls `create_transaction_from_statement` RPC). After success, auto-selects the new system transaction for matching.
+Add `useImportBatchEntries(batchId)` for the detail modal:
+- Queries `bank_statement_entries` where `import_batch_id = batchId`
 
 ---
 
-## 3. Hooks Usage (No New Hooks)
+## 3. Workbench Integration
 
-All existing hooks are reused:
-- `usePendingReconciliation(bankAccountId)` -- fetches both sides
-- `useReconcileManual()` -- pairs statement + system entries
-- `useMatchSuggestions(bankAccountId)` -- highlights suggested matches
-- `useCreateFromStatement()` -- creates missing transactions
-- `useBulkReconcile()` -- batch reconciliation
+**File:** `src/components/financeiro/reconciliation/ReconciliationPage.tsx`
+
+After a successful import:
+- Auto-switch to "Workbench" tab
+- The workbench already handles pending items correctly via `usePendingReconciliation`
+- New imports will appear automatically in the left panel (bank statement entries)
 
 ---
 
 ## 4. File Changes Summary
 
-| File | Change Type | Description |
-|------|------------|-------------|
-| `StatementImporter.tsx` | Modify | Add wizard steps (Upload -> Preview -> Confirm) using existing Stepper component |
-| `ReconciliationPage.tsx` | Modify | Add "Lista"/"Workbench" tabs. Build the side-by-side workbench with balance bar, split panels, selection logic, floating action bar, and create-transaction modal |
+| File | Change |
+|------|--------|
+| `StatementImporter.tsx` | Add step 3 (Audit Info), write to `bank_import_history`, generate shared batch ID |
+| `ReconciliationPage.tsx` | Add "Historico" tab with timeline view + detail dialog |
+| `useReconciliation.ts` | Add `useImportHistory` and `useImportBatchEntries` hooks |
 
-No new files. No database changes. No new dependencies.
+No new files. No database migrations. No new dependencies.
 
 ---
 
 ## Technical Details
 
-### Selection Logic Implementation
+### Import Flow (StatementImporter)
 
 ```text
-1. User clicks bank entry A (R$ 5.000)     -> selectedStatementIds = [A]
-2. User clicks system entry B (R$ 5.000)   -> selectedSystemIds = [B]  
-3. Balance bar: R$ 5.000 - R$ 5.000 = R$ 0 -> GREEN
-4. "Conciliar" button appears
-5. Click -> calls reconcile_transactions(A, B)
-6. Both items removed from lists, queries invalidated
+Step 1: User uploads OFX/CSV -> entries parsed
+Step 2: User reviews parsed entries -> clicks "Continuar"
+Step 3: User enters auditor name -> clicks "Importar"
+Step 4: System executes:
+   a) const batchId = crypto.randomUUID()
+   b) INSERT into bank_import_history (bank_account_id, auditor_name, total_transactions, total_amount, status, imported_by)
+   c) INSERT into bank_statement_entries (all entries with import_batch_id = batchId)
+   d) Show confirmation screen
 ```
 
-### Multi-match (1:N) Logic
+### Import History Hook
 
 ```text
-1. User selects bank entries A (R$ 3.000) + B (R$ 2.000)  -> sum = R$ 5.000
-2. User selects system entry C (R$ 5.000)                  -> sum = R$ 5.000
-3. diff = 0 -> GREEN -> "Conciliar" enabled
-4. System reconciles each pair: (A,C) and (B,C) using reconcile_transactions
+useImportHistory(bankAccountId):
+  SELECT * FROM bank_import_history
+  WHERE bank_account_id = :bankAccountId (or all if null)
+  ORDER BY imported_at DESC
+  LIMIT 50
+
+useImportBatchEntries(batchId):
+  SELECT * FROM bank_statement_entries
+  WHERE import_batch_id = :batchId
+  ORDER BY transaction_date ASC
 ```
 
-### Match Suggestions Highlighting
+### View Mode Tabs (ReconciliationPage)
 
-When `useMatchSuggestions` returns results, items with suggested matches get a subtle glow/badge. If both sides of a suggestion are visible, a dotted line or badge connects them visually.
+Current: `viewMode: 'lista' | 'workbench'`
+New: `viewMode: 'lista' | 'workbench' | 'historico'`
 
+The "Historico" tab is always available (not bank-dependent like Workbench).
