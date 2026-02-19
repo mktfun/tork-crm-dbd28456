@@ -3815,9 +3815,16 @@ export type Database = {
         Args: { p_bank_account_id: string }
         Returns: {
           amount: number
+          branch_name: string
+          customer_name: string
           description: string
           id: string
+          insurer_name: string
+          item_name: string
+          paid_amount: number
+          remaining_amount: number
           status: string
+          total_amount: number
           transaction_date: string
           type: string
         }[]

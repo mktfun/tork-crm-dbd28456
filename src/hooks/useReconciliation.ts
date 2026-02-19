@@ -30,8 +30,16 @@ export interface PendingReconciliationItem {
     reference_number: string | null;
     status: string;
     matched_id: string | null;
-    type: 'revenue' | 'expense' | 'receita' | 'despesa'; // Allow both for now
+    type: 'revenue' | 'expense' | 'receita' | 'despesa';
     bank_account_id?: string | null;
+    // Rich policy details (from RPC)
+    total_amount?: number | null;
+    paid_amount?: number | null;
+    remaining_amount?: number | null;
+    customer_name?: string | null;
+    insurer_name?: string | null;
+    branch_name?: string | null;
+    item_name?: string | null;
 }
 // ...
 
@@ -145,9 +153,10 @@ export function usePendingReconciliation(
             // Mapear Sistema (nomes simplificados)
             const systemItems: PendingReconciliationItem[] = (systemResult.data || []).map((item: any) => {
                 const itemType = item.type || (item.amount < 0 ? 'expense' : 'revenue');
+                const remainingAmt = item.remaining_amount ?? item.amount;
                 const signedAmount = (itemType === 'expense' || itemType === 'despesa')
-                    ? -Math.abs(item.amount)
-                    : Math.abs(item.amount);
+                    ? -Math.abs(remainingAmt)
+                    : Math.abs(remainingAmt);
                 return {
                     source: 'system',
                     id: item.id,
@@ -155,10 +164,17 @@ export function usePendingReconciliation(
                     description: item.description,
                     amount: signedAmount,
                     reference_number: null,
-                    status: 'pending',
+                    status: item.status || 'pending',
                     matched_id: null,
                     type: itemType,
                     bank_account_id: item.bank_account_id || null,
+                    total_amount: item.total_amount ?? null,
+                    paid_amount: item.paid_amount ?? null,
+                    remaining_amount: item.remaining_amount ?? null,
+                    customer_name: item.customer_name ?? null,
+                    insurer_name: item.insurer_name ?? null,
+                    branch_name: item.branch_name ?? null,
+                    item_name: item.item_name ?? null,
                 };
             });
 
