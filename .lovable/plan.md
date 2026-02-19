@@ -1,56 +1,99 @@
 
-# Prompt 21: Workbench Matching UI & "Sem Banco" Visibility
+# Prompt 22: Universal Partial Reconciliation (Baixa Parcial)
 
 ## Summary
-Enhance the Reconciliation Workbench to display rich policy details (Customer, Insurer, Branch, Item) on system transaction cards, show a value breakdown (Full / Paid / Remaining), and improve the "Tripod" balance bar. The database RPC is already updated -- this is purely a frontend change.
+Create a Partial Reconciliation Modal that opens automatically when the user tries to match items with different amounts in the Workbench. The backend RPC already supports this -- this is a frontend-only change.
 
 ## Changes
 
-### 1. New `SystemEntryCard` component in `ReconciliationWorkbench.tsx`
-Replace the generic `EntryCard` usage for the **right panel (System)** with a richer card layout:
+### 1. New file: `src/components/financeiro/reconciliation/PartialReconciliationModal.tsx`
 
-- **Title**: `customer_name` (bold, large) with fallback to `description`
-- **Badges row**: `branch_name` | `insurer_name` | `item_name` (only rendered if non-null)
-- **Value breakdown** (3 inline items):
-  - "Cheio: R$ X" (muted)
-  - "Baixado: R$ Y" (green)
-  - "Faltante: R$ Z" (red, bold -- this is `remaining_amount`)
-- **"Sem Banco" badge**: Retained for items where `bank_account_id` is null
-- **Date** shown below badges
+A self-contained modal component with these props:
+- `isOpen`, `onClose`, `onConfirm(amount: number)`
+- `statementItem: { description, amount, date }`
+- `systemItem: { description, totalAmount, paidAmount, remainingAmount, customerName }`
 
-### 2. Update `systemSum` calculation
-Currently uses `item.amount`. Change to use `item.remaining_amount ?? Math.abs(item.amount)` so the Tripod difference indicator correctly reflects remaining balances.
+**UI Layout:**
+- **Header**: "Baixa Parcial" with AlertTriangle icon
+- **System Item Section**: Customer name (or description fallback), value breakdown (Cheio / Baixado / Faltante)
+- **Statement Item Section**: Description, amount, date
+- **Input Field**: "Valor a Conciliar" -- defaults to `Math.abs(statementItem.amount)`, editable
+- **Live Calculation**: "Novo Saldo Devedor" = `remainingAmount - inputValue`
+- **Validation**: If input > remaining, show red warning and disable confirm button
+- **Buttons**: "Cancelar" (outline) and "Confirmar Baixa Parcial" (primary)
 
-### 3. Tripod Balance Bar refinement
-The existing balance bar already has the correct 3-column layout (Extrato / Diferenca / Sistema). Minor label and visual polish:
-- Add a delta symbol to the difference display
-- Keep existing green/red logic
+### 2. Update `ReconciliationWorkbench.tsx`
 
-### 4. Left panel (Statement) -- no changes
-The `EntryCard` for statement items remains as-is since bank statement entries don't have policy details.
+**New state:**
+- `showPartialModal: boolean`
+- `partialStatementItem / partialSystemItem` to hold the selected items for the modal
+
+**Replace the "Valores nao batem" block (lines 513-518):**
+- Instead of just showing a warning, render a "Baixa Parcial" button that opens the modal
+- The button will be styled with an amber/warning color
+
+**New handler `handlePartialReconcile(amount: number)`:**
+- Calls `reconcilePartial.mutateAsync` with `amountToReconcile: amount` and `targetBankId: bankAccountId`
+- Clears selection and closes modal on success
+
+**Also update `handleReconcile` (lines 272-294):**
+- Add mismatch detection: if `!isPerfectMatch && hasBothSides`, open the partial modal instead of reconciling directly
+- This covers the case where user clicks "Conciliar" with mismatched amounts
+
+### 3. No hook changes needed
+The `useReconcilePartial` hook (line 662) already accepts `amountToReconcile` and `targetBankId`.
+
+### 4. No database changes needed
+The `reconcile_transaction_partial` RPC already handles partial amounts and bank linking.
 
 ## Technical Details
 
+### File: `src/components/financeiro/reconciliation/PartialReconciliationModal.tsx` (NEW)
+
+```text
+Props interface:
+  isOpen: boolean
+  onClose: () => void
+  onConfirm: (amount: number) => void
+  statementItem: { description: string, amount: number, date: string }
+  systemItem: { 
+    description: string, 
+    totalAmount: number, 
+    paidAmount: number, 
+    remainingAmount: number, 
+    customerName?: string 
+  }
+  isLoading?: boolean
+```
+
+Uses existing Dialog, Input, Button, Badge components. Input is a controlled number field with `formatCurrency` for display values.
+
 ### File: `src/components/financeiro/reconciliation/ReconciliationWorkbench.tsx`
 
-**New `SystemEntryCard` component** (added alongside existing `EntryCard`):
-- Accepts `PendingReconciliationItem` with the rich fields
-- Renders customer name as primary title
-- Shows badge row for branch/insurer/item
-- Shows value breakdown using `total_amount`, `paid_amount`, `remaining_amount`
-- Fallback: if `customer_name` is null, renders like the standard `EntryCard`
+**New state (after line 205):**
+```text
+const [showPartialModal, setShowPartialModal] = useState(false);
+```
 
-**Right panel render** (lines ~336-347):
-- Replace `EntryCard` with `SystemEntryCard` for system items
+**Floating Action Bar changes (lines 513-518):**
+Replace the static warning with an actionable button:
+```text
+{hasBothSides && !isPerfectMatch && (
+  <Button onClick={() => setShowPartialModal(true)}>
+    Baixa Parcial
+  </Button>
+)}
+```
 
-**`systemSum` calculation** (lines ~161-163):
-- Use `remaining_amount` (absolute value) instead of `amount` for more accurate difference calculation
+**Modal render (before closing div):**
+Render `PartialReconciliationModal` using the first selected statement and system items, passing their amounts and details.
 
-### File: `src/hooks/useReconciliation.ts`
-- No changes needed -- the `PendingReconciliationItem` interface already includes all rich fields (`total_amount`, `paid_amount`, `remaining_amount`, `customer_name`, `insurer_name`, `branch_name`, `item_name`) and the mapping logic is already in place.
+**onConfirm handler:**
+Calls `reconcilePartial.mutateAsync({ statementEntryId, systemTransactionId, amountToReconcile, targetBankId: bankAccountId })`, then clears selection.
 
-### File: `src/components/financeiro/conciliacao/SystemTransactionList.tsx`
-- No changes needed -- the "Sem Banco" badge is already implemented here from Prompt 19.
-
-## No Database Changes
-The `get_transactions_for_reconciliation` RPC has already been updated with the JOINs and new columns as specified.
+## User Flow
+1. User selects a statement entry (R$ 200) and a system commission (R$ 1.000, Faltante R$ 500)
+2. Floating bar shows "Baixa Parcial" button instead of just "Valores nao batem"
+3. User clicks it -- modal opens pre-filled with R$ 200
+4. Modal shows: Novo Saldo Devedor = R$ 300
+5. User confirms -- RPC executes, commission becomes "Partial" with R$ 300 remaining
