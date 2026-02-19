@@ -421,13 +421,13 @@ export async function getFinancialSummary(params: {
   const raw = data as any || {};
 
   console.log('[getFinancialSummary] RAW response:', JSON.stringify(raw).substring(0, 500));
-  
+
   const parseSummary = (obj: any): FinancialSummary => {
     if (!obj) return { totalIncome: 0, totalExpense: 0, netResult: 0, pendingIncome: 0, pendingExpense: 0, transactionCount: 0, cashBalance: 0, operationalPendingIncome: 0, operationalPendingExpense: 0, globalPendingIncome: 0, globalPendingExpense: 0 };
-    
+
     // Support both camelCase and snake_case keys from RPC
     const get = (camel: string, snake: string) => Number(obj[camel] ?? obj[snake]) || 0;
-    
+
     return {
       totalIncome: get('totalIncome', 'total_income'),
       totalExpense: get('totalExpense', 'total_expense'),

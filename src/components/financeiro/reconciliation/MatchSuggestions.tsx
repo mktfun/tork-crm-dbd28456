@@ -90,8 +90,8 @@ export function MatchSuggestions({ suggestions, onClose, onApplied }: MatchSugge
                             <AppCard
                                 key={idx}
                                 className={`p-4 cursor-pointer transition-all ${selectedSuggestions.has(idx)
-                                        ? 'ring-2 ring-primary bg-primary/5'
-                                        : 'hover:bg-muted/50'
+                                    ? 'ring-2 ring-primary bg-primary/5'
+                                    : 'hover:bg-muted/50'
                                     }`}
                                 onClick={() => toggleSuggestion(idx)}
                             >
