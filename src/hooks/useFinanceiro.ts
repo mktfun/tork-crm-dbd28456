@@ -781,7 +781,7 @@ export function useGoalVsActual(
 
       const goal = Number(result.goal_amount || 0);
       const actual = Number(result.actual_amount || 0);
-      const percentage = Number(result.progress || 0);
+      const percentage = Number(result.pct ?? result.progress ?? 0);
       const diff = actual - goal;
 
       let status: 'achieved' | 'near' | 'below' = 'below';
