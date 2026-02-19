@@ -29,6 +29,7 @@ import { useFinancialAccounts } from '@/hooks/useFinanceiro';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
+import { PartialReconciliationModal } from './PartialReconciliationModal';
 
 interface ReconciliationWorkbenchProps {
     bankAccountId: string;
@@ -203,6 +204,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
     const [createCategoryId, setCreateCategoryId] = useState('');
     const [bankSearch, setBankSearch] = useState('');
     const [systemSearch, setSystemSearch] = useState('');
+    const [showPartialModal, setShowPartialModal] = useState(false);
 
     // Data
     const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined;
@@ -270,6 +272,11 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
     // Reconcile handler (1:1 or N:M via multiple calls)
     // Uses reconcile_transaction_partial with targetBankId for bank auto-linking
     const handleReconcile = async () => {
+        // If mismatch detected, open partial modal instead
+        if (!isPerfectMatch && hasBothSides) {
+            setShowPartialModal(true);
+            return;
+        }
         if (selectedStatementIds.length === 1 && selectedSystemIds.length === 1) {
             await reconcilePartial.mutateAsync({
                 statementEntryId: selectedStatementIds[0],
@@ -289,6 +296,19 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
                 }
             }
         }
+        setSelectedStatementIds([]);
+        setSelectedSystemIds([]);
+    };
+
+    const handlePartialReconcile = async (amount: number) => {
+        if (selectedStatementIds.length < 1 || selectedSystemIds.length < 1) return;
+        await reconcilePartial.mutateAsync({
+            statementEntryId: selectedStatementIds[0],
+            systemTransactionId: selectedSystemIds[0],
+            amountToReconcile: amount,
+            targetBankId: bankAccountId,
+        });
+        setShowPartialModal(false);
         setSelectedStatementIds([]);
         setSelectedSystemIds([]);
     };
@@ -511,10 +531,14 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
                             )}
 
                             {hasBothSides && !isPerfectMatch && (
-                                <div className="flex items-center gap-2 text-sm text-red-400">
+                                <Button
+                                    size="sm"
+                                    className="gap-2 font-semibold bg-amber-600 hover:bg-amber-700 text-white"
+                                    onClick={() => setShowPartialModal(true)}
+                                >
                                     <AlertTriangle className="w-4 h-4" />
-                                    <span>Valores não batem</span>
-                                </div>
+                                    Baixa Parcial
+                                </Button>
                             )}
 
                             {isMissingTransaction && (
@@ -611,6 +635,26 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Partial Reconciliation Modal */}
+            <PartialReconciliationModal
+                isOpen={showPartialModal}
+                onClose={() => setShowPartialModal(false)}
+                onConfirm={handlePartialReconcile}
+                isLoading={reconcilePartial.isPending}
+                statementItem={{
+                    description: (statementItems.find(i => i.id === selectedStatementIds[0]))?.description || '',
+                    amount: (statementItems.find(i => i.id === selectedStatementIds[0]))?.amount || 0,
+                    date: (statementItems.find(i => i.id === selectedStatementIds[0]))?.transaction_date || '',
+                }}
+                systemItem={{
+                    description: (systemItems.find(i => i.id === selectedSystemIds[0]))?.description || '',
+                    totalAmount: Math.abs((systemItems.find(i => i.id === selectedSystemIds[0]))?.total_amount ?? 0),
+                    paidAmount: Math.abs((systemItems.find(i => i.id === selectedSystemIds[0]))?.paid_amount ?? 0),
+                    remainingAmount: Math.abs((systemItems.find(i => i.id === selectedSystemIds[0]))?.remaining_amount ?? 0),
+                    customerName: (systemItems.find(i => i.id === selectedSystemIds[0]))?.customer_name || undefined,
+                }}
+            />
         </div>
     );
 }
