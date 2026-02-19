@@ -1,69 +1,92 @@
 
 
-# Fix Settings (Chart of Accounts) + Reconciliation Sign Bug
+# Fix Reconciliation Sign Mismatch (Final Resolution)
 
-## Two Issues
+## Root Cause
 
-### Issue 1: ConfiguracoesTab -- "Contas Bancarias" showing ledger accounts instead of real banks
+The frontend hook `usePendingReconciliation` (lines 144-159 of `useReconciliation.ts`) already has correct sign-forcing logic:
 
-**Problem:** The left column in "Plano de Contas" tab uses `AccountListSection` with `assetAccounts` (from `financial_accounts` table), showing ledger entries like "Contas a Receber" instead of real bank accounts (Itau, Nubank, etc.).
+```
+const itemType = item.type || (item.amount < 0 ? 'expense' : 'revenue');
+const signedAmount = (itemType === 'expense') ? -Math.abs(item.amount) : Math.abs(item.amount);
+```
 
-**Fix:** Replace the `AccountListSection` for "Contas Bancarias" with the already-imported-but-unused `BankAccountsSection` component, which correctly queries the `bank_accounts` table.
+**However**, the RPC `get_transactions_for_reconciliation` does NOT return a `type` column. Since `item.type` is always `undefined` and the amount is stored as a positive magnitude, the fallback `item.amount < 0 ? 'expense' : 'revenue'` always evaluates to `'revenue'`. This is why every transaction appears green/positive.
 
-Additionally, add a "Restaurar Padroes" button next to the Categories section that seeds standard categories if missing.
+## Solution
 
-### Issue 2: Reconciliation sign mismatch -- expenses appear as positive on system side
+### Step 1: Database Migration -- Update the RPC
 
-**Problem:** As shown in the screenshot, bank side shows `-R$ 150,00` for an expense but system side shows `+R$ 150,00`. The `usePendingReconciliation` hook maps system items with raw `item.amount` (which is stored as a positive magnitude for expenses). This causes a `R$ 300` mismatch instead of `R$ 0`.
+Replace `get_transactions_for_reconciliation` with a version that joins `financial_ledger` and `financial_accounts` to determine the actual transaction type (`expense` or `revenue`).
 
-**Fix:** In the system items mapping, force negative sign when `type === 'expense'`.
+```sql
+CREATE OR REPLACE FUNCTION get_transactions_for_reconciliation(p_bank_account_id UUID)
+RETURNS TABLE (
+    id UUID,
+    transaction_date DATE,
+    description TEXT,
+    amount NUMERIC,
+    type TEXT,
+    status TEXT
+) 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id uuid;
+BEGIN
+  v_user_id := auth.uid();
 
----
+  RETURN QUERY
+  SELECT
+      ft.id,
+      ft.transaction_date,
+      ft.description,
+      ABS(fl.amount) as amount,
+      fa.type::TEXT as type,
+      ft.status
+  FROM financial_transactions ft
+  JOIN financial_ledger fl ON ft.id = fl.transaction_id
+  JOIN financial_accounts fa ON fl.account_id = fa.id
+  WHERE
+      fa.type IN ('expense', 'revenue')
+      AND ft.user_id = v_user_id
+      AND NOT COALESCE(ft.is_void, FALSE)
+      AND (ft.reconciled = false OR ft.reconciled IS NULL)
+      AND EXISTS (
+          SELECT 1 FROM financial_ledger fl2
+          JOIN financial_accounts fa2 ON fl2.account_id = fa2.id
+          WHERE fl2.transaction_id = ft.id
+            AND fa2.type = 'asset'
+      )
+  ORDER BY ft.transaction_date DESC;
+END;
+$$;
+```
 
-## Changes
+Key differences from the old RPC:
+- Returns a `type` column (`'expense'` or `'revenue'`) derived from `financial_accounts.type`
+- Returns a `status` column
+- Joins through `financial_ledger` to `financial_accounts` to get the actual account type
+- Filters to only expense/revenue legs (not asset/liability legs)
+- Keeps `SECURITY DEFINER` and `user_id` check for RLS
 
-### 1. `src/components/financeiro/ConfiguracoesTab.tsx`
+### Step 2: No Frontend Changes Needed
 
-**Left column fix (lines 448-458):**
-- Replace `AccountListSection` for "Contas Bancarias" with `<BankAccountsSection />`
-- Remove the now-unnecessary `assetAccounts` filter (but keep it for `CommissionTargetSection`)
+The existing frontend code in `useReconciliation.ts` (lines 144-159) already:
+1. Reads `item.type` from the RPC response
+2. Falls back to amount-based detection only if `type` is missing
+3. Forces negative sign for expenses via `-Math.abs(item.amount)`
 
-**Right column enhancement (lines 460-469):**
-- Add a "Restaurar Padroes" button next to "Adicionar" in the Categories section header
-- The button calls a function that checks for standard category names and creates any that are missing using `createAccount` from `financialService`
-- Standard categories to seed:
-  - Expense: "Despesas Administrativas", "Marketing", "Pessoal", "Impostos e Taxas"
-  - Revenue: "Receita de Vendas", "Receita de Servicos", "Comissoes"
+The `ReconciliationWorkbench.tsx` `EntryCard` (line 49) uses `item.amount >= 0` for color logic, which will work correctly once expenses have negative amounts.
 
-### 2. `src/hooks/useReconciliation.ts` (line 144-154)
+### Summary
 
-**Fix system items amount sign:**
-- Change the amount mapping from `amount: item.amount` to:
-  ```
-  amount: (item.type === 'expense' || item.type === 'despesa')
-    ? -Math.abs(item.amount)
-    : Math.abs(item.amount)
-  ```
-- This ensures expenses are negative (matching bank statement convention) and revenues are positive
+| Component | Change |
+|-----------|--------|
+| RPC `get_transactions_for_reconciliation` | Database migration: add `type` and `status` columns to return table |
+| `useReconciliation.ts` | No change (already handles `type` correctly) |
+| `ReconciliationWorkbench.tsx` | No change (sign detection via `amount >= 0` works with signed data) |
 
-### 3. `src/components/financeiro/reconciliation/ReconciliationWorkbench.tsx` (line 49)
-
-**Fix EntryCard sign detection:**
-- Currently uses `item.amount >= 0` to determine revenue/expense visuals
-- After the sign fix, this will work correctly since expenses will now be negative
-
-### 4. `src/components/financeiro/conciliacao/SystemTransactionList.tsx`
-
-**No changes needed** -- it already handles sign display correctly via `isExpense` check on `transaction.type` and applies manual `-`/`+` prefixes with `Math.abs`. After the hook fix, `transaction.amount` will be signed, so the `Math.abs` in `formatCurrency` will still work correctly for display.
-
----
-
-## Technical Summary
-
-| File | Change |
-|------|--------|
-| `ConfiguracoesTab.tsx` | Replace left column with `BankAccountsSection`; add "Restaurar Padroes" button for categories |
-| `useReconciliation.ts` | Force signed amounts in `usePendingReconciliation` system items mapping |
-| `ReconciliationWorkbench.tsx` | No change needed (sign detection already uses `amount >= 0`) |
-| `SystemTransactionList.tsx` | No change needed (already uses type-based detection) |
-
+This is a **database-only fix**. One migration, zero code changes.
