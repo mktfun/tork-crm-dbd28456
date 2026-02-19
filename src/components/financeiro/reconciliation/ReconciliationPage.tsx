@@ -231,6 +231,8 @@ export function ReconciliationPage() {
     const [selectedBankForBinding, setSelectedBankForBinding] = useState<string>('');
     const [showMatchReview, setShowMatchReview] = useState(false);
     const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+    const [showBankSelectForWorkbench, setShowBankSelectForWorkbench] = useState(false);
+    const [pendingWorkbenchBankId, setPendingWorkbenchBankId] = useState<string>('');
     const isConsolidated = !selectedBankAccountId || selectedBankAccountId === 'all';
 
     // Queries
@@ -551,7 +553,15 @@ export function ReconciliationPage() {
 
             {/* View Mode Tabs */}
             <div className="flex items-center gap-2">
-                <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'lista' | 'workbench' | 'historico')} className="w-auto">
+                <Tabs value={viewMode} onValueChange={(v) => {
+                    const newMode = v as 'lista' | 'workbench' | 'historico';
+                    if (newMode === 'workbench' && isConsolidated) {
+                        setPendingWorkbenchBankId('');
+                        setShowBankSelectForWorkbench(true);
+                        return;
+                    }
+                    setViewMode(newMode);
+                }} className="w-auto">
                     <TabsList className="h-9">
                         <TabsTrigger value="lista" className="text-sm px-4 h-7 gap-1.5">
                             <CalendarIcon className="w-3.5 h-3.5" />
@@ -560,7 +570,6 @@ export function ReconciliationPage() {
                         <TabsTrigger
                             value="workbench"
                             className="text-sm px-4 h-7 gap-1.5"
-                            disabled={isConsolidated}
                         >
                             <GitCompare className="w-3.5 h-3.5" />
                             Workbench
@@ -571,9 +580,6 @@ export function ReconciliationPage() {
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>
-                {isConsolidated && viewMode === 'lista' && (
-                    <span className="text-xs text-muted-foreground">Selecione um banco para usar o Workbench</span>
-                )}
                 {!isConsolidated && matchSuggestions.length > 0 && (
                     <Button
                         variant="outline"
@@ -679,6 +685,21 @@ export function ReconciliationPage() {
                     bankAccountId={selectedBankAccountId}
                     dateRange={dateRange}
                 />
+            ) : viewMode === 'workbench' && isConsolidated ? (
+                <AppCard className="p-12 flex flex-col items-center justify-center text-center">
+                    <Landmark className="w-10 h-10 text-muted-foreground mb-3" />
+                    <p className="text-muted-foreground text-sm">Selecione um banco para iniciar a conciliação.</p>
+                    <Button
+                        className="mt-4 gap-2"
+                        onClick={() => {
+                            setPendingWorkbenchBankId('');
+                            setShowBankSelectForWorkbench(true);
+                        }}
+                    >
+                        <Landmark className="w-4 h-4" />
+                        Selecionar Banco
+                    </Button>
+                </AppCard>
             ) : (
             <>
             {/* Main Content - List View */}
@@ -1152,6 +1173,58 @@ export function ReconciliationPage() {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setSelectedBatchId(null)}>
                             Fechar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Bank Select for Workbench Dialog */}
+            <Dialog
+                open={showBankSelectForWorkbench}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setShowBankSelectForWorkbench(false);
+                        // If no bank was selected, stay on current view (don't switch to workbench)
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Landmark className="w-5 h-5 text-primary" />
+                            Selecionar Banco para Conciliação
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Selecione a conta bancária que deseja conciliar no Workbench.
+                        </p>
+                        <Select value={pendingWorkbenchBankId} onValueChange={setPendingWorkbenchBankId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione o banco..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {bankAccounts?.accounts?.map((account) => (
+                                    <SelectItem key={account.id} value={account.id}>
+                                        {account.bankName}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setShowBankSelectForWorkbench(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            disabled={!pendingWorkbenchBankId}
+                            onClick={() => {
+                                setSelectedBankAccountId(pendingWorkbenchBankId);
+                                setViewMode('workbench');
+                                setShowBankSelectForWorkbench(false);
+                            }}
+                        >
+                            Continuar
                         </Button>
                     </DialogFooter>
                 </DialogContent>
