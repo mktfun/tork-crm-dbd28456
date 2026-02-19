@@ -141,17 +141,23 @@ export function usePendingReconciliation(
 
             // Mapear Sistema (nomes simplificados)
             // Mapear Sistema (nomes simplificados)
-            const systemItems: PendingReconciliationItem[] = (systemResult.data || []).map((item: any) => ({
-                source: 'system',
-                id: item.id,
-                transaction_date: item.transaction_date,
-                description: item.description,
-                amount: item.amount,
-                reference_number: null,
-                status: 'pending', // Status visual na lista
-                matched_id: null,
-                type: item.type || (item.amount < 0 ? 'expense' : 'revenue') // Fallback if type missing
-            }));
+            const systemItems: PendingReconciliationItem[] = (systemResult.data || []).map((item: any) => {
+                const itemType = item.type || (item.amount < 0 ? 'expense' : 'revenue');
+                const signedAmount = (itemType === 'expense' || itemType === 'despesa')
+                    ? -Math.abs(item.amount)
+                    : Math.abs(item.amount);
+                return {
+                    source: 'system',
+                    id: item.id,
+                    transaction_date: item.transaction_date,
+                    description: item.description,
+                    amount: signedAmount,
+                    reference_number: null,
+                    status: 'pending',
+                    matched_id: null,
+                    type: itemType
+                };
+            });
 
             // Mapear Extrato
             const statementItems: PendingReconciliationItem[] = (statementResult.data || []).map((item: any) => ({
