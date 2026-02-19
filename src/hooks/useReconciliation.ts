@@ -108,18 +108,20 @@ export function useReconciliationDashboard() {
 export function usePendingReconciliation(
     bankAccountId: string | null,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    includeUnassigned: boolean = false
 ) {
     const { user } = useAuth();
 
     return useQuery({
-        queryKey: ['pending-reconciliation', user?.id, bankAccountId, startDate, endDate],
+        queryKey: ['pending-reconciliation', user?.id, bankAccountId, startDate, endDate, includeUnassigned],
         queryFn: async () => {
             if (!user || !bankAccountId) return { statement: [], system: [] };
 
             // 1. Buscar transações do sistema (RPC nova)
             const systemPromise = (supabase.rpc as any)('get_transactions_for_reconciliation', {
-                p_bank_account_id: bankAccountId
+                p_bank_account_id: bankAccountId,
+                p_include_unassigned: includeUnassigned
             });
 
             // 2. Buscar entradas do extrato (Tabela direta)
