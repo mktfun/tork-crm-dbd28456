@@ -317,6 +317,7 @@ export interface PaginatedStatementItem {
     reconciled: boolean;
     bank_account_id: string | null;
     total_count: number;
+    reconciled_by_name?: string | null;
 }
 
 /**

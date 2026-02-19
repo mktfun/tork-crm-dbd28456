@@ -776,9 +776,18 @@ export function ReconciliationPage() {
                                         </TableCell>
                                         <TableCell>
                                             {item.reconciled ? (
-                                                <Badge variant="secondary" className="text-xs">
-                                                    Conciliado
-                                                </Badge>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Badge variant="secondary" className="text-xs cursor-help">
+                                                                Conciliado
+                                                            </Badge>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>Conciliado por: {item.reconciled_by_name || 'Desconhecido'}</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
                                             ) : (
                                                 <Badge variant="outline" className="text-xs">
                                                     Pendente
