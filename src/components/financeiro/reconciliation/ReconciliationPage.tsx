@@ -233,6 +233,10 @@ export function ReconciliationPage() {
     const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
     const [showBankSelectForWorkbench, setShowBankSelectForWorkbench] = useState(false);
     const [pendingWorkbenchBankId, setPendingWorkbenchBankId] = useState<string>('');
+    
+    // Target Linking Mode: target bank for linking without changing view filter
+    const [targetLinkingBankId, setTargetLinkingBankId] = useState<string | null>(null);
+    
     const isConsolidated = !selectedBankAccountId || selectedBankAccountId === 'all';
 
     // Queries
@@ -555,11 +559,13 @@ export function ReconciliationPage() {
             <div className="flex items-center gap-2">
                 <Tabs value={viewMode} onValueChange={(v) => {
                     const newMode = v as 'lista' | 'workbench' | 'historico';
-                    if (newMode === 'workbench' && isConsolidated) {
+                    if (newMode === 'workbench') {
+                        // Always show bank select modal for workbench to pick target bank
                         setPendingWorkbenchBankId('');
                         setShowBankSelectForWorkbench(true);
                         return;
                     }
+                    setTargetLinkingBankId(null);
                     setViewMode(newMode);
                 }} className="w-auto">
                     <TabsList className="h-9">
@@ -680,12 +686,22 @@ export function ReconciliationPage() {
                         </div>
                     )}
                 </AppCard>
-            ) : viewMode === 'workbench' && selectedBankAccountId && !isConsolidated ? (
+            ) : viewMode === 'workbench' && (targetLinkingBankId || (selectedBankAccountId && !isConsolidated)) ? (
                 <ReconciliationWorkbench
-                    bankAccountId={selectedBankAccountId}
+                    bankAccountId={targetLinkingBankId || selectedBankAccountId!}
                     dateRange={dateRange}
+                    targetLinkingBankId={targetLinkingBankId || undefined}
+                    targetLinkingBankName={
+                        targetLinkingBankId
+                            ? bankAccounts?.accounts?.find(a => a.id === targetLinkingBankId)?.bankName
+                            : undefined
+                    }
+                    onChangeTargetBank={() => {
+                        setPendingWorkbenchBankId('');
+                        setShowBankSelectForWorkbench(true);
+                    }}
                 />
-            ) : viewMode === 'workbench' && isConsolidated ? (
+            ) : viewMode === 'workbench' ? (
                 <AppCard className="p-12 flex flex-col items-center justify-center text-center">
                     <Landmark className="w-10 h-10 text-muted-foreground mb-3" />
                     <p className="text-muted-foreground text-sm">Selecione um banco para iniciar a conciliação.</p>
@@ -1192,12 +1208,12 @@ export function ReconciliationPage() {
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Landmark className="w-5 h-5 text-primary" />
-                            Selecionar Banco para Conciliação
+                            Para qual banco deseja vincular?
                         </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <p className="text-sm text-muted-foreground">
-                            Selecione a conta bancária que deseja conciliar no Workbench.
+                            Selecione o banco de destino. Os itens sem banco serão vinculados a ele ao conciliar.
                         </p>
                         <Select value={pendingWorkbenchBankId} onValueChange={setPendingWorkbenchBankId}>
                             <SelectTrigger>
@@ -1219,7 +1235,8 @@ export function ReconciliationPage() {
                         <Button
                             disabled={!pendingWorkbenchBankId}
                             onClick={() => {
-                                setSelectedBankAccountId(pendingWorkbenchBankId);
+                                // Set target linking bank WITHOUT changing the view filter
+                                setTargetLinkingBankId(pendingWorkbenchBankId);
                                 setViewMode('workbench');
                                 setShowBankSelectForWorkbench(false);
                             }}
