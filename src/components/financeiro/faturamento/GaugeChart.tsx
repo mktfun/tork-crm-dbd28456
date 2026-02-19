@@ -1,55 +1,44 @@
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
 
 interface GaugeChartProps {
   percentage: number;
-  size?: number;
 }
 
-export function GaugeChart({ percentage, size = 200 }: GaugeChartProps) {
-  const [animatedValue, setAnimatedValue] = useState(0);
-  const clampedPercent = Math.min(animatedValue, 100);
-
-  useEffect(() => {
-    // Small delay then animate
-    const timer = setTimeout(() => setAnimatedValue(Math.min(percentage, 100)), 100);
-    return () => clearTimeout(timer);
-  }, [percentage]);
+export function GaugeChart({ percentage }: GaugeChartProps) {
+  const clamped = Math.min(percentage, 100);
 
   const getColor = (val: number) => {
-    if (val >= 90) return 'hsl(152, 69%, 41%)'; // emerald
-    if (val >= 50) return 'hsl(38, 92%, 50%)';  // amber
-    return 'hsl(0, 84%, 60%)';                   // red
+    if (val >= 90) return 'hsl(152, 69%, 41%)';
+    if (val >= 50) return 'hsl(38, 92%, 50%)';
+    return 'hsl(0, 84%, 60%)';
   };
 
   const color = getColor(percentage);
   const isAchieved = percentage >= 100;
 
-  // Data for the filled arc
-  const filledAngle = 180 * (clampedPercent / 100);
-  const bgData = [{ value: 1 }];
-  const fillData = [{ value: clampedPercent }, { value: 100 - clampedPercent }];
+  const endAngle = 180 - (180 * (clamped / 100));
+  const fillData = [{ value: clamped }, { value: 100 - clamped }];
 
   return (
-    <div className="relative flex justify-center items-end" style={{ height: size }}>
+    <div className="relative h-[180px] w-full flex justify-center items-end -mt-4 pb-0">
       <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
+        <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
           {/* Background track */}
           <Pie
-            data={bgData}
+            data={[{ value: 100 }]}
             dataKey="value"
             cx="50%"
             cy="100%"
             startAngle={180}
             endAngle={0}
-            innerRadius="65%"
-            outerRadius="90%"
+            innerRadius="60%"
+            outerRadius="100%"
             fill="hsl(var(--muted))"
             stroke="none"
             isAnimationActive={false}
           />
-          {/* Filled arc */}
+          {/* Filled indicator */}
           <Pie
             data={fillData}
             dataKey="value"
@@ -57,8 +46,8 @@ export function GaugeChart({ percentage, size = 200 }: GaugeChartProps) {
             cy="100%"
             startAngle={180}
             endAngle={0}
-            innerRadius="65%"
-            outerRadius="90%"
+            innerRadius="60%"
+            outerRadius="100%"
             cornerRadius={6}
             stroke="none"
             isAnimationActive={true}
@@ -72,23 +61,32 @@ export function GaugeChart({ percentage, size = 200 }: GaugeChartProps) {
         </PieChart>
       </ResponsiveContainer>
 
-      {/* Center value */}
+      {/* Center value overlay */}
       <motion.div
-        className="absolute bottom-2 text-center"
+        className="absolute bottom-2 flex flex-col items-center"
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.3, duration: 0.5 }}
       >
         <span
-          className="text-4xl font-bold"
-          style={isAchieved ? { color, textShadow: `0 0 20px ${color}` } : { color: 'hsl(var(--foreground))' }}
+          className="text-4xl font-bold tracking-tighter"
+          style={isAchieved
+            ? { color, textShadow: `0 0 20px ${color}` }
+            : { color: 'hsl(var(--foreground))' }
+          }
         >
           {Math.round(percentage)}%
         </span>
-        <p className="text-xs text-muted-foreground">do objetivo</p>
+        {isAchieved ? (
+          <span className="text-xs font-medium text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full mt-1">
+            Meta Batida! 🚀
+          </span>
+        ) : (
+          <p className="text-xs text-muted-foreground">do objetivo</p>
+        )}
       </motion.div>
 
-      {/* Glow effect when achieved */}
+      {/* Glow pulse when achieved */}
       {isAchieved && (
         <div
           className="absolute bottom-0 left-1/2 -translate-x-1/2 w-32 h-16 rounded-full blur-2xl opacity-30 animate-pulse"
