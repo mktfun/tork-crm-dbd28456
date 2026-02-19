@@ -1,99 +1,56 @@
 
-# Prompt 22: Universal Partial Reconciliation (Baixa Parcial)
+# Fix: Decouple View Filter from Target Bank in Workbench
 
-## Summary
-Create a Partial Reconciliation Modal that opens automatically when the user tries to match items with different amounts in the Workbench. The backend RPC already supports this -- this is a frontend-only change.
+## Problem
+When the user selects a target bank in the Workbench modal, the system passes that bank ID as both the **view filter** and the **linking target**. This causes the data to be filtered to only show that bank's items, hiding all the "Sem Banco" (unassigned) items the user actually wants to work with.
+
+## Root Cause
+In `ReconciliationPage.tsx` (line 691), the Workbench receives `bankAccountId={targetLinkingBankId || selectedBankAccountId!}`. This means when `targetLinkingBankId` is set, the Workbench fetches data filtered by that bank instead of showing the consolidated view.
 
 ## Changes
 
-### 1. New file: `src/components/financeiro/reconciliation/PartialReconciliationModal.tsx`
+### 1. ReconciliationPage.tsx -- Fix the Workbench props (line 689-703)
 
-A self-contained modal component with these props:
-- `isOpen`, `onClose`, `onConfirm(amount: number)`
-- `statementItem: { description, amount, date }`
-- `systemItem: { description, totalAmount, paidAmount, remainingAmount, customerName }`
-
-**UI Layout:**
-- **Header**: "Baixa Parcial" with AlertTriangle icon
-- **System Item Section**: Customer name (or description fallback), value breakdown (Cheio / Baixado / Faltante)
-- **Statement Item Section**: Description, amount, date
-- **Input Field**: "Valor a Conciliar" -- defaults to `Math.abs(statementItem.amount)`, editable
-- **Live Calculation**: "Novo Saldo Devedor" = `remainingAmount - inputValue`
-- **Validation**: If input > remaining, show red warning and disable confirm button
-- **Buttons**: "Cancelar" (outline) and "Confirmar Baixa Parcial" (primary)
-
-### 2. Update `ReconciliationWorkbench.tsx`
-
-**New state:**
-- `showPartialModal: boolean`
-- `partialStatementItem / partialSystemItem` to hold the selected items for the modal
-
-**Replace the "Valores nao batem" block (lines 513-518):**
-- Instead of just showing a warning, render a "Baixa Parcial" button that opens the modal
-- The button will be styled with an amber/warning color
-
-**New handler `handlePartialReconcile(amount: number)`:**
-- Calls `reconcilePartial.mutateAsync` with `amountToReconcile: amount` and `targetBankId: bankAccountId`
-- Clears selection and closes modal on success
-
-**Also update `handleReconcile` (lines 272-294):**
-- Add mismatch detection: if `!isPerfectMatch && hasBothSides`, open the partial modal instead of reconciling directly
-- This covers the case where user clicks "Conciliar" with mismatched amounts
-
-### 3. No hook changes needed
-The `useReconcilePartial` hook (line 662) already accepts `amountToReconcile` and `targetBankId`.
-
-### 4. No database changes needed
-The `reconcile_transaction_partial` RPC already handles partial amounts and bank linking.
-
-## Technical Details
-
-### File: `src/components/financeiro/reconciliation/PartialReconciliationModal.tsx` (NEW)
-
+**Current (broken):**
 ```text
-Props interface:
-  isOpen: boolean
-  onClose: () => void
-  onConfirm: (amount: number) => void
-  statementItem: { description: string, amount: number, date: string }
-  systemItem: { 
-    description: string, 
-    totalAmount: number, 
-    paidAmount: number, 
-    remainingAmount: number, 
-    customerName?: string 
-  }
-  isLoading?: boolean
+bankAccountId={targetLinkingBankId || selectedBankAccountId!}
 ```
 
-Uses existing Dialog, Input, Button, Badge components. Input is a controlled number field with `formatCurrency` for display values.
+**Fixed:**
+- When `targetLinkingBankId` is set (Linking Mode): pass `bankAccountId=""` or `null` equivalent so the hook fetches ALL items (consolidated), while still passing `targetLinkingBankId` separately for the RPC actions.
+- When `selectedBankAccountId` is set (filtered mode): pass `bankAccountId={selectedBankAccountId}` as before.
 
-### File: `src/components/financeiro/reconciliation/ReconciliationWorkbench.tsx`
+The condition on line 689 also needs updating: the Workbench should render when `targetLinkingBankId` is set OR when a specific bank is selected. When `targetLinkingBankId` is set, the `bankAccountId` prop should be empty/null to trigger consolidated fetching.
 
-**New state (after line 205):**
+### 2. ReconciliationWorkbench.tsx -- Handle null/empty bankAccountId for consolidated view
+
+**Line 220:**
 ```text
-const [showPartialModal, setShowPartialModal] = useState(false);
+const { data: pendingData, isLoading } = usePendingReconciliation(
+    bankAccountId, startDate, endDate, showUnassigned || !!targetLinkingBankId
+);
 ```
 
-**Floating Action Bar changes (lines 513-518):**
-Replace the static warning with an actionable button:
+When `bankAccountId` is empty/null (linking mode), the hook should fetch consolidated data (all unassigned items). The `effectiveBankId` (line 219) remains `targetLinkingBankId || bankAccountId` and is used only for the reconciliation RPC calls, not for data fetching.
+
+### 3. ReconciliationWorkbench.tsx -- Allow empty bankAccountId in props
+
+Update the `bankAccountId` prop type to accept empty string or make it optional, so the component can operate in "consolidated + linking" mode.
+
+## Summary of Data Flow After Fix
+
 ```text
-{hasBothSides && !isPerfectMatch && (
-  <Button onClick={() => setShowPartialModal(true)}>
-    Baixa Parcial
-  </Button>
-)}
+Linking Mode:
+  bankAccountId = "" (fetch ALL/consolidated)
+  targetLinkingBankId = "itau-id" (used only in reconcile RPC)
+  showUnassigned = true (automatic)
+
+Filtered Mode (direct bank selection):
+  bankAccountId = "santander-id" (fetch filtered)
+  targetLinkingBankId = undefined
+  showUnassigned = toggle-controlled
 ```
 
-**Modal render (before closing div):**
-Render `PartialReconciliationModal` using the first selected statement and system items, passing their amounts and details.
-
-**onConfirm handler:**
-Calls `reconcilePartial.mutateAsync({ statementEntryId, systemTransactionId, amountToReconcile, targetBankId: bankAccountId })`, then clears selection.
-
-## User Flow
-1. User selects a statement entry (R$ 200) and a system commission (R$ 1.000, Faltante R$ 500)
-2. Floating bar shows "Baixa Parcial" button instead of just "Valores nao batem"
-3. User clicks it -- modal opens pre-filled with R$ 200
-4. Modal shows: Novo Saldo Devedor = R$ 300
-5. User confirms -- RPC executes, commission becomes "Partial" with R$ 300 remaining
+## Files Modified
+- `src/components/financeiro/reconciliation/ReconciliationPage.tsx` -- Fix Workbench props to pass empty bankAccountId in linking mode
+- `src/components/financeiro/reconciliation/ReconciliationWorkbench.tsx` -- Ensure effectiveBankId is only used for RPC actions, not for data fetching filter
