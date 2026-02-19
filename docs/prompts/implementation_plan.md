@@ -81,6 +81,7 @@ The user reported critical bugs:
 - **[READY]** **Prompt 19**: Frontend Import Flow (No Bank Select).
 - **[READY]** **Prompt 20**: Unlock Workbench & Force Bank Selection Modal.
 - **[READY]** **Prompt 21**: Workbench UI (Tripod Layout, Rich Cards, Filter Logic).
+- **[READY]** **Prompt 22**: Universal Partial Reconciliation Modal (Detects mismatch, shows modal, calls partial RPC).
 
 ## Verification Plan
 
