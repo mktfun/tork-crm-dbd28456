@@ -3959,7 +3959,7 @@ export type Database = {
       }
       import_bank_statement_batch: {
         Args: {
-          p_bank_account_id: string
+          p_bank_account_id?: string
           p_entries: Json
           p_file_name: string
           p_total_amount: number
@@ -4013,14 +4013,24 @@ export type Database = {
         }[]
       }
       promote_user_to_admin: { Args: { user_email: string }; Returns: boolean }
-      reconcile_transaction_partial: {
-        Args: {
-          p_amount_to_reconcile?: number
-          p_statement_entry_id: string
-          p_system_transaction_id: string
-        }
-        Returns: Json
-      }
+      reconcile_transaction_partial:
+        | {
+            Args: {
+              p_amount_to_reconcile?: number
+              p_statement_entry_id: string
+              p_system_transaction_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_amount_to_reconcile?: number
+              p_statement_entry_id: string
+              p_system_transaction_id: string
+              p_target_bank_id?: string
+            }
+            Returns: Json
+          }
       reconcile_transactions: {
         Args: { p_statement_entry_id: string; p_system_transaction_id: string }
         Returns: Json

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import {
     ArrowUpRight, ArrowDownRight, CheckCircle2, AlertTriangle,
-    Plus, X, Zap, Wand2, Loader2, Search
+    Plus, X, Zap, Wand2, Loader2, Search, Unlink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,7 @@ import {
 import {
     usePendingReconciliation,
     useReconcileManual,
+    useReconcilePartial,
     useMatchSuggestions,
     useCreateFromStatement,
     type PendingReconciliationItem,
@@ -40,11 +41,13 @@ function EntryCard({
     selected,
     suggested,
     onClick,
+    isUnassigned,
 }: {
     item: PendingReconciliationItem;
     selected: boolean;
     suggested: boolean;
     onClick: () => void;
+    isUnassigned?: boolean;
 }) {
     const isRevenue = item.amount >= 0;
 
@@ -63,7 +66,15 @@ function EntryCard({
         >
             <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground truncate">{item.description}</p>
+                    <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-foreground truncate">{item.description}</p>
+                        {isUnassigned && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-500/30 text-amber-500 shrink-0">
+                                <Unlink className="w-2.5 h-2.5 mr-0.5" />
+                                Sem Banco
+                            </Badge>
+                        )}
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-muted-foreground">
                             {format(new Date(item.transaction_date), 'dd/MM/yyyy')}
@@ -109,6 +120,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
     const { data: accounts } = useFinancialAccounts();
 
     const reconcileManual = useReconcileManual();
+    const reconcilePartial = useReconcilePartial();
     const createFromStatement = useCreateFromStatement();
 
     const statementItems = pendingData?.statement || [];
@@ -159,22 +171,22 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
     const isMissingTransaction = hasLeftSelection && !hasRightSelection;
 
     // Reconcile handler (1:1 or N:M via multiple calls)
+    // Uses reconcile_transaction_partial with targetBankId for bank auto-linking
     const handleReconcile = async () => {
-        // For each statement entry, pair with a system entry
-        // Simple approach: pair them in order, or if 1:1 just pair directly
         if (selectedStatementIds.length === 1 && selectedSystemIds.length === 1) {
-            await reconcileManual.mutateAsync({
+            await reconcilePartial.mutateAsync({
                 statementEntryId: selectedStatementIds[0],
                 systemTransactionId: selectedSystemIds[0],
+                targetBankId: bankAccountId,
             });
         } else {
-            // N:M - pair each statement with first system (or iterate)
             for (const stmtId of selectedStatementIds) {
                 for (const sysId of selectedSystemIds) {
                     try {
-                        await reconcileManual.mutateAsync({
+                        await reconcilePartial.mutateAsync({
                             statementEntryId: stmtId,
                             systemTransactionId: sysId,
+                            targetBankId: bankAccountId,
                         });
                     } catch { /* skip duplicates */ }
                 }
@@ -285,6 +297,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
                                             selected={selectedStatementIds.includes(item.id)}
                                             suggested={suggestedStatementIds.has(item.id)}
                                             onClick={() => toggleStatement(item.id)}
+                                            isUnassigned={!item.bank_account_id}
                                         />
                                     ))
                                 )}
@@ -327,6 +340,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
                                             selected={selectedSystemIds.includes(item.id)}
                                             suggested={suggestedSystemIds.has(item.id)}
                                             onClick={() => toggleSystem(item.id)}
+                                            isUnassigned={!item.bank_account_id}
                                         />
                                     ))
                                 )}
@@ -384,9 +398,9 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
                                     size="sm"
                                     className="gap-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
                                     onClick={handleReconcile}
-                                    disabled={reconcileManual.isPending}
+                                    disabled={reconcilePartial.isPending}
                                 >
-                                    {reconcileManual.isPending ? (
+                                    {reconcilePartial.isPending ? (
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                     ) : (
                                         <CheckCircle2 className="w-4 h-4" />

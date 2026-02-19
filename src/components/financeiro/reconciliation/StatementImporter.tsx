@@ -14,7 +14,7 @@ import { formatCurrency } from '@/utils/formatCurrency';
 import { cn } from '@/lib/utils';
 
 interface StatementImporterProps {
-    bankAccountId: string;
+    bankAccountId?: string | null;
     onClose: () => void;
     onSuccess: () => void;
 }
@@ -243,7 +243,7 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
                 .from('bank_import_history')
                 .insert({
                     id: batchId,
-                    bank_account_id: bankAccountId,
+                    bank_account_id: bankAccountId || null,
                     imported_by: user.id,
                     auditor_name: auditorName.trim(),
                     file_name: uploadedFileName,
@@ -254,10 +254,10 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
 
             if (historyError) throw historyError;
 
-            // 2. Insert all entries with shared batch ID
+            // 2. Insert all entries with shared batch ID (bank_account_id can be NULL for lazy import)
             const entriesToInsert = parsedEntries.map(entry => ({
                 user_id: user.id,
-                bank_account_id: bankAccountId,
+                bank_account_id: bankAccountId || null,
                 transaction_date: entry.transaction_date,
                 description: entry.description,
                 amount: entry.amount,

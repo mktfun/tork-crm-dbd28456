@@ -985,7 +985,7 @@ export function ReconciliationPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Import Bank Selection Dialog */}
+            {/* Import Dialog - Lazy Import (No Bank Required) */}
             <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
@@ -996,54 +996,40 @@ export function ReconciliationPage() {
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <p className="text-sm text-muted-foreground">
-                            Selecione a conta bancária para importar o extrato:
+                            Importe o extrato agora. O vínculo bancário será feito no Workbench ao conciliar.
                         </p>
-                        <Select value={importBankId} onValueChange={setImportBankId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Selecione o banco..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {bankAccounts?.accounts?.map((account) => (
-                                    <SelectItem key={account.id} value={account.id}>
-                                        {account.bankName}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowImportDialog(false)}>
                             Cancelar
                         </Button>
                         <Button
-                            disabled={!importBankId}
                             onClick={() => {
                                 setShowImportDialog(false);
-                                setSelectedBankAccountId(importBankId);
                                 setShowImporter(true);
                             }}
                         >
-                            Continuar
+                            Importar Arquivo
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Modal de Importação */}
-            {showImporter && importBankId && (
+            {/* Modal de Importação (Lazy - no bank required) */}
+            {showImporter && (
                 <StatementImporter
-                    bankAccountId={importBankId}
+                    bankAccountId={null}
                     onClose={() => setShowImporter(false)}
                     onSuccess={async () => {
                         setShowImporter(false);
-                        // Redirect to that bank's view
-                        setSelectedBankAccountId(importBankId);
                         refetch();
-                        setViewMode('workbench');
-                        // Auto-check for matches after import
-                        const result = await refetchSuggestions();
-                        if (result.data && result.data.length > 0) {
-                            setShowMatchReview(true);
+                        // If a bank is selected, go to workbench
+                        if (!isConsolidated && selectedBankAccountId) {
+                            setViewMode('workbench');
+                            const result = await refetchSuggestions();
+                            if (result.data && result.data.length > 0) {
+                                setShowMatchReview(true);
+                            }
                         }
                     }}
                 />
