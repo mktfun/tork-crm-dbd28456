@@ -69,6 +69,7 @@ import {
 } from '@/hooks/useReconciliation';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { StatementImporter } from './StatementImporter';
+import { ReconciliationWorkbench } from './ReconciliationWorkbench';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 20;
@@ -211,6 +212,7 @@ export function ReconciliationPage() {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     const [showImporter, setShowImporter] = useState(false);
+    const [viewMode, setViewMode] = useState<'lista' | 'workbench'>('lista');
     const [page, setPage] = useState(1);
 
     // State for bank selection dialog (late binding)
@@ -533,7 +535,38 @@ export function ReconciliationPage() {
                 />
             </section>
 
-            {/* Main Content */}
+            {/* View Mode Tabs */}
+            <div className="flex items-center gap-2">
+                <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'lista' | 'workbench')} className="w-auto">
+                    <TabsList className="h-9">
+                        <TabsTrigger value="lista" className="text-sm px-4 h-7 gap-1.5">
+                            <CalendarIcon className="w-3.5 h-3.5" />
+                            Lista
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="workbench"
+                            className="text-sm px-4 h-7 gap-1.5"
+                            disabled={isConsolidated}
+                        >
+                            <GitCompare className="w-3.5 h-3.5" />
+                            Workbench
+                        </TabsTrigger>
+                    </TabsList>
+                </Tabs>
+                {isConsolidated && viewMode !== 'workbench' && (
+                    <span className="text-xs text-muted-foreground">Selecione um banco para usar o Workbench</span>
+                )}
+            </div>
+
+            {/* Workbench View */}
+            {viewMode === 'workbench' && selectedBankAccountId && !isConsolidated ? (
+                <ReconciliationWorkbench
+                    bankAccountId={selectedBankAccountId}
+                    dateRange={dateRange}
+                />
+            ) : (
+            <>
+            {/* Main Content - List View */}
             <AppCard className="overflow-hidden">
                 <div className="p-4 border-b bg-transparent flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -731,6 +764,8 @@ export function ReconciliationPage() {
                     </div>
                 )}
             </AppCard>
+            </>
+            )}
 
             {/* ============ FLOATING ACTION BAR ============ */}
             <AnimatePresence>

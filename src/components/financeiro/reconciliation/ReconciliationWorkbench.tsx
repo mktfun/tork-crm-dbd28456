@@ -1,0 +1,501 @@
+import { useState, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
+import {
+    ArrowUpRight, ArrowDownRight, CheckCircle2, AlertTriangle,
+    Plus, X, Zap, Wand2, Loader2, Search
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
+import {
+    ResizablePanelGroup, ResizablePanel, ResizableHandle
+} from '@/components/ui/resizable';
+import {
+    usePendingReconciliation,
+    useReconcileManual,
+    useMatchSuggestions,
+    useCreateFromStatement,
+    type PendingReconciliationItem,
+    type MatchSuggestion,
+} from '@/hooks/useReconciliation';
+import { useFinancialAccounts } from '@/hooks/useFinanceiro';
+import { formatCurrency } from '@/utils/formatCurrency';
+import { cn } from '@/lib/utils';
+import { DateRange } from 'react-day-picker';
+
+interface ReconciliationWorkbenchProps {
+    bankAccountId: string;
+    dateRange?: DateRange;
+}
+
+// Compact card for statement/system items
+function EntryCard({
+    item,
+    selected,
+    suggested,
+    onClick,
+}: {
+    item: PendingReconciliationItem;
+    selected: boolean;
+    suggested: boolean;
+    onClick: () => void;
+}) {
+    const isRevenue = item.amount >= 0;
+
+    return (
+        <button
+            onClick={onClick}
+            className={cn(
+                'w-full text-left p-3 rounded-lg border transition-all duration-150',
+                'hover:bg-secondary/50',
+                selected
+                    ? 'border-primary bg-primary/10 ring-1 ring-primary/30'
+                    : suggested
+                        ? 'border-amber-500/40 bg-amber-500/5'
+                        : 'border-border bg-card',
+            )}
+        >
+            <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate">{item.description}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-muted-foreground">
+                            {format(new Date(item.transaction_date), 'dd/MM/yyyy')}
+                        </span>
+                        {item.reference_number && (
+                            <span className="text-[10px] text-muted-foreground/70 font-mono">
+                                #{item.reference_number}
+                            </span>
+                        )}
+                        {suggested && !selected && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-500/50 text-amber-500">
+                                <Wand2 className="w-2.5 h-2.5 mr-0.5" />
+                                Match
+                            </Badge>
+                        )}
+                    </div>
+                </div>
+                <span className={cn(
+                    'text-sm font-bold shrink-0',
+                    isRevenue ? 'text-emerald-400' : 'text-red-400'
+                )}>
+                    {isRevenue ? '+' : ''}{formatCurrency(item.amount)}
+                </span>
+            </div>
+        </button>
+    );
+}
+
+export function ReconciliationWorkbench({ bankAccountId, dateRange }: ReconciliationWorkbenchProps) {
+    const [selectedStatementIds, setSelectedStatementIds] = useState<string[]>([]);
+    const [selectedSystemIds, setSelectedSystemIds] = useState<string[]>([]);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [createCategoryId, setCreateCategoryId] = useState('');
+    const [bankSearch, setBankSearch] = useState('');
+    const [systemSearch, setSystemSearch] = useState('');
+
+    // Data
+    const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined;
+    const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined;
+
+    const { data: pendingData, isLoading } = usePendingReconciliation(bankAccountId, startDate, endDate);
+    const { data: suggestions = [] } = useMatchSuggestions(bankAccountId);
+    const { data: accounts } = useFinancialAccounts();
+
+    const reconcileManual = useReconcileManual();
+    const createFromStatement = useCreateFromStatement();
+
+    const statementItems = pendingData?.statement || [];
+    const systemItems = pendingData?.system || [];
+
+    // Filter
+    const filteredStatement = useMemo(() => {
+        if (!bankSearch) return statementItems;
+        const q = bankSearch.toLowerCase();
+        return statementItems.filter(i => i.description.toLowerCase().includes(q));
+    }, [statementItems, bankSearch]);
+
+    const filteredSystem = useMemo(() => {
+        if (!systemSearch) return systemItems;
+        const q = systemSearch.toLowerCase();
+        return systemItems.filter(i => i.description.toLowerCase().includes(q));
+    }, [systemItems, systemSearch]);
+
+    // Suggested IDs sets
+    const suggestedStatementIds = useMemo(() => new Set(suggestions.map(s => s.statement_entry_id)), [suggestions]);
+    const suggestedSystemIds = useMemo(() => new Set(suggestions.map(s => s.system_transaction_id)), [suggestions]);
+
+    // Selection logic
+    const toggleStatement = useCallback((id: string) => {
+        setSelectedStatementIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    }, []);
+
+    const toggleSystem = useCallback((id: string) => {
+        setSelectedSystemIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    }, []);
+
+    // Computed sums
+    const bankSum = useMemo(() =>
+        statementItems.filter(i => selectedStatementIds.includes(i.id)).reduce((s, i) => s + i.amount, 0),
+        [statementItems, selectedStatementIds]
+    );
+
+    const systemSum = useMemo(() =>
+        systemItems.filter(i => selectedSystemIds.includes(i.id)).reduce((s, i) => s + i.amount, 0),
+        [systemItems, selectedSystemIds]
+    );
+
+    const diff = bankSum - systemSum;
+    const hasLeftSelection = selectedStatementIds.length > 0;
+    const hasRightSelection = selectedSystemIds.length > 0;
+    const hasBothSides = hasLeftSelection && hasRightSelection;
+    const isPerfectMatch = hasBothSides && Math.abs(diff) < 0.01;
+    const isMissingTransaction = hasLeftSelection && !hasRightSelection;
+
+    // Reconcile handler (1:1 or N:M via multiple calls)
+    const handleReconcile = async () => {
+        // For each statement entry, pair with a system entry
+        // Simple approach: pair them in order, or if 1:1 just pair directly
+        if (selectedStatementIds.length === 1 && selectedSystemIds.length === 1) {
+            await reconcileManual.mutateAsync({
+                statementEntryId: selectedStatementIds[0],
+                systemTransactionId: selectedSystemIds[0],
+            });
+        } else {
+            // N:M - pair each statement with first system (or iterate)
+            for (const stmtId of selectedStatementIds) {
+                for (const sysId of selectedSystemIds) {
+                    try {
+                        await reconcileManual.mutateAsync({
+                            statementEntryId: stmtId,
+                            systemTransactionId: sysId,
+                        });
+                    } catch { /* skip duplicates */ }
+                }
+            }
+        }
+        setSelectedStatementIds([]);
+        setSelectedSystemIds([]);
+    };
+
+    const handleCreateTransaction = async () => {
+        if (!createCategoryId || selectedStatementIds.length === 0) return;
+        for (const stmtId of selectedStatementIds) {
+            try {
+                await createFromStatement.mutateAsync({
+                    statementEntryId: stmtId,
+                    categoryAccountId: createCategoryId,
+                });
+            } catch { /* skip */ }
+        }
+        setShowCreateModal(false);
+        setCreateCategoryId('');
+        setSelectedStatementIds([]);
+    };
+
+    const clearSelection = () => {
+        setSelectedStatementIds([]);
+        setSelectedSystemIds([]);
+    };
+
+    // Balance bar totals (when nothing selected, show totals)
+    const bankTotal = useMemo(() => statementItems.reduce((s, i) => s + i.amount, 0), [statementItems]);
+    const systemTotal = useMemo(() => systemItems.reduce((s, i) => s + i.amount, 0), [systemItems]);
+    const displayBankSum = hasLeftSelection ? bankSum : bankTotal;
+    const displaySystemSum = hasRightSelection ? systemSum : systemTotal;
+    const displayDiff = hasLeftSelection || hasRightSelection ? diff : bankTotal - systemTotal;
+
+    return (
+        <div className="space-y-4">
+            {/* Balance Bar */}
+            <div className="grid grid-cols-3 gap-4 p-4 rounded-xl bg-muted/50 border border-border">
+                <div className="text-left">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Extrato (Banco)</span>
+                    <p className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(displayBankSum)}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {hasLeftSelection
+                            ? `${selectedStatementIds.length} selecionados`
+                            : `${statementItems.length} pendentes`
+                        }
+                    </p>
+                </div>
+                <div className="text-center">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Diferença</span>
+                    <p className={cn(
+                        'text-xl font-bold font-mono mt-0.5',
+                        Math.abs(displayDiff) < 0.01 ? 'text-emerald-400' : 'text-red-400'
+                    )}>
+                        {formatCurrency(displayDiff)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        {Math.abs(displayDiff) < 0.01 ? 'Equilibrado ✓' : 'Divergente'}
+                    </p>
+                </div>
+                <div className="text-right">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Sistema (ERP)</span>
+                    <p className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(displaySystemSum)}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {hasRightSelection
+                            ? `${selectedSystemIds.length} selecionados`
+                            : `${systemItems.length} pendentes`
+                        }
+                    </p>
+                </div>
+            </div>
+
+            {/* Split View */}
+            <div className="rounded-xl border border-border overflow-hidden bg-card" style={{ height: 'calc(100vh - 520px)', minHeight: 400 }}>
+                <ResizablePanelGroup direction="horizontal">
+                    {/* Left Panel - Bank Statement */}
+                    <ResizablePanel defaultSize={50} minSize={30}>
+                        <div className="flex flex-col h-full">
+                            <div className="p-3 border-b border-border bg-muted/30 flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs font-semibold">Extrato</Badge>
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Filtrar..."
+                                        className="h-7 pl-7 text-xs"
+                                        value={bankSearch}
+                                        onChange={(e) => setBankSearch(e.target.value)}
+                                    />
+                                </div>
+                                <span className="text-xs text-muted-foreground shrink-0">{filteredStatement.length}</span>
+                            </div>
+                            <div className="flex-1 overflow-auto p-2 space-y-1.5">
+                                {isLoading ? (
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                                    ))
+                                ) : filteredStatement.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                                        <p>Nenhuma entrada pendente</p>
+                                    </div>
+                                ) : (
+                                    filteredStatement.map(item => (
+                                        <EntryCard
+                                            key={item.id}
+                                            item={item}
+                                            selected={selectedStatementIds.includes(item.id)}
+                                            suggested={suggestedStatementIds.has(item.id)}
+                                            onClick={() => toggleStatement(item.id)}
+                                        />
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </ResizablePanel>
+
+                    <ResizableHandle withHandle />
+
+                    {/* Right Panel - System Transactions */}
+                    <ResizablePanel defaultSize={50} minSize={30}>
+                        <div className="flex flex-col h-full">
+                            <div className="p-3 border-b border-border bg-muted/30 flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs font-semibold">Sistema</Badge>
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Filtrar..."
+                                        className="h-7 pl-7 text-xs"
+                                        value={systemSearch}
+                                        onChange={(e) => setSystemSearch(e.target.value)}
+                                    />
+                                </div>
+                                <span className="text-xs text-muted-foreground shrink-0">{filteredSystem.length}</span>
+                            </div>
+                            <div className="flex-1 overflow-auto p-2 space-y-1.5">
+                                {isLoading ? (
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                                    ))
+                                ) : filteredSystem.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                                        <p>Nenhuma transação pendente</p>
+                                    </div>
+                                ) : (
+                                    filteredSystem.map(item => (
+                                        <EntryCard
+                                            key={item.id}
+                                            item={item}
+                                            selected={selectedSystemIds.includes(item.id)}
+                                            suggested={suggestedSystemIds.has(item.id)}
+                                            onClick={() => toggleSystem(item.id)}
+                                        />
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </ResizablePanel>
+                </ResizablePanelGroup>
+            </div>
+
+            {/* Floating Action Bar */}
+            <AnimatePresence>
+                {(hasLeftSelection || hasRightSelection) && (
+                    <motion.div
+                        initial={{ y: 80, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 80, opacity: 0 }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+                    >
+                        <div className="flex items-center gap-4 px-6 py-3 rounded-2xl border border-primary/30 bg-card/95 backdrop-blur-xl shadow-2xl shadow-primary/10">
+                            {/* Selection info */}
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                                        {selectedStatementIds.length}
+                                    </div>
+                                    <span className="text-muted-foreground">banco</span>
+                                </div>
+                                <span className="text-muted-foreground">×</span>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                                        {selectedSystemIds.length}
+                                    </div>
+                                    <span className="text-muted-foreground">sistema</span>
+                                </div>
+                            </div>
+
+                            <div className="h-6 w-px bg-border" />
+
+                            {/* Diff indicator */}
+                            {hasBothSides && (
+                                <div className={cn(
+                                    'text-sm font-mono font-bold',
+                                    isPerfectMatch ? 'text-emerald-400' : 'text-red-400'
+                                )}>
+                                    Δ {formatCurrency(diff)}
+                                </div>
+                            )}
+
+                            <div className="h-6 w-px bg-border" />
+
+                            {/* Actions */}
+                            {isPerfectMatch && (
+                                <Button
+                                    size="sm"
+                                    className="gap-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    onClick={handleReconcile}
+                                    disabled={reconcileManual.isPending}
+                                >
+                                    {reconcileManual.isPending ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <CheckCircle2 className="w-4 h-4" />
+                                    )}
+                                    Conciliar
+                                </Button>
+                            )}
+
+                            {hasBothSides && !isPerfectMatch && (
+                                <div className="flex items-center gap-2 text-sm text-red-400">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    <span>Valores não batem</span>
+                                </div>
+                            )}
+
+                            {isMissingTransaction && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="gap-2 font-semibold"
+                                    onClick={() => setShowCreateModal(true)}
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Criar Lançamento
+                                </Button>
+                            )}
+
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-foreground"
+                                onClick={clearSelection}
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Create Transaction Modal */}
+            <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Plus className="w-5 h-5 text-primary" />
+                            Criar Lançamento do Extrato
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Crie uma transação no sistema a partir da(s) entrada(s) selecionada(s) do extrato.
+                        </p>
+
+                        {/* Preview selected entries */}
+                        <div className="space-y-2 max-h-40 overflow-auto">
+                            {statementItems
+                                .filter(i => selectedStatementIds.includes(i.id))
+                                .map(item => (
+                                    <div key={item.id} className="flex justify-between p-2 bg-muted/50 rounded text-sm border border-border/50">
+                                        <div className="min-w-0">
+                                            <p className="font-medium truncate">{item.description}</p>
+                                            <p className="text-xs text-muted-foreground">{item.transaction_date}</p>
+                                        </div>
+                                        <p className={cn('font-semibold shrink-0 ml-2', item.amount >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                                            {formatCurrency(item.amount)}
+                                        </p>
+                                    </div>
+                                ))}
+                        </div>
+
+                        {/* Category selector */}
+                        <div>
+                            <label className="text-sm font-medium text-foreground mb-1.5 block">
+                                Categoria (obrigatório)
+                            </label>
+                            <Select value={createCategoryId} onValueChange={setCreateCategoryId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione a categoria..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {(accounts || []).map((acc: any) => (
+                                        <SelectItem key={acc.id} value={acc.id}>
+                                            {acc.code ? `${acc.code} - ` : ''}{acc.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowCreateModal(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleCreateTransaction}
+                            disabled={!createCategoryId || createFromStatement.isPending}
+                            className="gap-2"
+                        >
+                            {createFromStatement.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Plus className="w-4 h-4" />
+                            )}
+                            Criar e Conciliar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}
