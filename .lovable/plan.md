@@ -1,80 +1,168 @@
 
 
-# Fix Analytics Dashboard & Legacy Account Cleanup
+# Professional Side-by-Side Reconciliation Workbench
 
-This plan addresses two major issues: (1) the "Analise por Dimensao" chart showing empty and the "Metas" gauge showing incorrect values, and (2) transactions displaying R$ 0,00 due to legacy account references.
+## Overview
 
----
-
-## Part 1: Database Migration - Fix RPCs
-
-A single SQL migration will update three database functions:
-
-### 1.1 `get_revenue_by_dimension`
-- Currently looks for legacy policy data instead of the new `financial_transactions` columns (`producer_id`, `insurance_company_id`, `ramo_id`)
-- Will be replaced to prioritize those columns, falling back to `apolices` join only when missing
-- Uses CTEs for clean dimension resolution (producer name from `profiles`, ramo name from `ramos`, company name from `companies`)
-
-### 1.2 `get_goal_vs_actual`
-- Currently returns incorrect percentage because it may use wrong field names or calculation
-- Will be replaced to properly sum `total_amount` from confirmed, non-void revenue transactions
-- Returns `percentage_achieved` as `ROUND((actual / goal) * 100, 2)` -- the frontend already reads `result.pct` which maps to this column alias
-
-### 1.3 `get_recent_financial_transactions`
-- Transactions show R$ 0,00 because `total_amount` isn't calculated correctly
-- Will calculate as `SUM(ABS(fl.amount)) / 2` from `financial_ledger` to get the true value regardless of account type
-- Also returns `is_confirmed` and `reconciled` fields properly
-
-### 1.4 Archive Legacy Accounts
-- Archive "Caixa", "Banco Principal", and "Comissoes a Receber" accounts (set `status = 'archived'`)
-- These should no longer be used as default counterparts
+Replace the current flat table-based reconciliation with an enterprise-grade **side-by-side workbench** where users match bank statement entries (left) against system transactions (right), with strict sum-validation before allowing reconciliation. No database changes required -- all existing RPCs are reused.
 
 ---
 
-## Part 2: Frontend - Fix `createFinancialMovement`
+## Architecture
 
-**File:** `src/services/financialService.ts`
+The current single-table view in `ReconciliationPage.tsx` will be restructured into two modes:
+- **List Mode** (existing): The current table view for browsing/filtering all transactions (kept as a tab)
+- **Workbench Mode** (new): The side-by-side matching interface (new default tab when a bank is selected)
 
-Update the `createFinancialMovement` function (lines ~224-245):
-- Remove logic that searches for "Caixa" as a default asset account
-- For **expenses** without a bank: search for "Contas a Pagar" (liability type)
-- For **revenue** without a bank: search for "Contas a Receber" (asset type)
-- Throw a clear error if neither account is found
+The `StatementImporter.tsx` will be upgraded with a 3-step wizard flow.
 
 ---
 
-## Part 3: Frontend - Gauge Chart Alignment
+## 1. StatementImporter Wizard Upgrade
 
-**File:** `src/components/financeiro/faturamento/GaugeChart.tsx`
+**File:** `src/components/financeiro/reconciliation/StatementImporter.tsx`
 
-Minor tweaks to ensure the gauge renders correctly:
-- Confirm container height is fixed at `180px`
-- Ensure `PieChart` uses `margin={{ top: 0, right: 0, bottom: 0, left: 0 }}`
-- Ensure `Pie` uses `cx="50%" cy="100%"` for perfect semicircle
-- Position percentage text with `absolute bottom-2`
+Replace the current single-screen importer with a 3-step wizard:
 
-These are already mostly in place from previous changes -- will verify and adjust if needed.
+| Step | Name | Description |
+|------|------|-------------|
+| 1 | Upload | Drag-and-drop zone + "Gerar Dados de Teste" button (already exists) |
+| 2 | Preview | Editable grid showing parsed rows with totals summary |
+| 3 | Confirm | Import result feedback: "Importado R$ X | 30 Entradas" |
+
+**Key changes:**
+- Add `wizardStep` state (1, 2, 3)
+- Reuse existing `Stepper` component from `src/components/ui/stepper.tsx`
+- Step 1: Current upload zone (no changes)
+- Step 2: Current preview grid, but user must explicitly click "Continuar" to proceed
+- Step 3: Shows import result with success animation, then "Fechar" button
+- Import button moves from footer to Step 2 -> Step 3 transition
+- Back button available on steps 2 and 3
 
 ---
 
-## Part 4: Hook Field Mapping Verification
+## 2. Workbench Layout (ReconciliationPage.tsx)
 
-**File:** `src/hooks/useFinanceiro.ts`
+**File:** `src/components/financeiro/reconciliation/ReconciliationPage.tsx`
 
-- `useGoalVsActual` (line ~784): Already reads `result.pct` -- the updated RPC aliases the column as `pct`, so this should work correctly after the migration
-- `useRevenueByDimension` (line ~460): Already maps `dimension_name`, `total_amount`, `transaction_count`, `percentage` -- matches the updated RPC signature
-- `getRecentTransactions` (line ~292): Already maps `is_confirmed` with fallback -- will continue to work with the updated RPC that now returns this field
+### 2a. Add Tabs: "Lista" vs "Workbench"
+
+Below the KPI cards, add a tab switcher:
+- "Lista" tab: Shows the existing table view (current code, untouched)
+- "Workbench" tab: Shows the new side-by-side matching UI
+
+The Workbench tab is only enabled when a specific bank account is selected (not "Consolidado").
+
+### 2b. Balance Bar (Top of Workbench)
+
+A horizontal bar showing three values:
+
+```text
++---------------------------+-------------------+---------------------------+
+|  Extrato (Banco)          |    Diferenca      |    Sistema (ERP)          |
+|  R$ 12.500,00             |    R$ 0,00        |    R$ 12.500,00           |
+|  3 itens selecionados     |    (green/red)    |    2 itens selecionados   |
++---------------------------+-------------------+---------------------------+
+```
+
+- Left total = sum of selected bank statement entries (or total pending if none selected)
+- Right total = sum of selected system transactions (or total pending if none selected)
+- Center = Left - Right (green if 0, red otherwise)
+
+### 2c. Split Panels
+
+Use `react-resizable-panels` (already installed) for a resizable left/right split:
+
+**Left Panel - "Extrato (Banco)":**
+- Fetches `bank_statement_entries` with `reconciliation_status = 'pending'` using existing `usePendingReconciliation` hook (`.statement` property)
+- Each entry rendered as a compact card showing: date, description, amount
+- Click to toggle selection (turns blue/primary border)
+- Multi-select supported
+
+**Right Panel - "Sistema (ERP)":**
+- Fetches pending system transactions using existing `usePendingReconciliation` hook (`.system` property)
+- Same compact card style
+- Click to toggle selection
+
+### 2d. Selection State
+
+```
+selectedStatementIds: string[]   // Left column selections
+selectedSystemIds: string[]      // Right column selections
+```
+
+Computed values:
+- `bankSum` = sum of amounts from selected statement entries
+- `systemSum` = sum of amounts from selected system transactions  
+- `diff` = bankSum - systemSum
+
+### 2e. Floating Action Bar (Bottom)
+
+Appears when any items are selected. Three scenarios:
+
+| Scenario | Condition | Action |
+|----------|-----------|--------|
+| Perfect Match | `diff === 0` and both sides have selections | Show "Conciliar" button (green). Calls `reconcile_transactions` RPC for each pair, or `bulk_manual_reconcile` if 1:many |
+| Mismatch | `diff !== 0` and both sides have selections | Show warning: "Valores nao batem (Diff: R$ X)" with disabled button |
+| Missing Transaction | Left has selection, Right is empty | Show "Criar Lancamento" button. Opens a pre-filled dialog to create a system transaction from the bank entry |
+
+### 2f. "Criar Lancamento" Modal
+
+When user selects bank items but no system items, a modal opens pre-filled with:
+- Date from bank entry
+- Description from bank entry
+- Amount from bank entry
+- User selects: Category (required)
+
+On submit: uses existing `useCreateFromStatement` hook (which calls `create_transaction_from_statement` RPC). After success, auto-selects the new system transaction for matching.
 
 ---
 
-## Technical Summary
+## 3. Hooks Usage (No New Hooks)
 
-| Change | Type | File/Location |
-|--------|------|---------------|
-| Update `get_revenue_by_dimension` | SQL Migration | Database |
-| Update `get_goal_vs_actual` | SQL Migration | Database |
-| Update `get_recent_financial_transactions` | SQL Migration | Database |
-| Archive legacy accounts | SQL Migration | Database |
-| Replace "Caixa" logic with "Contas a Pagar"/"Contas a Receber" | Code Edit | `financialService.ts` |
-| Verify gauge layout | Code Edit | `GaugeChart.tsx` (if needed) |
+All existing hooks are reused:
+- `usePendingReconciliation(bankAccountId)` -- fetches both sides
+- `useReconcileManual()` -- pairs statement + system entries
+- `useMatchSuggestions(bankAccountId)` -- highlights suggested matches
+- `useCreateFromStatement()` -- creates missing transactions
+- `useBulkReconcile()` -- batch reconciliation
+
+---
+
+## 4. File Changes Summary
+
+| File | Change Type | Description |
+|------|------------|-------------|
+| `StatementImporter.tsx` | Modify | Add wizard steps (Upload -> Preview -> Confirm) using existing Stepper component |
+| `ReconciliationPage.tsx` | Modify | Add "Lista"/"Workbench" tabs. Build the side-by-side workbench with balance bar, split panels, selection logic, floating action bar, and create-transaction modal |
+
+No new files. No database changes. No new dependencies.
+
+---
+
+## Technical Details
+
+### Selection Logic Implementation
+
+```text
+1. User clicks bank entry A (R$ 5.000)     -> selectedStatementIds = [A]
+2. User clicks system entry B (R$ 5.000)   -> selectedSystemIds = [B]  
+3. Balance bar: R$ 5.000 - R$ 5.000 = R$ 0 -> GREEN
+4. "Conciliar" button appears
+5. Click -> calls reconcile_transactions(A, B)
+6. Both items removed from lists, queries invalidated
+```
+
+### Multi-match (1:N) Logic
+
+```text
+1. User selects bank entries A (R$ 3.000) + B (R$ 2.000)  -> sum = R$ 5.000
+2. User selects system entry C (R$ 5.000)                  -> sum = R$ 5.000
+3. diff = 0 -> GREEN -> "Conciliar" enabled
+4. System reconciles each pair: (A,C) and (B,C) using reconcile_transactions
+```
+
+### Match Suggestions Highlighting
+
+When `useMatchSuggestions` returns results, items with suggested matches get a subtle glow/badge. If both sides of a suggestion are visible, a dotted line or badge connects them visually.
 
