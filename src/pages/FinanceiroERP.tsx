@@ -31,7 +31,7 @@ import { TesourariaTab } from '@/components/financeiro/TesourariaTab';
 import { ProvisoesTab } from '@/components/financeiro/ProvisoesTab';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
 import { ReconciliationPage } from '@/components/financeiro/reconciliation';
-import { ModuloFaturamento } from '@/components/financeiro/dashboard/ModuloFaturamento';
+import { MetasCard } from '@/components/financeiro/faturamento/MetasCard';
 import { ModuloTesouraria } from '@/components/financeiro/dashboard/ModuloTesouraria';
 import { ModuloMultiBancos } from '@/components/financeiro/dashboard/ModuloMultiBancos';
 import { RecentTransactionsCard } from '@/components/financeiro/dashboard/RecentTransactionsCard';
@@ -158,7 +158,9 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
     <div className="space-y-6">
       <CashFlowChart data={cashFlowData} isLoading={cashFlowLoading} granularity="day" />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ModuloFaturamento onClick={() => onTabChange('transacoes')} dateRange={dateRange} />
+        <div onClick={() => onTabChange('transacoes')} className="cursor-pointer transition-transform hover:scale-[1.01]">
+          <MetasCard />
+        </div>
         <ModuloMultiBancos onClick={() => onTabChange('caixa')} />
       </div>
       <ModuloTesouraria onClick={() => onTabChange('tesouraria')} />
