@@ -31,6 +31,7 @@ export interface PendingReconciliationItem {
     status: string;
     matched_id: string | null;
     type: 'revenue' | 'expense' | 'receita' | 'despesa'; // Allow both for now
+    bank_account_id?: string | null;
 }
 // ...
 
@@ -114,11 +115,12 @@ export function usePendingReconciliation(
             });
 
             // 2. Buscar entradas do extrato (Tabela direta)
+            // Include entries for this bank OR unassigned entries (bank_account_id IS NULL)
             let statementQuery = supabase
                 .from('bank_statement_entries')
                 .select('*')
-                .eq('bank_account_id', bankAccountId)
-                .eq('reconciliation_status', 'pending');
+                .eq('reconciliation_status', 'pending')
+                .or(`bank_account_id.eq.${bankAccountId},bank_account_id.is.null`);
 
             if (startDate && endDate) {
                 statementQuery = statementQuery
@@ -155,7 +157,8 @@ export function usePendingReconciliation(
                     reference_number: null,
                     status: 'pending',
                     matched_id: null,
-                    type: itemType
+                    type: itemType,
+                    bank_account_id: item.bank_account_id || null,
                 };
             });
 
@@ -169,7 +172,8 @@ export function usePendingReconciliation(
                 reference_number: item.reference_number,
                 status: item.reconciliation_status,
                 matched_id: item.matched_transaction_id,
-                type: item.amount < 0 ? 'expense' : 'revenue'
+                type: item.amount < 0 ? 'expense' : 'revenue',
+                bank_account_id: item.bank_account_id || null,
             }));
 
             return {
@@ -647,15 +651,18 @@ export function useReconcilePartial() {
             statementEntryId,
             systemTransactionId,
             amountToReconcile,
+            targetBankId,
         }: {
             statementEntryId: string;
             systemTransactionId: string;
             amountToReconcile?: number;
+            targetBankId?: string;
         }) => {
             const { data, error } = await (supabase.rpc as any)('reconcile_transaction_partial', {
                 p_statement_entry_id: statementEntryId,
                 p_system_transaction_id: systemTransactionId,
                 p_amount_to_reconcile: amountToReconcile || null,
+                p_target_bank_id: targetBankId || null,
             });
 
             if (error) throw error;
