@@ -82,6 +82,9 @@ The user reported critical bugs:
 - **[READY]** **Prompt 20**: Unlock Workbench & Force Bank Selection Modal.
 - **[READY]** **Prompt 21**: Workbench UI (Tripod Layout, Rich Cards, Filter Logic).
 - **[READY]** **Prompt 22**: Universal Partial Reconciliation Modal (Detects mismatch, shows modal, calls partial RPC).
+- **[READY]** **Prompt 23**: SQL Fix for Duplicate Keys (Smart Merge logic for Lazy Import).
+- **[READY]** **Prompt 24**: Workbench Clean View (Hide Unassigned by Default + Toggle).
+- **[READY]** **Prompt 25**: REFACTOR - Fix Workbench Filter Logic (Default Consolidated, Modal on Drop Only).
 
 ## Verification Plan
 
