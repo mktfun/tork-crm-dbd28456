@@ -3335,84 +3335,33 @@ export type Database = {
           transaction_date: string
         }[]
       }
-      get_bank_statement_paginated:
-        | {
-            Args: {
-              p_bank_account_id: string
-              p_end_date: string
-              p_page?: number
-              p_page_size?: number
-              p_start_date: string
-            }
-            Returns: {
-              amount: number
-              bank_account_id: string
-              bank_name: string
-              category_name: string
-              description: string
-              id: string
-              reconciled: boolean
-              running_balance: number
-              status_display: string
-              total_count: number
-              transaction_date: string
-              type: string
-            }[]
-          }
-        | {
-            Args: {
-              p_bank_account_id: string
-              p_end_date: string
-              p_page?: number
-              p_page_size?: number
-              p_search_term?: string
-              p_start_date: string
-              p_status?: string
-              p_type?: string
-            }
-            Returns: {
-              amount: number
-              bank_account_id: string
-              bank_name: string
-              category_name: string
-              description: string
-              id: string
-              reconciled: boolean
-              reconciled_by_name: string
-              running_balance: number
-              status_display: string
-              total_count: number
-              transaction_date: string
-              type: string
-            }[]
-          }
-        | {
-            Args: {
-              p_bank_account_id: string
-              p_end_date: string
-              p_page: number
-              p_page_size: number
-              p_search_term?: string
-              p_start_date: string
-              p_status?: string
-              p_type?: string
-            }
-            Returns: {
-              amount: number
-              bank_account_id: string
-              bank_name: string
-              category_name: string
-              description: string
-              id: string
-              reconciled: boolean
-              reconciled_by_name: string
-              running_balance: number
-              status_display: string
-              total_count: number
-              transaction_date: string
-              type: string
-            }[]
-          }
+      get_bank_statement_paginated: {
+        Args: {
+          p_bank_account_id: string
+          p_end_date: string
+          p_page?: number
+          p_page_size?: number
+          p_search_term?: string
+          p_start_date: string
+          p_status?: string
+          p_type?: string
+        }
+        Returns: {
+          amount: number
+          bank_account_id: string
+          bank_name: string
+          category_name: string
+          description: string
+          id: string
+          reconciled: boolean
+          reconciled_by_name: string
+          running_balance: number
+          status_display: string
+          total_count: number
+          transaction_date: string
+          type: string
+        }[]
+      }
       get_bank_transactions:
         | {
             Args: {
