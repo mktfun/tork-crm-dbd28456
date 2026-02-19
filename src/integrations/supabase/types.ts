@@ -3375,6 +3375,7 @@ export type Database = {
               description: string
               id: string
               reconciled: boolean
+              reconciled_by_name: string
               running_balance: number
               status_display: string
               total_count: number
