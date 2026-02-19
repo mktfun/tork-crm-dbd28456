@@ -103,6 +103,99 @@ function EntryCard({
     );
 }
 
+// Rich card for system items with policy details
+function SystemEntryCard({
+    item,
+    selected,
+    suggested,
+    onClick,
+    isUnassigned,
+}: {
+    item: PendingReconciliationItem;
+    selected: boolean;
+    suggested: boolean;
+    onClick: () => void;
+    isUnassigned?: boolean;
+}) {
+    const isRevenue = item.amount >= 0;
+    const hasRichData = !!item.customer_name;
+    const displayAmount = item.remaining_amount != null ? Math.abs(item.remaining_amount) : Math.abs(item.amount);
+
+    // Fallback to standard EntryCard if no rich data
+    if (!hasRichData) {
+        return <EntryCard item={item} selected={selected} suggested={suggested} onClick={onClick} isUnassigned={isUnassigned} />;
+    }
+
+    return (
+        <button
+            onClick={onClick}
+            className={cn(
+                'w-full text-left p-3 rounded-lg border transition-all duration-150',
+                'hover:bg-secondary/50',
+                selected
+                    ? 'border-primary bg-primary/10 ring-1 ring-primary/30'
+                    : suggested
+                        ? 'border-amber-500/40 bg-amber-500/5'
+                        : 'border-border bg-card',
+            )}
+        >
+            {/* Title row */}
+            <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-sm font-bold text-foreground truncate">{item.customer_name}</p>
+                <span className={cn(
+                    'text-sm font-bold shrink-0',
+                    isRevenue ? 'text-emerald-400' : 'text-red-400'
+                )}>
+                    {isRevenue ? '+' : '-'}{formatCurrency(displayAmount)}
+                </span>
+            </div>
+
+            {/* Badges row */}
+            <div className="flex flex-wrap items-center gap-1 mb-1.5">
+                {item.branch_name && (
+                    <Badge variant="metallic" className="text-[10px] px-1.5 py-0 h-4">{item.branch_name}</Badge>
+                )}
+                {item.insurer_name && (
+                    <Badge variant="silverOutline" className="text-[10px] px-1.5 py-0 h-4">{item.insurer_name}</Badge>
+                )}
+                {item.item_name && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground">{item.item_name}</Badge>
+                )}
+                {isUnassigned && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-500/30 text-amber-500 shrink-0">
+                        <Unlink className="w-2.5 h-2.5 mr-0.5" />
+                        Sem Banco
+                    </Badge>
+                )}
+                {suggested && !selected && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-500/50 text-amber-500">
+                        <Wand2 className="w-2.5 h-2.5 mr-0.5" />
+                        Match
+                    </Badge>
+                )}
+            </div>
+
+            {/* Value breakdown */}
+            <div className="flex items-center gap-3 text-[10px] mb-1">
+                <span className="text-muted-foreground">
+                    Cheio: {formatCurrency(Math.abs(item.total_amount ?? 0))}
+                </span>
+                <span className="text-emerald-500">
+                    Baixado: {formatCurrency(Math.abs(item.paid_amount ?? 0))}
+                </span>
+                <span className="text-red-400 font-bold">
+                    Faltante: {formatCurrency(Math.abs(item.remaining_amount ?? 0))}
+                </span>
+            </div>
+
+            {/* Date */}
+            <span className="text-[10px] text-muted-foreground">
+                {format(new Date(item.transaction_date), 'dd/MM/yyyy')}
+            </span>
+        </button>
+    );
+}
+
 export function ReconciliationWorkbench({ bankAccountId, dateRange }: ReconciliationWorkbenchProps) {
     const [selectedStatementIds, setSelectedStatementIds] = useState<string[]>([]);
     const [selectedSystemIds, setSelectedSystemIds] = useState<string[]>([]);
@@ -159,7 +252,11 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
     );
 
     const systemSum = useMemo(() =>
-        systemItems.filter(i => selectedSystemIds.includes(i.id)).reduce((s, i) => s + i.amount, 0),
+        systemItems.filter(i => selectedSystemIds.includes(i.id)).reduce((s, i) => {
+            const val = i.remaining_amount != null ? Math.abs(i.remaining_amount) : Math.abs(i.amount);
+            const signed = (i.type === 'expense' || i.type === 'despesa') ? -val : val;
+            return s + signed;
+        }, 0),
         [systemItems, selectedSystemIds]
     );
 
@@ -218,7 +315,11 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
 
     // Balance bar totals (when nothing selected, show totals)
     const bankTotal = useMemo(() => statementItems.reduce((s, i) => s + i.amount, 0), [statementItems]);
-    const systemTotal = useMemo(() => systemItems.reduce((s, i) => s + i.amount, 0), [systemItems]);
+    const systemTotal = useMemo(() => systemItems.reduce((s, i) => {
+        const val = i.remaining_amount != null ? Math.abs(i.remaining_amount) : Math.abs(i.amount);
+        const signed = (i.type === 'expense' || i.type === 'despesa') ? -val : val;
+        return s + signed;
+    }, 0), [systemItems]);
     const displayBankSum = hasLeftSelection ? bankSum : bankTotal;
     const displaySystemSum = hasRightSelection ? systemSum : systemTotal;
     const displayDiff = hasLeftSelection || hasRightSelection ? diff : bankTotal - systemTotal;
@@ -238,7 +339,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
                     </p>
                 </div>
                 <div className="text-center">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Diferença</span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Δ Diferença</span>
                     <p className={cn(
                         'text-xl font-bold font-mono mt-0.5',
                         Math.abs(displayDiff) < 0.01 ? 'text-emerald-400' : 'text-red-400'
@@ -334,7 +435,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
                                     </div>
                                 ) : (
                                     filteredSystem.map(item => (
-                                        <EntryCard
+                                        <SystemEntryCard
                                             key={item.id}
                                             item={item}
                                             selected={selectedSystemIds.includes(item.id)}
