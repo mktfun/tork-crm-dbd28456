@@ -25,6 +25,7 @@ import {
     Eye,
     FileText,
     UserCheck,
+    Sparkles,
 } from 'lucide-react';
 import { DatePickerWithRange } from '@/components/ui/date-picker-with-range';
 import { Input } from '@/components/ui/input';
@@ -573,6 +574,17 @@ export function ReconciliationPage() {
                 {isConsolidated && viewMode === 'lista' && (
                     <span className="text-xs text-muted-foreground">Selecione um banco para usar o Workbench</span>
                 )}
+                {!isConsolidated && matchSuggestions.length > 0 && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 ml-auto"
+                        onClick={() => setShowMatchReview(true)}
+                    >
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        Ver Sugestões ({matchSuggestions.length})
+                    </Button>
+                )}
             </div>
 
             {/* Historico View */}
@@ -625,6 +637,12 @@ export function ReconciliationPage() {
                                                     </Badge>
                                                 </div>
                                                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                                    {item.file_name && (
+                                                        <span className="flex items-center gap-1">
+                                                            <FileText className="w-3 h-3" />
+                                                            {item.file_name}
+                                                        </span>
+                                                    )}
                                                     {item.auditor_name && (
                                                         <span className="flex items-center gap-1">
                                                             <UserCheck className="w-3 h-3" />

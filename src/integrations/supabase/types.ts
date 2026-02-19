@@ -1882,6 +1882,7 @@ export type Database = {
           is_confirmed: boolean
           is_reconciled: boolean | null
           is_void: boolean | null
+          paid_amount: number | null
           producer_id: string | null
           ramo_id: string | null
           reconciled: boolean | null
@@ -1914,6 +1915,7 @@ export type Database = {
           is_confirmed?: boolean
           is_reconciled?: boolean | null
           is_void?: boolean | null
+          paid_amount?: number | null
           producer_id?: string | null
           ramo_id?: string | null
           reconciled?: boolean | null
@@ -1946,6 +1948,7 @@ export type Database = {
           is_confirmed?: boolean
           is_reconciled?: boolean | null
           is_void?: boolean | null
+          paid_amount?: number | null
           producer_id?: string | null
           ramo_id?: string | null
           reconciled?: boolean | null
@@ -3383,6 +3386,33 @@ export type Database = {
               type: string
             }[]
           }
+        | {
+            Args: {
+              p_bank_account_id: string
+              p_end_date: string
+              p_page: number
+              p_page_size: number
+              p_search_term?: string
+              p_start_date: string
+              p_status?: string
+              p_type?: string
+            }
+            Returns: {
+              amount: number
+              bank_account_id: string
+              bank_name: string
+              category_name: string
+              description: string
+              id: string
+              reconciled: boolean
+              reconciled_by_name: string
+              running_balance: number
+              status_display: string
+              total_count: number
+              transaction_date: string
+              type: string
+            }[]
+          }
       get_bank_transactions:
         | {
             Args: {
@@ -3978,6 +4008,15 @@ export type Database = {
         Args: { p_notes?: string; p_statement_entry_id: string }
         Returns: Json
       }
+      import_bank_statement_batch: {
+        Args: {
+          p_bank_account_id: string
+          p_entries: Json
+          p_file_name: string
+          p_total_amount: number
+        }
+        Returns: Json
+      }
       is_admin: { Args: { user_id?: string }; Returns: boolean }
       link_manual_transactions: { Args: { p_user_id: string }; Returns: string }
       manual_reconcile_transaction: {
@@ -4025,6 +4064,14 @@ export type Database = {
         }[]
       }
       promote_user_to_admin: { Args: { user_email: string }; Returns: boolean }
+      reconcile_transaction_partial: {
+        Args: {
+          p_amount_to_reconcile?: number
+          p_statement_entry_id: string
+          p_system_transaction_id: string
+        }
+        Returns: Json
+      }
       reconcile_transactions: {
         Args: { p_statement_entry_id: string; p_system_transaction_id: string }
         Returns: Json

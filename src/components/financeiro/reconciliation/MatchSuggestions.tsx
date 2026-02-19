@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Sparkles, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
+import { X, Sparkles, CheckCircle2, XCircle, ArrowRight, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppCard } from '@/components/ui/app-card';
 import { Badge } from '@/components/ui/badge';
@@ -127,9 +127,15 @@ export function MatchSuggestions({ suggestions, onClose, onApplied }: MatchSugge
                                         </div>
                                     </div>
 
-                                    {/* Confiança */}
-                                    <div className="text-right">
+                                    {/* Confiança + Parcial */}
+                                    <div className="text-right space-y-1">
                                         {getConfidenceBadge(suggestion.confidence)}
+                                        {Math.abs(suggestion.statement_amount) !== Math.abs(suggestion.system_amount) && (
+                                            <Badge className="bg-amber-500/20 text-amber-400 flex items-center gap-1">
+                                                <AlertTriangle className="w-3 h-3" />
+                                                Parcial
+                                            </Badge>
+                                        )}
                                         {suggestion.date_diff > 0 && (
                                             <p className="text-xs text-muted-foreground mt-1">
                                                 {suggestion.date_diff} dia{suggestion.date_diff > 1 ? 's' : ''} de diferença

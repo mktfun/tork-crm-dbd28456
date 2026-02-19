@@ -585,8 +585,10 @@ export function useImportStatementEntries() {
         mutationFn: async ({
             bankAccountId,
             entries,
+            fileName,
         }: {
             bankAccountId: string;
+            fileName?: string;
             entries: Array<{
                 transaction_date: string;
                 description: string;
@@ -596,41 +598,86 @@ export function useImportStatementEntries() {
         }) => {
             if (!user) throw new Error('Usuário não autenticado');
 
-            const entriesToInsert = entries.map(entry => ({
-                user_id: user.id,
-                bank_account_id: bankAccountId,
-                transaction_date: entry.transaction_date,
-                description: entry.description,
-                amount: entry.amount,
-                reference_number: entry.reference_number || null,
-                reconciliation_status: 'pending',
-                import_batch_id: crypto.randomUUID(),
-            }));
+            const totalAmount = entries.reduce((s, e) => s + Math.abs(e.amount), 0);
 
-            const { data, error } = await (supabase as any)
-                .from('bank_statement_entries' as any)
-                .insert(entriesToInsert)
-                .select();
+            // Use the batch RPC if available
+            const { data, error } = await (supabase.rpc as any)('import_bank_statement_batch', {
+                p_bank_account_id: bankAccountId,
+                p_file_name: fileName || 'manual_import',
+                p_total_amount: totalAmount,
+                p_entries: entries,
+            });
 
             if (error) {
-                // Verificar se é erro de duplicata
                 if (error.code === '23505') {
                     throw new Error('Algumas transações já foram importadas anteriormente');
                 }
                 throw error;
             }
 
-            return { imported: data?.length || 0 };
+            const result = data as { success: boolean; batch_id?: string; count?: number };
+            if (!result.success) {
+                throw new Error('Falha ao importar lote');
+            }
+
+            return { imported: result.count || entries.length, batchId: result.batch_id };
         },
         onSuccess: (result) => {
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['import-history'] });
             toast.success(`${result.imported} transações importadas com sucesso!`);
         },
         onError: (error: Error) => {
             toast.error(`Erro na importação: ${error.message}`);
+        },
+    });
+}
+
+/**
+ * Mutation para conciliação parcial
+ */
+export function useReconcilePartial() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({
+            statementEntryId,
+            systemTransactionId,
+            amountToReconcile,
+        }: {
+            statementEntryId: string;
+            systemTransactionId: string;
+            amountToReconcile?: number;
+        }) => {
+            const { data, error } = await (supabase.rpc as any)('reconcile_transaction_partial', {
+                p_statement_entry_id: statementEntryId,
+                p_system_transaction_id: systemTransactionId,
+                p_amount_to_reconcile: amountToReconcile || null,
+            });
+
+            if (error) throw error;
+
+            const result = data as { success: boolean; error?: string };
+            if (!result.success) {
+                throw new Error(result.error || 'Falha na conciliação parcial');
+            }
+
+            return result;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['match-suggestions'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
+            toast.success('Conciliação parcial realizada com sucesso!');
+        },
+        onError: (error: Error) => {
+            toast.error(`Erro na conciliação parcial: ${error.message}`);
         },
     });
 }
@@ -648,16 +695,35 @@ export function useApplyMatchSuggestions() {
 
             for (const suggestion of suggestions) {
                 try {
-                    const { data, error } = await (supabase.rpc as any)('reconcile_transactions', {
-                        p_statement_entry_id: suggestion.statement_entry_id,
-                        p_system_transaction_id: suggestion.system_transaction_id,
-                    });
+                    const isPartial = Math.abs(suggestion.statement_amount) !== Math.abs(suggestion.system_amount);
 
-                    if (error) throw error;
+                    if (isPartial) {
+                        // Use partial reconciliation RPC
+                        const { data, error } = await (supabase.rpc as any)('reconcile_transaction_partial', {
+                            p_statement_entry_id: suggestion.statement_entry_id,
+                            p_system_transaction_id: suggestion.system_transaction_id,
+                            p_amount_to_reconcile: Math.abs(suggestion.statement_amount),
+                        });
 
-                    const result = data as { success: boolean };
-                    if (result.success) {
-                        successCount++;
+                        if (error) throw error;
+
+                        const result = data as { success: boolean };
+                        if (result.success) {
+                            successCount++;
+                        }
+                    } else {
+                        // Use full reconciliation RPC
+                        const { data, error } = await (supabase.rpc as any)('reconcile_transactions', {
+                            p_statement_entry_id: suggestion.statement_entry_id,
+                            p_system_transaction_id: suggestion.system_transaction_id,
+                        });
+
+                        if (error) throw error;
+
+                        const result = data as { success: boolean };
+                        if (result.success) {
+                            successCount++;
+                        }
                     }
                 } catch (err) {
                     errors.push(`Falha ao conciliar: ${(err as Error).message}`);

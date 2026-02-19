@@ -16,31 +16,24 @@ interface TransactionKpiCardProps {
     icon: React.ElementType;
 }
 
-const variantStyles = {
-    success: 'border-emerald-500/30 bg-emerald-500/5',
-    warning: 'border-amber-500/30 bg-amber-500/5',
-    danger: 'border-rose-500/30 bg-rose-500/5'
-};
-
 const iconStyles = {
-    success: 'bg-emerald-500/20 text-emerald-500',
-    warning: 'bg-amber-500/20 text-amber-500',
-    danger: 'bg-rose-500/20 text-rose-500'
+    success: 'text-emerald-400 drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]',
+    warning: 'text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]',
+    danger: 'text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.4)]'
 };
 
 export function TransactionKpiCard({ title, value, variant, icon: Icon }: TransactionKpiCardProps) {
     return (
         <AppCard className={cn(
-            'flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer hover:bg-secondary/70',
-            variantStyles[variant]
+            'flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70'
         )}>
-            <div className="flex items-center gap-3">
-                <div className={cn('p-2 rounded-lg', iconStyles[variant])}>
-                    <Icon className="w-4 h-4" />
-                </div>
-                <div>
+            <div className="flex items-start justify-between">
+                <div className="space-y-1.5 min-w-0 flex-1">
                     <p className="text-sm font-medium text-muted-foreground">{title}</p>
-                    <p className="text-2xl font-bold text-foreground">{formatCurrency(value)}</p>
+                    <p className="text-2xl md:text-3xl font-bold text-foreground">{formatCurrency(value)}</p>
+                </div>
+                <div className="p-2 rounded-lg bg-foreground/10 ml-3 shrink-0">
+                    <Icon className={cn('w-5 h-5', iconStyles[variant])} />
                 </div>
             </div>
         </AppCard>
