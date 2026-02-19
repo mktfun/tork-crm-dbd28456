@@ -3835,10 +3835,11 @@ export type Database = {
         Args: { p_bank_account_id: string }
         Returns: {
           amount: number
-          category_name: string
           description: string
           id: string
+          status: string
           transaction_date: string
+          type: string
         }[]
       }
       get_unbanked_transactions: {
