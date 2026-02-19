@@ -623,6 +623,66 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_import_history: {
+        Row: {
+          auditor_name: string | null
+          bank_account_id: string | null
+          created_at: string | null
+          error_message: string | null
+          file_name: string | null
+          file_size_bytes: number | null
+          id: string
+          imported_at: string | null
+          imported_by: string | null
+          status: string | null
+          total_amount: number | null
+          total_transactions: number | null
+        }
+        Insert: {
+          auditor_name?: string | null
+          bank_account_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          file_name?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          imported_at?: string | null
+          imported_by?: string | null
+          status?: string | null
+          total_amount?: number | null
+          total_transactions?: number | null
+        }
+        Update: {
+          auditor_name?: string | null
+          bank_account_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          file_name?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          imported_at?: string | null
+          imported_by?: string | null
+          status?: string | null
+          total_amount?: number | null
+          total_transactions?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_import_history_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_import_history_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliation_dashboard"
+            referencedColumns: ["bank_account_id"]
+          },
+        ]
+      }
       bank_statement_entries: {
         Row: {
           amount: number

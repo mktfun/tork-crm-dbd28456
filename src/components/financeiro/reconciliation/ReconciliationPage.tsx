@@ -21,6 +21,10 @@ import {
     TrendingUp,
     Zap,
     Wand2,
+    History,
+    Eye,
+    FileText,
+    UserCheck,
 } from 'lucide-react';
 import { DatePickerWithRange } from '@/components/ui/date-picker-with-range';
 import { Input } from '@/components/ui/input';
@@ -64,8 +68,12 @@ import {
     useBulkReconcile,
     useMatchSuggestions,
     useReconcileManual,
+    useImportHistory,
+    useImportBatchEntries,
     type PaginatedStatementItem,
-    type MatchSuggestion
+    type MatchSuggestion,
+    type ImportHistoryItem,
+    type BankStatementEntry,
 } from '@/hooks/useReconciliation';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { StatementImporter } from './StatementImporter';
@@ -212,13 +220,14 @@ export function ReconciliationPage() {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     const [showImporter, setShowImporter] = useState(false);
-    const [viewMode, setViewMode] = useState<'lista' | 'workbench'>('lista');
+    const [viewMode, setViewMode] = useState<'lista' | 'workbench' | 'historico'>('lista');
     const [page, setPage] = useState(1);
 
     // State for bank selection dialog (late binding)
     const [bankBindingTarget, setBankBindingTarget] = useState<PaginatedStatementItem | null>(null);
     const [selectedBankForBinding, setSelectedBankForBinding] = useState<string>('');
     const [showMatchReview, setShowMatchReview] = useState(false);
+    const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
     const isConsolidated = !selectedBankAccountId || selectedBankAccountId === 'all';
 
     // Queries
@@ -296,6 +305,10 @@ export function ReconciliationPage() {
         setStatusFilter(status);
         setPage(1);
     };
+
+    // Import History
+    const { data: importHistory = [], isLoading: isLoadingHistory } = useImportHistory(selectedBankAccountId);
+    const { data: batchEntries = [], isLoading: isLoadingBatch } = useImportBatchEntries(selectedBatchId);
 
     // Mutations
     const reconcileMutation = useReconcileTransactionDirectly();
@@ -537,7 +550,7 @@ export function ReconciliationPage() {
 
             {/* View Mode Tabs */}
             <div className="flex items-center gap-2">
-                <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'lista' | 'workbench')} className="w-auto">
+                <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'lista' | 'workbench' | 'historico')} className="w-auto">
                     <TabsList className="h-9">
                         <TabsTrigger value="lista" className="text-sm px-4 h-7 gap-1.5">
                             <CalendarIcon className="w-3.5 h-3.5" />
@@ -551,15 +564,99 @@ export function ReconciliationPage() {
                             <GitCompare className="w-3.5 h-3.5" />
                             Workbench
                         </TabsTrigger>
+                        <TabsTrigger value="historico" className="text-sm px-4 h-7 gap-1.5">
+                            <History className="w-3.5 h-3.5" />
+                            Histórico
+                        </TabsTrigger>
                     </TabsList>
                 </Tabs>
-                {isConsolidated && viewMode !== 'workbench' && (
+                {isConsolidated && viewMode === 'lista' && (
                     <span className="text-xs text-muted-foreground">Selecione um banco para usar o Workbench</span>
                 )}
             </div>
 
-            {/* Workbench View */}
-            {viewMode === 'workbench' && selectedBankAccountId && !isConsolidated ? (
+            {/* Historico View */}
+            {viewMode === 'historico' ? (
+                <AppCard className="p-4">
+                    <div className="flex items-center gap-2 mb-4">
+                        <History className="w-5 h-5 text-primary" />
+                        <h3 className="font-semibold text-foreground">Histórico de Importações</h3>
+                    </div>
+                    {isLoadingHistory ? (
+                        <div className="space-y-3">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <Skeleton key={i} className="h-20 w-full rounded-lg" />
+                            ))}
+                        </div>
+                    ) : importHistory.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                            <FileText className="w-10 h-10 mb-3 opacity-50" />
+                            <p className="text-sm">Nenhuma importação registrada.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {importHistory.map((item) => {
+                                const bankAccount = bankAccounts?.accounts?.find(a => a.id === item.bank_account_id);
+                                return (
+                                    <div key={item.id} className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors">
+                                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                                            <div className={cn(
+                                                'w-10 h-10 rounded-full flex items-center justify-center shrink-0',
+                                                item.status === 'completed' ? 'bg-emerald-500/20' : 'bg-red-500/20'
+                                            )}>
+                                                {item.status === 'completed' ? (
+                                                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                                                ) : (
+                                                    <AlertCircle className="w-5 h-5 text-red-400" />
+                                                )}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-sm font-medium text-foreground">
+                                                        {item.imported_at ? format(new Date(item.imported_at), 'dd/MM/yyyy HH:mm') : '—'}
+                                                    </span>
+                                                    {bankAccount && (
+                                                        <Badge variant="secondary" className="text-[10px]">
+                                                            {bankAccount.bankName}
+                                                        </Badge>
+                                                    )}
+                                                    <Badge variant={item.status === 'completed' ? 'secondary' : 'destructive'} className="text-[10px]">
+                                                        {item.status === 'completed' ? 'Concluído' : 'Erro'}
+                                                    </Badge>
+                                                </div>
+                                                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                                    {item.auditor_name && (
+                                                        <span className="flex items-center gap-1">
+                                                            <UserCheck className="w-3 h-3" />
+                                                            {item.auditor_name}
+                                                        </span>
+                                                    )}
+                                                    <span>{item.total_transactions || 0} transações</span>
+                                                    <span className="font-medium text-foreground">
+                                                        {formatCurrency(Number(item.total_amount) || 0)}
+                                                    </span>
+                                                </div>
+                                                {item.error_message && (
+                                                    <p className="text-xs text-red-400 mt-1">{item.error_message}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="gap-1.5 shrink-0"
+                                            onClick={() => setSelectedBatchId(item.id)}
+                                        >
+                                            <Eye className="w-3.5 h-3.5" />
+                                            Ver Detalhes
+                                        </Button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </AppCard>
+            ) : viewMode === 'workbench' && selectedBankAccountId && !isConsolidated ? (
                 <ReconciliationWorkbench
                     bankAccountId={selectedBankAccountId}
                     dateRange={dateRange}
@@ -869,6 +966,8 @@ export function ReconciliationPage() {
                     onSuccess={async () => {
                         setShowImporter(false);
                         refetch();
+                        // Auto-switch to workbench after import
+                        setViewMode('workbench');
                         // Auto-check for matches after import
                         const result = await refetchSuggestions();
                         if (result.data && result.data.length > 0) {
@@ -937,6 +1036,64 @@ export function ReconciliationPage() {
                         >
                             <Wand2 className="w-4 h-4" />
                             {reconcileManualMutation.isPending ? 'Processando...' : 'Confirmar Tudo'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Batch Detail Dialog */}
+            <Dialog open={!!selectedBatchId} onOpenChange={(open) => !open && setSelectedBatchId(null)}>
+                <DialogContent className="sm:max-w-lg max-h-[80vh]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-primary" />
+                            Detalhes da Importação
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        {isLoadingBatch ? (
+                            <div className="space-y-2">
+                                {Array.from({ length: 3 }).map((_, i) => (
+                                    <Skeleton key={i} className="h-12 w-full rounded-lg" />
+                                ))}
+                            </div>
+                        ) : batchEntries.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-6">Nenhuma entrada encontrada para este lote.</p>
+                        ) : (
+                            <>
+                                <p className="text-sm text-muted-foreground">
+                                    <span className="font-semibold text-foreground">{batchEntries.length}</span> transações neste lote
+                                </p>
+                                <div className="max-h-64 overflow-auto space-y-1.5">
+                                    {batchEntries.map((entry) => (
+                                        <div key={entry.id} className="flex items-center justify-between p-2.5 bg-muted/50 rounded border border-border/50">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-medium truncate">{entry.description}</p>
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <span>{entry.transaction_date}</span>
+                                                    <Badge variant={entry.reconciliation_status === 'matched' ? 'secondary' : 'outline'} className="text-[10px]">
+                                                        {entry.reconciliation_status === 'matched' ? 'Conciliado' : 'Pendente'}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                            <p className={cn('font-semibold text-sm shrink-0 ml-3', entry.amount >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                                                {formatCurrency(entry.amount)}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="p-3 bg-muted/50 rounded flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Total do lote:</span>
+                                    <span className="font-bold text-foreground">
+                                        {formatCurrency(batchEntries.reduce((s, e) => s + Math.abs(e.amount), 0))}
+                                    </span>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setSelectedBatchId(null)}>
+                            Fechar
                         </Button>
                     </DialogFooter>
                 </DialogContent>
