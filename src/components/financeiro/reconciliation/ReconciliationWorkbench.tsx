@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import {
     ArrowUpRight, ArrowDownRight, CheckCircle2, AlertTriangle,
-    Plus, X, Zap, Wand2, Loader2, Search, Unlink
+    Plus, X, Zap, Wand2, Loader2, Search, Unlink, Landmark
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -36,6 +36,9 @@ import { PartialReconciliationModal } from './PartialReconciliationModal';
 interface ReconciliationWorkbenchProps {
     bankAccountId: string;
     dateRange?: DateRange;
+    targetLinkingBankId?: string;
+    targetLinkingBankName?: string;
+    onChangeTargetBank?: () => void;
 }
 
 // Compact card for statement/system items
@@ -199,7 +202,7 @@ function SystemEntryCard({
     );
 }
 
-export function ReconciliationWorkbench({ bankAccountId, dateRange }: ReconciliationWorkbenchProps) {
+export function ReconciliationWorkbench({ bankAccountId, dateRange, targetLinkingBankId, targetLinkingBankName, onChangeTargetBank }: ReconciliationWorkbenchProps) {
     const [selectedStatementIds, setSelectedStatementIds] = useState<string[]>([]);
     const [selectedSystemIds, setSelectedSystemIds] = useState<string[]>([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -213,7 +216,8 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
     const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined;
     const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined;
 
-    const { data: pendingData, isLoading } = usePendingReconciliation(bankAccountId, startDate, endDate, showUnassigned);
+    const effectiveBankId = targetLinkingBankId || bankAccountId;
+    const { data: pendingData, isLoading } = usePendingReconciliation(bankAccountId, startDate, endDate, showUnassigned || !!targetLinkingBankId);
     const { data: suggestions = [] } = useMatchSuggestions(bankAccountId);
     const { data: accounts } = useFinancialAccounts();
 
@@ -284,7 +288,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
             await reconcilePartial.mutateAsync({
                 statementEntryId: selectedStatementIds[0],
                 systemTransactionId: selectedSystemIds[0],
-                targetBankId: bankAccountId,
+                targetBankId: effectiveBankId,
             });
         } else {
             for (const stmtId of selectedStatementIds) {
@@ -293,7 +297,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
                         await reconcilePartial.mutateAsync({
                             statementEntryId: stmtId,
                             systemTransactionId: sysId,
-                            targetBankId: bankAccountId,
+                            targetBankId: effectiveBankId,
                         });
                     } catch { /* skip duplicates */ }
                 }
@@ -309,7 +313,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
             statementEntryId: selectedStatementIds[0],
             systemTransactionId: selectedSystemIds[0],
             amountToReconcile: amount,
-            targetBankId: bankAccountId,
+            targetBankId: effectiveBankId,
         });
         setShowPartialModal(false);
         setSelectedStatementIds([]);
@@ -349,6 +353,25 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange }: Reconcilia
 
     return (
         <div className="space-y-4">
+            {/* Target Linking Banner */}
+            {targetLinkingBankId && targetLinkingBankName && (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 border border-primary/30">
+                    <Landmark className="w-5 h-5 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground">
+                            🔵 MODO DE VINCULAÇÃO: {targetLinkingBankName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            Arraste transações sem banco para conciliar neste banco.
+                        </p>
+                    </div>
+                    {onChangeTargetBank && (
+                        <Button variant="outline" size="sm" onClick={onChangeTargetBank} className="shrink-0">
+                            Alterar
+                        </Button>
+                    )}
+                </div>
+            )}
             {/* Balance Bar */}
             <div className="grid grid-cols-3 gap-4 p-4 rounded-xl bg-muted/50 border border-border">
                 <div className="text-left">
