@@ -221,27 +221,61 @@ export async function createFinancialMovement(payload: {
   insurance_company_id?: string;
   producer_id?: string;
 }) {
-  // Logic to find a default asset account if bank not provided
-  // We need to fetch accounts to find a default one (e.g. 'Caixa').
-  // Since this runs on client side (service), we can query supabase directly.
-
+  // Find the correct counterpart account based on transaction type
   let assetAccountId = '';
 
-  // Try to find a default asset account (e.g. Caixa)
-  const { data: accounts } = await supabase
-    .from('financial_accounts')
-    .select('id, name, type')
-    .eq('status', 'active')
-    .eq('type', 'asset');
+  if (payload.type === 'expense') {
+    // For expenses without a bank: use "Contas a Pagar" (liability)
+    const { data: liabilityAccounts } = await supabase
+      .from('financial_accounts')
+      .select('id, name')
+      .eq('status', 'active')
+      .eq('type', 'liability')
+      .ilike('name', '%contas a pagar%')
+      .limit(1);
 
-  if (accounts && accounts.length > 0) {
-    const caixa = accounts.find(a => a.name.toLowerCase().includes('caixa'));
-    assetAccountId = caixa ? caixa.id : accounts[0].id;
+    if (liabilityAccounts && liabilityAccounts.length > 0) {
+      assetAccountId = liabilityAccounts[0].id;
+    } else {
+      // Fallback: any active liability account
+      const { data: fallback } = await supabase
+        .from('financial_accounts')
+        .select('id')
+        .eq('status', 'active')
+        .eq('type', 'liability')
+        .limit(1);
+      if (fallback && fallback.length > 0) {
+        assetAccountId = fallback[0].id;
+      } else {
+        throw new Error('Conta "Contas a Pagar" não encontrada. Verifique o plano de contas.');
+      }
+    }
   } else {
-    // If no asset account exists, we might fail or let the specific function fail.
-    // For now, let's assume one exists or the specific function handles it (it requires it).
-    // Warning: registerExpense/Revenue Require 'assetAccountId'.
-    console.warn('No asset account found for default counterpart');
+    // For revenue without a bank: use "Contas a Receber" (asset)
+    const { data: assetAccounts } = await supabase
+      .from('financial_accounts')
+      .select('id, name')
+      .eq('status', 'active')
+      .eq('type', 'asset')
+      .ilike('name', '%contas a receber%')
+      .limit(1);
+
+    if (assetAccounts && assetAccounts.length > 0) {
+      assetAccountId = assetAccounts[0].id;
+    } else {
+      // Fallback: any active asset account
+      const { data: fallback } = await supabase
+        .from('financial_accounts')
+        .select('id')
+        .eq('status', 'active')
+        .eq('type', 'asset')
+        .limit(1);
+      if (fallback && fallback.length > 0) {
+        assetAccountId = fallback[0].id;
+      } else {
+        throw new Error('Conta "Contas a Receber" não encontrada. Verifique o plano de contas.');
+      }
+    }
   }
 
   if (payload.type === 'expense') {
