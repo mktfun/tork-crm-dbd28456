@@ -686,7 +686,7 @@ export type Database = {
       bank_statement_entries: {
         Row: {
           amount: number
-          bank_account_id: string
+          bank_account_id: string | null
           created_at: string | null
           description: string
           id: string
@@ -706,7 +706,7 @@ export type Database = {
         }
         Insert: {
           amount: number
-          bank_account_id: string
+          bank_account_id?: string | null
           created_at?: string | null
           description: string
           id?: string
@@ -726,7 +726,7 @@ export type Database = {
         }
         Update: {
           amount?: number
-          bank_account_id?: string
+          bank_account_id?: string | null
           created_at?: string | null
           description?: string
           id?: string
