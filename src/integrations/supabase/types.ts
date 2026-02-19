@@ -3546,7 +3546,7 @@ export type Database = {
           actual_amount: number
           difference: number
           goal_amount: number
-          percentage_achieved: number
+          pct: number
           status: string
         }[]
       }
@@ -3697,17 +3697,16 @@ export type Database = {
         Args: { p_limit?: number; p_offset?: number; p_type?: string }
         Returns: {
           account_names: string
-          amount: number
           created_at: string
           description: string
           id: string
+          is_confirmed: boolean
           is_void: boolean
           reconciled: boolean
           reference_number: string
           status: string
           total_amount: number
           transaction_date: string
-          type: string
         }[]
       }
       get_reconciliation_kpis: {
