@@ -3,7 +3,7 @@ import { DashboardKpis } from '@/components/dashboard/DashboardKpis';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardController } from '@/components/dashboard/DashboardController';
 import { PerformanceChart } from '@/components/dashboard/PerformanceChart';
-import { DashboardGlobalInsight } from '@/components/dashboard/DashboardGlobalInsight';
+// DashboardGlobalInsight merged into ThinkingCard
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
@@ -118,17 +118,13 @@ export default function Dashboard() {
         <DashboardHeader />
       </div>
 
-      {/* CARD DE INSIGHT GLOBAL ESTRATÉGICO */}
-      <div className="dashboard-global-insight">
-        <DashboardGlobalInsight />
-      </div>
-
-      {/* DEMO: INTEGRAÇÃO DE RACIOCÍNIO IA */}
-      <div className="grid grid-cols-1">
+      {/* CARD DE INSIGHT GLOBAL ESTRATÉGICO + RACIOCÍNIO IA */}
+      <div className="dashboard-global-insight grid grid-cols-1">
         <ThinkingCard
-          title="Análise em Tempo Real (Glass Box Demo)"
+          title="Análise em Tempo Real"
           steps={aiReasoningSteps}
           isThinking={true}
+          strategicSummary={{ focus: 'general' }}
         />
       </div>
 
