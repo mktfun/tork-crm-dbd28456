@@ -722,6 +722,10 @@ export interface ReconciliationKpis {
     total_amount: number;
     reconciled_amount: number;
     pending_amount: number;
+    reconciled_revenue: number;
+    reconciled_expense: number;
+    pending_revenue: number;
+    pending_expense: number;
 }
 
 export interface ReconciliationKpisWithComparison {
@@ -730,7 +734,6 @@ export interface ReconciliationKpisWithComparison {
 }
 
 function parseKpiRow(row: any): ReconciliationKpis {
-    // Handle case where RPC now returns { current, previous } wrapper
     const data = row?.current || row;
     return {
         total_count: Number(data?.total_count) || 0,
@@ -740,10 +743,14 @@ function parseKpiRow(row: any): ReconciliationKpis {
         total_amount: Number(data?.total_amount) || 0,
         reconciled_amount: Number(data?.reconciled_amount) || 0,
         pending_amount: Number(data?.pending_amount) || 0,
+        reconciled_revenue: Number(data?.reconciled_revenue) || 0,
+        reconciled_expense: Number(data?.reconciled_expense) || 0,
+        pending_revenue: Number(data?.pending_revenue) || 0,
+        pending_expense: Number(data?.pending_expense) || 0,
     };
 }
 
-const emptyKpis: ReconciliationKpis = { total_count: 0, reconciled_count: 0, pending_count: 0, ignored_count: 0, total_amount: 0, reconciled_amount: 0, pending_amount: 0 };
+const emptyKpis: ReconciliationKpis = { total_count: 0, reconciled_count: 0, pending_count: 0, ignored_count: 0, total_amount: 0, reconciled_amount: 0, pending_amount: 0, reconciled_revenue: 0, reconciled_expense: 0, pending_revenue: 0, pending_expense: 0 };
 
 export function useReconciliationKpis(
     bankAccountId: string | null,
@@ -783,6 +790,10 @@ export function useReconciliationKpis(
                     total_amount: Number(currentData.total_amount) || 0,
                     reconciled_amount: Number(currentData.reconciled_amount) || 0,
                     pending_amount: Number(currentData.pending_amount) || 0,
+                    reconciled_revenue: Number(currentData.reconciled_revenue) || 0,
+                    reconciled_expense: Number(currentData.reconciled_expense) || 0,
+                    pending_revenue: Number(currentData.pending_revenue) || 0,
+                    pending_expense: Number(currentData.pending_expense) || 0,
                 },
                 previous: {
                     total_count: Number(previousData.total_count) || 0,
@@ -792,6 +803,10 @@ export function useReconciliationKpis(
                     total_amount: Number(previousData.total_amount) || 0,
                     reconciled_amount: Number(previousData.reconciled_amount) || 0,
                     pending_amount: Number(previousData.pending_amount) || 0,
+                    reconciled_revenue: Number(previousData.reconciled_revenue) || 0,
+                    reconciled_expense: Number(previousData.reconciled_expense) || 0,
+                    pending_revenue: Number(previousData.pending_revenue) || 0,
+                    pending_expense: Number(previousData.pending_expense) || 0,
                 },
             };
         },

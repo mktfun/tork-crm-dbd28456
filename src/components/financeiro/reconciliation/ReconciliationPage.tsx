@@ -87,19 +87,54 @@ interface PremiumKpiProps {
     variant: 'pending' | 'reconciled' | 'count' | 'progress';
     trend?: { value: number; label: string } | null;
     onClick?: () => void;
+    breakdown?: { revenue: number; expense: number } | null;
 }
 
-function PremiumKpiCard({ title, value, subtitle, icon, variant, trend, onClick }: PremiumKpiProps) {
+function PremiumKpiCard({ title, value, subtitle, icon: Icon, variant, trend, onClick, breakdown }: PremiumKpiProps) {
+    const formatCurrencyShort = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     return (
-        <GlassKpiCard
-            title={title}
-            value={value}
-            subtitle={subtitle}
-            icon={icon}
-            iconClassName={variantIconConfig[variant]}
-            trend={trend}
+        <AppCard
             onClick={onClick}
-        />
+            className={cn(
+                'flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg border-border bg-card hover:bg-secondary/70',
+                onClick && 'cursor-pointer',
+            )}
+        >
+            <div className="flex items-start justify-between">
+                <div className="space-y-1.5 min-w-0 flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">{title}</p>
+                    <p className="text-2xl md:text-3xl font-bold text-foreground break-words">{value}</p>
+                    {breakdown && (breakdown.revenue > 0 || breakdown.expense > 0) && (
+                        <div className="flex flex-col gap-0.5 mt-1">
+                            <span className="text-xs font-medium text-emerald-400 flex items-center gap-1">
+                                <ArrowUpRight className="w-3 h-3" />
+                                Receitas: {formatCurrencyShort(breakdown.revenue)}
+                            </span>
+                            <span className="text-xs font-medium text-rose-400 flex items-center gap-1">
+                                <ArrowDownRight className="w-3 h-3" />
+                                Despesas: {formatCurrencyShort(breakdown.expense)}
+                            </span>
+                        </div>
+                    )}
+                    {trend && trend.value !== 0 && !breakdown && (
+                        <p className={cn(
+                            'text-xs font-medium flex items-center gap-1',
+                            trend.value > 0 ? 'text-emerald-400' : 'text-rose-400'
+                        )}>
+                            {trend.value > 0 ? <TrendingUp className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                            {trend.value > 0 ? '+' : ''}{trend.value.toFixed(0)}%
+                            <span className="text-muted-foreground font-normal ml-0.5">{trend.label || 'vs anterior'}</span>
+                        </p>
+                    )}
+                    {subtitle && !breakdown && (!trend || trend.value === 0) && (
+                        <p className="text-xs text-muted-foreground">{subtitle}</p>
+                    )}
+                </div>
+                <div className="p-2 rounded-lg bg-foreground/10 ml-3 shrink-0">
+                    <Icon className={cn('w-5 h-5', variantIconConfig[variant])} />
+                </div>
+            </div>
+        </AppCard>
     );
 }
 
@@ -449,6 +484,7 @@ export function ReconciliationPage() {
                     variant="pending"
                     trend={pendingTrend !== null ? { value: pendingTrend, label: 'vs período anterior' } : null}
                     onClick={() => handleCardFilter('pendente')}
+                    breakdown={{ revenue: currentKpis?.pending_revenue || 0, expense: currentKpis?.pending_expense || 0 }}
                 />
                 <PremiumKpiCard
                     title="Total Conciliado"
@@ -458,6 +494,7 @@ export function ReconciliationPage() {
                     variant="reconciled"
                     trend={reconciledTrend !== null ? { value: reconciledTrend, label: 'vs período anterior' } : null}
                     onClick={() => handleCardFilter('conciliado')}
+                    breakdown={{ revenue: currentKpis?.reconciled_revenue || 0, expense: currentKpis?.reconciled_expense || 0 }}
                 />
                 <PremiumKpiCard
                     title="Qtd. Pendentes"
