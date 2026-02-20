@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Plus, Trash2, Users } from "lucide-react";
 import { motion } from "framer-motion";
-import type { HealthWizardData } from "../HealthWizard";
+import type { HealthWizardData } from "./HealthWizard";
 
 interface Props {
   data: HealthWizardData;

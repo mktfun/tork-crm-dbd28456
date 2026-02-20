@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Shield, FileText, CreditCard, Calendar, AlertCircle, Loader2 } from 'lucide-react';
+import { Shield, FileText, CreditCard, Calendar, AlertCircle, Loader2, Plus, FileEdit, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -129,6 +129,42 @@ export default function PortalHome() {
               <h2 className="text-white font-light text-lg tracking-wide">Bem-vindo(a)!</h2>
               <p className="text-zinc-500 text-sm">{clientName}</p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Nova Solicitação */}
+      <Card className="bg-black/70 border-white/[0.06] backdrop-blur-2xl">
+        <CardContent className="p-4 space-y-3">
+          <h3 className="text-white font-light tracking-wide flex items-center gap-2">
+            <Plus className="w-4 h-4 text-zinc-400" />
+            Nova Solicitação
+          </h3>
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              variant="outline"
+              className="h-auto py-3 flex flex-col items-center gap-1.5 bg-black/50 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
+              onClick={() => navigate(`/${slug}/portal/wizard?type=cotacao`)}
+            >
+              <Plus className="w-5 h-5 text-zinc-400" />
+              <span className="text-xs text-white font-light">Nova Cotação</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-3 flex flex-col items-center gap-1.5 bg-black/50 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
+              onClick={() => navigate(`/${slug}/portal/wizard?type=endosso`)}
+            >
+              <FileEdit className="w-5 h-5 text-zinc-400" />
+              <span className="text-xs text-white font-light">Endosso</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-3 flex flex-col items-center gap-1.5 bg-black/50 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
+              onClick={() => navigate(`/${slug}/portal/wizard?type=sinistro`)}
+            >
+              <AlertTriangle className="w-5 h-5 text-zinc-400" />
+              <span className="text-xs text-white font-light">Sinistro</span>
+            </Button>
           </div>
         </CardContent>
       </Card>

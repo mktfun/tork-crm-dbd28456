@@ -14,11 +14,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { LgpdConsent } from "@/components/ui/lgpd-consent";
 
 // Step Components
-import { HealthStep1Lives } from "./health/HealthStep1Lives";
-import { HealthStep2Business } from "./health/HealthStep2Business";
-import { HealthStep3Preferences } from "./health/HealthStep3Preferences";
-import { HealthStep4Contact } from "./health/HealthStep4Contact";
-import { HealthStep5CrossSell } from "./health/HealthStep5CrossSell";
+import { HealthStep1Lives } from "./HealthStep1Lives";
+import { HealthStep2Business } from "./HealthStep2Business";
+import { HealthStep3Preferences } from "./HealthStep3Preferences";
+import { HealthStep4Contact } from "./HealthStep4Contact";
+import { HealthStep5CrossSell } from "./HealthStep5CrossSell";
 
 export interface HealthWizardData {
   // Step 1: Vidas
@@ -152,38 +152,40 @@ export const HealthWizard = () => {
   // Carregar configurações de qualificação
   React.useEffect(() => {
     const loadConfig = async () => {
-      const { data: settings } = await supabase
-        .from('integration_settings')
-        .select('*')
-        .eq('id', 1)
-        .single();
-      
-      if (settings) {
-        // Converter regionStates legado para regionLocations se necessário
-        const rawLocations = (settings as any).health_region_locations;
-        const legacyStates = settings.health_region_states ?? [];
+      try {
+        const { data: settings } = await (supabase as any)
+          .from('integration_settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
         
-        // Usar novo formato se disponível, senão converter do legado
-        let regionLocations: Array<{state: string; city?: string}> = [];
-        if (rawLocations && Array.isArray(rawLocations) && rawLocations.length > 0) {
-          regionLocations = rawLocations;
-        } else if (legacyStates.length > 0) {
-          regionLocations = legacyStates.map((s: string) => ({ state: s }));
+        if (settings) {
+          const rawLocations = settings.health_region_locations;
+          const legacyStates = settings.health_region_states ?? [];
+          
+          let regionLocations: Array<{state: string; city?: string}> = [];
+          if (rawLocations && Array.isArray(rawLocations) && rawLocations.length > 0) {
+            regionLocations = rawLocations;
+          } else if (legacyStates.length > 0) {
+            regionLocations = legacyStates.map((s: string) => ({ state: s }));
+          }
+          
+          setQualificationConfig({
+            ageMin: settings.health_age_limit_min ?? 0,
+            ageMax: settings.health_age_limit_max ?? 65,
+            livesMin: settings.health_lives_min ?? 1,
+            livesMax: settings.health_lives_max ?? 99,
+            acceptCPF: settings.health_accept_cpf ?? true,
+            acceptCNPJ: settings.health_accept_cnpj ?? true,
+            cnpjMinEmployees: settings.health_cnpj_min_employees ?? 2,
+            cpfRequireHigherEducation: settings.health_cpf_require_higher_education ?? false,
+            regionMode: settings.health_region_mode ?? 'allow_all',
+            regionLocations,
+            budgetMin: settings.health_budget_min ?? 0,
+          });
         }
-        
-        setQualificationConfig({
-          ageMin: settings.health_age_limit_min ?? 0,
-          ageMax: settings.health_age_limit_max ?? 65,
-          livesMin: settings.health_lives_min ?? 1,
-          livesMax: settings.health_lives_max ?? 99,
-          acceptCPF: settings.health_accept_cpf ?? true,
-          acceptCNPJ: settings.health_accept_cnpj ?? true,
-          cnpjMinEmployees: settings.health_cnpj_min_employees ?? 2,
-          cpfRequireHigherEducation: settings.health_cpf_require_higher_education ?? false,
-          regionMode: (settings.health_region_mode as any) ?? 'allow_all',
-          regionLocations,
-          budgetMin: settings.health_budget_min ?? 0,
-        });
+      } catch (err) {
+        console.warn('integration_settings not available, using defaults');
       }
     };
     loadConfig();

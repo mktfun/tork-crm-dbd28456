@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Shield, Car, Heart, Calendar, Sparkles } from "lucide-react";
-import type { HealthWizardData } from "../HealthWizard";
+import type { HealthWizardData } from "./HealthWizard";
 
 interface Props {
   data: HealthWizardData;

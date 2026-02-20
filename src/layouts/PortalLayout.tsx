@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Home, FileText, CreditCard, User, LogOut, Loader2, Shield } from 'lucide-react';
+import { Home, FileText, CreditCard, User, LogOut, Loader2, Shield, Inbox } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface PortalClient {
@@ -198,6 +198,18 @@ export function PortalLayout() {
               <span className="text-xs tracking-wide">Carteirinhas</span>
             </Button>
           )}
+
+          <Button
+            variant="ghost"
+            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${isActive('solicitacoes')
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-zinc-300'
+              }`}
+            onClick={() => navigate(`/${brokerageSlug}/portal/solicitacoes`)}
+          >
+            <Inbox className="w-5 h-5" />
+            <span className="text-xs tracking-wide">Inbox</span>
+          </Button>
 
           <Button
             variant="ghost"

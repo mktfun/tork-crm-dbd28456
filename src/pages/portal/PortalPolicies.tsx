@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Shield, Calendar, Building2, Car, Home, Heart, Briefcase, AlertCircle, ChevronRight, Lock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Shield, Calendar, Building2, Car, Home, Heart, Briefcase, AlertCircle, ChevronRight, Lock, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +41,8 @@ interface ClientData {
 }
 
 export default function PortalPolicies() {
+  const navigate = useNavigate();
+  const { brokerageSlug } = useParams<{ brokerageSlug: string }>();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [companies, setCompanies] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -192,6 +196,22 @@ export default function PortalPolicies() {
                           {format(new Date(policy.expiration_date), 'dd/MM/yy', { locale: ptBR })}
                         </span>
                       </div>
+                      {differenceInDays(new Date(policy.expiration_date), new Date()) <= 30 &&
+                       differenceInDays(new Date(policy.expiration_date), new Date()) >= 0 &&
+                       policy.status.toLowerCase() !== 'cancelada' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/${brokerageSlug}/portal/wizard?type=renovacao&ramo=${(policy.type || 'auto').toLowerCase()}`);
+                          }}
+                        >
+                          <RefreshCw className="w-3 h-3 mr-1" />
+                          Renovar
+                        </Button>
+                      )}
                     </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-zinc-600 flex-shrink-0" />

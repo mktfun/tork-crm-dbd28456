@@ -2150,6 +2150,93 @@ export type Database = {
           },
         ]
       }
+      portal_requests: {
+        Row: {
+          brokerage_user_id: string
+          client_id: string
+          created_at: string | null
+          custom_fields: Json | null
+          deal_id: string | null
+          disqualification_reason: string | null
+          id: string
+          insurance_type: string
+          is_qualified: boolean | null
+          policy_id: string | null
+          qar_report: string | null
+          request_type: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          brokerage_user_id: string
+          client_id: string
+          created_at?: string | null
+          custom_fields?: Json | null
+          deal_id?: string | null
+          disqualification_reason?: string | null
+          id?: string
+          insurance_type: string
+          is_qualified?: boolean | null
+          policy_id?: string | null
+          qar_report?: string | null
+          request_type: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          brokerage_user_id?: string
+          client_id?: string
+          created_at?: string | null
+          custom_fields?: Json | null
+          deal_id?: string | null
+          disqualification_reason?: string | null
+          id?: string
+          insurance_type?: string
+          is_qualified?: boolean | null
+          policy_id?: string | null
+          qar_report?: string | null
+          request_type?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_requests_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_requests_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "v_n8n_agent_config"
+            referencedColumns: ["deal_id"]
+          },
+          {
+            foreignKeyName: "portal_requests_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "apolices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       producers: {
         Row: {
           brokerage_id: number

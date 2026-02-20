@@ -2,10 +2,16 @@ import React from 'react';
 import { Check, User, Building2, DollarSign, Users2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+export interface Step {
+  id: string;
+  title: string;
+  description?: string;
+}
+
 const STEP_ICONS = [User, Building2, DollarSign, Users2];
 
 interface StepperProps {
-  steps: string[];
+  steps: string[] | Step[];
   currentStep: number;
   className?: string;
 }
@@ -18,11 +24,11 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
         const isCompleted = stepNumber < currentStep;
         const isActive = stepNumber === currentStep;
         const Icon = STEP_ICONS[index] ?? User;
+        const label = typeof step === 'string' ? step : step.title;
 
         return (
           <div key={index} className="flex items-center">
             <div className="flex flex-col items-center">
-              {/* Circle */}
               <div
                 className={cn(
                   "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300",
@@ -39,8 +45,6 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
                   <Icon className="h-4 w-4" />
                 )}
               </div>
-
-              {/* Label */}
               <span
                 className={cn(
                   "mt-2 text-xs font-medium transition-colors duration-200 whitespace-nowrap",
@@ -51,11 +55,9 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
                       : "text-muted-foreground"
                 )}
               >
-                {step}
+                {label}
               </span>
             </div>
-
-            {/* Connector */}
             {index < steps.length - 1 && (
               <div className="relative h-0.5 w-12 sm:w-20 mx-2 sm:mx-4">
                 <div className="absolute inset-0 bg-border rounded-full" />
