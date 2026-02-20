@@ -2082,6 +2082,74 @@ export type Database = {
           },
         ]
       }
+      policy_renewal_history: {
+        Row: {
+          created_at: string
+          id: string
+          new_bonus_class: string | null
+          new_commission_rate: number
+          new_expiration_date: string
+          new_policy_number: string | null
+          new_premium_value: number
+          observations: string | null
+          policy_id: string
+          previous_bonus_class: string | null
+          previous_commission_rate: number
+          previous_expiration_date: string
+          previous_policy_number: string | null
+          previous_premium_value: number
+          renewal_type: string
+          renewed_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          new_bonus_class?: string | null
+          new_commission_rate: number
+          new_expiration_date: string
+          new_policy_number?: string | null
+          new_premium_value: number
+          observations?: string | null
+          policy_id: string
+          previous_bonus_class?: string | null
+          previous_commission_rate: number
+          previous_expiration_date: string
+          previous_policy_number?: string | null
+          previous_premium_value: number
+          renewal_type?: string
+          renewed_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          new_bonus_class?: string | null
+          new_commission_rate?: number
+          new_expiration_date?: string
+          new_policy_number?: string | null
+          new_premium_value?: number
+          observations?: string | null
+          policy_id?: string
+          previous_bonus_class?: string | null
+          previous_commission_rate?: number
+          previous_expiration_date?: string
+          previous_policy_number?: string | null
+          previous_premium_value?: number
+          renewal_type?: string
+          renewed_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "policy_renewal_history_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "apolices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       producers: {
         Row: {
           brokerage_id: number

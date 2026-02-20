@@ -113,6 +113,7 @@ export const useSupabaseRenewals = (
           brokerageId: item.brokerage_id,
           userId: item.user_id,
           automaticRenewal: item.automatic_renewal || true,
+          bonus_class: item.bonus_class || null,
           // Dados adicionais para a UI
           clientName: item.clientes?.name || 'Cliente não encontrado',
           clientPhone: item.clientes?.phone || null,
