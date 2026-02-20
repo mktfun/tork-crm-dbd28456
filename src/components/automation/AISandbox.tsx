@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Trash2, Bot, User, Loader2, FlaskConical, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useAISandbox } from '@/hooks/useAISandbox';
@@ -120,9 +120,9 @@ export function AISandbox({
   };
 
   return (
-    <div className="flex flex-col h-full bg-card/30">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border/50">
+    <div className="flex flex-col h-full min-h-0">
+      {/* Header — flex-shrink-0 */}
+      <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-border/50">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/20">
             <FlaskConical className="h-4 w-4 text-primary" />
@@ -154,9 +154,9 @@ export function AISandbox({
         )}
       </div>
       
-      {/* Integration Flow Viz */}
+      {/* Integration Flow Viz — flex-shrink-0 */}
       {selectedStage && (
-        <div className="px-4 py-3 border-b border-border/50 bg-secondary/20">
+        <div className="flex-shrink-0 px-4 py-3 border-b border-border/50 bg-secondary/20">
           <IntegrationFlowViz
             chatwootLabel={selectedStage.chatwoot_label}
             aiName={aiSetting?.ai_name ?? pipelineDefault?.ai_name ?? 'Agente IA'}
@@ -166,112 +166,109 @@ export function AISandbox({
         </div>
       )}
 
-      
-      {/* Formatting Alert */}
+      {/* Formatting Alert — flex-shrink-0 */}
       {lastViolations.length > 0 && (
-        <div className="px-4 pt-3">
+        <div className="flex-shrink-0 px-4 pt-3">
           <FormattingAlert violations={lastViolations} />
         </div>
       )}
       
-      {/* Messages area */}
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-4">
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-secondary/50 flex items-center justify-center mb-4">
-                <Sparkles className="h-8 w-8 text-muted-foreground" />
+      {/* Messages area — flex-1, scrolls internally */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-secondary/50 flex items-center justify-center mb-4">
+              <Sparkles className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-sm font-medium text-foreground mb-1">
+              Sandbox Pronto
+            </h3>
+            <p className="text-xs text-muted-foreground max-w-[200px] mb-4">
+              {selectedStage 
+                ? `Teste como a IA vai responder na etapa "${selectedStage.name}"`
+                : 'Selecione uma etapa para testar o comportamento da IA'
+              }
+            </p>
+            
+            {selectedStage && (
+              <div className="flex flex-wrap gap-2 justify-center">
+                {getSuggestions(selectedStage.name).map((suggestion) => (
+                  <Button
+                    key={suggestion}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => sendMessage(suggestion)}
+                    disabled={isLoading}
+                  >
+                    {suggestion}
+                  </Button>
+                ))}
               </div>
-              <h3 className="text-sm font-medium text-foreground mb-1">
-                Sandbox Pronto
-              </h3>
-              <p className="text-xs text-muted-foreground max-w-[200px] mb-4">
-                {selectedStage 
-                  ? `Teste como a IA vai responder na etapa "${selectedStage.name}"`
-                  : 'Selecione uma etapa para testar o comportamento da IA'
-                }
-              </p>
+            )}
+          </div>
+        ) : (
+          messages.map((message, index) => (
+            <div
+              key={index}
+              className={cn(
+                'flex gap-3',
+                message.role === 'user' ? 'justify-end' : 'justify-start'
+              )}
+            >
+              {message.role === 'assistant' && (
+                <div className={cn(
+                  'flex items-center justify-center w-7 h-7 rounded-lg shrink-0',
+                  message.violations?.length ? 'bg-destructive/20' : 'bg-primary/20'
+                )}>
+                  <Bot className={cn(
+                    'h-4 w-4',
+                    message.violations?.length ? 'text-destructive' : 'text-primary'
+                  )} />
+                </div>
+              )}
               
-              {selectedStage && (
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {getSuggestions(selectedStage.name).map((suggestion) => (
-                    <Button
-                      key={suggestion}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => sendMessage(suggestion)}
-                      disabled={isLoading}
-                    >
-                      {suggestion}
-                    </Button>
-                  ))}
+              <div
+                className={cn(
+                  'max-w-[80%] rounded-xl px-3 py-2',
+                  message.role === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : message.violations?.length
+                    ? 'bg-destructive/10 border border-destructive/30 text-foreground'
+                    : 'bg-secondary text-foreground'
+                )}
+              >
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              </div>
+              
+              {message.role === 'user' && (
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-secondary shrink-0">
+                  <User className="h-4 w-4 text-muted-foreground" />
                 </div>
               )}
             </div>
-          ) : (
-            messages.map((message, index) => (
-              <div
-                key={index}
-                className={cn(
-                  'flex gap-3',
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                )}
-              >
-                {message.role === 'assistant' && (
-                  <div className={cn(
-                    'flex items-center justify-center w-7 h-7 rounded-lg shrink-0',
-                    message.violations?.length ? 'bg-destructive/20' : 'bg-primary/20'
-                  )}>
-                    <Bot className={cn(
-                      'h-4 w-4',
-                      message.violations?.length ? 'text-destructive' : 'text-primary'
-                    )} />
-                  </div>
-                )}
-                
-                <div
-                  className={cn(
-                    'max-w-[80%] rounded-xl px-3 py-2',
-                    message.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : message.violations?.length
-                      ? 'bg-destructive/10 border border-destructive/30 text-foreground'
-                      : 'bg-secondary text-foreground'
-                  )}
-                >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                </div>
-                
-                {message.role === 'user' && (
-                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-secondary shrink-0">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-          
-          {isLoading && (
-            <div className="flex gap-3">
-              <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/20 shrink-0">
-                <Bot className="h-4 w-4 text-primary" />
-              </div>
-              <div className="bg-secondary rounded-xl px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Digitando...</span>
-                </div>
+          ))
+        )}
+        
+        {isLoading && (
+          <div className="flex gap-3">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/20 shrink-0">
+              <Bot className="h-4 w-4 text-primary" />
+            </div>
+            <div className="bg-secondary rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Digitando...</span>
               </div>
             </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
+          </div>
+        )}
+        
+        <div ref={messagesEndRef} />
+      </div>
       
-      {/* Input area */}
-      <div className="p-4 border-t border-border/50">
+      {/* Input area — flex-shrink-0, always visible at bottom */}
+      <div className="flex-shrink-0 p-4 border-t border-border/50">
         <div className="flex gap-2">
           <Input
             value={input}

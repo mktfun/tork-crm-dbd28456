@@ -7,8 +7,8 @@ import { useCrmAiSettings } from '@/hooks/useCrmAiSettings';
 import { useGlobalAiConfig } from '@/hooks/useGlobalAiConfig';
 import { usePipelineAiDefaults } from '@/hooks/usePipelineAiDefaults';
 import { SalesFlowTimeline } from './SalesFlowTimeline';
-import { useScrollFollow } from '@/hooks/useScrollFollow';
 import { AISandbox } from './AISandbox';
+import { SandboxFloatingCard } from './SandboxFloatingCard';
 import { PipelineAiDefaultsModal } from './PipelineAiDefaultsModal';
 import { NewPipelineModal } from '@/components/crm/NewPipelineModal';
 import { NewStageModal } from '@/components/crm/NewStageModal';
@@ -23,9 +23,7 @@ export function AIAutomationDashboard() {
   const { pipelines, isLoading: pipelinesLoading } = useCRMPipelines();
   const { config: globalConfig } = useGlobalAiConfig();
 
-  // Scroll-follow refs
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const sandboxRef = useScrollFollow(scrollContainerRef, 0.08);
 
   // Pipeline selection
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
@@ -168,9 +166,9 @@ export function AIAutomationDashboard() {
           </TabsList>
         </div>
 
-        <TabsContent value="etapas" className="flex-1 m-0 overflow-y-auto scroll-smooth" ref={scrollContainerRef as any}>
+        <TabsContent value="etapas" className="flex-1 m-0 overflow-y-auto scroll-smooth relative" ref={scrollContainerRef as any}>
           <div className="grid grid-cols-1 lg:grid-cols-5 items-start">
-            {/* Left column — flows naturally, page scrolls through it */}
+            {/* Left column — flows naturally, scrolls with the page */}
             <div className="lg:col-span-3 p-4">
               <SalesFlowTimeline
                 pipelines={pipelines}
@@ -192,8 +190,9 @@ export function AIAutomationDashboard() {
                 isSaving={upsertSetting.isPending}
               />
             </div>
-            {/* Right column — follows scroll with spring effect */}
-            <div ref={sandboxRef} className="lg:col-span-2" style={{ height: '100vh' }}>
+
+            {/* Right column — floating card pinned to viewport */}
+            <SandboxFloatingCard scrollContainerRef={scrollContainerRef}>
               <AISandbox
                 selectedStage={selectedStage}
                 selectedPipeline={selectedPipeline}
@@ -204,7 +203,7 @@ export function AIAutomationDashboard() {
                 globalBaseInstructions={globalConfig?.base_instructions ?? undefined}
                 globalAgentName={globalConfig?.agent_name ?? undefined}
               />
-            </div>
+            </SandboxFloatingCard>
           </div>
         </TabsContent>
 
