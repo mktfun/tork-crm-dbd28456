@@ -186,7 +186,7 @@ export function AIAutomationDashboard() {
                 isSaving={upsertSetting.isPending}
               />
             </div>
-            <div className="lg:col-span-2 border-l border-border overflow-hidden flex flex-col">
+            <div className="lg:col-span-2 border-l border-border overflow-hidden flex flex-col h-full">
               <AISandbox
                 selectedStage={selectedStage}
                 selectedPipeline={selectedPipeline}

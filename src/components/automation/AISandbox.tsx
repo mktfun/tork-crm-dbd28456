@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Trash2, Bot, User, Loader2, FlaskConical, Sparkles, ChevronRight } from 'lucide-react';
+import { Send, Trash2, Bot, User, Loader2, FlaskConical, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { useAISandbox } from '@/hooks/useAISandbox';
 import { FormattingAlert } from './FormattingAlert';
 import { IntegrationFlowViz } from './IntegrationFlowViz';
-import { AI_PERSONA_PRESETS, GLOBAL_SYNTAX_RULES } from './aiPresets';
+import { AI_PERSONA_PRESETS } from './aiPresets';
 
 interface Stage {
   id: string;
@@ -59,52 +59,6 @@ function getSuggestions(stageName: string): string[] {
   return ['Oi, tudo bem?', 'Quero saber mais', 'Pode me ajudar?'];
 }
 
-// Replicate buildSystemPrompt locally for display only
-function buildSystemPromptPreview(cfg: {
-  pipelineName: string;
-  stageName: string;
-  nextStageName?: string;
-  aiName?: string;
-  aiPersona?: string;
-  aiObjective?: string;
-  dealTitle?: string;
-  companyName?: string;
-  globalBaseInstructions?: string;
-  allowEmojis?: boolean;
-}): string {
-  const parts: string[] = [];
-
-  const substituteVars = (text: string) =>
-    text
-      .replace(/\{\{ai_name\}\}/g, cfg.aiName ?? 'Agente')
-      .replace(/\{\{company_name\}\}/g, cfg.companyName ?? 'sua empresa')
-      .replace(/\{\{deal_title\}\}/g, cfg.dealTitle ?? 'nosso produto')
-      .replace(/\{\{pipeline_name\}\}/g, cfg.pipelineName)
-      .replace(/\{\{next_stage_name\}\}/g, cfg.nextStageName ?? 'próxima etapa');
-
-  if (cfg.aiPersona) {
-    parts.push(substituteVars(cfg.aiPersona));
-  } else if (cfg.globalBaseInstructions) {
-    parts.push(substituteVars(cfg.globalBaseInstructions));
-  } else {
-    const defaultPreset = AI_PERSONA_PRESETS.find(p => p.id === 'proactive');
-    if (defaultPreset) {
-      parts.push(substituteVars(defaultPreset.xmlPrompt));
-    }
-  }
-
-  if (cfg.aiObjective) {
-    parts.push(`<mission>\nSeu objetivo principal nesta etapa é: ${cfg.aiObjective}\n</mission>`);
-  }
-
-  parts.push(`<context>\nFunil: "${cfg.pipelineName}" | Etapa atual: "${cfg.stageName}"${cfg.nextStageName ? ` | Próxima etapa: "${cfg.nextStageName}"` : ''}\n${cfg.dealTitle ? `Produto/Foco: ${cfg.dealTitle}` : ''}\n${cfg.aiName ? `Você se chama ${cfg.aiName}.` : ''}\nQuando concluir a coleta de dados, use a tag: [MOVER_PARA: ${cfg.nextStageName ?? 'próxima etapa'}]\n</context>`);
-
-  if (!cfg.allowEmojis) {
-    parts.push(GLOBAL_SYNTAX_RULES);
-  }
-
-  return parts.join('\n\n');
-}
 
 export function AISandbox({
   selectedStage,
@@ -117,7 +71,6 @@ export function AISandbox({
   globalAgentName,
 }: AISandboxProps) {
   const [input, setInput] = useState('');
-  const [showPrompt, setShowPrompt] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Detect if active persona allows emojis (matches a preset with allowEmojis)
@@ -213,23 +166,6 @@ export function AISandbox({
         </div>
       )}
 
-      {/* System Prompt Preview */}
-      {selectedStage && sandboxConfig && (
-        <div className="px-4 py-2 border-b border-border/50">
-          <button
-            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-            onClick={() => setShowPrompt(!showPrompt)}
-          >
-            <ChevronRight className={cn("h-3 w-3 transition-transform", showPrompt && "rotate-90")} />
-            Ver system prompt enviado ao Gemini
-          </button>
-          {showPrompt && (
-            <pre className="mt-2 p-3 rounded-lg bg-muted/50 text-[10px] text-muted-foreground font-mono whitespace-pre-wrap max-h-40 overflow-y-auto border border-border/50">
-              {buildSystemPromptPreview(sandboxConfig)}
-            </pre>
-          )}
-        </div>
-      )}
       
       {/* Formatting Alert */}
       {lastViolations.length > 0 && (

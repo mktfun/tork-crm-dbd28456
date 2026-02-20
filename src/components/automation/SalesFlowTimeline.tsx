@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Settings, Dna } from 'lucide-react';
+import { Plus, Dna } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -114,51 +114,20 @@ export function SalesFlowTimeline({
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9"
-                  onClick={onOpenPipelineDefaults}
-                  disabled={!selectedPipeline}
-                >
-                  <Dna className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Configurar persona padrão de IA para este funil</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9"
-                  onClick={onEditPipeline}
-                  disabled={!selectedPipeline}
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Editar funil</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9"
-                  onClick={onAddPipeline}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Novo funil</TooltipContent>
-            </Tooltip>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                onClick={onOpenPipelineDefaults}
+                disabled={!selectedPipeline}
+              >
+                <Dna className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Configurar persona padrão de IA para este funil</TooltipContent>
+          </Tooltip>
         </div>
       </TooltipProvider>
 
