@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCompanyNames } from '@/hooks/useCompanyNames';
 import { useClients } from '@/hooks/useAppData';
@@ -149,14 +150,14 @@ export default function Policies() {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusVariant = (status: string): string => {
     switch (status) {
-      case 'Ativa': return 'bg-green-600';
-      case 'Orçamento': return 'bg-blue-600';
-      case 'Aguardando Apólice': return 'bg-yellow-600';
-      case 'Cancelada': return 'bg-red-600';
-      case 'Renovada': return 'bg-purple-600';
-      default: return 'bg-gray-600';
+      case 'Ativa': return 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+      case 'Orçamento': return 'bg-blue-500/15 text-blue-400 border border-blue-500/30';
+      case 'Aguardando Apólice': return 'bg-amber-500/15 text-amber-400 border border-amber-500/30';
+      case 'Cancelada': return 'bg-destructive/15 text-destructive border border-destructive/30';
+      case 'Renovada': return 'bg-purple-500/15 text-purple-400 border border-purple-500/30';
+      default: return 'bg-muted text-muted-foreground border border-border';
     }
   };
 
@@ -378,10 +379,11 @@ export default function Policies() {
             {/* Ações Principais */}
             <Button
               onClick={() => setIsAIImportModalOpen(true)}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border-0"
+              variant="outline"
+              className="bg-muted/80 border-border text-foreground hover:bg-muted hover:text-foreground gap-2"
             >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Importar Lote (OCR)
+              <Sparkles className="w-4 h-4 text-primary" />
+              Importar via IA
             </Button>
 
             <Button
@@ -476,7 +478,43 @@ export default function Policies() {
 
       {/* Lista de Apólices */}
       <div className="grid gap-4">
-        {filteredPolicies.map(policy => {
+        {isLoading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-card border border-border rounded-lg p-6 animate-pulse"
+            >
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex-1 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-5 bg-muted rounded w-48" />
+                    <div className="h-5 bg-muted rounded w-16" />
+                  </div>
+                  <div className="grid grid-cols-4 gap-4">
+                    {Array.from({ length: 4 }).map((_, j) => (
+                      <div key={j} className="space-y-1">
+                        <div className="h-3 bg-muted rounded w-16" />
+                        <div className="h-4 bg-muted/70 rounded w-24" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="space-y-1 text-right">
+                    <div className="h-3 bg-muted rounded w-12 ml-auto" />
+                    <div className="h-5 bg-muted rounded w-24" />
+                    <div className="h-3 bg-muted rounded w-16 ml-auto" />
+                  </div>
+                  <div className="space-y-1 text-right">
+                    <div className="h-3 bg-muted rounded w-16 ml-auto" />
+                    <div className="h-4 bg-muted rounded w-20" />
+                    <div className="h-3 bg-muted rounded w-12 ml-auto" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        ) : filteredPolicies.map(policy => {
           const client = clients.find(c => c.id === policy.clientId);
           const producer = producers.find(p => p.id === policy.producerId);
           const daysRemaining = differenceInDays(parseLocalDate(policy.expirationDate), new Date());
@@ -523,7 +561,7 @@ export default function Policies() {
 
                 {/* Badges de status — lado direito */}
                 <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                  <Badge className={getStatusColor(policy.status) + " text-white"}>
+                  <Badge className={cn("font-medium text-xs", getStatusVariant(policy.status))}>
                     {policy.status}
                   </Badge>
                   <AutoRenewalIndicator
@@ -532,8 +570,8 @@ export default function Policies() {
                     status={policy.status}
                   />
                   {isExpiringSoon && policy.status === 'Ativa' && (
-                    <Badge variant="destructive" className="animate-pulse">
-                      Vence em breve!
+                    <Badge className="bg-destructive/10 text-destructive border border-destructive/30 text-xs">
+                      {daysRemaining}d p/ vencer
                     </Badge>
                   )}
                 </div>
@@ -602,6 +640,11 @@ export default function Policies() {
             </AppCard>
           );
         })}
+        {!isLoading && filteredPolicies.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            Nenhuma apólice encontrada com os filtros selecionados.
+          </div>
+        )}
       </div>
 
       {/* Controles de Paginação */}
