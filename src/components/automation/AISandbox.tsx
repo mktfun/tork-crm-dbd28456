@@ -39,6 +39,7 @@ interface AISandboxProps {
     ai_objective?: string | null;
     is_active?: boolean | null;
   } | null;
+  nextStageName?: string;
 }
 
 // Contextual suggestions based on stage name
@@ -59,6 +60,7 @@ function getSuggestions(stageName: string): string[] {
 function buildSystemPromptPreview(cfg: {
   pipelineName: string;
   stageName: string;
+  nextStageName?: string;
   aiName?: string;
   aiPersona?: string;
   aiObjective?: string;
@@ -66,12 +68,20 @@ function buildSystemPromptPreview(cfg: {
 }): string {
   const parts: string[] = [];
 
+  const substituteVars = (text: string) =>
+    text
+      .replace(/\{\{ai_name\}\}/g, cfg.aiName ?? 'Agente')
+      .replace(/\{\{company_name\}\}/g, 'Corretora')
+      .replace(/\{\{deal_title\}\}/g, cfg.dealTitle ?? 'nosso produto')
+      .replace(/\{\{pipeline_name\}\}/g, cfg.pipelineName)
+      .replace(/\{\{next_stage_name\}\}/g, cfg.nextStageName ?? 'próxima etapa');
+
   if (cfg.aiPersona) {
-    parts.push(cfg.aiPersona);
+    parts.push(substituteVars(cfg.aiPersona));
   } else {
     const defaultPreset = AI_PERSONA_PRESETS.find(p => p.id === 'proactive');
     if (defaultPreset) {
-      parts.push(defaultPreset.xmlPrompt);
+      parts.push(substituteVars(defaultPreset.xmlPrompt));
     }
   }
 
@@ -79,7 +89,7 @@ function buildSystemPromptPreview(cfg: {
     parts.push(`<mission>\nSeu objetivo principal nesta etapa é: ${cfg.aiObjective}\n</mission>`);
   }
 
-  parts.push(`<context>\nVocê está atendendo no funil "${cfg.pipelineName}", etapa "${cfg.stageName}".\n${cfg.dealTitle ? `O lead demonstrou interesse em: ${cfg.dealTitle}` : ''}\n${cfg.aiName ? `Seu nome é ${cfg.aiName}.` : ''}\n</context>`);
+  parts.push(`<context>\nFunil: "${cfg.pipelineName}" | Etapa atual: "${cfg.stageName}"${cfg.nextStageName ? ` | Próxima etapa: "${cfg.nextStageName}"` : ''}\n${cfg.dealTitle ? `Produto/Foco: ${cfg.dealTitle}` : ''}\n${cfg.aiName ? `Você se chama ${cfg.aiName}.` : ''}\nQuando concluir a coleta de dados, use a tag: [MOVER_PARA: ${cfg.nextStageName ?? 'próxima etapa'}]\n</context>`);
 
   parts.push(GLOBAL_SYNTAX_RULES);
 
@@ -91,6 +101,7 @@ export function AISandbox({
   selectedPipeline,
   aiSetting,
   pipelineDefault,
+  nextStageName,
 }: AISandboxProps) {
   const [input, setInput] = useState('');
   const [showPrompt, setShowPrompt] = useState(false);
@@ -102,6 +113,7 @@ export function AISandbox({
     pipelineId: selectedPipeline.id,
     pipelineName: selectedPipeline.name,
     stageName: selectedStage.name,
+    nextStageName: nextStageName,
     aiName: aiSetting?.ai_name ?? pipelineDefault?.ai_name ?? undefined,
     aiPersona: aiSetting?.ai_persona ?? pipelineDefault?.ai_persona ?? undefined,
     aiObjective: aiSetting?.ai_objective ?? pipelineDefault?.ai_objective ?? undefined,

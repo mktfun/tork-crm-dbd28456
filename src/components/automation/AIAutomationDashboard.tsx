@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Bot, Loader2 } from 'lucide-react';
 import { useCRMPipelines } from '@/hooks/useCRMPipelines';
 import { useCRMStages } from '@/hooks/useCRMDeals';
@@ -38,6 +38,13 @@ export function AIAutomationDashboard() {
   // Selected stage for editing
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const selectedStage = stages.find(s => s.id === selectedStageId) || null;
+  const sortedStagesForNext = useMemo(
+    () => [...stages].sort((a, b) => a.position - b.position),
+    [stages]
+  );
+  const nextStage = selectedStage
+    ? sortedStagesForNext.find(s => s.position > selectedStage.position) ?? null
+    : null;
   const selectedAiSetting = aiSettings.find(s => s.stage_id === selectedStageId) || null;
 
   // Modals
@@ -185,6 +192,7 @@ export function AIAutomationDashboard() {
                 selectedPipeline={selectedPipeline}
                 aiSetting={selectedAiSetting}
                 pipelineDefault={pipelineDefault}
+                nextStageName={nextStage?.name}
               />
             </div>
           </div>

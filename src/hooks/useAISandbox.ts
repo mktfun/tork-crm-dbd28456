@@ -15,6 +15,7 @@ interface SandboxConfig {
   pipelineId: string;
   pipelineName: string;
   stageName: string;
+  nextStageName?: string;
   aiName?: string;
   aiPersona?: string;
   aiObjective?: string;
@@ -38,15 +39,23 @@ export function useAISandbox(config: SandboxConfig | null): UseAISandboxReturn {
 
   const buildSystemPrompt = useCallback((cfg: SandboxConfig): string => {
     const parts: string[] = [];
+
+    // Substitui as variáveis dinâmicas {{...}} no texto do persona
+    const substituteVars = (text: string) =>
+      text
+        .replace(/\{\{ai_name\}\}/g, cfg.aiName ?? 'Agente')
+        .replace(/\{\{company_name\}\}/g, 'Corretora')
+        .replace(/\{\{deal_title\}\}/g, cfg.dealTitle ?? 'nosso produto')
+        .replace(/\{\{pipeline_name\}\}/g, cfg.pipelineName)
+        .replace(/\{\{next_stage_name\}\}/g, cfg.nextStageName ?? 'próxima etapa');
     
-    // Base persona
+    // Base persona (com variáveis substituídas)
     if (cfg.aiPersona) {
-      parts.push(cfg.aiPersona);
+      parts.push(substituteVars(cfg.aiPersona));
     } else {
-      // Fallback to default preset
       const defaultPreset = AI_PERSONA_PRESETS.find(p => p.id === 'proactive');
       if (defaultPreset) {
-        parts.push(defaultPreset.xmlPrompt);
+        parts.push(substituteVars(defaultPreset.xmlPrompt));
       }
     }
     
@@ -61,9 +70,10 @@ Seu objetivo principal nesta etapa é: ${cfg.aiObjective}
     // Context injection
     parts.push(`
 <context>
-Você está atendendo no funil "${cfg.pipelineName}", etapa "${cfg.stageName}".
-${cfg.dealTitle ? `O lead demonstrou interesse em: ${cfg.dealTitle}` : ''}
-${cfg.aiName ? `Seu nome é ${cfg.aiName}.` : ''}
+Funil: "${cfg.pipelineName}" | Etapa atual: "${cfg.stageName}"${cfg.nextStageName ? ` | Próxima etapa: "${cfg.nextStageName}"` : ''}
+${cfg.dealTitle ? `Produto/Foco: ${cfg.dealTitle}` : ''}
+${cfg.aiName ? `Você se chama ${cfg.aiName}.` : ''}
+Quando concluir a coleta de dados, use a tag: [MOVER_PARA: ${cfg.nextStageName ?? 'próxima etapa'}]
 </context>`);
     
     // Global syntax rules
