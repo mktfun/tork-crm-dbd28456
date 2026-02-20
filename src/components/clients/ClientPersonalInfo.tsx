@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { MaskedInput } from '@/components/ui/masked-input';
+import { FileText } from 'lucide-react';
 import { Client } from '@/types';
 
 interface ClientPersonalInfoProps {
@@ -20,11 +21,16 @@ export function ClientPersonalInfo({
 }: ClientPersonalInfoProps) {
   return (
     <AppCard className="p-6">
-      <h2 className="text-xl font-semibold text-foreground mb-4">Informações Pessoais</h2>
+      <div className="flex items-center gap-3 mb-5">
+        <div className="p-2 rounded-lg bg-muted">
+          <FileText size={18} className="text-muted-foreground" />
+        </div>
+        <h2 className="text-base font-semibold text-foreground">Informações Pessoais</h2>
+      </div>
       
       <div className="space-y-4">
         <div>
-          <Label className="text-sm font-medium text-muted-foreground">CPF/CNPJ</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CPF/CNPJ</Label>
           {isEditing ? (
             <MaskedInput 
               mask="999.999.999-99"
@@ -34,12 +40,12 @@ export function ClientPersonalInfo({
               placeholder="000.000.000-00"
             />
           ) : (
-            <p className="text-lg text-foreground mt-1 font-mono">{client.cpfCnpj || 'Não informado'}</p>
+            <p className="text-base font-medium text-foreground mt-1 font-mono">{client.cpfCnpj || 'Não informado'}</p>
           )}
         </div>
 
         <div>
-          <Label className="text-sm font-medium text-muted-foreground">Data de Nascimento</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Data de Nascimento</Label>
           {isEditing ? (
             <Input 
               type="date"
@@ -48,14 +54,14 @@ export function ClientPersonalInfo({
               className="mt-1"
             />
           ) : (
-            <p className="text-lg text-foreground mt-1">
+            <p className="text-base font-medium text-foreground mt-1">
               {client.birthDate ? new Date(client.birthDate).toLocaleDateString('pt-BR') : 'Não informado'}
             </p>
           )}
         </div>
 
         <div>
-          <Label className="text-sm font-medium text-muted-foreground">Estado Civil</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado Civil</Label>
           {isEditing ? (
             <Select value={client.maritalStatus || ''} onValueChange={(value) => onFieldChange('maritalStatus', value)}>
               <SelectTrigger className="mt-1">
@@ -69,12 +75,12 @@ export function ClientPersonalInfo({
               </SelectContent>
             </Select>
           ) : (
-            <p className="text-lg text-foreground mt-1">{client.maritalStatus || 'Não informado'}</p>
+            <p className="text-base font-medium text-foreground mt-1">{client.maritalStatus || 'Não informado'}</p>
           )}
         </div>
 
         <div>
-          <Label className="text-sm font-medium text-muted-foreground">Profissão</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Profissão</Label>
           {isEditing ? (
             <Input 
               value={client.profession || ''}
@@ -83,12 +89,12 @@ export function ClientPersonalInfo({
               placeholder="Ex: Engenheiro, Médico..."
             />
           ) : (
-            <p className="text-lg text-foreground mt-1">{client.profession || 'Não informado'}</p>
+            <p className="text-base font-medium text-foreground mt-1">{client.profession || 'Não informado'}</p>
           )}
         </div>
 
         <div>
-          <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</Label>
           {isEditing ? (
             <Select value={client.status || 'Ativo'} onValueChange={(value) => onFieldChange('status', value)}>
               <SelectTrigger className="mt-1">
