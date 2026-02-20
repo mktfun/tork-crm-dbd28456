@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -67,6 +67,21 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
       renewalType: 'auto_12m'
     }
   });
+
+  // Reset form values when policy changes (modal opens with different policy)
+  useEffect(() => {
+    if (policy && isOpen) {
+      reset({
+        newPremiumValue: policy.premiumValue || 0,
+        newCommissionRate: policy.commissionRate || 0,
+        bonusClass: String(Math.min(10, Number(policy.bonus_class || '0') + 1)),
+        insuranceCompanyId: policy.insuranceCompany || '',
+        newPolicyNumber: policy.policyNumber || '',
+        startDate: policy.expirationDate || '',
+        renewalType: 'auto_12m',
+      });
+    }
+  }, [policy, isOpen, reset]);
 
   const renewalType = watch('renewalType');
   const startDate = watch('startDate');
