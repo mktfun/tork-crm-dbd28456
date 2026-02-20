@@ -132,19 +132,32 @@ export function AIAutomationDashboard() {
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="border-b px-6 py-3 bg-background">
-        <h1 className="font-semibold text-lg flex items-center gap-2">
+      <div className="flex-shrink-0 border-b border-border px-6 py-4 flex items-center gap-4">
+        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
           <Bot className="h-5 w-5 text-primary" />
-          Automação de Vendas
-        </h1>
+        </div>
+        <div>
+          <h1 className="font-semibold text-base text-foreground leading-none">Automação de Vendas</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Configure a IA no funil e teste o comportamento</p>
+        </div>
       </div>
 
       {/* Tabs */}
       <Tabs defaultValue="etapas" className="flex-1 flex flex-col min-h-0">
-        <div className="border-b px-6">
-          <TabsList className="h-12">
-            <TabsTrigger value="etapas">Configurar Etapas</TabsTrigger>
-            <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
+        <div className="border-b border-border px-6">
+          <TabsList className="bg-transparent p-0 h-11 gap-4">
+            <TabsTrigger
+              value="etapas"
+              className="px-0 pb-3 pt-2 h-auto rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent text-sm font-medium text-muted-foreground"
+            >
+              Configurar Etapas
+            </TabsTrigger>
+            <TabsTrigger
+              value="configuracoes"
+              className="px-0 pb-3 pt-2 h-auto rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent text-sm font-medium text-muted-foreground"
+            >
+              Configurações
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -152,30 +165,30 @@ export function AIAutomationDashboard() {
           <div className="h-full grid grid-cols-1 lg:grid-cols-5 gap-4 min-h-0 overflow-hidden">
             <div className="lg:col-span-3 min-h-0 overflow-hidden">
               <SalesFlowTimeline
-            pipelines={pipelines}
-            selectedPipelineId={selectedPipelineId}
-            onSelectPipeline={setSelectedPipelineId}
-            stages={stages}
-            aiSettings={aiSettings}
-            pipelineDefault={pipelineDefault}
-            selectedStageId={selectedStageId}
-            stageConfigMap={stageConfigMap}
-            onSelectStage={setSelectedStageId}
-            onToggleAI={handleToggleAI}
-            onSaveStageConfig={handleSaveStageConfig}
-            onResetStageToDefault={handleResetStageToDefault}
-            onOpenPipelineDefaults={() => setShowPipelineDefaults(true)}
-            onEditPipeline={() => setEditingPipeline(selectedPipeline)}
-            onAddStage={() => setShowNewStage(true)}
-            onAddPipeline={() => setShowNewPipeline(true)}
+                pipelines={pipelines}
+                selectedPipelineId={selectedPipelineId}
+                onSelectPipeline={setSelectedPipelineId}
+                stages={stages}
+                aiSettings={aiSettings}
+                pipelineDefault={pipelineDefault}
+                selectedStageId={selectedStageId}
+                stageConfigMap={stageConfigMap}
+                onSelectStage={setSelectedStageId}
+                onToggleAI={handleToggleAI}
+                onSaveStageConfig={handleSaveStageConfig}
+                onResetStageToDefault={handleResetStageToDefault}
+                onOpenPipelineDefaults={() => setShowPipelineDefaults(true)}
+                onEditPipeline={() => setEditingPipeline(selectedPipeline)}
+                onAddStage={() => setShowNewStage(true)}
+                onAddPipeline={() => setShowNewPipeline(true)}
                 isSaving={upsertSetting.isPending}
               />
             </div>
             <div className="lg:col-span-2 min-h-0 overflow-hidden">
               <AISandbox
-            selectedStage={selectedStage}
-            selectedPipeline={selectedPipeline}
-            aiSetting={selectedAiSetting}
+                selectedStage={selectedStage}
+                selectedPipeline={selectedPipeline}
+                aiSetting={selectedAiSetting}
                 pipelineDefault={pipelineDefault}
               />
             </div>

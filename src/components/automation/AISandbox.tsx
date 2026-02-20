@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Trash2, Bot, User, Loader2, FlaskConical, Sparkles } from 'lucide-react';
+import { Send, Trash2, Bot, User, Loader2, FlaskConical, Sparkles, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useAISandbox } from '@/hooks/useAISandbox';
 import { FormattingAlert } from './FormattingAlert';
 import { IntegrationFlowViz } from './IntegrationFlowViz';
+import { AI_PERSONA_PRESETS, GLOBAL_SYNTAX_RULES } from './aiPresets';
 
 interface Stage {
   id: string;
@@ -39,6 +41,51 @@ interface AISandboxProps {
   } | null;
 }
 
+// Contextual suggestions based on stage name
+function getSuggestions(stageName: string): string[] {
+  const name = stageName.toLowerCase();
+  if (name.includes('lead') || name.includes('novo'))
+    return ['Oi, tudo bem?', 'Quero uma cotação', 'Quanto custa?'];
+  if (name.includes('contato') || name.includes('qualific'))
+    return ['Qual plano vocês têm?', 'Tem cobertura para dentista?', 'E o prazo de carência?'];
+  if (name.includes('proposta') || name.includes('negocia'))
+    return ['Posso parcelar?', 'Qual o desconto?', 'E para PJ?'];
+  if (name.includes('sinistro') || name.includes('suporte') || name.includes('pós'))
+    return ['Preciso de ajuda com reembolso', 'Tive um acidente', 'Como faço para usar?'];
+  return ['Oi, tudo bem?', 'Quero saber mais', 'Pode me ajudar?'];
+}
+
+// Replicate buildSystemPrompt locally for display only
+function buildSystemPromptPreview(cfg: {
+  pipelineName: string;
+  stageName: string;
+  aiName?: string;
+  aiPersona?: string;
+  aiObjective?: string;
+  dealTitle?: string;
+}): string {
+  const parts: string[] = [];
+
+  if (cfg.aiPersona) {
+    parts.push(cfg.aiPersona);
+  } else {
+    const defaultPreset = AI_PERSONA_PRESETS.find(p => p.id === 'proactive');
+    if (defaultPreset) {
+      parts.push(defaultPreset.xmlPrompt);
+    }
+  }
+
+  if (cfg.aiObjective) {
+    parts.push(`<mission>\nSeu objetivo principal nesta etapa é: ${cfg.aiObjective}\n</mission>`);
+  }
+
+  parts.push(`<context>\nVocê está atendendo no funil "${cfg.pipelineName}", etapa "${cfg.stageName}".\n${cfg.dealTitle ? `O lead demonstrou interesse em: ${cfg.dealTitle}` : ''}\n${cfg.aiName ? `Seu nome é ${cfg.aiName}.` : ''}\n</context>`);
+
+  parts.push(GLOBAL_SYNTAX_RULES);
+
+  return parts.join('\n\n');
+}
+
 export function AISandbox({
   selectedStage,
   selectedPipeline,
@@ -46,6 +93,7 @@ export function AISandbox({
   pipelineDefault,
 }: AISandboxProps) {
   const [input, setInput] = useState('');
+  const [showPrompt, setShowPrompt] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Build config for sandbox
@@ -57,7 +105,7 @@ export function AISandbox({
     aiName: aiSetting?.ai_name ?? pipelineDefault?.ai_name ?? undefined,
     aiPersona: aiSetting?.ai_persona ?? pipelineDefault?.ai_persona ?? undefined,
     aiObjective: aiSetting?.ai_objective ?? pipelineDefault?.ai_objective ?? undefined,
-    dealTitle: selectedPipeline.name, // Use pipeline name as context
+    dealTitle: selectedPipeline.name,
   } : null;
   
   const { messages, isLoading, lastViolations, sendMessage, clearChat } = useAISandbox(sandboxConfig);
@@ -93,7 +141,13 @@ export function AISandbox({
             <FlaskConical className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-foreground">Laboratório do Robô</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-foreground">Laboratório do Robô</h2>
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5 gap-1 text-muted-foreground">
+                <Sparkles className="w-2.5 h-2.5" />
+                Gemini Flash
+              </Badge>
+            </div>
             <p className="text-[10px] text-muted-foreground">
               Teste o comportamento da IA
             </p>
@@ -124,6 +178,24 @@ export function AISandbox({
           />
         </div>
       )}
+
+      {/* System Prompt Preview */}
+      {selectedStage && sandboxConfig && (
+        <div className="px-4 py-2 border-b border-border/50">
+          <button
+            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setShowPrompt(!showPrompt)}
+          >
+            <ChevronRight className={cn("h-3 w-3 transition-transform", showPrompt && "rotate-90")} />
+            Ver system prompt enviado ao Gemini
+          </button>
+          {showPrompt && (
+            <pre className="mt-2 p-3 rounded-lg bg-muted/50 text-[10px] text-muted-foreground font-mono whitespace-pre-wrap max-h-40 overflow-y-auto border border-border/50">
+              {buildSystemPromptPreview(sandboxConfig)}
+            </pre>
+          )}
+        </div>
+      )}
       
       {/* Formatting Alert */}
       {lastViolations.length > 0 && (
@@ -152,7 +224,7 @@ export function AISandbox({
               
               {selectedStage && (
                 <div className="flex flex-wrap gap-2 justify-center">
-                  {['Oi, tudo bem?', 'Quero um orçamento', 'Quanto custa?'].map((suggestion) => (
+                  {getSuggestions(selectedStage.name).map((suggestion) => (
                     <Button
                       key={suggestion}
                       variant="outline"
@@ -248,7 +320,7 @@ export function AISandbox({
           </Button>
         </div>
         <p className="text-[10px] text-muted-foreground mt-2 text-center">
-          Ctrl+Enter para enviar • Esc para limpar
+          Enter para enviar
         </p>
       </div>
     </div>

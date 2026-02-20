@@ -139,8 +139,6 @@ export function StageFlowCard({
           : ''
       )}
     >
-      {/* Connecting line to next stage */}
-      <div className="absolute left-6 -bottom-4 w-px h-4 bg-border" />
       
       {/* Stage color indicator */}
       <div 
@@ -199,7 +197,7 @@ export function StageFlowCard({
           
           <div className="flex items-center gap-2">
             <span className={cn(
-              'text-xs font-medium',
+              'text-xs font-medium w-10 text-center',
               isActive ? 'text-emerald-400' : 'text-muted-foreground'
             )}>
               {isActive ? 'IA' : 'Manual'}
@@ -224,8 +222,8 @@ export function StageFlowCard({
         <div className="px-4 pb-4 pt-0 space-y-4 border-t border-border/50">
           {/* Vibe Selector */}
           <div className="pt-4">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-              Vibe do Agente
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+              Vibe do agente
             </label>
             <VibeSelector
               value={selectedVibe}
@@ -236,8 +234,8 @@ export function StageFlowCard({
           
           {/* Mission */}
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-              Missão Principal
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+              Missão principal
             </label>
             <Textarea
               value={mission}

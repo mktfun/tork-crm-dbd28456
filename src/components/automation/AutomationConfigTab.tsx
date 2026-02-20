@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Save, MessageCircle, ExternalLink, Eye, EyeOff, Loader2, RefreshCw, Wifi, Send, Copy, Check } from 'lucide-react';
+import { Save, MessageCircle, ExternalLink, Eye, EyeOff, Loader2, RefreshCw, Wifi, Send, Copy, Check, Settings, Link } from 'lucide-react';
 import { InboxAgentMapping } from '@/components/settings/InboxAgentMapping';
 
 interface AutomationSettings {
@@ -189,7 +189,6 @@ export function AutomationConfigTab() {
     const toastId = toast.loading('Enviando teste para n8n...');
     
     try {
-      // Chamar edge function que monta payload de teste e envia pro n8n
       const { data, error } = await supabase.functions.invoke('test-n8n-webhook', {
         body: { 
           inbox_id: testInboxId,
@@ -231,7 +230,18 @@ export function AutomationConfigTab() {
   }
 
   return (
-    <div className="space-y-6 pb-6">
+    <div className="space-y-6 pb-24">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Settings className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <h2 className="font-semibold text-base text-foreground">Configurações de Automação</h2>
+          <p className="text-xs text-muted-foreground">Credenciais e integrações do sistema</p>
+        </div>
+      </div>
+
       {/* Chatwoot Config */}
       <Card>
         <CardHeader>
@@ -325,11 +335,6 @@ export function AutomationConfigTab() {
           </div>
 
           <div className="flex flex-wrap gap-3 pt-2">
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              Salvar
-            </Button>
-
             <Button 
               variant="outline" 
               onClick={handleTestChatwoot} 
@@ -354,8 +359,15 @@ export function AutomationConfigTab() {
       {/* Webhook CRM */}
       <Card>
         <CardHeader>
-          <CardTitle>Webhook do CRM</CardTitle>
-          <CardDescription>Configure este URL no Chatwoot para receber eventos</CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <Link className="h-5 w-5 text-emerald-400" />
+            </div>
+            <div>
+              <CardTitle>Webhook do CRM</CardTitle>
+              <CardDescription>Configure no Chatwoot para receber eventos em tempo real</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
@@ -427,11 +439,6 @@ export function AutomationConfigTab() {
           </div>
 
           <div className="flex gap-3">
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              Salvar
-            </Button>
-
             <Button 
               variant="outline" 
               onClick={handleTestN8n} 
@@ -446,6 +453,14 @@ export function AutomationConfigTab() {
 
       {/* Inbox Agent Mapping */}
       <InboxAgentMapping />
+
+      {/* Sticky Save Button */}
+      <div className="sticky bottom-0 bg-background/80 backdrop-blur border-t border-border pt-4 mt-4 flex justify-end">
+        <Button onClick={handleSave} disabled={saving} className="min-w-[120px]">
+          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+          Salvar Tudo
+        </Button>
+      </div>
     </div>
   );
 }

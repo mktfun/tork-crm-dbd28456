@@ -95,29 +95,9 @@ export function SalesFlowTimeline({
 
   return (
     <div className="flex flex-col h-full bg-card/30 rounded-xl border border-border">
-      {/* Header */}
-      <div className="flex flex-col gap-3 p-4 border-b border-border/50">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Fluxo de Vendas</h2>
-            <p className="text-xs text-muted-foreground">
-              {stages.length} etapas • {activeCount} com IA ativa
-            </p>
-          </div>
-          
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onAddPipeline}
-            className="gap-1"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Funil
-          </Button>
-        </div>
-        
-        {/* Pipeline selector */}
-        <div className="flex items-center gap-2">
+      {/* Header — select + action icons in 1 line */}
+      <TooltipProvider>
+        <div className="flex items-center gap-2 p-4 border-b border-border/50">
           <Select
             value={selectedPipelineId || undefined}
             onValueChange={onSelectPipeline}
@@ -128,56 +108,70 @@ export function SalesFlowTimeline({
             <SelectContent>
               {pipelines.map((pipeline) => (
                 <SelectItem key={pipeline.id} value={pipeline.id}>
-                  {pipeline.name}
-                  {pipeline.is_default && " ★"}
+                  {pipeline.name}{pipeline.is_default && ' ★'}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          
-          <TooltipProvider>
+
+          <div className="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  className="h-9 w-9 shrink-0"
+                  className="h-9 w-9"
                   onClick={onOpenPipelineDefaults}
                   disabled={!selectedPipeline}
                 >
                   <Dna className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>
-                DNA Padrão do Funil
-              </TooltipContent>
+              <TooltipContent>Configurar persona padrão de IA para este funil</TooltipContent>
             </Tooltip>
-          </TooltipProvider>
-          
-          <TooltipProvider>
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 shrink-0"
+                  className="h-9 w-9"
                   onClick={onEditPipeline}
                   disabled={!selectedPipeline}
                 >
                   <Settings className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>
-                Configurar Funil
-              </TooltipContent>
+              <TooltipContent>Editar funil</TooltipContent>
             </Tooltip>
-          </TooltipProvider>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={onAddPipeline}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Novo funil</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
+      </TooltipProvider>
+
+      {/* Stage count bar */}
+      <div className="px-4 py-1.5 border-b border-border/30 bg-muted/20">
+        <p className="text-[11px] text-muted-foreground">
+          {stages.length} etapas • {activeCount} com IA ativa
+        </p>
       </div>
       
       {/* Stages timeline */}
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-0">
           {sortedStages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center mb-3">
@@ -197,30 +191,38 @@ export function SalesFlowTimeline({
           ) : (
             <>
               {sortedStages.map((stage, index) => (
-                <StageFlowCard
-                  key={stage.id}
-                  stage={stage}
-                  aiSetting={aiSettingsMap.get(stage.id) || null}
-                  pipelineDefault={pipelineDefault}
-                  isSelected={selectedStageId === stage.id}
-                  hasCustomConfig={stageConfigMap.get(stage.id) ?? false}
-                  onSelect={() => onSelectStage(stage.id)}
-                  onToggleAI={onToggleAI}
-                  onSaveConfig={onSaveStageConfig}
-                  onResetToDefault={onResetStageToDefault}
-                  isSaving={isSaving}
-                />
+                <React.Fragment key={stage.id}>
+                  <StageFlowCard
+                    stage={stage}
+                    aiSetting={aiSettingsMap.get(stage.id) || null}
+                    pipelineDefault={pipelineDefault}
+                    isSelected={selectedStageId === stage.id}
+                    hasCustomConfig={stageConfigMap.get(stage.id) ?? false}
+                    onSelect={() => onSelectStage(stage.id)}
+                    onToggleAI={onToggleAI}
+                    onSaveConfig={onSaveStageConfig}
+                    onResetToDefault={onResetStageToDefault}
+                    isSaving={isSaving}
+                  />
+                  {index < sortedStages.length - 1 && (
+                    <div className="flex justify-center py-1">
+                      <div className="w-px h-4 bg-border/50" />
+                    </div>
+                  )}
+                </React.Fragment>
               ))}
               
               {/* Add stage button */}
-              <Button
-                variant="outline"
-                className="w-full border-dashed"
-                onClick={onAddStage}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar Etapa
-              </Button>
+              <div className="pt-4">
+                <Button
+                  variant="outline"
+                  className="w-full border-dashed"
+                  onClick={onAddStage}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Etapa
+                </Button>
+              </div>
             </>
           )}
         </div>
