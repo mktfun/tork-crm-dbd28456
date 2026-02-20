@@ -201,117 +201,117 @@ export default function Renovacoes() {
         {/* Table */}
         {loading ? (
           <div className="glass-component p-0 overflow-hidden">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="px-4 py-3 border-b border-border animate-pulse">
-                <div className="flex gap-4">
-                  <div className="h-4 bg-muted rounded w-1/6" />
-                  <div className="h-4 bg-muted rounded w-1/6" />
-                  <div className="h-4 bg-muted rounded w-1/6" />
-                  <div className="h-4 bg-muted rounded w-1/12" />
-                  <div className="h-4 bg-muted rounded w-1/12" />
-                  <div className="h-4 bg-muted rounded w-1/6" />
-                </div>
-              </div>
-            ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <tbody>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={i} className="border-b border-border">
+                      <td className="px-4 py-3" colSpan={9}>
+                        <div className="flex gap-4 animate-pulse">
+                          <div className="h-4 bg-muted rounded w-1/6" />
+                          <div className="h-4 bg-muted rounded w-1/6" />
+                          <div className="h-4 bg-muted rounded w-1/6" />
+                          <div className="h-4 bg-muted rounded w-1/12" />
+                          <div className="h-4 bg-muted rounded w-1/12" />
+                          <div className="h-4 bg-muted rounded w-1/6" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : renewals.length > 0 ? (
           <div className="glass-component p-0 overflow-hidden">
-            {/* Table Header */}
-            <div className="hidden md:grid grid-cols-[1.5fr_1fr_1fr_1fr_0.7fr_1fr_0.7fr_1fr_auto] gap-2 px-4 py-3 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              <span>Cliente</span>
-              <span>Nº Apólice</span>
-              <span>Seguradora</span>
-              <span>Vencimento</span>
-              <span>Dias</span>
-              <span>Prêmio</span>
-              <span>Bônus</span>
-              <span>Status</span>
-              <span></span>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[900px]">
+                <thead>
+                  <tr className="border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left">Cliente</th>
+                    <th className="px-4 py-3 text-left">Nº Apólice</th>
+                    <th className="px-4 py-3 text-left">Seguradora</th>
+                    <th className="px-4 py-3 text-left">Vencimento</th>
+                    <th className="px-4 py-3 text-left">Dias</th>
+                    <th className="px-4 py-3 text-left">Prêmio</th>
+                    <th className="px-4 py-3 text-left">Bônus</th>
+                    <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-right w-[120px]"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {renewals.map((policy: any) => {
+                    const isOverdue = policy.diasParaVencer < 0;
+                    const isCritical = policy.diasParaVencer >= 0 && policy.diasParaVencer <= 15;
+
+                    return (
+                      <tr
+                        key={policy.id}
+                        className="border-b border-border hover:bg-muted/50 transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <span className="font-medium text-foreground truncate block max-w-[180px]">{policy.clientName}</span>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{policy.policyNumber || '—'}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{policy.companies?.name || '—'}</td>
+                        <td className="px-4 py-3 text-foreground whitespace-nowrap">{formatDate(policy.expirationDate)}</td>
+                        <td className="px-4 py-3">
+                          <span className={cn(
+                            "font-semibold text-xs whitespace-nowrap",
+                            isOverdue ? "text-destructive" : isCritical ? "text-amber-500" : "text-foreground"
+                          )}>
+                            {isOverdue ? `${Math.abs(policy.diasParaVencer)}d atr.` : `${policy.diasParaVencer}d`}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-foreground font-medium whitespace-nowrap">
+                          {policy.premiumValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant="outline" className="text-xs">
+                            Cl. {policy.bonus_class || '0'}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          {getRenewalStatusBadge(policy.renewalStatus || 'Pendente', policy.diasParaVencer)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            {policy.renewalStatus !== 'Renovada' && policy.renewalStatus !== 'Não Renovada' && (
+                              <Button size="sm" variant="ghost" onClick={() => handleRenewClick(policy)} className="text-xs h-7 px-2">
+                                <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                                Renovar
+                              </Button>
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => updateRenewalStatus(policy.id, 'Em Contato')}>
+                                  Marcar como Em Contato
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => updateRenewalStatus(policy.id, 'Proposta Enviada')}>
+                                  Marcar como Proposta Enviada
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => updateRenewalStatus(policy.id, 'Não Renovada')} className="text-destructive">
+                                  Marcar como Não Renovada
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
 
-            {/* Table Rows */}
-            {renewals.map((policy: any) => {
-              const isOverdue = policy.diasParaVencer < 0;
-              const isCritical = policy.diasParaVencer >= 0 && policy.diasParaVencer <= 15;
-
-              return (
-                <div
-                  key={policy.id}
-                  className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr_1fr_1fr_0.7fr_1fr_0.7fr_1fr_auto] gap-2 px-4 py-3 border-b border-border hover:bg-muted/50 transition-colors items-center text-sm"
-                >
-                  {/* Cliente */}
-                  <div>
-                    <p className="font-medium text-foreground truncate">{policy.clientName}</p>
-                  </div>
-
-                  {/* Nº Apólice */}
-                  <div className="text-muted-foreground truncate">{policy.policyNumber || '—'}</div>
-
-                  {/* Seguradora */}
-                  <div className="text-muted-foreground truncate">{policy.companies?.name || '—'}</div>
-
-                  {/* Vencimento */}
-                  <div className="text-foreground">{formatDate(policy.expirationDate)}</div>
-
-                  {/* Dias */}
-                  <div>
-                    <span className={cn(
-                      "font-semibold text-xs",
-                      isOverdue ? "text-destructive" : isCritical ? "text-amber-500" : "text-foreground"
-                    )}>
-                      {isOverdue ? `${Math.abs(policy.diasParaVencer)}d atr.` : `${policy.diasParaVencer}d`}
-                    </span>
-                  </div>
-
-                  {/* Prêmio */}
-                  <div className="text-foreground font-medium">
-                    {policy.premiumValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </div>
-
-                  {/* Bônus */}
-                  <div>
-                    <Badge variant="outline" className="text-xs">
-                      Cl. {policy.bonus_class || '0'}
-                    </Badge>
-                  </div>
-
-                  {/* Status */}
-                  <div>{getRenewalStatusBadge(policy.renewalStatus || 'Pendente', policy.diasParaVencer)}</div>
-
-                  {/* Ações */}
-                  <div className="flex items-center gap-1">
-                    {policy.renewalStatus !== 'Renovada' && policy.renewalStatus !== 'Não Renovada' && (
-                      <Button size="sm" variant="ghost" onClick={() => handleRenewClick(policy)} className="text-xs h-7 px-2">
-                        <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                        Renovar
-                      </Button>
-                    )}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => updateRenewalStatus(policy.id, 'Em Contato')}>
-                          Marcar como Em Contato
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => updateRenewalStatus(policy.id, 'Proposta Enviada')}>
-                          Marcar como Proposta Enviada
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => updateRenewalStatus(policy.id, 'Não Renovada')} className="text-destructive">
-                          Marcar como Não Renovada
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              );
-            })}
-
             {/* Pagination Footer */}
-            <div className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground">
+            <div className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground border-t border-border">
               <span>
                 {totalCount === 0 ? '0' : `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, totalCount)}`} de{' '}
                 {totalCount} apólices
