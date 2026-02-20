@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ArrowDownRight, ArrowUpRight, Landmark } from "lucide-react";
+import { AppCard } from "@/components/ui/app-card";
 
 export interface TableTransaction {
   id: string;
@@ -49,7 +50,7 @@ export function BankTransactionsTable({
   };
 
   return (
-    <div className="glass-component p-0 shadow-lg border-border bg-card">
+    <AppCard className="p-0 shadow-lg border-border bg-card">
       {/* Header padronizado */}
       <div className="flex flex-col space-y-1.5 p-6 pb-4">
         <div className="flex items-center gap-3">
@@ -122,6 +123,6 @@ export function BankTransactionsTable({
           </TableBody>
         </Table>
       </div>
-    </div>
+    </AppCard>
   );
 }

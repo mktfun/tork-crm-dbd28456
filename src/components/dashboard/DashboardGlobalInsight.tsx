@@ -5,6 +5,7 @@ import { useStrategicSummary } from '@/hooks/useStrategicSummary';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { AppCard } from '@/components/ui/app-card';
 
 interface DashboardGlobalInsightProps {
   focus?: 'general' | 'finance' | 'crm';
@@ -43,7 +44,7 @@ export function DashboardGlobalInsight({ focus = 'general' }: DashboardGlobalIns
     : 'Aguardando...';
 
   return (
-    <div className="glass-component p-6 border-l-4 border-l-primary bg-card/50 backdrop-blur-xl shadow-lg">
+    <AppCard className="p-6 border-l-4 border-l-primary bg-card/50 backdrop-blur-xl shadow-lg">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -101,6 +102,6 @@ export function DashboardGlobalInsight({ focus = 'general' }: DashboardGlobalIns
           {isCached ? `Cache • Atualizado: ${formattedDate}` : `Atualizado: ${formattedDate}`}
         </span>
       </div>
-    </div>
+    </AppCard>
   );
 }

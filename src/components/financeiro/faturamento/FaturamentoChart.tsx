@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { CashFlowDataPoint } from "@/types/financeiro";
+import { AppCard } from "@/components/ui/app-card";
 
 interface FaturamentoChartProps {
   data: CashFlowDataPoint[];
@@ -43,7 +44,7 @@ export function FaturamentoChart({ data, isLoading }: FaturamentoChartProps) {
 
   if (isLoading) {
     return (
-      <div className="glass-component p-6 shadow-lg border-border bg-card">
+      <AppCard className="p-6 shadow-lg border-border bg-card">
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-primary/10 rounded-lg">
@@ -55,12 +56,12 @@ export function FaturamentoChart({ data, isLoading }: FaturamentoChartProps) {
         <div className="flex items-center justify-center h-[300px]">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
-      </div>
+      </AppCard>
     );
   }
 
   return (
-    <div className="glass-component p-6 shadow-lg border-border bg-card">
+    <AppCard className="p-6 shadow-lg border-border bg-card">
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 bg-primary/10 rounded-lg">
@@ -114,6 +115,6 @@ export function FaturamentoChart({ data, isLoading }: FaturamentoChartProps) {
           />
         </AreaChart>
       </ResponsiveContainer>
-    </div>
+    </AppCard>
   );
 }

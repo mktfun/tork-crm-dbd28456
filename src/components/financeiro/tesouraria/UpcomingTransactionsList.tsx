@@ -10,6 +10,7 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AppCard } from "@/components/ui/app-card";
 
 interface UpcomingTransactionsListProps {
     daysAhead?: number;
@@ -42,7 +43,7 @@ export function UpcomingTransactionsList({ daysAhead = 30 }: UpcomingTransaction
 
     if (isLoading) {
         return (
-            <div className="glass-component p-0 shadow-lg border-border bg-card">
+            <AppCard className="p-0 shadow-lg border-border bg-card">
                 <div className="flex flex-col space-y-1.5 p-6 pb-4">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-primary/10 rounded-lg">
@@ -65,20 +66,20 @@ export function UpcomingTransactionsList({ daysAhead = 30 }: UpcomingTransaction
                         </div>
                     ))}
                 </div>
-            </div>
+            </AppCard>
         );
     }
 
     if (error) {
         return (
-            <div className="glass-component p-0 shadow-lg border-border bg-card border-destructive/50">
+            <AppCard className="p-0 shadow-lg border-border bg-card border-destructive/50">
                 <div className="p-6">
                     <Alert variant="destructive" className="border-none bg-transparent p-0">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>Erro ao carregar dados: {error.message}</AlertDescription>
                     </Alert>
                 </div>
-            </div>
+            </AppCard>
         );
     }
 
@@ -91,7 +92,7 @@ export function UpcomingTransactionsList({ daysAhead = 30 }: UpcomingTransaction
     );
 
     return (
-        <div className="glass-component p-0 shadow-lg border-border bg-card">
+        <AppCard className="p-0 shadow-lg border-border bg-card">
             <div className="flex flex-col space-y-1.5 p-6 pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -172,6 +173,6 @@ export function UpcomingTransactionsList({ daysAhead = 30 }: UpcomingTransaction
                     </>
                 )}
             </div>
-        </div>
+        </AppCard>
     );
 }

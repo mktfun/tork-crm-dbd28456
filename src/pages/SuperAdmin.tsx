@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { KpiCard } from '@/components/policies/KpiCard';
+import { AppCard } from '@/components/ui/app-card';
 import { ApiKeysManager } from '@/components/superadmin/ApiKeysManager';
 import { AuditLogsViewer } from '@/components/superadmin/AuditLogsViewer';
 import { 
@@ -167,7 +168,7 @@ export default function SuperAdmin() {
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                        <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
+                        <AppCard className="p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:translate-y-[-2px] hover:shadow-xl cursor-pointer border-border bg-card hover:bg-secondary/70">
                           <div className="flex items-center gap-2 mb-2">
                             <div className="p-2 rounded-lg bg-foreground/10">
                               <Activity className="h-4 w-4 text-foreground" />
@@ -175,8 +176,8 @@ export default function SuperAdmin() {
                             <span className="text-sm font-medium text-muted-foreground">Total</span>
                           </div>
                           <p className="text-2xl md:text-3xl font-bold text-foreground">{auditStats.total.toLocaleString('pt-BR')}</p>
-                        </div>
-                        <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
+                        </AppCard>
+                        <AppCard className="p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:translate-y-[-2px] hover:shadow-xl cursor-pointer border-border bg-card hover:bg-secondary/70">
                           <div className="flex items-center gap-2 mb-2">
                             <div className="p-2 rounded-lg bg-foreground/10">
                               <CheckCircle2 className="h-4 w-4 text-emerald-400" />
@@ -184,8 +185,8 @@ export default function SuperAdmin() {
                             <span className="text-sm font-medium text-muted-foreground">Sucesso</span>
                           </div>
                           <p className="text-2xl md:text-3xl font-bold text-foreground">{auditStats.successful.toLocaleString('pt-BR')}</p>
-                        </div>
-                        <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
+                        </AppCard>
+                        <AppCard className="p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:translate-y-[-2px] hover:shadow-xl cursor-pointer border-border bg-card hover:bg-secondary/70">
                           <div className="flex items-center gap-2 mb-2">
                             <div className="p-2 rounded-lg bg-foreground/10">
                               <XCircle className="h-4 w-4 text-red-400" />
@@ -193,8 +194,8 @@ export default function SuperAdmin() {
                             <span className="text-sm font-medium text-muted-foreground">Falhas</span>
                           </div>
                           <p className="text-2xl md:text-3xl font-bold text-foreground">{auditStats.failed.toLocaleString('pt-BR')}</p>
-                        </div>
-                        <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
+                        </AppCard>
+                        <AppCard className="p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:translate-y-[-2px] hover:shadow-xl cursor-pointer border-border bg-card hover:bg-secondary/70">
                           <div className="flex items-center gap-2 mb-2">
                             <div className="p-2 rounded-lg bg-foreground/10">
                               <Clock className="h-4 w-4 text-amber-400" />
@@ -202,8 +203,8 @@ export default function SuperAdmin() {
                             <span className="text-sm font-medium text-muted-foreground">Últimas 24h</span>
                           </div>
                           <p className="text-2xl md:text-3xl font-bold text-foreground">{auditStats.recent24h.toLocaleString('pt-BR')}</p>
-                        </div>
-                        <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
+                        </AppCard>
+                        <AppCard className="p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:translate-y-[-2px] hover:shadow-xl cursor-pointer border-border bg-card hover:bg-secondary/70">
                           <div className="flex items-center gap-2 mb-2">
                             <div className="p-2 rounded-lg bg-foreground/10">
                               <Activity className="h-4 w-4 text-purple-400" />
@@ -211,7 +212,7 @@ export default function SuperAdmin() {
                             <span className="text-sm font-medium text-muted-foreground">Taxa de Sucesso</span>
                           </div>
                           <p className="text-2xl md:text-3xl font-bold text-foreground">{auditStats.successRate.toFixed(1)}%</p>
-                        </div>
+                        </AppCard>
                       </div>
                     </CardContent>
                   </Card>

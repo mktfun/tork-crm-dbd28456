@@ -9,6 +9,7 @@ import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
+import { AppCard } from "@/components/ui/app-card";
 
 interface ReceivablesListProps {
   daysAhead?: number;
@@ -34,7 +35,7 @@ export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
 
   if (isLoading) {
     return (
-      <div className="glass-component p-0 shadow-lg border-border bg-card">
+      <AppCard className="p-0 shadow-lg border-border bg-card">
         <div className="flex flex-col space-y-1.5 p-6 pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
@@ -55,13 +56,13 @@ export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
             </div>
           ))}
         </div>
-      </div>
+      </AppCard>
     );
   }
 
   if (error) {
     return (
-      <div className="glass-component p-0 shadow-lg border-border bg-card">
+      <AppCard className="p-0 shadow-lg border-border bg-card">
         <div className="flex flex-col space-y-1.5 p-6 pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
@@ -76,13 +77,13 @@ export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
             <AlertDescription>Erro ao carregar recebíveis: {error.message}</AlertDescription>
           </Alert>
         </div>
-      </div>
+      </AppCard>
     );
   }
 
   if (!receivables || receivables.length === 0) {
     return (
-      <div className="glass-component p-0 shadow-lg border-border bg-card">
+      <AppCard className="p-0 shadow-lg border-border bg-card">
         <div className="flex flex-col space-y-1.5 p-6 pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
@@ -98,12 +99,12 @@ export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
             <p className="text-xs mt-1">Não há receitas a receber nos próximos {daysAhead} dias.</p>
           </div>
         </div>
-      </div>
+      </AppCard>
     );
   }
 
   return (
-    <div className="glass-component p-0 shadow-lg border-border bg-card">
+    <AppCard className="p-0 shadow-lg border-border bg-card">
       <div className="flex flex-col space-y-1.5 p-6 pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -157,6 +158,6 @@ export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
           </div>
         </div>
       </div>
-    </div>
+    </AppCard>
   );
 }

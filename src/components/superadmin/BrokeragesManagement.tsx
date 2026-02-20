@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AppCard } from '@/components/ui/app-card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -205,7 +206,7 @@ export function BrokeragesManagement() {
       </div>
 
       {/* Table */}
-      <div className="glass-component p-0 shadow-lg border-border bg-card">
+      <AppCard className="p-0 shadow-lg border-border bg-card">
         <div className="flex flex-col space-y-1.5 p-6 pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
@@ -322,7 +323,7 @@ export function BrokeragesManagement() {
             </Table>
           )}
         </div>
-      </div>
+      </AppCard>
 
       {/* Integration Modal */}
       <BrokerageIntegrationModal

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Activity, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AppCard } from '@/components/ui/app-card';
 
 export function AuditLogsViewer() {
   const [page, setPage] = useState(0);
@@ -13,7 +14,7 @@ export function AuditLogsViewer() {
 
   if (isLoading) {
     return (
-      <div className="glass-component p-0 shadow-lg border-border bg-card">
+      <AppCard className="p-0 shadow-lg border-border bg-card">
         <div className="flex flex-col space-y-1.5 p-6 pb-4">
           <Skeleton className="h-6 w-48" />
         </div>
@@ -22,7 +23,7 @@ export function AuditLogsViewer() {
             <Skeleton key={i} className="h-16" />
           ))}
         </div>
-      </div>
+      </AppCard>
     );
   }
 
@@ -31,7 +32,7 @@ export function AuditLogsViewer() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="glass-component p-0 shadow-lg border-border bg-card">
+    <AppCard className="p-0 shadow-lg border-border bg-card">
       {/* Header padronizado */}
       <div className="flex flex-col space-y-1.5 p-6 pb-4">
         <div className="flex items-center gap-3">
@@ -127,6 +128,6 @@ export function AuditLogsViewer() {
           </div>
         )}
       </div>
-    </div>
+    </AppCard>
   );
 }

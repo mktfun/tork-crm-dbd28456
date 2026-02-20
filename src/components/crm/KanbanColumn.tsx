@@ -7,6 +7,7 @@ import { Plus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { CRMStage, CRMDeal } from '@/hooks/useCRMDeals';
 import { DealCard } from './DealCard';
 import { Button } from '@/components/ui/button';
+import { AppCard } from '@/components/ui/app-card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,8 +70,8 @@ export function KanbanColumn({
       className={`flex-shrink-0 w-80 ${isDragging ? 'z-50' : ''}`}
     >
       {/* Column Header - drag handle is the colored area */}
-      <div 
-        className="glass-component rounded-xl p-4 mb-3 cursor-grab active:cursor-grabbing"
+      <AppCard 
+        className="rounded-xl p-4 mb-3 cursor-grab active:cursor-grabbing"
         style={{ borderTop: `3px solid ${stage.color}` }}
         {...attributes}
         {...listeners}
@@ -119,7 +120,7 @@ export function KanbanColumn({
             {formatCurrency(totalValue)}
           </p>
         )}
-      </div>
+      </AppCard>
 
       {/* Column Body */}
       <div
