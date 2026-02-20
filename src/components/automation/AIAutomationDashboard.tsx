@@ -193,6 +193,9 @@ export function AIAutomationDashboard() {
                 aiSetting={selectedAiSetting}
                 pipelineDefault={pipelineDefault}
                 nextStageName={nextStage?.name}
+                companyName={globalConfig?.company_name ?? undefined}
+                globalBaseInstructions={globalConfig?.base_instructions ?? undefined}
+                globalAgentName={globalConfig?.agent_name ?? undefined}
               />
             </div>
           </div>

@@ -20,6 +20,8 @@ interface SandboxConfig {
   aiPersona?: string;
   aiObjective?: string;
   dealTitle?: string;
+  companyName?: string;
+  globalBaseInstructions?: string;
   allowEmojis?: boolean;
 }
 
@@ -45,14 +47,16 @@ export function useAISandbox(config: SandboxConfig | null): UseAISandboxReturn {
     const substituteVars = (text: string) =>
       text
         .replace(/\{\{ai_name\}\}/g, cfg.aiName ?? 'Agente')
-        .replace(/\{\{company_name\}\}/g, 'Corretora')
+        .replace(/\{\{company_name\}\}/g, cfg.companyName ?? 'sua empresa')
         .replace(/\{\{deal_title\}\}/g, cfg.dealTitle ?? 'nosso produto')
         .replace(/\{\{pipeline_name\}\}/g, cfg.pipelineName)
         .replace(/\{\{next_stage_name\}\}/g, cfg.nextStageName ?? 'próxima etapa');
     
-    // Base persona (com variáveis substituídas)
+    // Base persona — hierarchy: stage > pipeline > globalBaseInstructions > preset hardcoded
     if (cfg.aiPersona) {
       parts.push(substituteVars(cfg.aiPersona));
+    } else if (cfg.globalBaseInstructions) {
+      parts.push(substituteVars(cfg.globalBaseInstructions));
     } else {
       const defaultPreset = AI_PERSONA_PRESETS.find(p => p.id === 'proactive');
       if (defaultPreset) {
