@@ -184,9 +184,9 @@ export function useDashboardMetrics(options: UseDashboardMetricsProps = {}) {
     return renewalsCount;
   }, [policies, policiesLoading, dateRange]);
 
-  // 🔥 KPI 4: COMISSÃO DO MÊS ATUAL OU PERÍODO FILTRADO - AGORA VIA LEDGER!
+  // 🔥 KPI 4: COMISSÃO CONCILIADA DO MÊS (reconciled = true no banco)
+  // Fonte: get_dashboard_financial_kpis — apenas receitas com reconciled=true
   const comissaoMesAtual = useMemo(() => {
-    // ✅ CORREÇÃO: Usar dados do Ledger (fonte única de verdade)
     return financialKpis?.totalCommission ?? 0;
   }, [financialKpis]);
 
