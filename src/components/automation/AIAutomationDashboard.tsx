@@ -137,10 +137,10 @@ export function AIAutomationDashboard() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col min-h-0">
       {/* Tabs */}
       <Tabs defaultValue="etapas" className="flex-1 flex flex-col min-h-0">
-        <div className="border-b border-border px-6">
+        <div className="border-b border-border px-6 flex-shrink-0">
           <TabsList className="h-auto p-0 bg-transparent rounded-none gap-0">
             <TabsTrigger
               value="etapas"
@@ -163,8 +163,9 @@ export function AIAutomationDashboard() {
           </TabsList>
         </div>
 
-        <TabsContent value="etapas" className="flex-1 m-0 overflow-hidden">
-          <div className="h-full grid grid-cols-1 lg:grid-cols-5 min-h-0">
+        <TabsContent value="etapas" className="flex-1 m-0 min-h-0 overflow-hidden">
+          <div className="h-full grid grid-cols-1 lg:grid-cols-5">
+            {/* Left column — only this scrolls */}
             <div className="lg:col-span-3 overflow-y-auto p-4">
               <SalesFlowTimeline
                 pipelines={pipelines}
@@ -186,7 +187,8 @@ export function AIAutomationDashboard() {
                 isSaving={upsertSetting.isPending}
               />
             </div>
-            <div className="lg:col-span-2 border-l border-border overflow-hidden flex flex-col h-full">
+            {/* Right column — fixed, never scrolls externally */}
+            <div className="lg:col-span-2 border-l border-border overflow-hidden flex flex-col">
               <AISandbox
                 selectedStage={selectedStage}
                 selectedPipeline={selectedPipeline}
