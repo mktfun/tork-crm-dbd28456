@@ -1,10 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { AppCard } from '@/components/ui/app-card';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { DateRange } from 'react-day-picker';
 import { ChartInsight } from './ChartInsight';
-import { TrendingUp, BarChart3, LineChart as LineChartIcon } from 'lucide-react';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { TrendingUp } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 
 interface GrowthData {
@@ -20,9 +19,7 @@ interface GrowthChartProps {
   insight: string;
 }
 
-export function GrowthChart({ data, type: initialType = 'bar', dateRange, insight }: GrowthChartProps) {
-  const [chartType, setChartType] = useState<'bar' | 'line'>(initialType);
-
+export function GrowthChart({ data, type: chartType = 'bar', dateRange, insight }: GrowthChartProps) {
   const periodType = useMemo(() => {
     if (!dateRange?.from || !dateRange?.to) return 'Mensal';
     const diasDiferenca = differenceInDays(dateRange.to, dateRange.from);
@@ -117,27 +114,11 @@ export function GrowthChart({ data, type: initialType = 'bar', dateRange, insigh
 
   return (
     <AppCard className="p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <TrendingUp className="w-5 h-5 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold text-foreground">Crescimento {periodType} - Novas vs Renovadas</h3>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-2 bg-primary/10 rounded-lg">
+          <TrendingUp className="w-5 h-5 text-primary" />
         </div>
-
-        <ToggleGroup
-          type="single"
-          value={chartType}
-          onValueChange={(value) => value && setChartType(value as 'bar' | 'line')}
-          className="bg-secondary/50 border border-border"
-        >
-          <ToggleGroupItem value="bar" aria-label="Visualização em barras" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-            <BarChart3 className="h-4 w-4" />
-          </ToggleGroupItem>
-          <ToggleGroupItem value="line" aria-label="Visualização em linhas" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-            <LineChartIcon className="h-4 w-4" />
-          </ToggleGroupItem>
-        </ToggleGroup>
+        <h3 className="text-lg font-semibold text-foreground">Crescimento {periodType} - Novas vs Renovadas</h3>
       </div>
 
       <div className="h-80">
