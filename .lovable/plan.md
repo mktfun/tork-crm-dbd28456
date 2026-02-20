@@ -1,89 +1,68 @@
 
-# Redesign e Correção da Tela de Renovações
 
-## Overview
+## Redesign da Tela de Automacao de Vendas
 
-This is a comprehensive redesign covering three areas: fixing the renewal flow (critical bug -- currently creates duplicate policies), redesigning the UI from cards to a table layout, and cleaning up all legacy hardcoded colors. The `policy_renewal_history` table migration has already been applied.
+Polimento visual e funcional em 6 arquivos, sem alterar logica de negocio, hooks ou edge functions.
 
-## Files to Modify
+---
 
-### 1. `src/components/policies/RenewPolicyModal.tsx` -- Critical flow fix + design cleanup
+### Mudancas por arquivo
 
-**Flow fix (critical):**
-- Remove `addPolicy` usage entirely -- renewals must NOT create new policies
-- Replace with: (1) insert into `policy_renewal_history` to save snapshot, (2) `updatePolicy` on the existing policy with new values
-- Add optional `newPolicyNumber` field to schema
-- Remove `generateRenewedPolicyNumber` function
-- Remove `validateOriginalPolicy` function (unnecessary gate)
+**1. `AIAutomationDashboard.tsx`**
+- Redesign do header: icone em container arredondado + subtitulo descritivo
+- Tabs com estilo underline (border-bottom) em vez de pill com `h-12`
+- Corrigir indentacao das props de `SalesFlowTimeline` e `AISandbox`
 
-**New `onSubmit` logic:**
-```text
-1. Insert into policy_renewal_history (previous + new values)
-2. updatePolicy(policy.id, { expirationDate, premiumValue, commissionRate, bonus_class, policyNumber?, renewalStatus: 'Renovada', status: 'Ativa' })
-3. Toast success, reset, close
-```
+**2. `SalesFlowTimeline.tsx`**
+- Compactar header em 1 linha: Select de funil + 3 botoes ghost icon-only (DNA, Settings, Plus)
+- Mover contagem de etapas para barra secundaria abaixo do select
+- Tooltips mais descritivos ("Configurar persona padrao de IA para este funil")
+- Adicionar separadores visuais (div w-px h-4) entre StageFlowCards em vez do connector absoluto
 
-**Design cleanup:**
-- Remove `bg-slate-900 border-slate-700` from DialogContent
-- Remove all `text-slate-300`, `bg-slate-800`, `border-slate-600`, `text-white` from Labels, Inputs, Selects, Textarea
-- Remove `bg-green-600 hover:bg-green-700 text-white` from submit button (use default variant)
-- Remove `border-slate-600 text-slate-300 hover:bg-slate-800` from cancel button (use `variant="outline"`)
-- Replace `text-red-400` error messages with `text-destructive`
+**3. `StageFlowCard.tsx`**
+- Remover linha conectora absoluta (`absolute left-6 -bottom-4`)
+- Labels expandidas: remover `uppercase tracking-wider`, usar casing normal
+- Toggle IA/Manual: largura fixa `w-10 text-center` para evitar layout shift
 
-**Enhanced header:**
-- Icon box with `bg-primary/10` + `RotateCcw` icon in `text-primary`
-- Subtitle showing policy number and client name
+**4. `IntegrationFlowViz.tsx`**
+- Remover `-mt-4` das setas
+- Mudar container para `items-end pb-1` e setas para `mb-5`
+- Cada step node recebe `flex-1` para distribuicao uniforme
 
-**DatePicker replacement:**
-- Replace native `<input type="date">` with Shadcn Popover + Calendar for `newExpirationDate`
-- Use `ptBR` locale, disable past dates
+**5. `AISandbox.tsx`**
+- Adicionar badge "Gemini Flash" ao lado do titulo do header
+- Corrigir hint de "Ctrl+Enter" para "Enter para enviar"
+- Sugestoes contextuais baseadas no nome da etapa selecionada (lead, contato, proposta, suporte)
+- Adicionar collapsible "Ver system prompt enviado ao Gemini" com preview do prompt montado
+- Novo estado local `showPrompt` e funcao `buildSystemPromptPreview` replicada do hook
 
-**Current policy summary block:**
-- Replace `bg-slate-800 border-slate-600` with `bg-muted/50 border-border`
-- Show 4 fields: Vencimento, Premio, Comissao, Bonus in a clean grid with `text-muted-foreground` labels and `text-foreground` values
+**6. `AutomationConfigTab.tsx`**
+- Adicionar header padrao com icone Settings + titulo + subtitulo
+- Remover botoes "Salvar" duplicados dos cards Chatwoot e n8n
+- Adicionar botao unico "Salvar Tudo" sticky no rodape
+- Card Webhook do CRM: adicionar icone verde `Link` no header
 
-### 2. `src/pages/Renovacoes.tsx` -- Full page redesign
+---
 
-**Replace cards with table layout:**
-- Remove `renderPolicyCard` function and card grid
-- Add a `glass-component` container with table header (icon box + title + count)
-- Table columns: Cliente, No Apolice, Seguradora, Vencimento, Dias, Premio, Bonus, Status, Acoes
-- Each row is a `div` with grid columns, hover state `hover:bg-muted/50`
-- Days column uses semantic colors: `text-destructive` (overdue), `text-amber-500` (<=15d), `text-foreground` (normal)
-- Actions column: "Renovar" button + DropdownMenu for status changes
+### Detalhes tecnicos
 
-**Add KPI bar:**
-- 4 mini KPIs between header and filters: "Vencendo em 30d" (orange), "Vencidas" (destructive), "Renovadas" (emerald), "Total" (primary)
-- Computed from loaded `renewals` array
+**Imports adicionais necessarios:**
+- `AISandbox.tsx`: `Badge`, `ChevronRight`, `Sparkles` do lucide + logica de `AI_PERSONA_PRESETS` e `GLOBAL_SYNTAX_RULES` de `aiPresets`
+- `AutomationConfigTab.tsx`: `Settings`, `Link` do lucide-react
+- `SalesFlowTimeline.tsx`: `React` (para Fragment)
 
-**Replace period filter Selects with Button group:**
-- Period: row of `Button variant="ghost"/"secondary"` for 30/60/90/120/Todos
-- Status: keep as Select (more options)
+**System prompt preview no Sandbox:**
+Replicar a logica de `buildSystemPrompt` do hook `useAISandbox` como funcao pura local no componente `AISandbox.tsx`, recebendo o `sandboxConfig` ja montado. Isso evita alterar o hook.
 
-**Fix hardcoded colors:**
-- Remove `text-red-400`, `text-orange-400`, `text-blue-400`, `text-green-400`, `bg-green-600`
-- Replace `getRenewalStatusBadge` switch with config map using `variant="secondary"/"default"/"destructive"`
+**Sugestoes contextuais:**
+Funcao `getSuggestions(stageName: string)` que faz match por keywords no nome da etapa (lead, contato, proposta, sinistro) e retorna 3 frases relevantes.
 
-**Pagination:**
-- Replace Pagination component with simple prev/next + "1-12 de 23" footer inside the table container
+**Botao Salvar unificado:**
+Os botoes "Testar Conexao", "Sincronizar Etiquetas" e "Enviar Teste" permanecem nos seus respectivos cards. Apenas os botoes "Salvar" sao removidos dos cards e substituidos por um unico botao sticky no final da pagina.
 
-**Loading skeleton:**
-- Replace card skeletons with table row skeletons
+**Nenhuma alteracao em:**
+- Hooks (`useAISandbox`, `useCrmAiSettings`, etc.)
+- Edge functions
+- Props/interfaces de componentes
+- Logica de toggle, vibe selection, debounce, reset
 
-### 3. `src/hooks/useSupabaseRenewals.ts` -- Add bonus_class
-
-- Add `bonus_class: item.bonus_class || null` to the transform map
-- No other changes needed
-
-## Files NOT Modified
-- `ExportRenewalsModal` -- untouched
-- `useSupabasePolicies.ts` -- untouched (updatePolicy already supports all needed fields)
-- `policy_renewal_history` table -- already created via migration
-- Any other hooks or components
-
-## Technical Notes
-
-- The `updatePolicy` function in `useSupabasePolicies.ts` already maps `premiumValue`, `commissionRate`, `expirationDate`, `bonus_class`, `policyNumber`, `renewalStatus`, and `status` -- no changes needed there
-- The `supabase` client import is needed in `RenewPolicyModal` for the direct insert into `policy_renewal_history` (not exposed via any hook)
-- The `policy.userId` field is available from `useSupabaseRenewals` transform and will be used for the `user_id` in the history insert
-- Calendar component needs `pointer-events-auto` class per Shadcn datepicker guidelines
