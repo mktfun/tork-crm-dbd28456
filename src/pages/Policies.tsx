@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Plus, FileText, DollarSign, TrendingUp, AlertCircle, Download, Sparkles, SlidersHorizontal, X } from 'lucide-react';
+import { Calendar, Plus, FileText, DollarSign, TrendingUp, AlertCircle, Download, Sparkles, SlidersHorizontal, X, Building2, Clock } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { formatDate, parseLocalDate } from '@/utils/dateUtils';
 import { PolicyFilters } from '@/hooks/useFilteredPolicies';
@@ -28,6 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerClose } from '@/components/ui/drawer';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
+import { AppCard } from '@/components/ui/app-card';
 
 export default function Policies() {
   const { clients } = useClients();
@@ -372,7 +373,7 @@ export default function Policies() {
             </div>
 
             {/* Separador visual */}
-            <div className="h-6 w-px bg-slate-700 hidden md:block" />
+            <div className="h-6 w-px bg-border hidden md:block" />
 
             {/* Ações Principais */}
             <Button
@@ -385,7 +386,7 @@ export default function Policies() {
 
             <Button
               onClick={() => setIsNewPolicyModalOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              variant="default"
             >
               <Plus className="w-4 h-4 mr-2" />
               Nova Apólice
@@ -445,7 +446,7 @@ export default function Policies() {
                 <AdvancedFiltersContent />
                 <div className="p-4 pt-0">
                   <DrawerClose asChild>
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-foreground">
+                    <Button className="w-full" variant="default">
                       Aplicar Filtros
                     </Button>
                   </DrawerClose>
@@ -478,86 +479,127 @@ export default function Policies() {
         {filteredPolicies.map(policy => {
           const client = clients.find(c => c.id === policy.clientId);
           const producer = producers.find(p => p.id === policy.producerId);
-          const isExpiringSoon = differenceInDays(parseLocalDate(policy.expirationDate), new Date()) <= 30;
+          const daysRemaining = differenceInDays(parseLocalDate(policy.expirationDate), new Date());
+          const isExpiringSoon = daysRemaining <= 30 && daysRemaining >= 0;
+          const policyRamos = (policy as typeof policy & { ramos?: { nome: string } }).ramos;
 
           return (
-            <div
+            <AppCard
               key={policy.id}
-              className="bg-card border border-border rounded-lg p-6 hover:bg-muted transition-colors cursor-pointer"
+              className="p-5 cursor-pointer hover:scale-[1.01]"
               onClick={() => navigate(`/dashboard/policies/${policy.id}`)}
             >
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="flex-1 space-y-3">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h3 className="text-lg font-semibold text-foreground">
-                      {client?.name?.split(' ')[0] || 'Cliente'} - {(policy as typeof policy & { ramos?: { nome: string } }).ramos?.nome || policy.type || 'Seguro'}
-                      {policy.insuredAsset && ` (${policy.insuredAsset.split(' ').slice(0, 3).join(' ')})`} - {policy.companies?.name?.split(' ')[0] || 'Cia'}
-                    </h3>
-                    <Badge
-                      className={getStatusColor(policy.status) + " text-white"}
-                    >
-                      {policy.status}
+              {/* ─── Linha 1: Identificação ─── */}
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+                <div className="space-y-1 min-w-0 flex-1">
+                  {/* Breadcrumb: ramo · seguradora */}
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-medium">
+                      {policyRamos?.nome || policy.type || 'Seguro'}
                     </Badge>
-                    <AutoRenewalIndicator
-                      automaticRenewal={policy.automaticRenewal}
-                      expirationDate={policy.expirationDate}
-                      status={policy.status}
-                    />
-                    {isExpiringSoon && policy.status === 'Ativa' && (
-                      <Badge variant="destructive" className="animate-pulse">
-                        Vence em breve!
-                      </Badge>
+                    <span>·</span>
+                    <span className="flex items-center gap-1">
+                      <Building2 className="w-3 h-3" />
+                      {policy.companies?.name || 'Seguradora'}
+                    </span>
+                    {policy.insuredAsset && (
+                      <>
+                        <span>·</span>
+                        <span className="truncate max-w-[200px]">{policy.insuredAsset}</span>
+                      </>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Cliente</p>
-                      <p className="text-foreground font-medium">{client?.name || 'Cliente não encontrado'}</p>
-                    </div>
+                  {/* Nome do cliente — destaque principal */}
+                  <h3 className="text-lg font-semibold text-foreground leading-tight">
+                    {client?.name || 'Cliente não encontrado'}
+                  </h3>
 
-                    <div>
-                      <p className="text-muted-foreground">Seguradora</p>
-                      <p className="text-foreground">{policy.companies?.name || 'Não especificada'}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-muted-foreground">Ramo</p>
-                      <p className="text-foreground">{(policy as typeof policy & { ramos?: { nome: string } }).ramos?.nome || policy.type || 'Não especificado'}</p>
-                    </div>
-
-                    {producer && (
-                      <div>
-                        <p className="text-muted-foreground">Produtor</p>
-                        <p className="text-foreground">{producer.name}</p>
-                      </div>
-                    )}
-                  </div>
+                  {/* Número da apólice */}
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {policy.policyNumber || `ORÇ-${policy.id.slice(-8)}`}
+                  </p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                {/* Badges de status — lado direito */}
+                <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                  <Badge className={getStatusColor(policy.status) + " text-white"}>
+                    {policy.status}
+                  </Badge>
+                  <AutoRenewalIndicator
+                    automaticRenewal={policy.automaticRenewal}
+                    expirationDate={policy.expirationDate}
+                    status={policy.status}
+                  />
+                  {isExpiringSoon && policy.status === 'Ativa' && (
+                    <Badge variant="destructive" className="animate-pulse">
+                      Vence em breve!
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* ─── Linha 2: Metadados + Financeiro ─── */}
+              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pt-3 border-t border-border">
+                {/* Lado esquerdo: campos de info */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm flex-1">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Cliente</p>
+                    <p className="text-foreground font-medium truncate">
+                      {client?.name?.split(' ').slice(0, 2).join(' ') || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Seguradora</p>
+                    <p className="text-foreground truncate">
+                      {policy.companies?.name?.split(' ')[0] || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Ramo</p>
+                    <p className="text-foreground">
+                      {policyRamos?.nome || policy.type || '—'}
+                    </p>
+                  </div>
+                  {producer && (
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Produtor</p>
+                      <p className="text-foreground truncate">{producer.name}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Lado direito: bloco financeiro + datas */}
+                <div className="flex items-end gap-5 flex-shrink-0">
+                  {/* Prêmio */}
                   <div className="text-right">
-                    <p className="text-muted-foreground text-sm">Prêmio</p>
-                    <p className="text-foreground font-semibold text-lg">
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Prêmio</p>
+                    <p className="text-foreground font-bold text-lg leading-tight">
                       {policy.premiumValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </p>
-                    <p className="text-green-400 text-xs">
+                    <p className="text-muted-foreground text-xs">
                       {policy.commissionRate}% comissão
                     </p>
                   </div>
 
+                  {/* Vencimento */}
                   <div className="text-right">
-                    <p className="text-muted-foreground text-sm">Vencimento</p>
-                    <p className={`font-medium ${isExpiringSoon ? 'text-red-400' : 'text-foreground'}`}>
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Vencimento</p>
+                    <p className={`font-medium leading-tight ${isExpiringSoon ? 'text-amber-500' : daysRemaining < 0 ? 'text-destructive' : 'text-foreground'}`}>
                       {formatDate(policy.expirationDate)}
                     </p>
-                    <p className="text-muted-foreground text-xs">
-                      {differenceInDays(parseLocalDate(policy.expirationDate), new Date())} dias
+                    <p className={`text-xs flex items-center justify-end gap-1 ${
+                      daysRemaining < 0 ? 'text-destructive' : daysRemaining <= 30 ? 'text-amber-500' : 'text-emerald-500'
+                    }`}>
+                      <Clock className="w-3 h-3" />
+                      {daysRemaining < 0
+                        ? `${Math.abs(daysRemaining)}d vencida`
+                        : `${daysRemaining}d restantes`}
                     </p>
                   </div>
                 </div>
               </div>
-            </div>
+            </AppCard>
           );
         })}
       </div>
