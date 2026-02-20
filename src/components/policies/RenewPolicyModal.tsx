@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,10 +8,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, RotateCcw } from 'lucide-react';
 import { format, addYears, isAfter } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 import { useSupabasePolicies } from '@/hooks/useSupabasePolicies';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Policy } from '@/types';
 import { formatDate, parseLocalDate } from '@/utils/dateUtils';
 
@@ -21,12 +26,12 @@ const renewalSchema = z.object({
   newCommissionRate: z.number().min(0, 'Taxa de comissão deve ser maior ou igual a zero').max(100, 'Taxa de comissão não pode ser maior que 100%'),
   bonusClass: z.string().optional(),
   newExpirationDate: z.string().min(1, 'Nova data de vencimento é obrigatória'),
+  newPolicyNumber: z.string().optional(),
   observations: z.string().optional(),
   renewalType: z.enum(['manual', 'auto_12m', 'auto_24m'], {
     message: 'Tipo de renovação é obrigatório'
   })
 }).refine((data) => {
-  // Validar se a nova data de vencimento é futura
   const newDate = new Date(data.newExpirationDate);
   const today = new Date();
   return isAfter(newDate, today);
@@ -46,7 +51,9 @@ interface RenewPolicyModalProps {
 
 export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPolicyModalProps) {
   const [isRenewing, setIsRenewing] = useState(false);
-  const { addPolicy, updatePolicy } = useSupabasePolicies();
+  const [expirationDate, setExpirationDate] = useState<Date | undefined>();
+  const { updatePolicy } = useSupabasePolicies();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const {
@@ -68,31 +75,10 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
 
   const renewalType = watch('renewalType');
 
-  // Gerar número único para apólice renovada
-  const generateRenewedPolicyNumber = (originalNumber: string) => {
-    const timestamp = Date.now();
-    const year = new Date().getFullYear();
-    return `${originalNumber}-R${year}-${timestamp.toString().slice(-6)}`;
-  };
-
-  // Validar campos obrigatórios da apólice original
-  const validateOriginalPolicy = (policy: Policy) => {
-    const missingFields = [];
-    
-    if (!policy.insuranceCompany) missingFields.push('Seguradora');
-    if (!policy.type) missingFields.push('Ramo');
-    if (!policy.policyNumber) missingFields.push('Número da apólice');
-    
-    return missingFields;
-  };
-
-  // Calcular nova data de vencimento baseada no tipo
   const calculateNewExpirationDate = (type: string) => {
     if (!policy?.expirationDate) return '';
-    
     const currentExpiration = parseLocalDate(policy.expirationDate);
     let newDate: Date;
-    
     switch (type) {
       case 'auto_12m':
         newDate = addYears(currentExpiration, 1);
@@ -103,118 +89,74 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
       default:
         newDate = addYears(currentExpiration, 1);
     }
-    
     return format(newDate, 'yyyy-MM-dd');
   };
 
-  // Atualizar data quando tipo de renovação muda
   const handleRenewalTypeChange = (type: string) => {
     setValue('renewalType', type as any);
     const newDate = calculateNewExpirationDate(type);
     setValue('newExpirationDate', newDate);
+    if (newDate) {
+      setExpirationDate(new Date(newDate + 'T12:00:00'));
+    }
+  };
+
+  const handleDateSelect = (date: Date | undefined) => {
+    setExpirationDate(date);
+    if (date) {
+      setValue('newExpirationDate', format(date, 'yyyy-MM-dd'));
+    }
   };
 
   const onSubmit = async (data: RenewalFormData) => {
-    if (!policy) {
-      console.error('❌ Política não encontrada para renovação');
-      return;
-    }
-
-    console.log('🔄 Iniciando processo de renovação para apólice:', policy.policyNumber);
-
-    // Validar campos obrigatórios da apólice original
-    const missingFields = validateOriginalPolicy(policy);
-    if (missingFields.length > 0) {
-      toast({
-        title: 'Erro na Renovação',
-        description: `A apólice original possui campos obrigatórios em branco: ${missingFields.join(', ')}. Complete essas informações antes de renovar.`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Validar se nova data é posterior à data de vencimento original
-    const originalExpiration = new Date(policy.expirationDate);
-    const newExpiration = new Date(data.newExpirationDate);
-    
-    if (!isAfter(newExpiration, originalExpiration)) {
-      toast({
-        title: 'Erro na Renovação',
-        description: 'A nova data de vencimento deve ser posterior à data de vencimento atual da apólice.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!policy || !user) return;
 
     setIsRenewing(true);
     try {
-      console.log('📝 Criando nova apólice renovada...');
-      
-      // Gerar número único para a apólice renovada
-      const renewedPolicyNumber = generateRenewedPolicyNumber(policy.policyNumber!);
-      console.log('🔢 Número da nova apólice:', renewedPolicyNumber);
+      // 1. Save renewal history snapshot
+      const { error: historyError } = await supabase.from('policy_renewal_history').insert({
+        policy_id: policy.id,
+        user_id: user.id,
+        previous_expiration_date: policy.expirationDate,
+        previous_premium_value: policy.premiumValue,
+        previous_commission_rate: policy.commissionRate,
+        previous_bonus_class: policy.bonus_class || null,
+        previous_policy_number: policy.policyNumber || null,
+        new_expiration_date: data.newExpirationDate,
+        new_premium_value: data.newPremiumValue,
+        new_commission_rate: data.newCommissionRate,
+        new_bonus_class: data.bonusClass || null,
+        new_policy_number: data.newPolicyNumber || policy.policyNumber || null,
+        renewal_type: data.renewalType,
+        observations: data.observations || null,
+      });
 
-      // 🎯 ETAPA 1: Criar nova apólice renovada PRIMEIRO
-      const renewedPolicy = {
-        clientId: policy.clientId,
-        policyNumber: renewedPolicyNumber,
-        insuranceCompany: policy.insuranceCompany!,
-        type: policy.type!,
-        insuredAsset: policy.insuredAsset || 'Não especificado',
+      if (historyError) throw historyError;
+
+      // 2. Update existing policy in-place
+      await updatePolicy(policy.id, {
+        expirationDate: data.newExpirationDate,
         premiumValue: data.newPremiumValue,
         commissionRate: data.newCommissionRate,
-        status: 'Ativa' as const,
-        expirationDate: data.newExpirationDate,
-        startDate: format(new Date(), 'yyyy-MM-dd'),
-        producerId: policy.producerId,
-        brokerageId: policy.brokerageId,
         bonus_class: data.bonusClass,
-        userId: policy.userId,
-        automaticRenewal: true // ✅ ADICIONADO: Campo obrigatório
-      };
-
-      console.log('💾 Salvando nova apólice renovada...');
-      await addPolicy(renewedPolicy);
-      console.log('✅ Nova apólice criada com sucesso');
-
-      // 🎯 ETAPA 2: Marcar apólice original como renovada DEPOIS
-      console.log('🔄 Atualizando status da apólice original para "Renovada"...');
-      await updatePolicy(policy.id, { 
-        status: 'Renovada',
-        bonus_class: data.bonusClass 
+        ...(data.newPolicyNumber ? { policyNumber: data.newPolicyNumber } : {}),
+        renewalStatus: 'Renovada',
+        status: 'Ativa',
       });
-      console.log('✅ Apólice original marcada como renovada');
 
       toast({
-        title: 'Renovação Concluída',
-        description: `Apólice ${policy.policyNumber} renovada com sucesso! Nova apólice: ${renewedPolicyNumber}`,
-        variant: 'default',
+        title: 'Renovação concluída',
+        description: `Apólice ${policy.policyNumber} renovada com sucesso até ${format(new Date(data.newExpirationDate + 'T12:00:00'), 'dd/MM/yyyy')}.`,
       });
 
-      console.log('🎉 Processo de renovação concluído com sucesso');
       reset();
       onClose();
       onSuccess?.();
-      
     } catch (error) {
-      console.error('❌ Erro durante o processo de renovação:', error);
-      
-      // Tratamento de erro mais específico
-      let errorMessage = 'Erro desconhecido durante a renovação.';
-      
-      if (error instanceof Error) {
-        if (error.message.includes('constraint')) {
-          errorMessage = 'Erro de validação no banco de dados. Verifique se todos os campos estão corretos.';
-        } else if (error.message.includes('duplicate')) {
-          errorMessage = 'Número da apólice já existe. Tente novamente.';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
+      console.error('Erro na renovação:', error);
       toast({
-        title: 'Erro na Renovação',
-        description: errorMessage,
+        title: 'Erro na renovação',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive',
       });
     } finally {
@@ -226,105 +168,97 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl bg-slate-900 border-slate-700">
-        <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
-            <RotateCcw className="w-5 h-5 text-green-400" />
-            Renovar Apólice: {policy.policyNumber}
-          </DialogTitle>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <RotateCcw className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-semibold">Renovar Apólice</DialogTitle>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {policy.policyNumber} · {(policy as any).clientName || 'Cliente'}
+              </p>
+            </div>
+          </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Informações da Apólice Atual */}
-          <div className="bg-slate-800 p-4 rounded-lg border border-slate-600">
-            <h3 className="text-sm font-medium text-slate-300 mb-2">Apólice Atual</h3>
+          {/* Current Policy Summary */}
+          <div className="bg-muted/50 p-4 rounded-lg border border-border">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">Situação Atual</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-slate-400">Prêmio Atual:</span>
-                <span className="text-white ml-2">
-                  {policy.premiumValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
+                <span className="text-muted-foreground">Vencimento atual</span>
+                <p className="text-foreground font-medium">{formatDate(policy.expirationDate)}</p>
               </div>
               <div>
-                <span className="text-slate-400">Vencimento:</span>
-                <span className="text-white ml-2">
-                  {formatDate(policy.expirationDate)}
-                </span>
+                <span className="text-muted-foreground">Prêmio atual</span>
+                <p className="text-foreground font-medium">
+                  {policy.premiumValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Comissão atual</span>
+                <p className="text-foreground font-medium">{policy.commissionRate}%</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Classe de bônus atual</span>
+                <p className="text-foreground font-medium">Classe {policy.bonus_class || '0'}</p>
               </div>
             </div>
           </div>
 
-          {/* Verificação de Campos Obrigatórios */}
-          {(!policy.insuranceCompany || !policy.type || !policy.policyNumber) && (
-            <div className="bg-yellow-900/20 border border-yellow-600 p-4 rounded-lg">
-              <h3 className="text-yellow-400 font-medium mb-2">⚠️ Atenção: Campos Obrigatórios</h3>
-              <p className="text-yellow-300 text-sm">
-                Esta apólice possui campos obrigatórios em branco. Complete essas informações antes de renovar:
-              </p>
-              <ul className="text-yellow-300 text-sm mt-2 list-disc list-inside">
-                {!policy.insuranceCompany && <li>Seguradora</li>}
-                {!policy.type && <li>Ramo</li>}
-                {!policy.policyNumber && <li>Número da apólice</li>}
-              </ul>
-            </div>
-          )}
-
-          {/* Tipo de Renovação */}
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <Label htmlFor="renewalType" className="text-slate-300">Tipo de Renovação</Label>
-              <Select value={renewalType} onValueChange={handleRenewalTypeChange}>
-                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                  <SelectValue placeholder="Selecione o tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manual">Manual (Personalizada)</SelectItem>
-                  <SelectItem value="auto_12m">Automática - 12 meses</SelectItem>
-                  <SelectItem value="auto_24m">Automática - 24 meses</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Renewal Type */}
+          <div>
+            <Label>Tipo de Renovação</Label>
+            <Select value={renewalType} onValueChange={handleRenewalTypeChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual">Manual (Personalizada)</SelectItem>
+                <SelectItem value="auto_12m">Automática - 12 meses</SelectItem>
+                <SelectItem value="auto_24m">Automática - 24 meses</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Dados da Nova Apólice */}
+          {/* New Policy Data */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="newPremiumValue" className="text-slate-300">Novo Valor do Prêmio *</Label>
+              <Label>Novo Valor do Prêmio *</Label>
               <Input
-                id="newPremiumValue"
                 type="number"
                 step="0.01"
                 min="0"
                 {...register('newPremiumValue', { valueAsNumber: true })}
-                className="bg-slate-800 border-slate-600 text-white"
                 placeholder="0,00"
               />
               {errors.newPremiumValue && (
-                <p className="text-red-400 text-xs mt-1">{errors.newPremiumValue.message}</p>
+                <p className="text-destructive text-xs mt-1">{errors.newPremiumValue.message}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="newCommissionRate" className="text-slate-300">Nova Taxa de Comissão (%) *</Label>
+              <Label>Nova Taxa de Comissão (%) *</Label>
               <Input
-                id="newCommissionRate"
                 type="number"
                 step="0.01"
                 min="0"
                 max="100"
                 {...register('newCommissionRate', { valueAsNumber: true })}
-                className="bg-slate-800 border-slate-600 text-white"
                 placeholder="0,00"
               />
               {errors.newCommissionRate && (
-                <p className="text-red-400 text-xs mt-1">{errors.newCommissionRate.message}</p>
+                <p className="text-destructive text-xs mt-1">{errors.newCommissionRate.message}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="bonusClass" className="text-slate-300">Classe de Bônus</Label>
+              <Label>Classe de Bônus</Label>
               <Select value={watch('bonusClass')} onValueChange={(value) => setValue('bonusClass', value)}>
-                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
@@ -339,46 +273,68 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
             </div>
 
             <div>
-              <Label htmlFor="newExpirationDate" className="text-slate-300">Nova Data de Vencimento *</Label>
-              <Input
-                id="newExpirationDate"
-                type="date"
-                {...register('newExpirationDate')}
-                className="bg-slate-800 border-slate-600 text-white"
-              />
+              <Label>Nova Data de Vencimento *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !expirationDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {expirationDate
+                      ? format(expirationDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+                      : 'Selecionar data'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={expirationDate}
+                    onSelect={handleDateSelect}
+                    locale={ptBR}
+                    initialFocus
+                    disabled={(date) => date <= new Date()}
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
               {errors.newExpirationDate && (
-                <p className="text-red-400 text-xs mt-1">{errors.newExpirationDate.message}</p>
+                <p className="text-destructive text-xs mt-1">{errors.newExpirationDate.message}</p>
               )}
             </div>
           </div>
 
-          {/* Observações */}
+          {/* Optional new policy number */}
           <div>
-            <Label htmlFor="observations" className="text-slate-300">Observações da Renovação</Label>
+            <Label>
+              Número da Nova Apólice{' '}
+              <span className="text-muted-foreground font-normal">(opcional — se a seguradora emitir novo número)</span>
+            </Label>
+            <Input
+              {...register('newPolicyNumber')}
+              placeholder={policy.policyNumber || 'Manter número atual'}
+            />
+          </div>
+
+          {/* Observations */}
+          <div>
+            <Label>Observações da Renovação</Label>
             <Textarea
-              id="observations"
               {...register('observations')}
-              className="bg-slate-800 border-slate-600 text-white"
               placeholder="Observações sobre a renovação..."
               rows={3}
             />
           </div>
 
-          {/* Ações */}
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onClose}
-              className="border-slate-600 text-slate-300 hover:bg-slate-800"
-            >
+          {/* Actions */}
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button 
-              type="submit" 
-              disabled={isRenewing || (!policy.insuranceCompany || !policy.type || !policy.policyNumber)}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
+            <Button type="submit" disabled={isRenewing}>
               {isRenewing ? 'Renovando...' : 'Confirmar Renovação'}
             </Button>
           </div>
