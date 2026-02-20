@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,36 +8,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, RotateCcw } from 'lucide-react';
-import { format, addYears, isAfter } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { format, addMonths, addYears, parseISO } from 'date-fns';
 import { useSupabasePolicies } from '@/hooks/useSupabasePolicies';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useSupabaseCompanies } from '@/hooks/useSupabaseCompanies';
 import { supabase } from '@/integrations/supabase/client';
 import { Policy } from '@/types';
-import { formatDate, parseLocalDate } from '@/utils/dateUtils';
+import { formatDate } from '@/utils/dateUtils';
 
 const renewalSchema = z.object({
   newPremiumValue: z.number().min(0.01, 'Valor do prêmio deve ser maior que zero'),
   newCommissionRate: z.number().min(0, 'Taxa de comissão deve ser maior ou igual a zero').max(100, 'Taxa de comissão não pode ser maior que 100%'),
   bonusClass: z.string().optional(),
-  newExpirationDate: z.string().min(1, 'Nova data de vencimento é obrigatória'),
+  insuranceCompanyId: z.string().optional(),
+  startDate: z.string().min(1, 'Data de início é obrigatória'),
+  manualExpirationDate: z.string().optional(),
   newPolicyNumber: z.string().optional(),
   observations: z.string().optional(),
-  renewalType: z.enum(['manual', 'auto_12m', 'auto_24m'], {
+  renewalType: z.enum(['manual', 'auto_6m', 'auto_12m', 'auto_24m'], {
     message: 'Tipo de renovação é obrigatório'
   })
-}).refine((data) => {
-  const newDate = new Date(data.newExpirationDate);
-  const today = new Date();
-  return isAfter(newDate, today);
-}, {
-  message: 'A nova data de vencimento deve ser posterior à data atual',
-  path: ['newExpirationDate']
 });
 
 type RenewalFormData = z.infer<typeof renewalSchema>;
@@ -51,10 +43,10 @@ interface RenewPolicyModalProps {
 
 export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPolicyModalProps) {
   const [isRenewing, setIsRenewing] = useState(false);
-  const [expirationDate, setExpirationDate] = useState<Date | undefined>();
   const { updatePolicy } = useSupabasePolicies();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { companies } = useSupabaseCompanies();
 
   const {
     register,
@@ -69,47 +61,41 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
       newPremiumValue: policy?.premiumValue || 0,
       newCommissionRate: policy?.commissionRate || 0,
       bonusClass: policy?.bonus_class || '0',
-      renewalType: 'manual'
+      insuranceCompanyId: policy?.insuranceCompany || '',
+      newPolicyNumber: policy?.policyNumber || '',
+      startDate: policy?.expirationDate || '',
+      renewalType: 'auto_12m'
     }
   });
 
   const renewalType = watch('renewalType');
+  const startDate = watch('startDate');
 
-  const calculateNewExpirationDate = (type: string) => {
-    if (!policy?.expirationDate) return '';
-    const currentExpiration = parseLocalDate(policy.expirationDate);
-    let newDate: Date;
-    switch (type) {
-      case 'auto_12m':
-        newDate = addYears(currentExpiration, 1);
-        break;
-      case 'auto_24m':
-        newDate = addYears(currentExpiration, 2);
-        break;
-      default:
-        newDate = addYears(currentExpiration, 1);
+  const computedExpiration = useMemo(() => {
+    if (!startDate) return null;
+    try {
+      const parsed = parseISO(startDate);
+      if (isNaN(parsed.getTime())) return null;
+      if (renewalType === 'auto_6m') return addMonths(parsed, 6);
+      if (renewalType === 'auto_12m') return addMonths(parsed, 12);
+      if (renewalType === 'auto_24m') return addYears(parsed, 2);
+      return null; // manual
+    } catch {
+      return null;
     }
-    return format(newDate, 'yyyy-MM-dd');
-  };
-
-  const handleRenewalTypeChange = (type: string) => {
-    setValue('renewalType', type as any);
-    const newDate = calculateNewExpirationDate(type);
-    setValue('newExpirationDate', newDate);
-    if (newDate) {
-      setExpirationDate(new Date(newDate + 'T12:00:00'));
-    }
-  };
-
-  const handleDateSelect = (date: Date | undefined) => {
-    setExpirationDate(date);
-    if (date) {
-      setValue('newExpirationDate', format(date, 'yyyy-MM-dd'));
-    }
-  };
+  }, [startDate, renewalType]);
 
   const onSubmit = async (data: RenewalFormData) => {
     if (!policy || !user) return;
+
+    const finalExpiration = computedExpiration
+      ? format(computedExpiration, 'yyyy-MM-dd')
+      : data.manualExpirationDate;
+
+    if (!finalExpiration) {
+      toast({ title: 'Erro', description: 'Data de vencimento não calculada', variant: 'destructive' });
+      return;
+    }
 
     setIsRenewing(true);
     try {
@@ -122,7 +108,7 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
         previous_commission_rate: policy.commissionRate,
         previous_bonus_class: policy.bonus_class || null,
         previous_policy_number: policy.policyNumber || null,
-        new_expiration_date: data.newExpirationDate,
+        new_expiration_date: finalExpiration,
         new_premium_value: data.newPremiumValue,
         new_commission_rate: data.newCommissionRate,
         new_bonus_class: data.bonusClass || null,
@@ -135,18 +121,20 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
 
       // 2. Update existing policy in-place
       await updatePolicy(policy.id, {
-        expirationDate: data.newExpirationDate,
+        expirationDate: finalExpiration,
         premiumValue: data.newPremiumValue,
         commissionRate: data.newCommissionRate,
         bonus_class: data.bonusClass,
         ...(data.newPolicyNumber ? { policyNumber: data.newPolicyNumber } : {}),
+        ...(data.insuranceCompanyId ? { insuranceCompany: data.insuranceCompanyId } : {}),
+        ...(data.startDate ? { startDate: data.startDate } : {}),
         renewalStatus: 'Renovada',
         status: 'Ativa',
       });
 
       toast({
         title: 'Renovação concluída',
-        description: `Apólice ${policy.policyNumber} renovada com sucesso até ${format(new Date(data.newExpirationDate + 'T12:00:00'), 'dd/MM/yyyy')}.`,
+        description: `Apólice ${policy.policyNumber || ''} renovada com sucesso até ${format(new Date(finalExpiration + 'T12:00:00'), 'dd/MM/yyyy')}.`,
       });
 
       reset();
@@ -210,23 +198,24 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
           </div>
 
           {/* Renewal Type */}
-          <div>
+          <div className="space-y-1.5">
             <Label>Tipo de Renovação</Label>
-            <Select value={renewalType} onValueChange={handleRenewalTypeChange}>
+            <Select value={renewalType} onValueChange={(v) => setValue('renewalType', v as any)}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o tipo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="manual">Manual (Personalizada)</SelectItem>
+                <SelectItem value="auto_6m">Automática - 6 meses</SelectItem>
                 <SelectItem value="auto_12m">Automática - 12 meses</SelectItem>
                 <SelectItem value="auto_24m">Automática - 24 meses</SelectItem>
+                <SelectItem value="manual">Manual (Personalizada)</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* New Policy Data */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
+            <div className="space-y-1.5">
               <Label>Novo Valor do Prêmio *</Label>
               <Input
                 type="number"
@@ -240,8 +229,8 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
               )}
             </div>
 
-            <div>
-              <Label>Nova Taxa de Comissão (%) *</Label>
+            <div className="space-y-1.5">
+              <Label>Comissão (%) *</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -255,72 +244,79 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
               )}
             </div>
 
-            <div>
+            <div className="space-y-1.5">
+              <Label>Seguradora</Label>
+              <Select
+                value={watch('insuranceCompanyId')}
+                onValueChange={(v) => setValue('insuranceCompanyId', v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Manter seguradora atual" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
               <Label>Classe de Bônus</Label>
               <Select value={watch('bonusClass')} onValueChange={(value) => setValue('bonusClass', value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="0">Classe 0 (Padrão)</SelectItem>
-                  <SelectItem value="1">Classe 1 (-10%)</SelectItem>
-                  <SelectItem value="2">Classe 2 (-20%)</SelectItem>
-                  <SelectItem value="3">Classe 3 (-30%)</SelectItem>
-                  <SelectItem value="4">Classe 4 (-40%)</SelectItem>
-                  <SelectItem value="5">Classe 5 (-50%)</SelectItem>
+                  {Array.from({ length: 11 }, (_, i) => (
+                    <SelectItem key={i} value={String(i)}>
+                      Classe {i}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div>
-              <Label>Nova Data de Vencimento *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !expirationDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {expirationDate
-                      ? format(expirationDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-                      : 'Selecionar data'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={expirationDate}
-                    onSelect={handleDateSelect}
-                    locale={ptBR}
-                    initialFocus
-                    disabled={(date) => date <= new Date()}
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-              {errors.newExpirationDate && (
-                <p className="text-destructive text-xs mt-1">{errors.newExpirationDate.message}</p>
+            {/* Start Date + computed expiration */}
+            <div className="space-y-1.5">
+              <Label>Data de Início de Vigência *</Label>
+              <Input type="date" {...register('startDate')} />
+              {computedExpiration && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                  <CalendarIcon className="w-3 h-3" />
+                  Vencimento: <span className="font-medium text-foreground">
+                    {format(computedExpiration, 'dd/MM/yyyy')}
+                  </span>
+                </p>
+              )}
+              {errors.startDate && (
+                <p className="text-destructive text-xs mt-1">{errors.startDate.message}</p>
               )}
             </div>
+
+            {/* Manual expiration date - only when type is manual */}
+            {renewalType === 'manual' && (
+              <div className="space-y-1.5">
+                <Label>Data de Vencimento *</Label>
+                <Input type="date" {...register('manualExpirationDate')} />
+              </div>
+            )}
           </div>
 
-          {/* Optional new policy number */}
-          <div>
+          {/* Policy number */}
+          <div className="space-y-1.5">
             <Label>
-              Número da Nova Apólice{' '}
+              Número da Apólice{' '}
               <span className="text-muted-foreground font-normal">(opcional — se a seguradora emitir novo número)</span>
             </Label>
             <Input
               {...register('newPolicyNumber')}
-              placeholder={policy.policyNumber || 'Manter número atual'}
+              placeholder="Ex: 123456789"
             />
           </div>
 
           {/* Observations */}
-          <div>
+          <div className="space-y-1.5">
             <Label>Observações da Renovação</Label>
             <Textarea
               {...register('observations')}
