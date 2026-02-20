@@ -24,6 +24,9 @@ interface PartialReconciliationModalProps {
     paidAmount: number;
     remainingAmount: number;
     customerName?: string;
+    branchName?: string;
+    insurerName?: string;
+    itemName?: string;
   };
   isLoading?: boolean;
 }
@@ -74,6 +77,19 @@ export function PartialReconciliationModal({
             <p className="text-sm font-bold text-foreground">
               {systemItem.customerName || systemItem.description}
             </p>
+            {(systemItem.branchName || systemItem.insurerName || systemItem.itemName) && (
+              <div className="flex flex-wrap items-center gap-1">
+                {systemItem.branchName && (
+                  <Badge variant="metallic" className="text-[10px] px-1.5 py-0 h-4">{systemItem.branchName}</Badge>
+                )}
+                {systemItem.insurerName && (
+                  <Badge variant="silverOutline" className="text-[10px] px-1.5 py-0 h-4">{systemItem.insurerName}</Badge>
+                )}
+                {systemItem.itemName && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground">{systemItem.itemName}</Badge>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-3 text-xs">
               <span className="text-muted-foreground">Cheio: {formatCurrency(systemItem.totalAmount)}</span>
               <span className="text-emerald-500">Baixado: {formatCurrency(systemItem.paidAmount)}</span>
