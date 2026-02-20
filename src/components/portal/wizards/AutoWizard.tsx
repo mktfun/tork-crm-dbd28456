@@ -12,9 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  ArrowLeft, 
-  ArrowRight, 
+import {
+  ArrowLeft,
+  ArrowRight,
   Loader2,
   Home,
   Building2,
@@ -28,7 +28,7 @@ import {
   Users
 } from "lucide-react";
 import { toast } from "sonner";
-import { sendToRDStation, buildAutoPayload } from "@/utils/dataProcessor";
+import { buildAutoPayload } from "@/utils/dataProcessor";
 import { usePartialLead } from "@/hooks/usePartialLead";
 import { Label } from "@/components/ui/label";
 import { LgpdConsent } from "@/components/ui/lgpd-consent";
@@ -58,11 +58,10 @@ const OptionCard: React.FC<OptionCardProps> = ({ icon, label, selected, onClick 
   <button
     type="button"
     onClick={onClick}
-    className={`flex flex-col items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 gap-2 h-24 ${
-      selected
+    className={`flex flex-col items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 gap-2 h-24 ${selected
         ? "border-primary bg-primary/5 text-primary shadow-sm scale-[1.02]"
         : "border-muted bg-background text-muted-foreground hover:bg-muted/50 hover:border-muted-foreground/30"
-    }`}
+      }`}
   >
     <span className={selected ? "text-primary" : "text-muted-foreground"}>{icon}</span>
     <span className="font-bold text-sm text-center leading-tight">{label}</span>
@@ -83,22 +82,20 @@ const YesNoToggle: React.FC<YesNoToggleProps> = ({ label, value, onChange }) => 
       <button
         type="button"
         onClick={() => onChange("sim")}
-        className={`h-12 flex items-center justify-center rounded-lg border text-sm font-medium transition-all duration-200 ${
-          value === "sim"
+        className={`h-12 flex items-center justify-center rounded-lg border text-sm font-medium transition-all duration-200 ${value === "sim"
             ? "bg-primary text-primary-foreground border-primary shadow-md scale-[1.02]"
             : "bg-background text-muted-foreground border-input hover:bg-muted/50"
-        }`}
+          }`}
       >
         Sim
       </button>
       <button
         type="button"
         onClick={() => onChange("nao")}
-        className={`h-12 flex items-center justify-center rounded-lg border text-sm font-medium transition-all duration-200 ${
-          value === "nao"
+        className={`h-12 flex items-center justify-center rounded-lg border text-sm font-medium transition-all duration-200 ${value === "nao"
             ? "bg-primary text-primary-foreground border-primary shadow-md scale-[1.02]"
             : "bg-background text-muted-foreground border-input hover:bg-muted/50"
-        }`}
+          }`}
       >
         Não
       </button>
@@ -109,18 +106,19 @@ const YesNoToggle: React.FC<YesNoToggleProps> = ({ label, value, onChange }) => 
 interface AutoWizardProps {
   dealType?: "renovacao" | "novo" | null;
   isUber?: boolean;
+  onComplete?: (payload: any) => void;
 }
 
-export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false }) => {
+export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false, onComplete }) => {
   const navigate = useNavigate();
   const { savePartialLead, updateStepIndex, getLeadId } = usePartialLead();
   const [currentStep, setCurrentStep] = React.useState(0);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  
+
   // LGPD Consent
   const [acceptedTerms, setAcceptedTerms] = React.useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = React.useState(false);
-  
+
   // Se for Uber, define vehicleUseType como comercial por padrão
   const [vehicleUseType, setVehicleUseType] = React.useState<"pessoal" | "comercial">(isUber ? "comercial" : "pessoal");
   // Form state - Step 1
@@ -170,7 +168,7 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
       setNeighborhood(data.bairro || "");
       setCity(data.localidade || "");
       setState(data.uf || "");
-      
+
       // Remove erro de CEP se existir
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -198,13 +196,13 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
   const [workParking, setWorkParking] = React.useState("fechada");
   const [usesForSchool, setUsesForSchool] = React.useState<"sim" | "nao">("nao");
   const [schoolParking, setSchoolParking] = React.useState("fechada");
-  
+
   // Condutor Jovem - Lógica Condicional
   const [livesWithYoungPerson, setLivesWithYoungPerson] = React.useState<"sim" | "nao">("nao");
   const [youngPersonDrives, setYoungPersonDrives] = React.useState<"sim" | "nao">("nao");
   const [youngDriverAge, setYoungDriverAge] = React.useState("");
   const [youngDriverGender, setYoungDriverGender] = React.useState("");
-  
+
   // Sinistro - Apenas para renovação
   const [hadClaim, setHadClaim] = React.useState<"sim" | "nao">("nao");
 
@@ -318,7 +316,7 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
         // Atualizar step index nos passos seguintes
         await updateStepIndex(currentStep + 1);
       }
-      
+
       setCurrentStep((prev) => prev + 1);
     }
   };
@@ -371,10 +369,11 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
         isUber,
       });
 
-      const leadId = getLeadId();
-      const success = await sendToRDStation(payload, leadId);
-      if (success) navigate("/sucesso");
-      else toast.error("Erro ao enviar cotação.");
+      if (onComplete) {
+        onComplete(payload);
+      } else {
+        toast.error("Configuração de envio incompleta.");
+      }
     } catch (error) {
       console.error(error);
       toast.error("Erro ao enviar cotação.");
@@ -415,16 +414,16 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
                 inputMode="numeric"
                 required
               />
-              <FormInput 
-                label={personType === "pf" ? "Nome Completo" : "Razão Social"} 
+              <FormInput
+                label={personType === "pf" ? "Nome Completo" : "Razão Social"}
                 placeholder={personType === "pf" ? "Seu nome completo" : "Nome da empresa"}
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 onBlur={() => handleBlur("name", name)}
                 error={touched.name ? errors.name : undefined}
-                required 
+                required
               />
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Estado Civil <span className="text-destructive">*</span></label>
@@ -439,37 +438,37 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
                     </SelectContent>
                   </Select>
                 </div>
-                <FormInput 
-                  label="Profissão" 
+                <FormInput
+                  label="Profissão"
                   placeholder="Ex: Engenheiro"
-                  value={profession} 
-                  onChange={(e) => setProfession(e.target.value)} 
+                  value={profession}
+                  onChange={(e) => setProfession(e.target.value)}
                   onBlur={() => handleBlur("profession", profession)}
                   error={touched.profession ? errors.profession : undefined}
-                  required 
+                  required
                 />
               </div>
 
-              <FormInput 
-                label="E-mail" 
-                type="email" 
+              <FormInput
+                label="E-mail"
+                type="email"
                 placeholder="seu@email.com"
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 onBlur={() => handleBlur("email", email)}
                 error={touched.email ? errors.email : undefined}
                 inputMode="email"
-                required 
+                required
               />
-              <FormInput 
-                label="Celular" 
+              <FormInput
+                label="Celular"
                 placeholder="(00) 00000-0000"
-                value={phone} 
-                onChange={(e) => setPhone(formatPhone(e.target.value))} 
+                value={phone}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
                 onBlur={() => handleBlur("phone", phone)}
                 error={touched.phone ? errors.phone : undefined}
                 inputMode="tel"
-                required 
+                required
               />
             </div>
           </FormCard>
@@ -553,7 +552,7 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {vehicleUseType === "comercial" 
+                  {vehicleUseType === "comercial"
                     ? "Inclui visitas a clientes, entregas e motoristas de aplicativo"
                     : "Inclui lazer e ida/volta ao trabalho/faculdade"}
                 </p>
@@ -586,7 +585,7 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
         {currentStep === 2 && (
           <FormCard title="Endereço & Residência" description="Onde o veículo pernoita">
             <div className="space-y-8">
-              
+
               {/* BLOCO A: Endereço Compacto */}
               <div className="space-y-4">
                 <div className="flex items-center gap-3 pb-2 border-b border-border">
@@ -595,41 +594,41 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
                     {cep}
                   </span>
                 </div>
-                
+
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div className="sm:col-span-3">
-                    <FormInput 
-                      label="Rua" 
+                    <FormInput
+                      label="Rua"
                       placeholder="Nome da rua"
-                      value={street} 
-                      onChange={(e) => setStreet(e.target.value)} 
-                      required 
+                      value={street}
+                      onChange={(e) => setStreet(e.target.value)}
+                      required
                     />
                   </div>
-                  <FormInput 
-                    label="Número" 
+                  <FormInput
+                    label="Número"
                     placeholder="Nº"
-                    value={number} 
-                    onChange={(e) => setNumber(e.target.value)} 
+                    value={number}
+                    onChange={(e) => setNumber(e.target.value)}
                     inputMode="numeric"
-                    required 
+                    required
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormInput 
-                    label="Bairro" 
+                  <FormInput
+                    label="Bairro"
                     placeholder="Seu bairro"
-                    value={neighborhood} 
-                    onChange={(e) => setNeighborhood(e.target.value)} 
-                    required 
+                    value={neighborhood}
+                    onChange={(e) => setNeighborhood(e.target.value)}
+                    required
                   />
-                  <FormInput 
-                    label="Cidade" 
+                  <FormInput
+                    label="Cidade"
                     placeholder="Sua cidade"
-                    value={city} 
-                    onChange={(e) => setCity(e.target.value)} 
-                    required 
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    required
                   />
                 </div>
               </div>
@@ -637,7 +636,7 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
               {/* BLOCO B: Residência & Garagem */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-foreground pb-2 border-b border-border">Residência & Garagem</h3>
-                
+
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">Qual seu tipo de residência?</Label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -700,13 +699,13 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
         {currentStep === 3 && (
           <FormCard title="Perfil de Risco" description="Rotina de uso do veículo">
             <div className="space-y-8">
-              
+
               {/* BLOCO A: Rotina - Trabalho */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-foreground pb-2 border-b border-border flex items-center gap-2">
                   <Briefcase size={18} /> Rotina de Trabalho
                 </h3>
-                
+
                 <YesNoToggle
                   label="Usa o veículo para ir ao trabalho?"
                   value={usesForWork}
@@ -745,7 +744,7 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
                 <h3 className="font-semibold text-foreground pb-2 border-b border-border flex items-center gap-2">
                   <GraduationCap size={18} /> Rotina de Estudo
                 </h3>
-                
+
                 <YesNoToggle
                   label="Usa o veículo para ir à faculdade/escola?"
                   value={usesForSchool}
@@ -784,7 +783,7 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
                 <h3 className="font-semibold text-foreground pb-2 border-b border-border flex items-center gap-2">
                   <Users size={18} /> Condutor Jovem
                 </h3>
-                
+
                 {/* Pergunta 1 - Sempre visível */}
                 <YesNoToggle
                   label="O principal condutor reside com pessoas entre 18 a 25 anos?"
@@ -847,13 +846,13 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
                   <h3 className="font-semibold text-foreground pb-2 border-b border-border flex items-center gap-2">
                     ⚠️ Histórico de Sinistros
                   </h3>
-                  
+
                   <YesNoToggle
                     label="Houve sinistro (acidente/roubo) na vigência atual?"
                     value={hadClaim}
                     onChange={setHadClaim}
                   />
-                  
+
                   {hadClaim === "sim" && (
                     <p className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
                       ⚠️ Importante: sinistros podem impactar o valor do prêmio na renovação. Entraremos em contato para mais detalhes.

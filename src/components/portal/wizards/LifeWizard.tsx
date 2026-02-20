@@ -8,7 +8,7 @@ import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { sendToRDStation, buildLifePayload } from "@/utils/dataProcessor";
+import { buildLifePayload } from "@/utils/dataProcessor";
 import { usePartialLead } from "@/hooks/usePartialLead";
 import { LgpdConsent } from "@/components/ui/lgpd-consent";
 
@@ -41,12 +41,16 @@ const formatCurrency = (value: string) => {
   return amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 };
 
-export const LifeWizard = () => {
+interface LifeWizardProps {
+  onComplete?: (payload: any) => void;
+}
+
+export const LifeWizard: React.FC<LifeWizardProps> = ({ onComplete }) => {
   const navigate = useNavigate();
   const { savePartialLead, updateStepIndex, getLeadId } = usePartialLead();
   const [currentStep, setCurrentStep] = React.useState(0);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  
+
   // LGPD Consent
   const [acceptedTerms, setAcceptedTerms] = React.useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = React.useState(false);
@@ -140,7 +144,7 @@ export const LifeWizard = () => {
       } else if (getLeadId()) {
         await updateStepIndex(currentStep + 1);
       }
-      
+
       setCurrentStep((prev) => prev + 1);
     }
   };
@@ -169,13 +173,10 @@ export const LifeWizard = () => {
         coverageFuneral: false,
       });
 
-      const leadId = getLeadId();
-      const success = await sendToRDStation(payload, leadId);
-      
-      if (success) {
-        navigate("/sucesso");
+      if (onComplete) {
+        onComplete(payload);
       } else {
-        toast.error("Erro ao enviar cotação. Tente novamente.");
+        toast.error("Configuração de envio incompleta.");
       }
     } catch (error) {
       console.error("Erro no submit:", error);

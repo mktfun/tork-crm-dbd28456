@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, ArrowRight, Smartphone, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { sendToRDStation, buildSmartphonePayload } from "@/utils/dataProcessor";
+import { buildSmartphonePayload } from "@/utils/dataProcessor";
 import { usePartialLead } from "@/hooks/usePartialLead";
 import { LgpdConsent } from "@/components/ui/lgpd-consent";
 
@@ -54,12 +54,16 @@ const formatCurrency = (value: string) => {
   return amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 };
 
-export const SmartphoneWizard = () => {
+interface SmartphoneWizardProps {
+  onComplete?: (payload: any) => void;
+}
+
+export const SmartphoneWizard: React.FC<SmartphoneWizardProps> = ({ onComplete }) => {
   const navigate = useNavigate();
   const { savePartialLead, updateStepIndex, getLeadId } = usePartialLead();
   const [currentStep, setCurrentStep] = React.useState(0);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  
+
   // LGPD Consent
   const [acceptedTerms, setAcceptedTerms] = React.useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = React.useState(false);
@@ -191,7 +195,7 @@ export const SmartphoneWizard = () => {
       } else if (getLeadId()) {
         await updateStepIndex(currentStep + 1);
       }
-      
+
       setCurrentStep((prev) => prev + 1);
     }
   };
@@ -224,13 +228,10 @@ export const SmartphoneWizard = () => {
         smartphoneValue,
       });
 
-      const leadId = getLeadId();
-      const success = await sendToRDStation(payload, leadId);
-      
-      if (success) {
-        navigate("/sucesso");
+      if (onComplete) {
+        onComplete(payload);
       } else {
-        toast.error("Erro ao enviar cotação. Tente novamente.");
+        toast.error("Configuração de envio incompleta.");
       }
     } catch (error) {
       console.error("Erro no submit:", error);
@@ -411,8 +412,8 @@ export const SmartphoneWizard = () => {
 
         {/* Step 3: Dados do Smartphone */}
         {currentStep === 2 && (
-          <FormCard 
-            title="Dados do Smartphone" 
+          <FormCard
+            title="Dados do Smartphone"
             description="Informe o valor do aparelho"
           >
             <div className="space-y-6">
@@ -422,7 +423,7 @@ export const SmartphoneWizard = () => {
                   <div>
                     <h4 className="font-semibold text-foreground mb-1">Cobertura para Smartphone</h4>
                     <p className="text-sm text-muted-foreground">
-                      O seguro residencial pode incluir cobertura para eletrônicos portáteis, 
+                      O seguro residencial pode incluir cobertura para eletrônicos portáteis,
                       protegendo seu smartphone contra roubo, furto e danos acidentais.
                     </p>
                   </div>

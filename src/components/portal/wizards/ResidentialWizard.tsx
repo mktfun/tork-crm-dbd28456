@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, ArrowRight, Home, Building2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { sendToRDStation, buildResidentialPayload } from "@/utils/dataProcessor";
+import { buildResidentialPayload } from "@/utils/dataProcessor";
 import { usePartialLead } from "@/hooks/usePartialLead";
 import { LgpdConsent } from "@/components/ui/lgpd-consent";
 
@@ -67,12 +67,16 @@ const formatCurrency = (value: string) => {
   return amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 };
 
-export const ResidentialWizard = () => {
+interface ResidentialWizardProps {
+  onComplete?: (payload: any) => void;
+}
+
+export const ResidentialWizard: React.FC<ResidentialWizardProps> = ({ onComplete }) => {
   const navigate = useNavigate();
   const { savePartialLead, updateStepIndex, getLeadId } = usePartialLead();
   const [currentStep, setCurrentStep] = React.useState(0);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  
+
   // LGPD Consent
   const [acceptedTerms, setAcceptedTerms] = React.useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = React.useState(false);
@@ -179,7 +183,7 @@ export const ResidentialWizard = () => {
   const isStepValid = (step: number) => {
     switch (step) {
       case 0:
-        const cpfCnpjValid = personType === "pf" 
+        const cpfCnpjValid = personType === "pf"
           ? cpfCnpj.replace(/\D/g, "").length === 11
           : cpfCnpj.replace(/\D/g, "").length === 14;
         return (
@@ -230,7 +234,7 @@ export const ResidentialWizard = () => {
       } else if (getLeadId()) {
         await updateStepIndex(currentStep + 1);
       }
-      
+
       setCurrentStep((prev) => prev + 1);
     }
   };
@@ -271,13 +275,10 @@ export const ResidentialWizard = () => {
         coverageNewValue: wantNewValueCoverage,
       });
 
-      const leadId = getLeadId();
-      const success = await sendToRDStation(payload, leadId);
-      
-      if (success) {
-        navigate("/sucesso");
+      if (onComplete) {
+        onComplete(payload);
       } else {
-        toast.error("Erro ao enviar cotação. Tente novamente.");
+        toast.error("Configuração de envio incompleta.");
       }
     } catch (error) {
       console.error("Erro no submit:", error);

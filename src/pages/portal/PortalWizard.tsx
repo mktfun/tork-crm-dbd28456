@@ -72,7 +72,7 @@ export default function PortalWizard() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
-        <EndorsementWizard />
+        <EndorsementWizard onComplete={handleComplete} />
       </div>
     );
   }
@@ -123,19 +123,19 @@ export default function PortalWizard() {
   const renderWizard = () => {
     switch (selectedRamo) {
       case 'auto':
-        return <AutoWizard />;
+        return <AutoWizard onComplete={handleComplete} />;
       case 'residencial':
-        return <ResidentialWizard />;
+        return <ResidentialWizard onComplete={handleComplete} />;
       case 'vida':
-        return <LifeWizard />;
+        return <LifeWizard onComplete={handleComplete} />;
       case 'empresarial':
-        return <BusinessWizard />;
+        return <BusinessWizard onComplete={handleComplete} />;
       case 'viagem':
-        return <TravelWizard />;
+        return <TravelWizard onComplete={handleComplete} />;
       case 'saude':
-        return <HealthWizard />;
+        return <HealthWizard onComplete={handleComplete} />;
       case 'smartphone':
-        return <SmartphoneWizard />;
+        return <SmartphoneWizard onComplete={handleComplete} />;
       default:
         return <p className="text-zinc-400">Wizard não encontrado.</p>;
     }

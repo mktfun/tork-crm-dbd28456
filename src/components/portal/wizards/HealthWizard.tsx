@@ -9,7 +9,7 @@ import { usePartialLead } from "@/hooks/usePartialLead";
 import { fetchCNPJData, formatCNPJ, isValidCNPJ } from "@/utils/cnpjApi";
 import { checkHealthQualification, type HealthQualificationConfig } from "@/utils/qualification";
 import { trackViewContent, trackLead, trackCompleteRegistration } from "@/utils/metaPixel";
-import { sendToRDStation, buildHealthPayload } from "@/utils/dataProcessor";
+import { buildHealthPayload } from "@/utils/dataProcessor";
 import { supabase } from "@/integrations/supabase/client";
 import { LgpdConsent } from "@/components/ui/lgpd-consent";
 
@@ -115,10 +115,14 @@ const steps = [
   { id: 'crosssell', title: 'Benefícios', icon: Gift },
 ];
 
-export const HealthWizard = () => {
+export interface HealthWizardProps {
+  onComplete?: (payload: any) => void;
+}
+
+export const HealthWizard: React.FC<HealthWizardProps> = ({ onComplete }) => {
   const navigate = useNavigate();
   const { savePartialLead, updateStepIndex, getLeadId } = usePartialLead();
-  
+
   const {
     data,
     currentStep,
@@ -158,18 +162,18 @@ export const HealthWizard = () => {
           .select('*')
           .eq('id', 1)
           .single();
-        
+
         if (settings) {
           const rawLocations = settings.health_region_locations;
           const legacyStates = settings.health_region_states ?? [];
-          
-          let regionLocations: Array<{state: string; city?: string}> = [];
+
+          let regionLocations: Array<{ state: string; city?: string }> = [];
           if (rawLocations && Array.isArray(rawLocations) && rawLocations.length > 0) {
             regionLocations = rawLocations;
           } else if (legacyStates.length > 0) {
             regionLocations = legacyStates.map((s: string) => ({ state: s }));
           }
-          
+
           setQualificationConfig({
             ageMin: settings.health_age_limit_min ?? 0,
             ageMax: settings.health_age_limit_max ?? 65,
@@ -250,29 +254,29 @@ export const HealthWizard = () => {
   const isStepValid = (step: number): boolean => {
     switch (step) {
       case 0: // Vidas
-        return data.livesCount >= 1 && 
+        return data.livesCount >= 1 &&
           data.lives.every(l => l.age && parseInt(l.age) > 0);
-      
+
       case 1: // Empresarial
         if (data.contractType === 'cnpj') {
           return isValidCNPJ(data.cnpj) && data.razaoSocial.length > 0;
         }
         // Modo CPF: todos os lives precisam ter CPF válido
-        return data.lives.every(life => 
+        return data.lives.every(life =>
           life.cpf && life.cpf.replace(/\D/g, '').length === 11
         );
-      
+
       case 2: // Preferências
         return data.budget > 0 && data.accommodation !== '';
-      
+
       case 3: // Contato
         return data.name.trim().length >= 3 &&
           /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email) &&
           data.phone.replace(/\D/g, '').length >= 10;
-      
+
       case 4: // Cross-sell (sempre válido)
         return true;
-      
+
       default:
         return false;
     }
@@ -282,7 +286,7 @@ export const HealthWizard = () => {
     if (currentStep < steps.length - 1 && isStepValid(currentStep)) {
       const newStep = currentStep + 1;
       updateStep(newStep);
-      
+
       // Salvar lead parcial no Step 3 (contato)
       if (currentStep === 3 && !getLeadId()) {
         await savePartialLead({
@@ -294,7 +298,7 @@ export const HealthWizard = () => {
           insuranceType: 'Plano de Saúde',
           stepIndex: newStep,
         });
-        
+
         // Track Lead event
         trackLead(data.budget);
       } else if (getLeadId()) {
@@ -322,13 +326,13 @@ export const HealthWizard = () => {
       const ages = data.lives
         .filter(l => l.age)
         .map(l => parseInt(l.age));
-      
+
       // Contar funcionários baseado no relacionamento 'employee' nas vidas
       const employeeCount = data.lives.filter(l => {
         const rel = String(l.relationship || '').toLowerCase().trim();
         return rel === 'employee';
       }).length;
-      
+
       const qualification = checkHealthQualification(
         {
           ages,
@@ -386,17 +390,13 @@ export const HealthWizard = () => {
         }))
       );
 
-      const leadId = getLeadId();
-      const success = await sendToRDStation(payload, leadId);
-
-      if (success) {
+      if (onComplete) {
         // Track CompleteRegistration apenas se qualificado
         trackCompleteRegistration('Plano de Saúde', qualification.isQualified);
-        
-        clearData();
-        navigate('/sucesso');
+
+        onComplete(payload);
       } else {
-        toast.error('Erro ao enviar cotação. Tente novamente.');
+        toast.error('Configuração de envio incompleta.');
       }
     } catch (error) {
       console.error('Erro no submit:', error);
@@ -437,29 +437,29 @@ export const HealthWizard = () => {
         <div className="flex items-center justify-between relative">
           {/* Progress Line */}
           <div className="absolute top-5 left-0 right-0 h-0.5 bg-border">
-            <motion.div 
+            <motion.div
               className="h-full bg-primary"
               initial={{ width: 0 }}
               animate={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
               transition={{ duration: 0.3 }}
             />
           </div>
-          
+
           {steps.map((step, index) => {
             const Icon = step.icon;
             const isActive = index === currentStep;
             const isCompleted = index < currentStep;
-            
+
             return (
               <div key={step.id} className="relative z-10 flex flex-col items-center">
                 <motion.div
                   className={`
                     w-10 h-10 rounded-full flex items-center justify-center
                     transition-all duration-300
-                    ${isCompleted 
-                      ? 'bg-primary text-primary-foreground' 
-                      : isActive 
-                        ? 'bg-primary text-primary-foreground ring-4 ring-primary/20' 
+                    ${isCompleted
+                      ? 'bg-primary text-primary-foreground'
+                      : isActive
+                        ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
                         : 'bg-card border-2 border-border text-muted-foreground'
                     }
                   `}
@@ -528,8 +528,8 @@ export const HealthWizard = () => {
           className={`
             flex items-center gap-2 px-6 py-3 rounded-full
             font-medium transition-all duration-300
-            ${currentStep === 0 
-              ? 'text-muted-foreground cursor-not-allowed opacity-50' 
+            ${currentStep === 0
+              ? 'text-muted-foreground cursor-not-allowed opacity-50'
               : 'text-foreground hover:bg-muted'
             }
           `}

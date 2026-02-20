@@ -18,7 +18,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { sendToRDStation, buildEndorsementPayload } from "@/utils/dataProcessor";
+import { buildEndorsementPayload } from "@/utils/dataProcessor";
 import { usePartialLead } from "@/hooks/usePartialLead";
 import { LgpdConsent } from "@/components/ui/lgpd-consent";
 
@@ -69,9 +69,10 @@ const formatDate = (value: string) => value.replace(/\D/g, "").replace(/(\d{2})(
 
 interface EndorsementWizardProps {
   isUber?: boolean;
+  onComplete?: (payload: any) => void;
 }
 
-export const EndorsementWizard: React.FC<EndorsementWizardProps> = ({ isUber = false }) => {
+export const EndorsementWizard: React.FC<EndorsementWizardProps> = ({ isUber = false, onComplete }) => {
   const navigate = useNavigate();
   const { savePartialLead, updateStepIndex, getLeadId } = usePartialLead();
   const [endorsementType, setEndorsementType] = React.useState<EndorsementType>(null);
@@ -230,7 +231,7 @@ export const EndorsementWizard: React.FC<EndorsementWizardProps> = ({ isUber = f
       } else if (getLeadId()) {
         await updateStepIndex(currentStep + 1);
       }
-      
+
       setCurrentStep((prev) => prev + 1);
     }
   };
@@ -282,10 +283,11 @@ export const EndorsementWizard: React.FC<EndorsementWizardProps> = ({ isUber = f
         cancelReason,
       });
 
-      const leadId = getLeadId();
-      const success = await sendToRDStation(payload, leadId);
-      if (success) navigate("/sucesso");
-      else toast.error("Erro ao enviar solicitação.");
+      if (onComplete) {
+        onComplete(payload);
+      } else {
+        toast.error("Configuração de envio incompleta.");
+      }
     } catch (error) {
       console.error(error);
       toast.error("Erro ao enviar solicitação.");
@@ -334,11 +336,10 @@ export const EndorsementWizard: React.FC<EndorsementWizardProps> = ({ isUber = f
                     key={option.type}
                     type="button"
                     onClick={() => setEndorsementType(option.type)}
-                    className={`group relative flex flex-col items-center justify-center p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 gap-3 h-36 ${
-                      isSelected
+                    className={`group relative flex flex-col items-center justify-center p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 gap-3 h-36 ${isSelected
                         ? `border-primary bg-primary/5 shadow-md scale-[1.02]`
                         : "border-muted bg-background hover:border-muted-foreground/30 hover:bg-muted/30"
-                    }`}
+                      }`}
                   >
                     <div className={`p-3 rounded-full ${option.bgColor} transition-colors`}>
                       <Icon size={28} className={option.color} />
