@@ -1,93 +1,72 @@
 
-# Prompt 23: Commission Payment Timeline
+
+# Prompt 28 -- Redesign da Tela de Agendamentos
 
 ## Overview
 
-Create a `CommissionPaymentTimeline` component that displays a visual progress bar and vertical timeline of partial payments for each commission. Integrate it into both the Policy Details page (replacing the simple commission list in `CommissionExtract`) and the Client Details page (as a new section after interactions).
-
-## Important Discovery
-
-The `transaction_payments` table has a FK to the legacy `transactions` table, NOT to `financial_transactions`. The ERP commissions stored in `financial_transactions` track payments differently:
-- `financial_transactions.total_amount` = full commission value
-- `financial_transactions.paid_amount` = accumulated paid amount  
-- `financial_transactions.status` = `'pending'` | `'partial'` | `'reconciled'`
-
-For the timeline, we will query `transaction_payments` where the `transaction_id` matches entries that can be correlated. However, since the reconciliation workbench writes partial payments directly to `financial_transactions.paid_amount`, we need to also check if there are reconciliation records. The approach will be:
-
-1. Query `financial_transactions` with their payment progress for ERP commissions
-2. For the detailed timeline events, we can use the reconciliation timestamps and description from `financial_transactions` itself (reconciled_at, reconciliation_method) as each partial reconciliation updates these fields
-
-Since the prompt explicitly shows querying `transaction_payments` as a sub-select of `financial_transactions`, but the FK doesn't support that join, I will instead query the payment timeline from the `financial_transactions` fields directly (paid_amount, status, reconciled_at) and fall back to showing summary progress when detailed payment events aren't available.
-
-## Files to Create
-
-### 1. `src/components/financeiro/CommissionPaymentTimeline.tsx` (NEW)
-
-Props:
-- `policyId: string` -- fetch commissions for this policy
-- `compact?: boolean` -- default false; when true, show only progress bar + summary + last 3 payments
-
-Query:
-```ts
-supabase
-  .from('financial_transactions')
-  .select(`
-    id, description, transaction_date, total_amount,
-    paid_amount, status, reference_number
-  `)
-  .eq('related_entity_id', policyId)
-  .eq('related_entity_type', 'policy')
-  .eq('is_void', false)
-  .order('transaction_date', { ascending: true })
-```
-
-For each commission found, render:
-- **Header**: Reference number + status badge
-- **Progress bar**: Using shadcn `Progress` component. Amber when < 100%, emerald when = 100%.
-- **Summary line**: "Recebido: R$ X / Faltante: R$ Y / Total: R$ Z"
-- **Timeline**: Vertical dot-line timeline. Since detailed payment events aren't available via FK join, show:
-  - If `paid_amount > 0` and `status === 'partial'`: one entry showing "Pagamento parcial registrado" with the paid amount
-  - If `status === 'reconciled'`: show "Quitado" entry
-  - If remaining > 0: dashed "Saldo pendente" entry in red
-
-Loading state: Skeleton components.
-Empty state: "Nenhum pagamento registrado ainda" with Pendente badge.
+Redesign the Appointments page to remove the unused sidebar panel, update KPIs to use semantic design tokens, fix hardcoded legacy colors, improve FullCalendar CSS integration, and add a filterable appointments table below the calendar.
 
 ## Files to Modify
 
-### 2. `src/components/policies/CommissionExtract.tsx`
+### 1. `src/components/appointments/StatsBar.tsx`
+- Replace the 4 legacy KPIs (hardcoded blue/green/red/purple colors) with semantic design system tokens
+- Replace "Taxa de Comparecimento" with "Pendentes" (more actionable)
+- Add `Clock` icon import from lucide
+- Add computed subtitle showing percentage for "Realizados"
+- Remove all `text-white`, `bg-blue-500/20`, `bg-green-500/20`, `bg-red-500/20`, `bg-purple-500/20`, `hover:shadow-white/5` classes
+- New color mapping: Total=`primary`, Realizados=`emerald-500`, Pendentes=`amber-500`, Cancelados=`destructive`
+- Loading skeleton: replace `bg-white/10` and `bg-white/5` with `bg-muted`
+- Card template: icon box (`p-2 rounded-lg`) + value (`text-2xl font-bold text-foreground`) + title (`text-xs text-muted-foreground uppercase`) + subtitle (`text-[11px] text-muted-foreground`)
 
-**What changes:**
-- Import `CommissionPaymentTimeline`
-- In the "Transacoes no Faturamento" section (lines 217-291), replace the existing commission list with `<CommissionPaymentTimeline policyId={policy.id} />`
-- Keep the "Gerar Comissao" button logic for when no commissions exist
-- Keep the header (Apolice summary grid, Comissao Total green block) unchanged
+### 2. `src/pages/Appointments.tsx`
+**Header fixes:**
+- Line 223: `text-white` -> `text-foreground`
+- Line 233: `bg-slate-800/50` -> `bg-muted`
+- Lines 237/243/249: remove `data-[state=on]:bg-blue-600 data-[state=on]:text-white`, use default `text-sm px-3 py-1`
 
-### 3. `src/pages/ClientDetails.tsx`
+**Remove sidebar panel:**
+- Remove `AppointmentsDashboard` import and its JSX block (lines 314-325)
+- Remove `upcomingAppointments`, `scheduleGaps`, `isLoadingUpcoming`, `isLoadingGaps` from `useSupabaseAppointments()` destructure
+- Remove `handleScheduleAtDate` function (lines 165-168) -- only used by removed panel
+- Simplify grid: remove `xl:grid-cols-[1fr,auto]`, calendar takes full width
 
-**What changes:**
-- Import `CommissionPaymentTimeline` and `AppCard`, `Badge`, `DollarSign` icon, `Separator`
-- After `<ClientInteractionsHistory />` (line 153), add a new section "Recebimentos de Comissao"
-- Iterate over `clientPolicies`, rendering `<CommissionPaymentTimeline policyId={policy.id} compact />` for each
-- Each policy gets a mini-header showing policy number and type badge
-- Separator between policies
-- Only render the section if `clientPolicies.length > 0`
+**Add appointments list table below calendar:**
+- New state: `filtroLista` (string, default `'Todos'`), `buscaLista` (string)
+- New `useMemo`: `appointmentsDoMes` -- filter appointments by current month from `dataDeReferencia`
+- New `useMemo`: `appointmentsListaFiltrada` -- apply status filter + text search
+- New imports: `ListChecks`, `CalendarDays`, `MoreVertical`, `Clock`, `Search` from lucide; `Input` from ui; `DropdownMenu` components; `Badge`
+- JSX: glass-component container with header (icon box + title + count), search input, status filter buttons, table with columns (Cliente/Titulo, Observacoes, Data/Hora, Status badge, Actions dropdown)
+- Status badge colors: Realizado=emerald, Cancelado=destructive, Pendente=amber, Atrasado (overdue pending)=destructive
+- Empty state with `CalendarDays` icon
 
-## Status Badge Mapping
+### 3. `src/index.css` -- FullCalendar theme improvements
+**Replace hardcoded dark-only styles with theme-aware ones:**
+- Lines 399-434: `.dark .fc-theme-standard .fc-list-day-cushion` -- simplify from heavy glassmorphism to clean `bg-muted` with `border-border`
+- Lines 457-470: `.dark .fc-theme-standard .fc-list-day-cushion:hover` -- simplify to `bg-muted/80`
+- Lines 473-488: `.dark .fc-theme-standard .fc-list-day-text` -- use `color: hsl(var(--foreground))`, remove text-shadow/filter
+- Lines 491-505: `.dark .fc-theme-standard .fc-list-day-side-text` -- use `color: hsl(var(--muted-foreground))`
+- Lines 546-550: `.fc .fc-list-event` -- use `hsl(var(--card))` instead of `rgba(15, 23, 42, 0.6)`
+- Lines 552-555: `.fc .fc-list-event:hover` -- use `hsl(var(--muted))` instead of `rgba(30, 41, 59, 0.8)`
+- Lines 558-566: `.fc-list-event-title` and `.fc-list-event-time` -- use `hsl(var(--foreground))` and `hsl(var(--muted-foreground))`
+- Add light-mode list-day-cushion rule: `bg-muted/50`
+- Remove the `::before` holographic shine pseudo-element (lines 437-454)
+- Remove slideInFromLeft animation for list headers (lines 514-528) -- unnecessary motion
+- Add: `.fc .fc-button` styles to match design system if any default FC buttons leak through
+- Add: `.fc-theme-standard .fc-list-empty` background to use `hsl(var(--background))`
 
-| Status | Label | Style |
-|--------|-------|-------|
-| `pending` | Pendente | `variant="outline"` + `text-amber-500 border-amber-500` |
-| `partial` | Parcial | `variant="outline"` + `text-blue-500 border-blue-500` |
-| `reconciled` | Quitado | `variant="default"` + `bg-emerald-600` |
+### 4. `src/hooks/useSupabaseAppointments.ts` -- No logic changes needed
+The `weeklyStats` query already returns `pendentes`. The `upcomingAppointments` and `scheduleGaps` queries can remain (they won't execute if not destructured, but React Query will still run them). To be safe, we keep them -- they're cached and lightweight. No changes to this file.
+
+## Files NOT modified
+- `AppointmentModal`, `AppointmentDetailsModal`, `ExportAppointmentsModal` -- untouched
+- `useSupabaseAppointments.ts` -- untouched (stats already include pendentes)
+- `useAppointments` (useAppData) -- untouched
+- `AppointmentsDashboard.tsx` -- not deleted (import simply removed from Appointments.tsx; file kept for potential future use)
 
 ## Technical Notes
+- The `appointments` array from `useAppointments()` is already the full list used by FullCalendar -- reuse it for the table
+- `dataDeReferencia` is updated by FullCalendar's `datesSet` callback, so the table auto-syncs with calendar navigation
+- The `handleViewAppointmentDetails` function already exists and is reused for table row clicks
+- Status filter uses simple string matching against `apt.status`
+- The "Atrasado" label is a computed display-only label for overdue pending appointments (same logic as `getAppointmentColor`)
 
-- Uses `useQuery` with key `['commission-timeline', policyId]`
-- `formatCurrency` from `@/utils/formatCurrency`
-- `Progress` from `@/components/ui/progress` with `indicatorClassName` for color control
-- `Skeleton` from `@/components/ui/skeleton` for loading state
-- `AppCard` with `glass-component` pattern for card wrapper
-- `date-fns` `format` for date formatting
-- No database migrations needed -- all data already exists
-- No changes to commission generation logic, RPCs, or other existing components
