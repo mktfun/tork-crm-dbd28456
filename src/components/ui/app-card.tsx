@@ -36,7 +36,7 @@ export function AppCard({ className, children, ...props }: AppCardProps) {
       ref={glassRef}
       className={cn(
         // 🔒 CLASSE PROTEGIDA - NÃO REMOVER
-        "glass-component",
+        "glass-component p-4 shadow-lg",
         className
       )}
       {...props}
