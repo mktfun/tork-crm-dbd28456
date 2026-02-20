@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Bot, Loader2 } from 'lucide-react';
 import { useCRMPipelines } from '@/hooks/useCRMPipelines';
 import { useCRMStages } from '@/hooks/useCRMDeals';
@@ -7,6 +7,7 @@ import { useCrmAiSettings } from '@/hooks/useCrmAiSettings';
 import { useGlobalAiConfig } from '@/hooks/useGlobalAiConfig';
 import { usePipelineAiDefaults } from '@/hooks/usePipelineAiDefaults';
 import { SalesFlowTimeline } from './SalesFlowTimeline';
+import { useScrollFollow } from '@/hooks/useScrollFollow';
 import { AISandbox } from './AISandbox';
 import { PipelineAiDefaultsModal } from './PipelineAiDefaultsModal';
 import { NewPipelineModal } from '@/components/crm/NewPipelineModal';
@@ -21,6 +22,10 @@ import { Button } from '@/components/ui/button';
 export function AIAutomationDashboard() {
   const { pipelines, isLoading: pipelinesLoading } = useCRMPipelines();
   const { config: globalConfig } = useGlobalAiConfig();
+
+  // Scroll-follow refs
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sandboxRef = useScrollFollow(scrollContainerRef, 0.08);
 
   // Pipeline selection
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
@@ -163,7 +168,7 @@ export function AIAutomationDashboard() {
           </TabsList>
         </div>
 
-        <TabsContent value="etapas" className="flex-1 m-0 overflow-y-auto scroll-smooth">
+        <TabsContent value="etapas" className="flex-1 m-0 overflow-y-auto scroll-smooth" ref={scrollContainerRef as any}>
           <div className="grid grid-cols-1 lg:grid-cols-5 items-start">
             {/* Left column — flows naturally, page scrolls through it */}
             <div className="lg:col-span-3 p-4">
@@ -187,8 +192,8 @@ export function AIAutomationDashboard() {
                 isSaving={upsertSetting.isPending}
               />
             </div>
-            {/* Right column — STICKY: sticks to top during scroll */}
-            <div className="lg:col-span-2 sticky top-0 border-l border-border" style={{ height: '100vh' }}>
+            {/* Right column — follows scroll with spring effect */}
+            <div ref={sandboxRef} className="lg:col-span-2" style={{ height: '100vh' }}>
               <AISandbox
                 selectedStage={selectedStage}
                 selectedPipeline={selectedPipeline}

@@ -21,9 +21,8 @@ export default function AIAutomation() {
     return <AIOnboardingWizard />;
   }
 
-  // Use calc to fill the remaining viewport height (header ~4rem + page padding ~1.5rem*2)
   return (
-    <div className="h-[calc(100vh-7rem)] -mb-6 flex flex-col">
+    <div className="flex flex-col h-full">
       <AIAutomationDashboard />
     </div>
   );
