@@ -13,6 +13,9 @@ import { ClientPersonalInfo } from '@/components/clients/ClientPersonalInfo';
 import { ClientPoliciesHistory } from '@/components/clients/ClientPoliciesHistory';
 import { ClientFinancialHistory } from '@/components/clients/ClientFinancialHistory';
 import { ClientInteractionsHistory } from '@/components/clients/ClientInteractionsHistory';
+import { CommissionPaymentTimeline } from '@/components/financeiro/CommissionPaymentTimeline';
+import { DollarSign } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 export default function ClientDetails() {
   const { id } = useParams<{ id: string }>();
@@ -151,6 +154,40 @@ export default function ClientDetails() {
             transactionTypes={mappedTransactionTypes}
           />
           <ClientInteractionsHistory />
+
+          {/* Histórico de comissões das apólices do cliente */}
+          {clientPolicies.length > 0 && (
+            <AppCard className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-foreground/10 p-2 rounded-lg">
+                  <DollarSign className="w-5 h-5 text-foreground" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">Recebimentos de Comissão</h3>
+                  <p className="text-xs text-muted-foreground">Histórico de baixas por apólice</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {clientPolicies.map((policy, index) => (
+                  <div key={policy.id}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-semibold text-foreground">
+                        Apólice {policy.policyNumber || policy.id.slice(0, 8)}
+                      </p>
+                      {policy.type && (
+                        <Badge variant="metallic" className="text-[10px]">{policy.type}</Badge>
+                      )}
+                    </div>
+                    <CommissionPaymentTimeline policyId={policy.id} compact />
+                    {index < clientPolicies.length - 1 && (
+                      <div className="border-t border-border mt-4" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </AppCard>
+          )}
         </div>
       </div>
     </div>

@@ -6,10 +6,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { AppCard } from '@/components/ui/app-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DollarSign, Eye, EyeOff, ExternalLink, Sparkles, Loader2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { formatDate } from '@/utils/dateUtils';
+import { DollarSign, Eye, EyeOff, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { CommissionPaymentTimeline } from '@/components/financeiro/CommissionPaymentTimeline';
 
 interface CommissionExtractProps {
   policy: Policy;
@@ -214,78 +213,27 @@ export function CommissionExtract({ policy }: CommissionExtractProps) {
           </p>
         </div>
 
-        {/* Transações de Comissão */}
+        {/* Histórico de Recebimentos */}
         <div>
-          <h4 className="font-semibold text-foreground mb-3">Transações no Faturamento</h4>
-          {allCommissions.length === 0 ? (
-            <div className="space-y-3">
-              <p className="text-muted-foreground text-sm">
-                Nenhuma transação de comissão encontrada para esta apólice.
-              </p>
-              {policy.status === 'Ativa' && (
-                <Button
-                  onClick={handleGenerateCommission}
-                  disabled={generating}
-                  className="gap-2"
-                  variant="default"
-                >
-                  {generating ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-4 h-4" />
-                  )}
-                  {generating ? 'Gerando...' : '✨ Gerar Comissão Financeira'}
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {allCommissions.map(commission => (
-                <Link
-                  to={
-                    commission.source === 'erp' 
-                      ? `/dashboard/financeiro?txnId=${commission.id}`
-                      : `/dashboard/financeiro?legacyId=${commission.id}`
-                  }
-                  key={`${commission.source}-${commission.id}`}
-                  className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/60 transition-colors group"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-foreground">{commission.description}</p>
-                      {commission.source === 'erp' && (
-                        <Badge variant="outline" className="text-xs">
-                          ERP
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDate(commission.date)}
-                    </p>
-                  </div>
-                  <div className="text-right flex items-center gap-3">
-                    <div>
-                      <p className="font-bold text-green-500">
-                        {commission.amount.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL'
-                        })}
-                      </p>
-                      <Badge
-                        variant={commission.status === 'PENDENTE' || commission.status === 'pending' ? 'outline' : 'default'}
-                        className={
-                          commission.status === 'PENDENTE' || commission.status === 'pending'
-                            ? 'text-yellow-500 border-yellow-500' 
-                            : 'text-green-500 border-green-500'
-                        }
-                      >
-                        {commission.status === 'pending' ? 'PENDENTE' : commission.status}
-                      </Badge>
-                    </div>
-                    <ExternalLink size={16} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                </Link>
-              ))}
+          <h4 className="font-semibold text-foreground mb-3">Histórico de Recebimentos</h4>
+          <CommissionPaymentTimeline policyId={policy.id} />
+
+          {/* Botão gerar comissão quando não há nenhuma */}
+          {allCommissions.length === 0 && policy.status === 'Ativa' && (
+            <div className="mt-3">
+              <Button
+                onClick={handleGenerateCommission}
+                disabled={generating}
+                className="gap-2"
+                variant="default"
+              >
+                {generating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                {generating ? 'Gerando...' : '✨ Gerar Comissão Financeira'}
+              </Button>
             </div>
           )}
         </div>
