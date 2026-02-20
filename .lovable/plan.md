@@ -1,72 +1,90 @@
 
 
-# Prompt 28 -- Redesign da Tela de Agendamentos
+# Redesign do AppointmentModal
 
 ## Overview
 
-Redesign the Appointments page to remove the unused sidebar panel, update KPIs to use semantic design tokens, fix hardcoded legacy colors, improve FullCalendar CSS integration, and add a filterable appointments table below the calendar.
+The `AppointmentModal.tsx` still contains legacy hardcoded colors and duplicated form JSX. This plan cleans it up to match the design system, deduplicates the form, and enhances the dialog header.
 
-## Files to Modify
+## What Changes
 
-### 1. `src/components/appointments/StatsBar.tsx`
-- Replace the 4 legacy KPIs (hardcoded blue/green/red/purple colors) with semantic design system tokens
-- Replace "Taxa de Comparecimento" with "Pendentes" (more actionable)
-- Add `Clock` icon import from lucide
-- Add computed subtitle showing percentage for "Realizados"
-- Remove all `text-white`, `bg-blue-500/20`, `bg-green-500/20`, `bg-red-500/20`, `bg-purple-500/20`, `hover:shadow-white/5` classes
-- New color mapping: Total=`primary`, Realizados=`emerald-500`, Pendentes=`amber-500`, Cancelados=`destructive`
-- Loading skeleton: replace `bg-white/10` and `bg-white/5` with `bg-muted`
-- Card template: icon box (`p-2 rounded-lg`) + value (`text-2xl font-bold text-foreground`) + title (`text-xs text-muted-foreground uppercase`) + subtitle (`text-[11px] text-muted-foreground`)
+### 1. Remove all hardcoded legacy colors
 
-### 2. `src/pages/Appointments.tsx`
-**Header fixes:**
-- Line 223: `text-white` -> `text-foreground`
-- Line 233: `bg-slate-800/50` -> `bg-muted`
-- Lines 237/243/249: remove `data-[state=on]:bg-blue-600 data-[state=on]:text-white`, use default `text-sm px-3 py-1`
+Replace across both form copies (which will become one after deduplication):
 
-**Remove sidebar panel:**
-- Remove `AppointmentsDashboard` import and its JSX block (lines 314-325)
-- Remove `upcomingAppointments`, `scheduleGaps`, `isLoadingUpcoming`, `isLoadingGaps` from `useSupabaseAppointments()` destructure
-- Remove `handleScheduleAtDate` function (lines 165-168) -- only used by removed panel
-- Simplify grid: remove `xl:grid-cols-[1fr,auto]`, calendar takes full width
+| Old Class | New Class |
+|---|---|
+| `bg-slate-900 border-slate-700` (DialogContent) | remove (use default DialogContent styling) |
+| `text-white` (DialogTitle) | `text-foreground` |
+| `text-slate-300` (all Labels) | `text-muted-foreground` |
+| `bg-slate-800 border-slate-600 text-white` (all Inputs, Textareas, SelectTriggers, Comboboxes) | remove (use default component styling) |
+| `border-slate-600 text-slate-300 hover:bg-slate-800` (Cancel button) | remove (use default `variant="outline"`) |
 
-**Add appointments list table below calendar:**
-- New state: `filtroLista` (string, default `'Todos'`), `buscaLista` (string)
-- New `useMemo`: `appointmentsDoMes` -- filter appointments by current month from `dataDeReferencia`
-- New `useMemo`: `appointmentsListaFiltrada` -- apply status filter + text search
-- New imports: `ListChecks`, `CalendarDays`, `MoreVertical`, `Clock`, `Search` from lucide; `Input` from ui; `DropdownMenu` components; `Badge`
-- JSX: glass-component container with header (icon box + title + count), search input, status filter buttons, table with columns (Cliente/Titulo, Observacoes, Data/Hora, Status badge, Actions dropdown)
-- Status badge colors: Realizado=emerald, Cancelado=destructive, Pendente=amber, Atrasado (overdue pending)=destructive
-- Empty state with `CalendarDays` icon
+### 2. Deduplicate the form
 
-### 3. `src/index.css` -- FullCalendar theme improvements
-**Replace hardcoded dark-only styles with theme-aware ones:**
-- Lines 399-434: `.dark .fc-theme-standard .fc-list-day-cushion` -- simplify from heavy glassmorphism to clean `bg-muted` with `border-border`
-- Lines 457-470: `.dark .fc-theme-standard .fc-list-day-cushion:hover` -- simplify to `bg-muted/80`
-- Lines 473-488: `.dark .fc-theme-standard .fc-list-day-text` -- use `color: hsl(var(--foreground))`, remove text-shadow/filter
-- Lines 491-505: `.dark .fc-theme-standard .fc-list-day-side-text` -- use `color: hsl(var(--muted-foreground))`
-- Lines 546-550: `.fc .fc-list-event` -- use `hsl(var(--card))` instead of `rgba(15, 23, 42, 0.6)`
-- Lines 552-555: `.fc .fc-list-event:hover` -- use `hsl(var(--muted))` instead of `rgba(30, 41, 59, 0.8)`
-- Lines 558-566: `.fc-list-event-title` and `.fc-list-event-time` -- use `hsl(var(--foreground))` and `hsl(var(--muted-foreground))`
-- Add light-mode list-day-cushion rule: `bg-muted/50`
-- Remove the `::before` holographic shine pseudo-element (lines 437-454)
-- Remove slideInFromLeft animation for list headers (lines 514-528) -- unnecessary motion
-- Add: `.fc .fc-button` styles to match design system if any default FC buttons leak through
-- Add: `.fc-theme-standard .fc-list-empty` background to use `hsl(var(--background))`
+Currently there are two identical form blocks (lines 169-273 and lines 290-394) -- one for the controlled modal (no trigger) and one for the trigger-based modal. Extract the form into a shared `formContent` variable used in both branches.
 
-### 4. `src/hooks/useSupabaseAppointments.ts` -- No logic changes needed
-The `weeklyStats` query already returns `pendentes`. The `upcomingAppointments` and `scheduleGaps` queries can remain (they won't execute if not destructured, but React Query will still run them). To be safe, we keep them -- they're cached and lightweight. No changes to this file.
+### 3. Enhance the Dialog header
 
-## Files NOT modified
-- `AppointmentModal`, `AppointmentDetailsModal`, `ExportAppointmentsModal` -- untouched
-- `useSupabaseAppointments.ts` -- untouched (stats already include pendentes)
-- `useAppointments` (useAppData) -- untouched
-- `AppointmentsDashboard.tsx` -- not deleted (import simply removed from Appointments.tsx; file kept for potential future use)
+Replace the plain `DialogTitle` with a styled header containing an icon box and subtitle:
 
-## Technical Notes
-- The `appointments` array from `useAppointments()` is already the full list used by FullCalendar -- reuse it for the table
-- `dataDeReferencia` is updated by FullCalendar's `datesSet` callback, so the table auto-syncs with calendar navigation
-- The `handleViewAppointmentDetails` function already exists and is reused for table row clicks
-- Status filter uses simple string matching against `apt.status`
-- The "Atrasado" label is a computed display-only label for overdue pending appointments (same logic as `getAppointmentColor`)
+```
+[calendar icon]  Novo Agendamento
+                 Preencha os dados do agendamento
+```
 
+Or when `initialDate` is provided:
+
+```
+[calendar icon]  Agendar para 20 de fevereiro
+                 Preencha os dados do agendamento
+```
+
+### 4. Keep all logic untouched
+
+No changes to:
+- `handleSubmit`, `handleInputChange`
+- `useSupabaseAppointments`, `useClients`, `usePolicies`, `useCompanyNames`
+- `RecurrenceConfig`
+- Form field structure (native date/time inputs kept as-is for reliability)
+- `clientOptions`, `policyOptions` derivation logic
+
+## Files Modified
+
+- `src/components/appointments/AppointmentModal.tsx` -- single file change
+
+## Technical Details
+
+The deduplicated structure will look like:
+
+```
+const formContent = (
+  <form onSubmit={handleSubmit} className="space-y-4">
+    {/* All fields with cleaned classes */}
+    {/* Buttons */}
+  </form>
+);
+
+if (!triggerButton) {
+  return (
+    <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>...</DialogHeader>
+        {formContent}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+return (
+  <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+    <DialogTrigger asChild>{triggerButton}</DialogTrigger>
+    <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogHeader>...</DialogHeader>
+      {formContent}
+    </DialogContent>
+  </Dialog>
+);
+```
+
+This reduces ~200 lines of duplicated JSX to a single shared block, making future maintenance straightforward.
