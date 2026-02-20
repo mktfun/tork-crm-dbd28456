@@ -86,12 +86,13 @@ export function DashboardKpis({ dateRange }: DashboardKpisProps) {
         />
 
         <KpiCard
-          title="Comissão (Mês)"
+          title="Comissão (Conciliada)"
           value={formatCurrency(metrics.comissaoMesAtual)}
           comparison={metrics.comissaoMesAnterior > 0 ?
             `${((metrics.comissaoMesAtual - metrics.comissaoMesAnterior) / metrics.comissaoMesAnterior * 100).toFixed(0)}% vs. mês anterior` :
             undefined
           }
+          zeroLabel="Nenhuma conciliada este mês"
           icon={<DollarSign className="h-5 w-5 text-emerald-500" />}
           onClick={() => navigate('/dashboard/financeiro')}
         />
