@@ -163,10 +163,10 @@ export function AIAutomationDashboard() {
           </TabsList>
         </div>
 
-        <TabsContent value="etapas" className="flex-1 m-0 min-h-0 overflow-hidden">
-          <div className="h-full grid grid-cols-1 lg:grid-cols-5">
-            {/* Left column — only this scrolls */}
-            <div className="lg:col-span-3 overflow-y-auto p-4">
+        <TabsContent value="etapas" className="flex-1 m-0 overflow-y-auto scroll-smooth">
+          <div className="grid grid-cols-1 lg:grid-cols-5 items-start">
+            {/* Left column — flows naturally, page scrolls through it */}
+            <div className="lg:col-span-3 p-4">
               <SalesFlowTimeline
                 pipelines={pipelines}
                 selectedPipelineId={selectedPipelineId}
@@ -187,8 +187,8 @@ export function AIAutomationDashboard() {
                 isSaving={upsertSetting.isPending}
               />
             </div>
-            {/* Right column — fixed, never scrolls externally */}
-            <div className="lg:col-span-2 border-l border-border overflow-hidden flex flex-col">
+            {/* Right column — STICKY: sticks to top during scroll */}
+            <div className="lg:col-span-2 sticky top-0 border-l border-border" style={{ height: '100vh' }}>
               <AISandbox
                 selectedStage={selectedStage}
                 selectedPipeline={selectedPipeline}
