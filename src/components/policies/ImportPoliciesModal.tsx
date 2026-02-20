@@ -254,6 +254,11 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
 
   const [processingMetrics, setProcessingMetrics] = useState<ProcessingMetrics | null>(null);
 
+  // Section 6: Timer states for elapsed/remaining time
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const processingStartRef = useRef<number>(0);
+  const processingTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Split View: Selected item for PDF preview
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const selectedItem = useMemo(() =>
@@ -332,6 +337,8 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     setEditedFields(new Map());
     setShowClientSearchFor(null);
     setProcessingLabel('');
+    if (processingTickRef.current) clearInterval(processingTickRef.current);
+    setElapsedSec(0);
   }, []);
 
   const handleClose = () => {
@@ -562,6 +569,13 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     setOcrProgress(0);
     setProcessingMetrics(null);
 
+    // Start timer
+    processingStartRef.current = Date.now();
+    setElapsedSec(0);
+    processingTickRef.current = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - processingStartRef.current) / 1000));
+    }, 1000);
+
     const fileMap = new Map<string, File>();
     files.forEach(f => fileMap.set(f.name, f));
 
@@ -698,7 +712,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
 
         // v11.0: Fase de reconciliação/enrichment
         setBulkPhase('reconciling');
-        setProcessingLabel('Enriquecendo dados do cliente...');
+        setProcessingLabel('Vinculando ao cadastro de clientes...');
 
         // Se tem documento válido, faz upsert automático de cliente
         let autoClientId: string | undefined;
@@ -764,6 +778,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
     }
 
     setOcrProgress(files.length);
+
+    // Stop timer
+    if (processingTickRef.current) clearInterval(processingTickRef.current);
 
     const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
     setProcessingMetrics({
@@ -1694,6 +1711,14 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                 Processar em Lote ({files.length})
               </Button>
             </div>
+            {files.length > 0 && (
+              <p className="text-xs text-center text-muted-foreground">
+                Estimativa: ~{files.length * 10 < 60
+                  ? `${files.length * 10}s`
+                  : `${Math.ceil((files.length * 10) / 60)} min`
+                } para {files.length} arquivo(s)
+              </p>
+            )}
           </div>
         )}
 
@@ -1726,6 +1751,27 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
 
               <Progress value={getProgressValue()} className="w-full max-w-sm h-2" />
 
+              {(() => {
+                const done = Math.max(ocrProgress, 1);
+                const avgPerFile = elapsedSec / done;
+                const remaining = Math.max(0, Math.round(avgPerFile * (files.length - done)));
+                const elapsed = elapsedSec < 60
+                  ? `${elapsedSec}s`
+                  : `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`;
+                const eta = remaining < 60
+                  ? `~${remaining}s`
+                  : `~${Math.ceil(remaining / 60)} min`;
+
+                return (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground w-full max-w-sm">
+                    <span>Decorrido: {elapsed}</span>
+                    {ocrProgress < files.length && (
+                      <span>Restante: {eta}</span>
+                    )}
+                  </div>
+                );
+              })()}
+
               <ScrollArea className="h-40 w-full max-w-md border border-zinc-700/50 rounded-xl bg-zinc-900/30">
                 <div className="p-3 space-y-2">
                   {files.map((file, index) => {
@@ -1751,8 +1797,8 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
         {/* Step: Processing (Saving to DB) - BLACK & SILVER */}
         {step === 'processing' && items.length > 0 && (
           <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6">
-            <div className="w-20 h-20 rounded-full bg-zinc-800/50 flex items-center justify-center border border-zinc-700/50">
-              <Loader2 className="w-10 h-10 text-zinc-300 animate-spin" />
+            <div className="w-20 h-20 rounded-full bg-muted/40 flex items-center justify-center border border-border">
+              <Loader2 className="w-10 h-10 text-primary animate-spin" />
             </div>
 
             <div className="text-center">
