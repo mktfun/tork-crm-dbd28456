@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Wallet, Building, BedDouble, MapPin } from "lucide-react";
-import type { HealthWizardData } from "../HealthWizard";
+import type { HealthWizardData } from "./HealthWizard";
 import { brazilianStatesWithCities, getCitiesByState } from "@/utils/brazilianCities";
 
 interface Props {

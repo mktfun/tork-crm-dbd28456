@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Building2, Loader2, CheckCircle2, GraduationCap, User } from "lucide-react";
-import type { HealthWizardData } from "../HealthWizard";
+import type { HealthWizardData } from "./HealthWizard";
 import { formatCNPJ, isValidCNPJ } from "@/utils/cnpjApi";
 
 interface Props {

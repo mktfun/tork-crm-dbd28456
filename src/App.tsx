@@ -55,6 +55,8 @@ import PortalPolicies from "./pages/portal/PortalPolicies";
 import PortalCards from "./pages/portal/PortalCards";
 import PortalProfile from "./pages/portal/PortalProfile";
 import PortalNotFound from "./pages/portal/PortalNotFound";
+import PortalWizard from "./pages/portal/PortalWizard";
+import PortalSolicitacoes from "./pages/portal/PortalSolicitacoes";
 
 // Helper to redirect legacy detail routes to dashboard namespace
 function ParamRedirect({ toBase }: { toBase: string }) {
@@ -158,6 +160,8 @@ function App() {
                     <Route path="policies" element={<PortalPolicies />} />
                     <Route path="cards" element={<PortalCards />} />
                     <Route path="profile" element={<PortalProfile />} />
+                    <Route path="wizard" element={<PortalWizard />} />
+                    <Route path="solicitacoes" element={<PortalSolicitacoes />} />
                   </Route>
 
                   {/* Área Global de Administração - ISOLADA DO LAYOUT OPERACIONAL */}

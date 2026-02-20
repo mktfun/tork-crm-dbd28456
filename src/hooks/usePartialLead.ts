@@ -19,8 +19,7 @@ export const usePartialLead = () => {
     try {
       console.log('💾 Salvando lead parcial:', data.email, 'Step:', data.stepIndex);
 
-      // Upsert baseado no email - atualiza se já existe ou insere se não
-      const { data: result, error } = await supabase
+      const { data: result, error } = await (supabase as any)
         .from('leads')
         .upsert(
           {
@@ -73,7 +72,7 @@ export const usePartialLead = () => {
     try {
       console.log('📊 Atualizando step index para:', stepIndex);
       
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('leads')
         .update({ last_step_index: stepIndex })
         .eq('id', leadId);

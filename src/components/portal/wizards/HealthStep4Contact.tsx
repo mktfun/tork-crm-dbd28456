@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Phone, User, Mail, CheckCircle2, AlertCircle } from "lucide-react";
-import type { HealthWizardData } from "../HealthWizard";
+import type { HealthWizardData } from "./HealthWizard";
 
 interface Props {
   data: HealthWizardData;
