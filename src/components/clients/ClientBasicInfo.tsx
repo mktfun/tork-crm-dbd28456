@@ -21,14 +21,17 @@ export function ClientBasicInfo({
 }: ClientBasicInfoProps) {
   return (
     <AppCard className="p-6">
-      <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-        <User size={20} />
-        Informações Básicas
-      </h2>
+      {/* Cabeçalho do card */}
+      <div className="flex items-center gap-3 mb-5">
+        <div className="p-2 rounded-lg bg-primary/10">
+          <User size={18} className="text-primary" />
+        </div>
+        <h2 className="text-base font-semibold text-foreground">Informações Básicas</h2>
+      </div>
       
       <div className="space-y-4">
         <div>
-          <Label className="text-sm font-medium text-muted-foreground">Nome</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nome</Label>
           {isEditing ? (
             <Input 
               value={client.name || ''}
@@ -36,12 +39,12 @@ export function ClientBasicInfo({
               className="mt-1"
             />
           ) : (
-            <p className="text-lg text-foreground mt-1">{client.name}</p>
+            <p className="text-base font-semibold text-foreground mt-1">{client.name}</p>
           )}
         </div>
         
         <div>
-          <Label className="text-sm font-medium text-muted-foreground">Telefone</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Telefone</Label>
           <div className="flex items-center gap-2 mt-1">
             {isEditing ? (
               <Input 
@@ -50,14 +53,20 @@ export function ClientBasicInfo({
                 className="flex-1"
               />
             ) : (
-              <p className="text-lg text-foreground flex-1">{client.phone}</p>
+              <a
+                href={`tel:${client.phone}`}
+                className="text-base font-medium text-foreground hover:text-primary transition-colors flex-1"
+              >
+                {client.phone || 'Não informado'}
+              </a>
             )}
-            {!isEditing && (
+            {!isEditing && client.phone && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={onWhatsAppClick}
-                className="text-green-400 hover:text-green-300 border-green-400/30"
+                className="shrink-0"
+                title="Abrir WhatsApp"
               >
                 <MessageCircle size={16} />
               </Button>
@@ -66,7 +75,7 @@ export function ClientBasicInfo({
         </div>
         
         <div>
-          <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Email</Label>
           {isEditing ? (
             <Input 
               value={client.email || ''}
@@ -74,7 +83,12 @@ export function ClientBasicInfo({
               className="mt-1"
             />
           ) : (
-            <p className="text-lg text-foreground mt-1">{client.email}</p>
+            <a
+              href={`mailto:${client.email}`}
+              className="text-base font-medium text-foreground hover:text-primary transition-colors block mt-1"
+            >
+              {client.email || 'Não informado'}
+            </a>
           )}
         </div>
       </div>
