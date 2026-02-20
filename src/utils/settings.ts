@@ -27,7 +27,7 @@ export interface IntegrationSettings {
 }
 
 export async function getSettings(): Promise<IntegrationSettings | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('integration_settings')
     .select('*')
     .eq('id', 1)
@@ -70,7 +70,7 @@ export async function saveSettings(
     );
   }
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('integration_settings')
     .update(updateData as any)
     .eq('id', 1);
