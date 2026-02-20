@@ -17,11 +17,14 @@ export default function AIAutomation() {
     );
   }
 
-  // Show onboarding wizard if not completed
   if (!hasCompletedOnboarding) {
     return <AIOnboardingWizard />;
   }
 
-  // Show main automation dashboard
-  return <AIAutomationDashboard />;
+  // Use calc to fill the remaining viewport height (header ~4rem + page padding ~1.5rem*2)
+  return (
+    <div className="h-[calc(100vh-7rem)] -mb-6 flex flex-col">
+      <AIAutomationDashboard />
+    </div>
+  );
 }
