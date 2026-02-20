@@ -21,14 +21,14 @@ export function ClientBasicInfo({
 }: ClientBasicInfoProps) {
   return (
     <AppCard className="p-6">
-      <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+      <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
         <User size={20} />
         Informações Básicas
       </h2>
       
       <div className="space-y-4">
         <div>
-          <Label className="text-sm font-medium text-slate-300">Nome</Label>
+          <Label className="text-sm font-medium text-muted-foreground">Nome</Label>
           {isEditing ? (
             <Input 
               value={client.name || ''}
@@ -36,12 +36,12 @@ export function ClientBasicInfo({
               className="mt-1"
             />
           ) : (
-            <p className="text-lg text-white mt-1">{client.name}</p>
+            <p className="text-lg text-foreground mt-1">{client.name}</p>
           )}
         </div>
         
         <div>
-          <Label className="text-sm font-medium text-slate-300">Telefone</Label>
+          <Label className="text-sm font-medium text-muted-foreground">Telefone</Label>
           <div className="flex items-center gap-2 mt-1">
             {isEditing ? (
               <Input 
@@ -50,7 +50,7 @@ export function ClientBasicInfo({
                 className="flex-1"
               />
             ) : (
-              <p className="text-lg text-white flex-1">{client.phone}</p>
+              <p className="text-lg text-foreground flex-1">{client.phone}</p>
             )}
             {!isEditing && (
               <Button
@@ -66,7 +66,7 @@ export function ClientBasicInfo({
         </div>
         
         <div>
-          <Label className="text-sm font-medium text-slate-300">Email</Label>
+          <Label className="text-sm font-medium text-muted-foreground">Email</Label>
           {isEditing ? (
             <Input 
               value={client.email || ''}
@@ -74,7 +74,7 @@ export function ClientBasicInfo({
               className="mt-1"
             />
           ) : (
-            <p className="text-lg text-white mt-1">{client.email}</p>
+            <p className="text-lg text-foreground mt-1">{client.email}</p>
           )}
         </div>
       </div>

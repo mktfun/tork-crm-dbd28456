@@ -20,11 +20,11 @@ export function ClientPersonalInfo({
 }: ClientPersonalInfoProps) {
   return (
     <AppCard className="p-6">
-      <h2 className="text-xl font-semibold text-white mb-4">Informações Pessoais</h2>
+      <h2 className="text-xl font-semibold text-foreground mb-4">Informações Pessoais</h2>
       
       <div className="space-y-4">
         <div>
-          <Label className="text-sm font-medium text-slate-300">CPF/CNPJ</Label>
+          <Label className="text-sm font-medium text-muted-foreground">CPF/CNPJ</Label>
           {isEditing ? (
             <MaskedInput 
               mask="999.999.999-99"
@@ -34,12 +34,12 @@ export function ClientPersonalInfo({
               placeholder="000.000.000-00"
             />
           ) : (
-            <p className="text-lg text-white mt-1 font-mono">{client.cpfCnpj || 'Não informado'}</p>
+            <p className="text-lg text-foreground mt-1 font-mono">{client.cpfCnpj || 'Não informado'}</p>
           )}
         </div>
 
         <div>
-          <Label className="text-sm font-medium text-slate-300">Data de Nascimento</Label>
+          <Label className="text-sm font-medium text-muted-foreground">Data de Nascimento</Label>
           {isEditing ? (
             <Input 
               type="date"
@@ -48,14 +48,14 @@ export function ClientPersonalInfo({
               className="mt-1"
             />
           ) : (
-            <p className="text-lg text-white mt-1">
+            <p className="text-lg text-foreground mt-1">
               {client.birthDate ? new Date(client.birthDate).toLocaleDateString('pt-BR') : 'Não informado'}
             </p>
           )}
         </div>
 
         <div>
-          <Label className="text-sm font-medium text-slate-300">Estado Civil</Label>
+          <Label className="text-sm font-medium text-muted-foreground">Estado Civil</Label>
           {isEditing ? (
             <Select value={client.maritalStatus || ''} onValueChange={(value) => onFieldChange('maritalStatus', value)}>
               <SelectTrigger className="mt-1">
@@ -69,12 +69,12 @@ export function ClientPersonalInfo({
               </SelectContent>
             </Select>
           ) : (
-            <p className="text-lg text-white mt-1">{client.maritalStatus || 'Não informado'}</p>
+            <p className="text-lg text-foreground mt-1">{client.maritalStatus || 'Não informado'}</p>
           )}
         </div>
 
         <div>
-          <Label className="text-sm font-medium text-slate-300">Profissão</Label>
+          <Label className="text-sm font-medium text-muted-foreground">Profissão</Label>
           {isEditing ? (
             <Input 
               value={client.profession || ''}
@@ -83,12 +83,12 @@ export function ClientPersonalInfo({
               placeholder="Ex: Engenheiro, Médico..."
             />
           ) : (
-            <p className="text-lg text-white mt-1">{client.profession || 'Não informado'}</p>
+            <p className="text-lg text-foreground mt-1">{client.profession || 'Não informado'}</p>
           )}
         </div>
 
         <div>
-          <Label className="text-sm font-medium text-slate-300">Status</Label>
+          <Label className="text-sm font-medium text-muted-foreground">Status</Label>
           {isEditing ? (
             <Select value={client.status || 'Ativo'} onValueChange={(value) => onFieldChange('status', value)}>
               <SelectTrigger className="mt-1">
