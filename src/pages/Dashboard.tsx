@@ -86,12 +86,8 @@ export default function Dashboard() {
   const { data: profile, isLoading: profileIsLoading } = useProfile();
   const updateProfileMutation = useUpdateProfile();
 
-  // Exemplo de passos de raciocínio da IA (Demo)
-  const aiReasoningSteps: ThinkingStep[] = [
-    { step: "Analisando fluxo de caixa recente...", status: "success", detail: "R$ 15.430,00 recebidos nos últimos 7 dias." },
-    { step: "Verificando padrões de cancelamento...", status: "success", detail: "Taxa de churn estável em 0.8%." },
-    { step: "Identificando oportunidades de cross-sell...", status: "thinking", detail: "3 clientes com perfil para seguro de vida." }
-  ];
+  // Compact mode: no reasoning steps, only strategic summary
+  const aiReasoningSteps: ThinkingStep[] = [];
 
   // A LÓGICA CORRETA E SEGURA
   const shouldShowOnboarding = !profileIsLoading && profile && profile.onboarding_completed === false;

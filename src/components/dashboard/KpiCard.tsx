@@ -2,27 +2,6 @@ import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { AppCard } from '@/components/ui/app-card';
 
-/**
- * 🔒 COMPONENTE PROTEGIDO - CARDS KPI DASHBOARD 🔒
- *
- * ⚠️ ATENÇÃO: COMPONENTE CRÍTICO DO DASHBOARD
- * ❌ NÃO ALTERAR AS CLASSES CORE (hover:scale-105, flex, etc)
- * ❌ NÃO REMOVER O AppCard como base
- * ❌ NÃO ALTERAR A ESTRUTURA HTML
- *
- * ESTRUTURA PROTEGIDA:
- * - AppCard como container principal
- * - Flex layout com justify-between
- * - Classes de cores definidas (default/warning/danger)
- * - Efeitos hover controlados
- *
- * ALTERAÇÕES SEGURAS:
- * ✅ Adicionar novas variantes de cor seguindo o padrão
- * ✅ Modificar ícones e textos
- * ✅ Adicionar props opcionais
- * ❌ NÃO quebrar a estrutura visual estabelecida
- */
-
 interface KpiCardProps {
   title: string;
   value: string;
@@ -31,6 +10,7 @@ interface KpiCardProps {
   colorVariant?: 'default' | 'warning' | 'danger';
   onClick?: () => void;
   className?: string;
+  zeroLabel?: string;
 }
 
 export function KpiCard({
@@ -40,12 +20,13 @@ export function KpiCard({
   icon,
   colorVariant = 'default',
   onClick,
-  className
+  className,
+  zeroLabel
 }: KpiCardProps) {
   const colorClasses = {
-    default: 'flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70',
-    warning: 'flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-yellow-500/50 bg-yellow-900/30 text-yellow-300 hover:bg-yellow-900/40',
-    danger: 'flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-red-500/60 bg-red-900/40 text-red-300 hover:bg-red-900/50'
+    default: 'flex flex-col justify-between transition-all duration-200 hover:shadow-xl hover:translate-y-[-2px] cursor-pointer border-border bg-card hover:bg-secondary/70',
+    warning: 'flex flex-col justify-between transition-all duration-200 hover:shadow-xl hover:translate-y-[-2px] cursor-pointer border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15',
+    danger: 'flex flex-col justify-between transition-all duration-200 hover:shadow-xl hover:translate-y-[-2px] cursor-pointer border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/15'
   };
 
   return (
@@ -70,6 +51,9 @@ export function KpiCard({
         <h2 className="text-2xl md:text-3xl font-bold text-foreground break-words mb-1">
           {value}
         </h2>
+        {value === '0' && zeroLabel && (
+          <p className="text-xs text-muted-foreground">{zeroLabel}</p>
+        )}
         {comparison && (
           <p className="text-xs text-muted-foreground line-clamp-2">{comparison}</p>
         )}
