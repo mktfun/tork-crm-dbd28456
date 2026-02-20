@@ -143,23 +143,25 @@ export function AIAutomationDashboard() {
     <div className="h-full flex flex-col min-h-0">
       {/* Tabs */}
       <Tabs defaultValue="etapas" className="flex-1 flex flex-col min-h-0">
-        <div className="border-b border-border px-6 flex-shrink-0">
-          <TabsList className="h-auto p-0 bg-transparent rounded-none gap-0">
+        <div className="px-6 flex-shrink-0">
+          <TabsList className="gap-1 bg-transparent border-b border-border/40 rounded-none p-0 h-auto w-full justify-start">
             <TabsTrigger
               value="etapas"
-              className="px-0 pb-3 pt-2 mr-6 h-auto rounded-none border-b-2 border-transparent
-                         text-sm font-medium text-muted-foreground bg-transparent shadow-none
-                         data-[state=active]:border-primary data-[state=active]:text-foreground
-                         data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="relative pb-3 pt-2 px-4 text-sm font-medium rounded-none
+                         text-muted-foreground bg-transparent border-b-2 border-transparent
+                         data-[state=active]:text-foreground data-[state=active]:border-primary
+                         data-[state=active]:bg-transparent data-[state=active]:shadow-none
+                         hover:text-foreground transition-colors"
             >
               Configurar Etapas
             </TabsTrigger>
             <TabsTrigger
               value="configuracoes"
-              className="px-0 pb-3 pt-2 h-auto rounded-none border-b-2 border-transparent
-                         text-sm font-medium text-muted-foreground bg-transparent shadow-none
-                         data-[state=active]:border-primary data-[state=active]:text-foreground
-                         data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="relative pb-3 pt-2 px-4 text-sm font-medium rounded-none
+                         text-muted-foreground bg-transparent border-b-2 border-transparent
+                         data-[state=active]:text-foreground data-[state=active]:border-primary
+                         data-[state=active]:bg-transparent data-[state=active]:shadow-none
+                         hover:text-foreground transition-colors"
             >
               Configurações
             </TabsTrigger>
