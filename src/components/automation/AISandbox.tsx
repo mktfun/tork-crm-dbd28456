@@ -65,6 +65,7 @@ function buildSystemPromptPreview(cfg: {
   aiPersona?: string;
   aiObjective?: string;
   dealTitle?: string;
+  allowEmojis?: boolean;
 }): string {
   const parts: string[] = [];
 
@@ -91,7 +92,9 @@ function buildSystemPromptPreview(cfg: {
 
   parts.push(`<context>\nFunil: "${cfg.pipelineName}" | Etapa atual: "${cfg.stageName}"${cfg.nextStageName ? ` | Próxima etapa: "${cfg.nextStageName}"` : ''}\n${cfg.dealTitle ? `Produto/Foco: ${cfg.dealTitle}` : ''}\n${cfg.aiName ? `Você se chama ${cfg.aiName}.` : ''}\nQuando concluir a coleta de dados, use a tag: [MOVER_PARA: ${cfg.nextStageName ?? 'próxima etapa'}]\n</context>`);
 
-  parts.push(GLOBAL_SYNTAX_RULES);
+  if (!cfg.allowEmojis) {
+    parts.push(GLOBAL_SYNTAX_RULES);
+  }
 
   return parts.join('\n\n');
 }
@@ -107,6 +110,12 @@ export function AISandbox({
   const [showPrompt, setShowPrompt] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  // Detect if active persona allows emojis (matches a preset with allowEmojis)
+  const activePersona = aiSetting?.ai_persona ?? pipelineDefault?.ai_persona ?? undefined;
+  const matchedPreset = activePersona
+    ? AI_PERSONA_PRESETS.find(p => p.xmlPrompt === activePersona)
+    : undefined;
+  
   // Build config for sandbox
   const sandboxConfig = selectedStage && selectedPipeline ? {
     stageId: selectedStage.id,
@@ -115,9 +124,10 @@ export function AISandbox({
     stageName: selectedStage.name,
     nextStageName: nextStageName,
     aiName: aiSetting?.ai_name ?? pipelineDefault?.ai_name ?? undefined,
-    aiPersona: aiSetting?.ai_persona ?? pipelineDefault?.ai_persona ?? undefined,
+    aiPersona: activePersona,
     aiObjective: aiSetting?.ai_objective ?? pipelineDefault?.ai_objective ?? undefined,
     dealTitle: selectedPipeline.name,
+    allowEmojis: matchedPreset?.allowEmojis ?? false,
   } : null;
   
   const { messages, isLoading, lastViolations, sendMessage, clearChat } = useAISandbox(sandboxConfig);

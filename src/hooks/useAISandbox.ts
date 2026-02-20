@@ -20,6 +20,7 @@ interface SandboxConfig {
   aiPersona?: string;
   aiObjective?: string;
   dealTitle?: string;
+  allowEmojis?: boolean;
 }
 
 interface UseAISandboxReturn {
@@ -76,8 +77,10 @@ ${cfg.aiName ? `Você se chama ${cfg.aiName}.` : ''}
 Quando concluir a coleta de dados, use a tag: [MOVER_PARA: ${cfg.nextStageName ?? 'próxima etapa'}]
 </context>`);
     
-    // Global syntax rules
-    parts.push(GLOBAL_SYNTAX_RULES);
+    // Global syntax rules (skip when emojis are allowed — preset has its own formatting)
+    if (!cfg.allowEmojis) {
+      parts.push(GLOBAL_SYNTAX_RULES);
+    }
     
     return parts.join('\n\n');
   }, []);
