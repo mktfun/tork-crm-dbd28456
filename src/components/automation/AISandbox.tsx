@@ -40,6 +40,9 @@ interface AISandboxProps {
     is_active?: boolean | null;
   } | null;
   nextStageName?: string;
+  companyName?: string;
+  globalBaseInstructions?: string;
+  globalAgentName?: string;
 }
 
 // Contextual suggestions based on stage name
@@ -65,6 +68,8 @@ function buildSystemPromptPreview(cfg: {
   aiPersona?: string;
   aiObjective?: string;
   dealTitle?: string;
+  companyName?: string;
+  globalBaseInstructions?: string;
   allowEmojis?: boolean;
 }): string {
   const parts: string[] = [];
@@ -72,13 +77,15 @@ function buildSystemPromptPreview(cfg: {
   const substituteVars = (text: string) =>
     text
       .replace(/\{\{ai_name\}\}/g, cfg.aiName ?? 'Agente')
-      .replace(/\{\{company_name\}\}/g, 'Corretora')
+      .replace(/\{\{company_name\}\}/g, cfg.companyName ?? 'sua empresa')
       .replace(/\{\{deal_title\}\}/g, cfg.dealTitle ?? 'nosso produto')
       .replace(/\{\{pipeline_name\}\}/g, cfg.pipelineName)
       .replace(/\{\{next_stage_name\}\}/g, cfg.nextStageName ?? 'próxima etapa');
 
   if (cfg.aiPersona) {
     parts.push(substituteVars(cfg.aiPersona));
+  } else if (cfg.globalBaseInstructions) {
+    parts.push(substituteVars(cfg.globalBaseInstructions));
   } else {
     const defaultPreset = AI_PERSONA_PRESETS.find(p => p.id === 'proactive');
     if (defaultPreset) {
@@ -105,6 +112,9 @@ export function AISandbox({
   aiSetting,
   pipelineDefault,
   nextStageName,
+  companyName,
+  globalBaseInstructions,
+  globalAgentName,
 }: AISandboxProps) {
   const [input, setInput] = useState('');
   const [showPrompt, setShowPrompt] = useState(false);
@@ -116,17 +126,19 @@ export function AISandbox({
     ? AI_PERSONA_PRESETS.find(p => p.xmlPrompt === activePersona)
     : undefined;
   
-  // Build config for sandbox
+  // Build config for sandbox with full fallback hierarchy
   const sandboxConfig = selectedStage && selectedPipeline ? {
     stageId: selectedStage.id,
     pipelineId: selectedPipeline.id,
     pipelineName: selectedPipeline.name,
     stageName: selectedStage.name,
     nextStageName: nextStageName,
-    aiName: aiSetting?.ai_name ?? pipelineDefault?.ai_name ?? undefined,
+    aiName: aiSetting?.ai_name ?? pipelineDefault?.ai_name ?? globalAgentName ?? undefined,
     aiPersona: activePersona,
     aiObjective: aiSetting?.ai_objective ?? pipelineDefault?.ai_objective ?? undefined,
     dealTitle: selectedPipeline.name,
+    companyName: companyName,
+    globalBaseInstructions: globalBaseInstructions,
     allowEmojis: matchedPreset?.allowEmojis ?? false,
   } : null;
   
