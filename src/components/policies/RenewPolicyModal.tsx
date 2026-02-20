@@ -60,7 +60,7 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
     defaultValues: {
       newPremiumValue: policy?.premiumValue || 0,
       newCommissionRate: policy?.commissionRate || 0,
-      bonusClass: policy?.bonus_class || '0',
+      bonusClass: String(Math.min(10, Number(policy?.bonus_class || '0') + 1)),
       insuranceCompanyId: policy?.insuranceCompany || '',
       newPolicyNumber: policy?.policyNumber || '',
       startDate: policy?.expirationDate || '',
@@ -251,7 +251,7 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
                 onValueChange={(v) => setValue('insuranceCompanyId', v)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Manter seguradora atual" />
+                  <SelectValue placeholder="Selecione a seguradora" />
                 </SelectTrigger>
                 <SelectContent>
                   {companies.map((c) => (
@@ -301,18 +301,18 @@ export function RenewPolicyModal({ policy, isOpen, onClose, onSuccess }: RenewPo
                 <Input type="date" {...register('manualExpirationDate')} />
               </div>
             )}
-          </div>
 
-          {/* Policy number */}
-          <div className="space-y-1.5">
-            <Label>
-              Número da Apólice{' '}
-              <span className="text-muted-foreground font-normal">(opcional — se a seguradora emitir novo número)</span>
-            </Label>
-            <Input
-              {...register('newPolicyNumber')}
-              placeholder="Ex: 123456789"
-            />
+            {/* Policy number - side by side with start date */}
+            <div className="space-y-1.5">
+              <Label>
+                Número da Apólice{' '}
+                <span className="text-muted-foreground font-normal">(opcional)</span>
+              </Label>
+              <Input
+                {...register('newPolicyNumber')}
+                placeholder="Ex: 123456789"
+              />
+            </div>
           </div>
 
           {/* Observations */}
