@@ -28,9 +28,11 @@ import { useAuth } from '@/hooks/useAuth';
 interface DeduplicationSectionProps {
   clients: Client[];
   onDeduplicationComplete: () => void;
+  onEnable?: () => void;
+  isLoading?: boolean;
 }
 
-export function DeduplicationSection({ clients, onDeduplicationComplete }: DeduplicationSectionProps) {
+export function DeduplicationSection({ clients, onDeduplicationComplete, onEnable, isLoading }: DeduplicationSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
@@ -42,6 +44,53 @@ export function DeduplicationSection({ clients, onDeduplicationComplete }: Dedup
   const duplicatePercentage = totalClients > 0 ? ((duplicateCount / totalClients) * 100).toFixed(1) : 0;
   const priorityCount = duplicateAlert.highConfidence + duplicateAlert.mediumConfidence;
   const qualityScore = Math.max(0, 100 - (duplicateCount / totalClients) * 100);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Card className="bg-card/50 border-border mb-6">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <Loader2 size={18} className="text-muted-foreground animate-spin" />
+            <CardTitle className="text-foreground font-medium">
+              Analisando duplicatas...
+            </CardTitle>
+          </div>
+          <div className="pt-3">
+            <Progress value={undefined} className="h-2" />
+            <p className="text-xs text-muted-foreground mt-2">Carregando todos os clientes para análise</p>
+          </div>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  // Not yet enabled — show collapsed card with button
+  if (clients.length === 0) {
+    return (
+      <Card className="bg-card/50 border-border mb-6">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <BarChart3 size={18} className="text-muted-foreground" />
+              <CardTitle className="text-foreground font-medium">
+                Deduplicação de Clientes
+              </CardTitle>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onEnable?.()}
+              className="gap-2"
+            >
+              <Target size={14} />
+              Verificar Duplicatas
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+    );
+  }
 
   // Se não há duplicatas, não mostra nada
   if (duplicateCount === 0) return null;

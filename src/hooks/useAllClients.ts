@@ -3,11 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Client } from '@/types';
 
-/**
- * Hook para carregar TODOS os clientes do usuário (sem paginação)
- * Usado especificamente para deduplicação e busca global
- */
-export function useAllClients() {
+interface UseAllClientsOptions {
+  enabled?: boolean;
+}
+
+export function useAllClients({ enabled = false }: UseAllClientsOptions = {}) {
   const { user } = useAuth();
 
   const { data: allClients, isLoading: loading, error } = useQuery({
@@ -25,7 +25,6 @@ export function useAllClients() {
         throw error;
       }
 
-      // Mapear dados do Supabase para o formato esperado
       const mappedClients: Client[] = (clientsData || []).map(item => ({
         id: item.id,
         name: item.name,
@@ -49,8 +48,8 @@ export function useAllClients() {
 
       return mappedClients;
     },
-    enabled: !!user,
-    staleTime: 30 * 60 * 1000, // 30 minutos (dados podem ficar mais tempo em cache)
+    enabled: !!user && enabled,
+    staleTime: 30 * 60 * 1000,
   });
 
   return {

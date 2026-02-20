@@ -24,7 +24,8 @@ export default function Clients() {
   usePageTitle('Clientes');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { allClients } = useAllClients();
+  const [deduplicationEnabled, setDeduplicationEnabled] = useState(false);
+  const { allClients, loading: deduplicationLoading } = useAllClients({ enabled: deduplicationEnabled });
 
   // Estado de paginação e filtros
   const [page, setPage] = useState(1);
@@ -144,7 +145,7 @@ export default function Clients() {
           <Button
             onClick={() => setIsImportModalOpen(true)}
             variant="outline"
-            className="bg-green-700 hover:bg-green-600 text-white border-green-600"
+            className=""
           >
             Importar Planilha
           </Button>
@@ -153,15 +154,15 @@ export default function Clients() {
       </div>
 
       {/* Seção de Deduplicação */}
-      {allClients && allClients.length > 0 && (
-        <DeduplicationSection
-          clients={allClients}
-          onDeduplicationComplete={() => {
-            queryClient.invalidateQueries({ queryKey: ['clients'] });
-            queryClient.invalidateQueries({ queryKey: ['clients-paginated'] });
-          }}
-        />
-      )}
+      <DeduplicationSection
+        clients={allClients}
+        onEnable={() => setDeduplicationEnabled(true)}
+        isLoading={deduplicationEnabled && deduplicationLoading}
+        onDeduplicationComplete={() => {
+          queryClient.invalidateQueries({ queryKey: ['clients'] });
+          queryClient.invalidateQueries({ queryKey: ['clients-paginated'] });
+        }}
+      />
 
       {/* Filtros Avançados */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-8 gap-4">
@@ -219,7 +220,7 @@ export default function Clients() {
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="flex flex-col items-center gap-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               <p className="text-foreground/60">Carregando clientes...</p>
             </div>
           </div>

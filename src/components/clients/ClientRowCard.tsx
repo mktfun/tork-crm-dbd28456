@@ -20,17 +20,17 @@ export function ClientRowCard({
 
   return (
     <div
-      className="bg-slate-800 border border-slate-700 rounded-lg p-6 hover:bg-slate-750 transition-colors cursor-pointer"
+      className="bg-card border border-border rounded-lg p-6 hover:bg-muted/50 transition-colors cursor-pointer"
       onClick={onClick}
     >
       {/* Linha 1: Nome, badges e botão */}
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-3 flex-wrap flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-white truncate max-w-[300px]">
+          <h3 className="text-lg font-semibold text-foreground truncate max-w-[300px]">
             {client.name}
           </h3>
           <Badge 
-            className={client.status === 'Ativo' ? 'bg-green-600 text-white' : 'bg-slate-600 text-white'}
+            className={client.status === 'Ativo' ? 'bg-green-600 text-white' : 'bg-muted text-muted-foreground'}
           >
             {client.status}
           </Badge>
@@ -48,7 +48,7 @@ export function ClientRowCard({
             e.stopPropagation();
             onClick();
           }}
-          className="bg-slate-700 hover:bg-slate-600 text-white border-slate-600 flex-shrink-0"
+          className="flex-shrink-0"
         >
           Ver Detalhes
         </Button>
@@ -58,10 +58,10 @@ export function ClientRowCard({
       <div className="grid grid-cols-1 md:grid-cols-5 gap-x-4 gap-y-3 text-sm mb-4">
         {/* Email - 2 colunas */}
         <div className="md:col-span-2 min-w-0">
-          <p className="text-slate-500 text-xs mb-1">Email</p>
+          <p className="text-muted-foreground text-xs mb-1">Email</p>
           <div className="flex items-center gap-2 min-w-0">
-            <Mail size={14} className="text-slate-400 flex-shrink-0" />
-            <span className="text-white truncate" title={client.email || '-'}>
+            <Mail size={14} className="text-muted-foreground flex-shrink-0" />
+            <span className="text-foreground truncate" title={client.email || '-'}>
               {client.email || '-'}
             </span>
           </div>
@@ -69,10 +69,10 @@ export function ClientRowCard({
 
         {/* Telefone */}
         <div className="min-w-0">
-          <p className="text-slate-500 text-xs mb-1">Telefone</p>
+          <p className="text-muted-foreground text-xs mb-1">Telefone</p>
           <div className="flex items-center gap-2 min-w-0">
-            <Phone size={14} className="text-slate-400 flex-shrink-0" />
-            <span className="text-white truncate" title={client.phone || '-'}>
+            <Phone size={14} className="text-muted-foreground flex-shrink-0" />
+            <span className="text-foreground truncate" title={client.phone || '-'}>
               {client.phone || '-'}
             </span>
           </div>
@@ -80,10 +80,10 @@ export function ClientRowCard({
 
         {/* CPF/CNPJ */}
         <div className="min-w-0">
-          <p className="text-slate-500 text-xs mb-1">CPF/CNPJ</p>
+          <p className="text-muted-foreground text-xs mb-1">CPF/CNPJ</p>
           <div className="flex items-center gap-2 min-w-0">
-            <FileText size={14} className="text-slate-400 flex-shrink-0" />
-            <span className="text-white truncate" title={client.cpfCnpj || '-'}>
+            <FileText size={14} className="text-muted-foreground flex-shrink-0" />
+            <span className="text-foreground truncate" title={client.cpfCnpj || '-'}>
               {client.cpfCnpj || '-'}
             </span>
           </div>
@@ -91,10 +91,10 @@ export function ClientRowCard({
 
         {/* Cliente desde */}
         <div className="min-w-0">
-          <p className="text-slate-500 text-xs mb-1">Cliente desde</p>
+          <p className="text-muted-foreground text-xs mb-1">Cliente desde</p>
           <div className="flex items-center gap-2">
-            <Calendar size={14} className="text-slate-400 flex-shrink-0" />
-            <span className="text-white">
+            <Calendar size={14} className="text-muted-foreground flex-shrink-0" />
+            <span className="text-foreground">
               {client.createdAt ? format(new Date(client.createdAt), 'dd/MM/yyyy') : '-'}
             </span>
           </div>
@@ -102,15 +102,15 @@ export function ClientRowCard({
       </div>
 
       {/* Linha 3: Métricas */}
-      <div className="border-t border-slate-700 pt-4 flex gap-6">
+      <div className="border-t border-border pt-4 flex gap-6">
         <div>
-          <p className="text-slate-500 text-xs mb-1">Apólices Ativas</p>
-          <p className="text-white font-semibold text-lg">
+          <p className="text-muted-foreground text-xs mb-1">Apólices Ativas</p>
+          <p className="text-foreground font-semibold text-lg">
             {client.apolices_ativas_count || 0}
           </p>
         </div>
         <div>
-          <p className="text-slate-500 text-xs mb-1">Comissão Total (Ativas)</p>
+          <p className="text-muted-foreground text-xs mb-1">Comissão Total (Ativas)</p>
           <p className="text-green-400 font-semibold text-lg">
             {(client.comissao_total_ativas || 0).toLocaleString('pt-BR', {
               style: 'currency',

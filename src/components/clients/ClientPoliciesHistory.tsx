@@ -15,20 +15,20 @@ export function ClientPoliciesHistory({ policies }: ClientPoliciesHistoryProps) 
 
   return (
     <AppCard className="p-6">
-      <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+      <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
         <FileText size={20} />
         Histórico de Apólices ({policies.length})
       </h2>
       
       {policies.length === 0 ? (
         <div className="text-center py-8">
-          <div className="text-slate-400 mb-4">
+          <div className="text-muted-foreground mb-4">
             <FileText size={48} className="mx-auto opacity-50" />
           </div>
-          <h3 className="text-lg font-medium text-white mb-2">
+          <h3 className="text-lg font-medium text-foreground mb-2">
             Nenhuma apólice encontrada
           </h3>
-          <p className="text-slate-300">
+          <p className="text-muted-foreground">
             Este cliente ainda não possui apólices cadastradas.
           </p>
         </div>
@@ -38,15 +38,15 @@ export function ClientPoliciesHistory({ policies }: ClientPoliciesHistoryProps) 
             <Link
               to={`/dashboard/policies/${policy.id}`}
               key={policy.id}
-              className="block border border-slate-700 rounded-lg p-4 bg-slate-800/50 hover:bg-slate-800/80 transition-colors"
+              className="block border border-border rounded-lg p-4 bg-muted/30 hover:bg-muted/60 transition-colors"
             >
               <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-white">{policy.ramos?.nome || policy.type || 'Tipo não informado'}</h4>
+                <h4 className="font-semibold text-foreground">{policy.ramos?.nome || policy.type || 'Tipo não informado'}</h4>
                 <Badge variant={policy.status === 'Ativa' ? 'default' : 'secondary'}>
                   {policy.status}
                 </Badge>
               </div>
-              <div className="text-sm text-slate-300 space-y-1">
+              <div className="text-sm text-muted-foreground space-y-1">
                 <p><span className="font-medium">Apólice:</span> {policy.policyNumber}</p>
                 <p><span className="font-medium">Seguradora:</span> {policy.companies?.name || 'Não especificada'}</p>
                 {policy.insuredAsset && (
