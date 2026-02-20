@@ -26,12 +26,13 @@ export function SandboxFloatingCard({ children, scrollContainerRef }: SandboxFlo
       const containerRect = container?.getBoundingClientRect();
       const top = containerRect?.top ?? rect.top;
 
+      const padding = 12;
       setCardStyle({
         position: 'fixed',
-        top: `${top}px`,
-        left: `${rect.left}px`,
-        width: `${rect.width}px`,
-        height: `calc(100vh - ${top}px - 16px)`,
+        top: `${top + padding}px`,
+        left: `${rect.left + padding}px`,
+        width: `${rect.width - padding * 2}px`,
+        height: `calc(100vh - ${top + padding}px - ${padding}px)`,
         maxHeight: '680px',
         zIndex: 30,
       });
