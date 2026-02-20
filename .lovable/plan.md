@@ -1,89 +1,93 @@
 
+# Prompt 23: Commission Payment Timeline
 
-# Prompt 26: Final Reconciliation Logic (The Correct Flow)
+## Overview
 
-## Problem Summary
+Create a `CommissionPaymentTimeline` component that displays a visual progress bar and vertical timeline of partial payments for each commission. Integrate it into both the Policy Details page (replacing the simple commission list in `CommissionExtract`) and the Client Details page (as a new section after interactions).
 
-The current implementation has two issues:
+## Important Discovery
 
-1. **Entering Workbench always forces a bank selection modal** (line 562-566 in ReconciliationPage.tsx). The user should see data immediately without a modal.
-2. **When in "Linking Mode" (targetLinkingBankId set), bankAccountId is passed as empty string** (line 691), which causes `usePendingReconciliation` to return empty arrays (line 119 in useReconciliation.ts: `if (!bankAccountId) return empty`).
+The `transaction_payments` table has a FK to the legacy `transactions` table, NOT to `financial_transactions`. The ERP commissions stored in `financial_transactions` track payments differently:
+- `financial_transactions.total_amount` = full commission value
+- `financial_transactions.paid_amount` = accumulated paid amount  
+- `financial_transactions.status` = `'pending'` | `'partial'` | `'reconciled'`
 
-## Two Modes Required
+For the timeline, we will query `transaction_payments` where the `transaction_id` matches entries that can be correlated. However, since the reconciliation workbench writes partial payments directly to `financial_transactions.paid_amount`, we need to also check if there are reconciliation records. The approach will be:
 
-- **Mode A (Consolidated/Default):** No bank selected. Show ALL items where `bank_account_id IS NULL`. No modal on entry. Modal only appears when matching two "No Bank" items (to ask which bank to assign).
-- **Mode B (Specific Bank):** User selects a bank from the dropdown. Show items for that bank. "Mostrar Sem Banco" toggle available. No modal needed for matching (bank is implied).
+1. Query `financial_transactions` with their payment progress for ERP commissions
+2. For the detailed timeline events, we can use the reconciliation timestamps and description from `financial_transactions` itself (reconciled_at, reconciliation_method) as each partial reconciliation updates these fields
 
-## Changes
+Since the prompt explicitly shows querying `transaction_payments` as a sub-select of `financial_transactions`, but the FK doesn't support that join, I will instead query the payment timeline from the `financial_transactions` fields directly (paid_amount, status, reconciled_at) and fall back to showing summary progress when detailed payment events aren't available.
 
-### 1. `src/hooks/useReconciliation.ts` -- Handle null bankAccountId for consolidated fetching
+## Files to Create
 
-**Current (line 119):** Returns empty when `bankAccountId` is falsy.
+### 1. `src/components/financeiro/CommissionPaymentTimeline.tsx` (NEW)
 
-**Fix:** When `bankAccountId` is null/empty, fetch consolidated data (all items with `bank_account_id IS NULL`):
-- System RPC: Call with a special "consolidated" flag or skip the bank-filtered RPC and query directly for unassigned transactions.
-- Statement query: Fetch entries where `bank_account_id IS NULL`.
+Props:
+- `policyId: string` -- fetch commissions for this policy
+- `compact?: boolean` -- default false; when true, show only progress bar + summary + last 3 payments
 
-### 2. `src/components/financeiro/reconciliation/ReconciliationPage.tsx`
-
-**Tab switching (lines 560-567):**
-- Remove the modal trigger when clicking Workbench. Instead, just switch to workbench mode directly.
-- If `isConsolidated` (no bank selected), pass `bankAccountId` as `null` to the Workbench (Mode A).
-- If a specific bank is selected, pass that bankId (Mode B).
-
-**Workbench rendering (lines 689-718):**
-- Remove the condition that requires `targetLinkingBankId` or `selectedBankAccountId` to render the Workbench.
-- Always render the Workbench when `viewMode === 'workbench'`.
-- Remove the fallback "Selecione um banco" card (lines 704-718).
-
-**Remove `targetLinkingBankId` state** (or repurpose it): The "target linking bank" concept is no longer needed as an upfront selection. Instead, the bank selection modal will appear on-demand during the matching action.
-
-**Remove `showBankSelectForWorkbench` modal trigger on tab click** (lines 562-566).
-
-### 3. `src/components/financeiro/reconciliation/ReconciliationWorkbench.tsx`
-
-**New state:** `pendingMatch` to hold the pair of items waiting for bank selection.
-
-**New behavior in `handleReconcile`:**
-
-```text
-if both items have no bank_account_id:
-    -> Store them as pendingMatch, open bank selection modal
-    -> On confirm: call RPC with selected bankId as targetBankId
-else if statement item has a bank:
-    -> Use that bank as targetBankId, reconcile directly (no modal)
-else if system item has a bank:
-    -> Use that bank as targetBankId, reconcile directly (no modal)
+Query:
+```ts
+supabase
+  .from('financial_transactions')
+  .select(`
+    id, description, transaction_date, total_amount,
+    paid_amount, status, reference_number
+  `)
+  .eq('related_entity_id', policyId)
+  .eq('related_entity_type', 'policy')
+  .eq('is_void', false)
+  .order('transaction_date', { ascending: true })
 ```
 
-**Bank selection modal:** Move the "Qual banco?" modal INTO the Workbench component, triggered only when both sides are unassigned.
+For each commission found, render:
+- **Header**: Reference number + status badge
+- **Progress bar**: Using shadcn `Progress` component. Amber when < 100%, emerald when = 100%.
+- **Summary line**: "Recebido: R$ X / Faltante: R$ Y / Total: R$ Z"
+- **Timeline**: Vertical dot-line timeline. Since detailed payment events aren't available via FK join, show:
+  - If `paid_amount > 0` and `status === 'partial'`: one entry showing "Pagamento parcial registrado" with the paid amount
+  - If `status === 'reconciled'`: show "Quitado" entry
+  - If remaining > 0: dashed "Saldo pendente" entry in red
 
-**Props simplification:**
-- Remove `targetLinkingBankId`, `targetLinkingBankName`, `onChangeTargetBank` props.
-- Accept `bankAccountId` as `string | null` (null = consolidated mode).
-- Accept `bankAccounts` list for the on-demand modal.
+Loading state: Skeleton components.
+Empty state: "Nenhum pagamento registrado ainda" with Pendente badge.
 
-### 4. `supabase/functions/generate-summary/index.ts` -- Fix build error
+## Files to Modify
 
-**Line 97:** `error.message` on `unknown` type. Fix: `(error as Error).message`.
+### 2. `src/components/policies/CommissionExtract.tsx`
 
-## Data Flow After Fix
+**What changes:**
+- Import `CommissionPaymentTimeline`
+- In the "Transacoes no Faturamento" section (lines 217-291), replace the existing commission list with `<CommissionPaymentTimeline policyId={policy.id} />`
+- Keep the "Gerar Comissao" button logic for when no commissions exist
+- Keep the header (Apolice summary grid, Comissao Total green block) unchanged
 
-```text
-Mode A (Consolidated):
-  bankAccountId = null
-  Hook fetches: bank_account_id IS NULL (both sides)
-  On match: if both unassigned -> modal asks bank -> RPC with selected bank
-  
-Mode B (Filtered):
-  bankAccountId = "santander-id"
-  Hook fetches: bank_account_id = santander + optionally NULL (toggle)
-  On match: no modal, bank is implied from statement side
-```
+### 3. `src/pages/ClientDetails.tsx`
 
-## Files Modified
-- `src/hooks/useReconciliation.ts` -- Handle null bankAccountId for consolidated fetch
-- `src/components/financeiro/reconciliation/ReconciliationPage.tsx` -- Remove upfront modal, simplify workbench rendering
-- `src/components/financeiro/reconciliation/ReconciliationWorkbench.tsx` -- Add on-demand bank modal, remove linking mode props
-- `supabase/functions/generate-summary/index.ts` -- Fix TypeScript error on line 97
+**What changes:**
+- Import `CommissionPaymentTimeline` and `AppCard`, `Badge`, `DollarSign` icon, `Separator`
+- After `<ClientInteractionsHistory />` (line 153), add a new section "Recebimentos de Comissao"
+- Iterate over `clientPolicies`, rendering `<CommissionPaymentTimeline policyId={policy.id} compact />` for each
+- Each policy gets a mini-header showing policy number and type badge
+- Separator between policies
+- Only render the section if `clientPolicies.length > 0`
 
+## Status Badge Mapping
+
+| Status | Label | Style |
+|--------|-------|-------|
+| `pending` | Pendente | `variant="outline"` + `text-amber-500 border-amber-500` |
+| `partial` | Parcial | `variant="outline"` + `text-blue-500 border-blue-500` |
+| `reconciled` | Quitado | `variant="default"` + `bg-emerald-600` |
+
+## Technical Notes
+
+- Uses `useQuery` with key `['commission-timeline', policyId]`
+- `formatCurrency` from `@/utils/formatCurrency`
+- `Progress` from `@/components/ui/progress` with `indicatorClassName` for color control
+- `Skeleton` from `@/components/ui/skeleton` for loading state
+- `AppCard` with `glass-component` pattern for card wrapper
+- `date-fns` `format` for date formatting
+- No database migrations needed -- all data already exists
+- No changes to commission generation logic, RPCs, or other existing components
