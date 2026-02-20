@@ -47,13 +47,11 @@ export function DashboardKpis({ dateRange }: DashboardKpisProps) {
   };
 
   const handleGreetingSent = () => {
-    // Invalidate queries to refresh data
     queryClient.invalidateQueries({
       queryKey: ['birthday-greetings', user?.id, new Date().getFullYear()]
     });
   };
 
-  // Show loading state while data is being fetched
   if (metrics.isLoading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
@@ -66,31 +64,27 @@ export function DashboardKpis({ dateRange }: DashboardKpisProps) {
     );
   }
 
-  // Determinar os títulos dos KPIs baseado se há filtro de data ou não
   const periodText = dateRange?.from && dateRange?.to ? 'Período' : 'Mês';
 
   return (
     <>
-      {/* KPIs ESTRATÉGICOS - GRID RESPONSIVO APRIMORADO */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
-        {/* KPI 1: Total de Clientes - DADOS CORRIGIDOS */}
         <KpiCard
           title={`Total de Clientes${dateRange?.from && dateRange?.to ? ' (Período)' : ''}`}
           value={metrics.activeClients.toString()}
-          icon={<Users className="h-5 w-5 text-blue-400" />}
+          icon={<Users className="h-5 w-5 text-primary" />}
           onClick={() => navigate('/dashboard/clients')}
         />
 
-        {/* KPI 2: Renovações Críticas (30 dias) - DADOS CORRIGIDOS */}
         <KpiCard
           title="Renovações (30 dias)"
           value={metrics.renewals30Days.toString()}
           colorVariant={metrics.renewals30Days > 0 ? "warning" : "default"}
           icon={<AlertTriangle className="h-5 w-5" />}
           onClick={handleRenovacoesClick}
+          zeroLabel="Nenhuma renovação próxima"
         />
 
-        {/* KPI 3: Comissão do Mês Atual - SEMPRE MÊS ATUAL */}
         <KpiCard
           title="Comissão (Mês)"
           value={formatCurrency(metrics.comissaoMesAtual)}
@@ -98,29 +92,27 @@ export function DashboardKpis({ dateRange }: DashboardKpisProps) {
             `${((metrics.comissaoMesAtual - metrics.comissaoMesAnterior) / metrics.comissaoMesAnterior * 100).toFixed(0)}% vs. mês anterior` :
             undefined
           }
-          icon={<DollarSign className="h-5 w-5 text-green-400" />}
+          icon={<DollarSign className="h-5 w-5 text-emerald-500" />}
           onClick={() => navigate('/dashboard/financeiro')}
         />
 
-        {/* KPI 4: Apólices Novas do Período/Mês - DADOS CORRIGIDOS */}
         <KpiCard
           title={`Apólices Novas (${periodText})`}
           value={metrics.apolicesNovasMes.toString()}
-          icon={<FileText className="h-5 w-5 text-purple-400" />}
+          icon={<FileText className="h-5 w-5 text-primary" />}
           onClick={handlePropostasClick}
         />
 
-        {/* KPI 5: Aniversariantes de Hoje - INTELIGENTE COM CONTROLE */}
         <KpiCard
           title="Aniversariantes Hoje"
           value={metrics.aniversariantesHoje.length.toString()}
           colorVariant={metrics.aniversariantesHoje.length > 0 ? "warning" : "default"}
-          icon={<Cake className="h-5 w-5 text-pink-400" />}
+          icon={<Cake className="h-5 w-5" />}
           onClick={handleAniversariantesClick}
+          zeroLabel="Ninguém faz aniversário hoje"
         />
       </div>
 
-      {/* Modal de Saudações Inteligente */}
       <BirthdayGreetingsModal
         open={birthdayModalOpen}
         onOpenChange={setBirthdayModalOpen}
