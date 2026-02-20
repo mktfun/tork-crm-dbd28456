@@ -94,7 +94,7 @@ export function SalesFlowTimeline({
   }).length;
 
   return (
-    <div className="flex flex-col h-full bg-card/30 rounded-xl border border-border">
+    <div className="flex flex-col bg-card/30 rounded-xl border border-border">
       {/* Header — select + action icons in 1 line */}
       <TooltipProvider>
         <div className="flex items-center gap-2 p-4 border-b border-border/50">
