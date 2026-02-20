@@ -1,90 +1,89 @@
 
-
-# Redesign do AppointmentModal
+# Redesign e Correção da Tela de Renovações
 
 ## Overview
 
-The `AppointmentModal.tsx` still contains legacy hardcoded colors and duplicated form JSX. This plan cleans it up to match the design system, deduplicates the form, and enhances the dialog header.
+This is a comprehensive redesign covering three areas: fixing the renewal flow (critical bug -- currently creates duplicate policies), redesigning the UI from cards to a table layout, and cleaning up all legacy hardcoded colors. The `policy_renewal_history` table migration has already been applied.
 
-## What Changes
+## Files to Modify
 
-### 1. Remove all hardcoded legacy colors
+### 1. `src/components/policies/RenewPolicyModal.tsx` -- Critical flow fix + design cleanup
 
-Replace across both form copies (which will become one after deduplication):
+**Flow fix (critical):**
+- Remove `addPolicy` usage entirely -- renewals must NOT create new policies
+- Replace with: (1) insert into `policy_renewal_history` to save snapshot, (2) `updatePolicy` on the existing policy with new values
+- Add optional `newPolicyNumber` field to schema
+- Remove `generateRenewedPolicyNumber` function
+- Remove `validateOriginalPolicy` function (unnecessary gate)
 
-| Old Class | New Class |
-|---|---|
-| `bg-slate-900 border-slate-700` (DialogContent) | remove (use default DialogContent styling) |
-| `text-white` (DialogTitle) | `text-foreground` |
-| `text-slate-300` (all Labels) | `text-muted-foreground` |
-| `bg-slate-800 border-slate-600 text-white` (all Inputs, Textareas, SelectTriggers, Comboboxes) | remove (use default component styling) |
-| `border-slate-600 text-slate-300 hover:bg-slate-800` (Cancel button) | remove (use default `variant="outline"`) |
-
-### 2. Deduplicate the form
-
-Currently there are two identical form blocks (lines 169-273 and lines 290-394) -- one for the controlled modal (no trigger) and one for the trigger-based modal. Extract the form into a shared `formContent` variable used in both branches.
-
-### 3. Enhance the Dialog header
-
-Replace the plain `DialogTitle` with a styled header containing an icon box and subtitle:
-
-```
-[calendar icon]  Novo Agendamento
-                 Preencha os dados do agendamento
+**New `onSubmit` logic:**
+```text
+1. Insert into policy_renewal_history (previous + new values)
+2. updatePolicy(policy.id, { expirationDate, premiumValue, commissionRate, bonus_class, policyNumber?, renewalStatus: 'Renovada', status: 'Ativa' })
+3. Toast success, reset, close
 ```
 
-Or when `initialDate` is provided:
+**Design cleanup:**
+- Remove `bg-slate-900 border-slate-700` from DialogContent
+- Remove all `text-slate-300`, `bg-slate-800`, `border-slate-600`, `text-white` from Labels, Inputs, Selects, Textarea
+- Remove `bg-green-600 hover:bg-green-700 text-white` from submit button (use default variant)
+- Remove `border-slate-600 text-slate-300 hover:bg-slate-800` from cancel button (use `variant="outline"`)
+- Replace `text-red-400` error messages with `text-destructive`
 
-```
-[calendar icon]  Agendar para 20 de fevereiro
-                 Preencha os dados do agendamento
-```
+**Enhanced header:**
+- Icon box with `bg-primary/10` + `RotateCcw` icon in `text-primary`
+- Subtitle showing policy number and client name
 
-### 4. Keep all logic untouched
+**DatePicker replacement:**
+- Replace native `<input type="date">` with Shadcn Popover + Calendar for `newExpirationDate`
+- Use `ptBR` locale, disable past dates
 
-No changes to:
-- `handleSubmit`, `handleInputChange`
-- `useSupabaseAppointments`, `useClients`, `usePolicies`, `useCompanyNames`
-- `RecurrenceConfig`
-- Form field structure (native date/time inputs kept as-is for reliability)
-- `clientOptions`, `policyOptions` derivation logic
+**Current policy summary block:**
+- Replace `bg-slate-800 border-slate-600` with `bg-muted/50 border-border`
+- Show 4 fields: Vencimento, Premio, Comissao, Bonus in a clean grid with `text-muted-foreground` labels and `text-foreground` values
 
-## Files Modified
+### 2. `src/pages/Renovacoes.tsx` -- Full page redesign
 
-- `src/components/appointments/AppointmentModal.tsx` -- single file change
+**Replace cards with table layout:**
+- Remove `renderPolicyCard` function and card grid
+- Add a `glass-component` container with table header (icon box + title + count)
+- Table columns: Cliente, No Apolice, Seguradora, Vencimento, Dias, Premio, Bonus, Status, Acoes
+- Each row is a `div` with grid columns, hover state `hover:bg-muted/50`
+- Days column uses semantic colors: `text-destructive` (overdue), `text-amber-500` (<=15d), `text-foreground` (normal)
+- Actions column: "Renovar" button + DropdownMenu for status changes
 
-## Technical Details
+**Add KPI bar:**
+- 4 mini KPIs between header and filters: "Vencendo em 30d" (orange), "Vencidas" (destructive), "Renovadas" (emerald), "Total" (primary)
+- Computed from loaded `renewals` array
 
-The deduplicated structure will look like:
+**Replace period filter Selects with Button group:**
+- Period: row of `Button variant="ghost"/"secondary"` for 30/60/90/120/Todos
+- Status: keep as Select (more options)
 
-```
-const formContent = (
-  <form onSubmit={handleSubmit} className="space-y-4">
-    {/* All fields with cleaned classes */}
-    {/* Buttons */}
-  </form>
-);
+**Fix hardcoded colors:**
+- Remove `text-red-400`, `text-orange-400`, `text-blue-400`, `text-green-400`, `bg-green-600`
+- Replace `getRenewalStatusBadge` switch with config map using `variant="secondary"/"default"/"destructive"`
 
-if (!triggerButton) {
-  return (
-    <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>...</DialogHeader>
-        {formContent}
-      </DialogContent>
-    </Dialog>
-  );
-}
+**Pagination:**
+- Replace Pagination component with simple prev/next + "1-12 de 23" footer inside the table container
 
-return (
-  <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-    <DialogTrigger asChild>{triggerButton}</DialogTrigger>
-    <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-      <DialogHeader>...</DialogHeader>
-      {formContent}
-    </DialogContent>
-  </Dialog>
-);
-```
+**Loading skeleton:**
+- Replace card skeletons with table row skeletons
 
-This reduces ~200 lines of duplicated JSX to a single shared block, making future maintenance straightforward.
+### 3. `src/hooks/useSupabaseRenewals.ts` -- Add bonus_class
+
+- Add `bonus_class: item.bonus_class || null` to the transform map
+- No other changes needed
+
+## Files NOT Modified
+- `ExportRenewalsModal` -- untouched
+- `useSupabasePolicies.ts` -- untouched (updatePolicy already supports all needed fields)
+- `policy_renewal_history` table -- already created via migration
+- Any other hooks or components
+
+## Technical Notes
+
+- The `updatePolicy` function in `useSupabasePolicies.ts` already maps `premiumValue`, `commissionRate`, `expirationDate`, `bonus_class`, `policyNumber`, `renewalStatus`, and `status` -- no changes needed there
+- The `supabase` client import is needed in `RenewPolicyModal` for the direct insert into `policy_renewal_history` (not exposed via any hook)
+- The `policy.userId` field is available from `useSupabaseRenewals` transform and will be used for the `user_id` in the history insert
+- Calendar component needs `pointer-events-auto` class per Shadcn datepicker guidelines
