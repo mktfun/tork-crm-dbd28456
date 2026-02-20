@@ -127,7 +127,7 @@ function SystemEntryCard({
     isUnassigned?: boolean;
 }) {
     const isRevenue = item.amount >= 0;
-    const hasRichData = !!item.customer_name;
+    const hasRichData = !!(item.customer_name || item.insurer_name || item.branch_name);
     const displayAmount = item.remaining_amount != null ? Math.abs(item.remaining_amount) : Math.abs(item.amount);
 
     // Fallback to standard EntryCard if no rich data
@@ -150,7 +150,9 @@ function SystemEntryCard({
         >
             {/* Title row */}
             <div className="flex items-center justify-between gap-2 mb-1">
-                <p className="text-sm font-bold text-foreground truncate">{item.customer_name}</p>
+                <p className="text-sm font-bold text-foreground truncate">
+                    {item.customer_name || item.description?.replace(/undefined/g, '').trim() || 'Comissão'}
+                </p>
                 <span className={cn(
                     'text-sm font-bold shrink-0',
                     isRevenue ? 'text-emerald-400' : 'text-red-400'
@@ -169,6 +171,11 @@ function SystemEntryCard({
                 )}
                 {item.item_name && (
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground">{item.item_name}</Badge>
+                )}
+                {!item.branch_name && !item.insurer_name && !item.item_name && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground">
+                        Comissão Automática
+                    </Badge>
                 )}
                 {isUnassigned && (
                     <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-500/30 text-amber-500 shrink-0">
@@ -731,11 +738,14 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                     date: (statementItems.find(i => i.id === selectedStatementIds[0]))?.transaction_date || '',
                 }}
                 systemItem={{
-                    description: (systemItems.find(i => i.id === selectedSystemIds[0]))?.description || '',
+                    description: (systemItems.find(i => i.id === selectedSystemIds[0]))?.description?.replace(/undefined/g, '').trim() || 'Comissão',
                     totalAmount: Math.abs((systemItems.find(i => i.id === selectedSystemIds[0]))?.total_amount ?? 0),
                     paidAmount: Math.abs((systemItems.find(i => i.id === selectedSystemIds[0]))?.paid_amount ?? 0),
                     remainingAmount: Math.abs((systemItems.find(i => i.id === selectedSystemIds[0]))?.remaining_amount ?? 0),
                     customerName: (systemItems.find(i => i.id === selectedSystemIds[0]))?.customer_name || undefined,
+                    branchName: (systemItems.find(i => i.id === selectedSystemIds[0]))?.branch_name || undefined,
+                    insurerName: (systemItems.find(i => i.id === selectedSystemIds[0]))?.insurer_name || undefined,
+                    itemName: (systemItems.find(i => i.id === selectedSystemIds[0]))?.item_name || undefined,
                 }}
             />
 
