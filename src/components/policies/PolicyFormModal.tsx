@@ -13,7 +13,15 @@ import { Switch } from '@/components/ui/switch';
 import { Combobox } from '@/components/ui/combobox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Stepper } from '@/components/ui/stepper';
-import { Edit3, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  User, Building2, DollarSign, Users2,
+  Shield, Activity, Tag, Hash,
+  Calendar, Percent, TrendingUp,
+  User2, Briefcase, AlertCircle,
+  Loader2, Check,
+  Edit3, X, ChevronLeft, ChevronRight
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 import { useClients, usePolicies } from '@/hooks/useAppData';
 import { QuickAddClientModal } from '@/components/clients/QuickAddClientModal';
@@ -40,6 +48,29 @@ const STEPS = [
   'Detalhes do Seguro',
   'Valores e Vigência',
   'Envolvidos'
+];
+
+const STEP_META = [
+  {
+    icon: User,
+    title: 'Informações Principais',
+    subtitle: 'Cliente, bem segurado e status inicial',
+  },
+  {
+    icon: Building2,
+    title: 'Detalhes do Seguro',
+    subtitle: 'Seguradora, ramo e número da apólice',
+  },
+  {
+    icon: DollarSign,
+    title: 'Valores e Vigência',
+    subtitle: 'Prêmio, comissão e datas de vigência',
+  },
+  {
+    icon: Users2,
+    title: 'Envolvidos',
+    subtitle: 'Produtor e corretora responsáveis',
+  },
 ];
 
 export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAdded }: PolicyFormModalProps) {
@@ -106,26 +137,16 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
     if (!selectedCompanyId) return;
     if (!availableBranches || availableBranches.length === 0) return;
 
-
-
     let foundRamo: { id: string; nome: string } | null = null;
 
-    // 1) Preferência por ID se veio da edge function
     if (pendingRamo.id) {
       foundRamo = availableBranches.find(r => r.id === pendingRamo.id) || null;
-      if (foundRamo) {
-
-      }
     }
 
-    // 2) Se não achou por ID, tentar por nome
     if (!foundRamo && pendingRamo.name) {
       const normalized = pendingRamo.name.toLowerCase().trim();
-
-      // Exact match
       foundRamo = availableBranches.find(r => r.nome.toLowerCase().trim() === normalized) || null;
 
-      // Partial match
       if (!foundRamo) {
         foundRamo = availableBranches.find(r => {
           const n = r.nome.toLowerCase().trim();
@@ -133,7 +154,6 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
         }) || null;
       }
 
-      // Word match
       if (!foundRamo) {
         foundRamo = availableBranches.find(r => {
           const words = normalized.split(' ').filter(w => w.length > 2);
@@ -142,7 +162,6 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
         }) || null;
       }
 
-      // Abreviações
       if (!foundRamo) {
         const abreviacoes: Record<string, string[]> = {
           'auto': ['automóvel', 'veículo', 'carro', 'automóveis'],
@@ -161,10 +180,6 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
             if (foundRamo) break;
           }
         }
-      }
-
-      if (foundRamo) {
-
       }
     }
 
@@ -189,10 +204,10 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
       setValue('type', '');
     }
   }, [selectedCompanyId, setValue, watch]);
+
   const currentStatus = watch('status');
   const startDate = watch('startDate');
 
-  // Auto-calculate expiration date effect
   React.useEffect(() => {
     if (!isManualDueDate && startDate && !isEditing) {
       const calculatedExpirationDate = format(addYears(new Date(startDate), 1), 'yyyy-MM-dd');
@@ -281,336 +296,512 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
   }));
 
   const handleClientCreated = (newClient: { id: string }) => {
-    // Refetch clients to include the new one
     refetchClients();
-    // Auto-select the new client
     setValue('clientId', newClient.id);
   };
 
-
-
-  const renderStepContent = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            {/* Cliente Selection */}
-            <div>
-              <Label htmlFor="clientId" className="text-white">Cliente *</Label>
-              <div className="flex gap-2 mt-1">
-                <div className="flex-1">
-                  <Combobox
-                    options={clientOptions}
-                    value={watch('clientId')}
-                    onValueChange={(value) => setValue('clientId', value)}
-                    placeholder="Buscar e selecionar cliente..."
-                    searchPlaceholder="Digite o nome ou telefone do cliente..."
-                    emptyText="Nenhum cliente encontrado."
-                  />
-                </div>
-                <QuickAddClientModal onClientCreated={handleClientCreated} />
-              </div>
-              {errors.clientId && (
-                <p className="text-red-400 text-sm mt-1">{errors.clientId.message}</p>
-              )}
-            </div>
-
-            {/* Bem Segurado */}
-            <div>
-              <Label htmlFor="insuredAsset" className="text-white">Bem Segurado *</Label>
-              <Textarea
-                {...register('insuredAsset')}
-                className="bg-slate-900/50 border-slate-700 text-white mt-1"
-                placeholder="Descreva o bem segurado..."
-                rows={3}
-              />
-              {errors.insuredAsset && (
-                <p className="text-red-400 text-sm mt-1">{errors.insuredAsset.message}</p>
-              )}
-            </div>
-
-            {/* Status */}
-            <div>
-              <Label htmlFor="status" className="text-white">Status *</Label>
-              <Select value={watch('status')} onValueChange={(value) => setValue('status', value as any)}>
-                <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-900/95 backdrop-blur-lg border-slate-700 text-white">
-                  <SelectItem value="Orçamento" className="hover:bg-white/10 focus:bg-white/10">Orçamento</SelectItem>
-                  <SelectItem value="Aguardando Apólice" className="hover:bg-white/10 focus:bg-white/10">Aguardando Apólice</SelectItem>
-                  <SelectItem value="Ativa" className="hover:bg-white/10 focus:bg-white/10">Ativa</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        );
-
-      case 2:
-        return (
-          <div className="space-y-6">
-            {/* Seguradora */}
-            <div>
-              <Label htmlFor="insuranceCompany" className="text-white">
-                Seguradora {currentStatus !== 'Orçamento' && '*'}
-              </Label>
-              <Select value={watch('insuranceCompany')} onValueChange={(value) => setValue('insuranceCompany', value)}>
-                <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white mt-1">
-                  <SelectValue placeholder="Selecione a seguradora" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-900/95 backdrop-blur-lg border-slate-700 text-white">
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id} className="hover:bg-white/10 focus:bg-white/10">
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.insuranceCompany && (
-                <p className="text-red-400 text-sm mt-1">{errors.insuranceCompany.message}</p>
-              )}
-            </div>
-
-            {/* Ramo */}
-            <div>
-              <Label htmlFor="type" className="text-white">
-                Ramo {currentStatus !== 'Orçamento' && '*'}
-              </Label>
-              <Select value={watch('type')} onValueChange={(value) => setValue('type', value)}>
-                <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white mt-1">
-                  <SelectValue placeholder="Selecione o ramo" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-900/95 backdrop-blur-lg border-slate-700 text-white">
-                  {availableBranches.map((ramo) => (
-                    <SelectItem key={ramo.id} value={ramo.id} className="hover:bg-white/10 focus:bg-white/10">
-                      {ramo.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.type && (
-                <p className="text-red-400 text-sm mt-1">{errors.type.message}</p>
-              )}
-            </div>
-
-            {/* Número da Apólice */}
-            <div>
-              <Label htmlFor="policyNumber" className="text-white">Número da Apólice</Label>
-              <Input
-                {...register('policyNumber')}
-                className="bg-slate-900/50 border-slate-700 text-white mt-1"
-                placeholder="Ex: 12345678"
-              />
-            </div>
-          </div>
-        );
-
-      case 3:
-        return (
-          <div className="space-y-6">
-            {/* Valores */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="premiumValue" className="text-white">Valor do Prêmio *</Label>
-                <Input
-                  {...register('premiumValue', { valueAsNumber: true })}
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="bg-slate-900/50 border-slate-700 text-white mt-1"
-                  placeholder="0,00"
-                />
-                {errors.premiumValue && (
-                  <p className="text-red-400 text-sm mt-1">{errors.premiumValue.message}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="commissionRate" className="text-white">Taxa de Comissão (%) *</Label>
-                <Input
-                  {...register('commissionRate', { valueAsNumber: true })}
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  className="bg-slate-900/50 border-slate-700 text-white mt-1"
-                  placeholder="20"
-                />
-                {errors.commissionRate && (
-                  <p className="text-red-400 text-sm mt-1">{errors.commissionRate.message}</p>
-                )}
-              </div>
-            </div>
-
-            <Separator className="bg-slate-700" />
-
-            {/* Toggle Renovação Automática */}
-            <div className="flex items-center justify-between py-2">
-              <Label htmlFor="automaticRenewal" className="text-white">
-                Gerar Renovação Automática?
-              </Label>
-              <Switch
-                id="automaticRenewal"
-                checked={watch('automaticRenewal')}
-                onCheckedChange={(checked) => setValue('automaticRenewal', checked)}
-              />
-            </div>
-
-            {/* Datas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="startDate" className="text-white">Data de Início *</Label>
-                <Input
-                  {...register('startDate')}
-                  type="date"
-                  className="bg-slate-900/50 border-slate-700 text-white mt-1"
-                />
-                {errors.startDate && (
-                  <p className="text-red-400 text-sm mt-1">{errors.startDate.message}</p>
-                )}
-              </div>
-
-              {/* Data de Vencimento com Toggle */}
-              <div>
-                <div className="flex items-center gap-2">
-                  <Label className="text-white">Data de Vencimento</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleToggleDueDateMode}
-                        className="h-6 w-6 p-0 text-white hover:bg-white/10"
-                      >
-                        {isManualDueDate ? <X size={14} /> : <Edit3 size={14} />}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{isManualDueDate ? 'Voltar para cálculo automático' : 'Alterar para data manual'}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-
-                {isManualDueDate ? (
-                  <Input
-                    {...register('expirationDate')}
-                    type="date"
-                    className="bg-slate-900/50 border-slate-700 text-white mt-1"
-                  />
-                ) : (
-                  <div className="mt-1 flex h-10 w-full items-center rounded-md border border-slate-700 bg-slate-900/50 px-3 py-2 text-sm text-gray-400">
-                    Calculada automaticamente (+1 ano)
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-
-      case 4:
-        return (
-          <div className="space-y-6">
-            {/* Produtor e Corretora */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="producerId" className="text-white">Produtor</Label>
-                <Select value={watch('producerId')} onValueChange={(value) => setValue('producerId', value)}>
-                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white mt-1">
-                    <SelectValue placeholder="Selecione o produtor" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900/95 backdrop-blur-lg border-slate-700 text-white">
-                    {producers.map((producer) => (
-                      <SelectItem key={producer.id} value={producer.id} className="hover:bg-white/10 focus:bg-white/10">
-                        {producer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="brokerageId" className="text-white">Corretora</Label>
-                <Select value={watch('brokerageId')} onValueChange={(value) => setValue('brokerageId', value)}>
-                  <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white mt-1">
-                    <SelectValue placeholder="Selecione a corretora" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900/95 backdrop-blur-lg border-slate-700 text-white">
-                    {brokerages.map((brokerage) => (
-                      <SelectItem key={brokerage.id} value={brokerage.id.toString()} className="hover:bg-white/10 focus:bg-white/10">
-                        {brokerage.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  const renderNavigationButtons = () => {
+  const renderStepHeader = () => {
+    const meta = STEP_META[currentStep - 1];
+    const MetaIcon = meta.icon;
     return (
-      <div className="flex justify-between pt-6 mt-6 border-t border-slate-700">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={currentStep === 1 ? onClose : handleBack}
-          className="bg-slate-700 text-white hover:bg-slate-600"
-        >
-          {currentStep === 1 ? (
-            'Cancelar'
-          ) : (
-            <>
-              <ChevronLeft size={16} className="mr-1" />
-              Voltar
-            </>
-          )}
-        </Button>
-
-        {currentStep < STEPS.length ? (
-          <Button
-            type="button"
-            onClick={handleNext}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            Avançar
-            <ChevronRight size={16} className="ml-1" />
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            onClick={onSubmit}
-            disabled={isSubmitting}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            {isSubmitting
-              ? (isEditing ? 'Salvando...' : 'Criando...')
-              : (isEditing ? 'Salvar Alterações' : 'Criar Apólice')
-            }
-          </Button>
-        )}
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border/50">
+        <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+          <MetaIcon className="w-5 h-5" />
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-foreground">{meta.title}</h3>
+          <p className="text-sm text-muted-foreground">{meta.subtitle}</p>
+        </div>
       </div>
     );
   };
 
+  const renderStepContent = () => {
+    const content = (() => {
+      switch (currentStep) {
+        case 1:
+          return (
+            <div className="space-y-5">
+              {/* Cliente */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-muted-foreground" />
+                  Cliente
+                  <span className="text-destructive text-xs">*</span>
+                </Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Combobox
+                      options={clientOptions}
+                      value={watch('clientId')}
+                      onValueChange={(value) => setValue('clientId', value)}
+                      placeholder="Buscar e selecionar cliente..."
+                      searchPlaceholder="Digite o nome ou telefone do cliente..."
+                      emptyText="Nenhum cliente encontrado."
+                    />
+                  </div>
+                  <QuickAddClientModal onClientCreated={handleClientCreated} />
+                </div>
+                {errors.clientId && (
+                  <p className="text-destructive text-xs flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.clientId.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Bem Segurado */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+                  Bem Segurado
+                  <span className="text-destructive text-xs">*</span>
+                </Label>
+                <Textarea
+                  {...register('insuredAsset')}
+                  className="bg-background border-border text-foreground placeholder:text-muted-foreground focus:border-primary/50"
+                  placeholder="Descreva o bem segurado..."
+                  rows={3}
+                />
+                {errors.insuredAsset && (
+                  <p className="text-destructive text-xs flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.insuredAsset.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Status — Pill Buttons */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+                  Status
+                  <span className="text-destructive text-xs">*</span>
+                </Label>
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { value: 'Orçamento', label: 'Orçamento', color: 'blue' },
+                    { value: 'Aguardando Apólice', label: 'Aguardando', color: 'amber' },
+                    { value: 'Ativa', label: 'Ativa', color: 'green' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setValue('status', opt.value as any)}
+                      className={cn(
+                        "px-4 py-2 rounded-full text-sm font-medium border-2 transition-all duration-200",
+                        watch('status') === opt.value
+                          ? opt.color === 'blue'
+                            ? "bg-blue-500/15 border-blue-500 text-blue-400"
+                            : opt.color === 'amber'
+                              ? "bg-amber-500/15 border-amber-500 text-amber-400"
+                              : "bg-emerald-500/15 border-emerald-500 text-emerald-400"
+                          : "bg-transparent border-border text-muted-foreground hover:border-border/80 hover:bg-muted/30"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+
+        case 2:
+          return (
+            <div className="space-y-5">
+              {/* Seguradora */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                  Seguradora
+                  {currentStatus !== 'Orçamento' && <span className="text-destructive text-xs">*</span>}
+                </Label>
+                <Select value={watch('insuranceCompany')} onValueChange={(value) => setValue('insuranceCompany', value)}>
+                  <SelectTrigger className="bg-background border-border text-foreground focus:border-primary/50">
+                    <SelectValue placeholder="Selecione a seguradora" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border">
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.insuranceCompany && (
+                  <p className="text-destructive text-xs flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.insuranceCompany.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Ramo */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-muted-foreground" />
+                  Ramo
+                  {currentStatus !== 'Orçamento' && <span className="text-destructive text-xs">*</span>}
+                </Label>
+                <Select value={watch('type')} onValueChange={(value) => setValue('type', value)}>
+                  <SelectTrigger className="bg-background border-border text-foreground focus:border-primary/50">
+                    <SelectValue placeholder="Selecione o ramo" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border">
+                    {availableBranches.map((ramo) => (
+                      <SelectItem key={ramo.id} value={ramo.id}>
+                        {ramo.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!selectedCompanyId && (
+                  <p className="text-xs text-muted-foreground mt-1">Selecione a seguradora primeiro</p>
+                )}
+                {errors.type && (
+                  <p className="text-destructive text-xs flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.type.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Número da Apólice */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                  <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+                  Número da Apólice
+                </Label>
+                <Input
+                  {...register('policyNumber')}
+                  className="bg-background border-border text-foreground placeholder:text-muted-foreground focus:border-primary/50"
+                  placeholder="Ex: 12345678"
+                />
+              </div>
+            </div>
+          );
+
+        case 3:
+          return (
+            <div className="space-y-5">
+              {/* Valores */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                    Valor do Prêmio
+                    <span className="text-destructive text-xs">*</span>
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">
+                      R$
+                    </span>
+                    <Input
+                      {...register('premiumValue', { valueAsNumber: true })}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground"
+                      placeholder="0,00"
+                    />
+                  </div>
+                  {errors.premiumValue && (
+                    <p className="text-destructive text-xs flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {errors.premiumValue.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                    <Percent className="w-3.5 h-3.5 text-muted-foreground" />
+                    Taxa de Comissão
+                    <span className="text-destructive text-xs">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      {...register('commissionRate', { valueAsNumber: true })}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      className="pr-9 bg-background border-border text-foreground"
+                      placeholder="20"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                  </div>
+                  {errors.commissionRate && (
+                    <p className="text-destructive text-xs flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {errors.commissionRate.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Commission Preview */}
+              {(() => {
+                const premium = watch('premiumValue');
+                const rate = watch('commissionRate');
+                if (premium && rate) {
+                  const commissionValue = premium * (rate / 100);
+                  return (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                      <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <p className="text-sm text-emerald-400">
+                        Comissão estimada:{' '}
+                        <span className="font-semibold">
+                          {commissionValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Toggle Renovação Automática */}
+              <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-muted/30 border border-border/50">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Renovação Automática</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Gera alerta de renovação próximo ao vencimento
+                  </p>
+                </div>
+                <Switch
+                  id="automaticRenewal"
+                  checked={watch('automaticRenewal')}
+                  onCheckedChange={(checked) => setValue('automaticRenewal', checked)}
+                />
+              </div>
+
+              {/* Datas */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                    Data de Início
+                    <span className="text-destructive text-xs">*</span>
+                  </Label>
+                  <Input
+                    {...register('startDate')}
+                    type="date"
+                    className="bg-background border-border text-foreground"
+                  />
+                  {errors.startDate && (
+                    <p className="text-destructive text-xs flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {errors.startDate.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                      Vencimento
+                    </Label>
+                    {!isManualDueDate && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
+                        Auto +1 ano
+                      </span>
+                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleToggleDueDateMode}
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+                        >
+                          {isManualDueDate ? <X size={13} /> : <Edit3 size={13} />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{isManualDueDate ? 'Voltar para cálculo automático' : 'Definir data manual'}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+
+                  {isManualDueDate ? (
+                    <Input
+                      {...register('expirationDate')}
+                      type="date"
+                      className="bg-background border-border text-foreground"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-full items-center rounded-md border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
+                      Calculado automaticamente a partir do início
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+
+        case 4:
+          return (
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                    <User2 className="w-3.5 h-3.5 text-muted-foreground" />
+                    Produtor
+                  </Label>
+                  <Select value={watch('producerId')} onValueChange={(value) => setValue('producerId', value)}>
+                    <SelectTrigger className="bg-background border-border text-foreground focus:border-primary/50">
+                      <SelectValue placeholder="Selecione o produtor" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border">
+                      {producers.map((producer) => (
+                        <SelectItem key={producer.id} value={producer.id}>
+                          {producer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-muted-foreground" />
+                    Corretora
+                  </Label>
+                  <Select value={watch('brokerageId')} onValueChange={(value) => setValue('brokerageId', value)}>
+                    <SelectTrigger className="bg-background border-border text-foreground focus:border-primary/50">
+                      <SelectValue placeholder="Selecione a corretora" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border">
+                      {brokerages.map((brokerage) => (
+                        <SelectItem key={brokerage.id} value={brokerage.id.toString()}>
+                          {brokerage.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Summary Card */}
+              {(() => {
+                const clienteName = clients.find(c => c.id === watch('clientId'))?.name;
+                const companyName = companies.find(c => c.id === watch('insuranceCompany'))?.name;
+                const premium = watch('premiumValue');
+                if (!clienteName && !companyName) return null;
+                return (
+                  <div className="mt-4 p-4 rounded-xl bg-muted/30 border border-border/50 space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Resumo da Apólice</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {clienteName && (
+                        <div className="flex items-center gap-2">
+                          <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <span className="text-foreground truncate">{clienteName}</span>
+                        </div>
+                      )}
+                      {companyName && (
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <span className="text-foreground truncate">{companyName}</span>
+                        </div>
+                      )}
+                      {premium > 0 && (
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <span className="text-foreground">
+                            {premium.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          );
+
+        default:
+          return null;
+      }
+    })();
+
+    return (
+      <div
+        key={currentStep}
+        className="animate-in fade-in slide-in-from-right-4 duration-300"
+      >
+        {renderStepHeader()}
+        {content}
+      </div>
+    );
+  };
+
+  const renderNavigationButtons = () => (
+    <div className="flex justify-between items-center pt-5 mt-5 border-t border-border/50">
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={currentStep === 1 ? onClose : handleBack}
+        className="text-muted-foreground hover:text-foreground gap-1.5"
+      >
+        {currentStep === 1 ? (
+          <>
+            <X className="w-4 h-4" />
+            Cancelar
+          </>
+        ) : (
+          <>
+            <ChevronLeft className="w-4 h-4" />
+            Voltar
+          </>
+        )}
+      </Button>
+
+      {currentStep < STEPS.length ? (
+        <Button
+          type="button"
+          onClick={handleNext}
+          className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground px-6"
+        >
+          Avançar
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          onClick={onSubmit}
+          disabled={isSubmitting}
+          className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground px-6 min-w-[130px]"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              {isEditing ? 'Salvando...' : 'Criando...'}
+            </>
+          ) : (
+            <>
+              <Check className="w-4 h-4" />
+              {isEditing ? 'Salvar Alterações' : 'Criar Apólice'}
+            </>
+          )}
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        {/* Stepper */}
         <Stepper steps={STEPS} currentStep={currentStep} />
 
         <div>
-          {/* Step Content */}
           <div className="min-h-[400px]">
             {renderStepContent()}
           </div>
 
-          {/* Navigation */}
           {renderNavigationButtons()}
         </div>
       </div>
