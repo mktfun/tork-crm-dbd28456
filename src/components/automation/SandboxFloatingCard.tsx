@@ -31,7 +31,8 @@ export function SandboxFloatingCard({ children, scrollContainerRef }: SandboxFlo
         top: `${top}px`,
         left: `${rect.left}px`,
         width: `${rect.width}px`,
-        bottom: '0px',
+        height: `calc(100vh - ${top}px - 16px)`,
+        maxHeight: '680px',
         zIndex: 30,
       });
     };
