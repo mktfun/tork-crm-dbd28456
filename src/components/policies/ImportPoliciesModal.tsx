@@ -167,7 +167,7 @@ const PremiumStepper = ({ phase }: StepperProps) => {
   };
 
   return (
-    <div className="flex items-center justify-center gap-0 px-8 py-4 border-b border-white/5">
+    <div className="flex items-center justify-center gap-0 px-8 py-4 border-b border-border/30">
       {steps.map((step, idx) => {
         const status = getStepStatus(step.id);
         return (
@@ -178,23 +178,23 @@ const PremiumStepper = ({ phase }: StepperProps) => {
             )}>
               <div className={cn(
                 "w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all duration-300",
-                status === 'complete' && "border-zinc-400 bg-zinc-400/20 shadow-lg shadow-zinc-400/20",
-                status === 'active' && "border-white bg-white/20 shadow-lg shadow-white/20",
-                status === 'pending' && "border-zinc-700 bg-zinc-800/50",
+                status === 'complete' && "border-primary bg-primary/15 text-primary",
+                status === 'active' && "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/30",
+                status === 'pending' && "border-border bg-muted/30 text-muted-foreground",
               )}>
                 {status === 'complete' ? (
-                  <Check className="w-4 h-4 text-zinc-300" />
+                  <Check className="w-4 h-4" />
                 ) : status === 'active' ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <span className="text-zinc-600 text-xs">{idx + 1}</span>
+                  <span className="text-xs">{idx + 1}</span>
                 )}
               </div>
               <span className={cn(
                 "text-sm font-medium transition-colors",
-                status === 'complete' && "text-zinc-400",
-                status === 'active' && "text-white",
-                status === 'pending' && "text-zinc-600",
+                status === 'complete' && "text-foreground",
+                status === 'active' && "text-primary font-semibold",
+                status === 'pending' && "text-muted-foreground",
               )}>
                 {step.label}
               </span>
@@ -204,8 +204,8 @@ const PremiumStepper = ({ phase }: StepperProps) => {
               <div className={cn(
                 "w-12 h-0.5 mx-3 transition-all duration-500",
                 getStepStatus(steps[idx + 1].id) !== 'pending'
-                  ? "bg-gradient-to-r from-zinc-400 to-zinc-300"
-                  : "bg-zinc-800"
+                  ? "bg-primary"
+                  : "bg-border"
               )} />
             )}
           </div>
@@ -1060,16 +1060,16 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
 
   const getPhaseLabel = () => {
     if (bulkPhase === 'ocr') {
-      return `OCR Mistral (${Math.min(ocrProgress + 1, files.length)} de ${files.length})...`;
+      return `Lendo documentos (${Math.min(ocrProgress + 1, files.length)} de ${files.length})...`;
     }
     if (bulkPhase === 'ai') {
-      return 'Mistral LLM extraindo dados...';
+      return 'IA extraindo informações da apólice...';
     }
     if (bulkPhase === 'reconciling') {
-      return 'Enriquecendo cliente...';
+      return 'Vinculando ao cadastro de clientes...';
     }
     if (bulkPhase === 'storage') {
-      return 'Salvando PDF original...';
+      return 'Salvando documentos...';
     }
     return 'Processando...';
   };
@@ -1608,9 +1608,9 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                 <Zap className="w-5 h-5 text-zinc-300" />
               </div>
               <div>
-                <p className="text-zinc-200 font-medium text-sm">Importação em Lote Inteligente</p>
+                <p className="text-zinc-200 font-medium text-sm">Importação Inteligente via IA</p>
                 <p className="text-zinc-500 text-xs">
-                  OCR.space extrai o texto • IA mapeia todos os documentos de uma só vez
+                  Envie os PDFs das apólices e a IA extrai automaticamente os dados para você revisar
                 </p>
               </div>
             </div>
@@ -1637,7 +1637,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
               </p>
               <p className="text-zinc-600 text-sm mt-1">ou clique para selecionar arquivos</p>
               <p className="text-zinc-500 text-xs mt-3">
-                ⚠️ Limite: 5MB por arquivo • OCR lê as 3 primeiras páginas
+                Aceita PDF e imagens • Máx. 5MB por arquivo
               </p>
             </div>
 
@@ -1704,10 +1704,10 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
 
             <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6">
               <div className="relative">
-                <div className="w-20 h-20 rounded-full bg-zinc-800/50 flex items-center justify-center border border-zinc-700/50">
-                  <Loader2 className="w-10 h-10 text-zinc-300 animate-spin" />
+                <div className="w-20 h-20 rounded-full bg-muted/40 flex items-center justify-center border border-border">
+                  <Loader2 className="w-10 h-10 text-primary animate-spin" />
                 </div>
-                <div className="absolute inset-0 rounded-full border-2 border-zinc-500/30 animate-ping" />
+                <div className="absolute inset-0 rounded-full border-2 border-primary/20 animate-ping" />
               </div>
 
               <div className="text-center">
@@ -1734,10 +1734,10 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
                       <div key={index} className="flex items-center justify-between py-2 px-3 rounded-lg bg-white/5">
                         <span className="text-sm text-white truncate max-w-[200px]">{file.name}</span>
                         <div className="flex items-center gap-2">
-                          {status === 'pending' && <Clock className="w-4 h-4 text-zinc-600" />}
-                          {status === 'processing' && <Loader2 className="w-4 h-4 text-zinc-300 animate-spin" />}
-                          {status === 'success' && <Check className="w-4 h-4 text-zinc-300" />}
-                          {status === 'error' && <AlertCircle className="w-4 h-4 text-red-400" />}
+                          {status === 'pending' && <Clock className="w-4 h-4 text-muted-foreground" />}
+                          {status === 'processing' && <Loader2 className="w-4 h-4 text-primary animate-spin" />}
+                          {status === 'success' && <Check className="w-4 h-4 text-emerald-400" />}
+                          {status === 'error' && <AlertCircle className="w-4 h-4 text-destructive" />}
                         </div>
                       </div>
                     );
