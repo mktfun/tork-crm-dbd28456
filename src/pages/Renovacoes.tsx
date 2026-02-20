@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertTriangle, CheckCircle, RotateCcw, Loader2, XCircle, FileText, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react';
+import { AppCard } from '@/components/ui/app-card';
 import { formatDate } from '@/utils/dateUtils';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { useSupabaseRenewals } from '@/hooks/useSupabaseRenewals';
@@ -109,14 +110,14 @@ export default function Renovacoes() {
     return (
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="glass-component p-8 text-center">
+          <AppCard className="p-8 text-center">
             <div className="text-destructive mb-4">
               <AlertTriangle size={48} className="mx-auto" />
             </div>
             <h3 className="text-lg font-medium text-foreground mb-2">Erro ao carregar renovações</h3>
             <p className="text-muted-foreground mb-4">Não foi possível carregar os dados.</p>
             <Button onClick={refetch} variant="outline">Tentar novamente</Button>
-          </div>
+          </AppCard>
         </div>
       </div>
     );
@@ -134,7 +135,7 @@ export default function Renovacoes() {
         {/* KPI Bar */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {kpis.map((kpi) => (
-            <div key={kpi.label} className="glass-component p-4 flex items-center gap-3">
+            <AppCard key={kpi.label} className="p-4 flex items-center gap-3">
               <div className={`p-2 rounded-lg ${kpi.bg}`}>
                 <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
               </div>
@@ -142,12 +143,12 @@ export default function Renovacoes() {
                 <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
                 <p className="text-xs text-muted-foreground">{kpi.label}</p>
               </div>
-            </div>
+            </AppCard>
           ))}
         </div>
 
         {/* Filters */}
-        <div className="glass-component p-4">
+        <AppCard className="p-4">
           <div className="flex items-center gap-4 flex-wrap justify-between">
             <div className="flex items-center gap-4 flex-wrap">
               {/* Period buttons */}
@@ -196,11 +197,11 @@ export default function Renovacoes() {
 
             <ExportRenewalsModal disabled={loading || renewals.length === 0} />
           </div>
-        </div>
+        </AppCard>
 
         {/* Table */}
         {loading ? (
-          <div className="glass-component p-0 overflow-hidden">
+          <AppCard className="p-0 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <tbody>
@@ -221,9 +222,9 @@ export default function Renovacoes() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </AppCard>
         ) : renewals.length > 0 ? (
-          <div className="glass-component p-0 overflow-hidden">
+          <AppCard className="p-0 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[900px]">
                 <thead>
@@ -326,9 +327,9 @@ export default function Renovacoes() {
                 </Button>
               </div>
             </div>
-          </div>
+          </AppCard>
         ) : (
-          <div className="glass-component p-8 text-center">
+          <AppCard className="p-8 text-center">
             <div className="text-muted-foreground mb-4">
               <CheckCircle size={48} className="mx-auto" />
             </div>
@@ -336,7 +337,7 @@ export default function Renovacoes() {
             <p className="text-muted-foreground">
               Todas as apólices estão com renovações em dia ou não há apólices que atendem aos filtros selecionados.
             </p>
-          </div>
+          </AppCard>
         )}
 
         {/* Renewal Modal */}

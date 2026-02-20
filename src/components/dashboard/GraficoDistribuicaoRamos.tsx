@@ -1,5 +1,5 @@
-
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { AppCard } from '@/components/ui/app-card';
 
 interface BranchDistributionData {
   ramo: string;
@@ -77,7 +77,7 @@ export function GraficoDistribuicaoRamos({ data }: GraficoDistribuicaoRamosProps
   };
 
   return (
-    <div className="glass-component p-6 shadow-lg border-border bg-card">
+    <AppCard className="p-6 shadow-lg border-border bg-card">
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 bg-primary/10 rounded-lg">
@@ -115,6 +115,6 @@ export function GraficoDistribuicaoRamos({ data }: GraficoDistribuicaoRamosProps
           </PieChart>
         </ResponsiveContainer>
       </div>
-    </div>
+    </AppCard>
   );
 }

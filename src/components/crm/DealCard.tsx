@@ -2,6 +2,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import { User, Phone, Calendar, DollarSign } from 'lucide-react';
+import { useGlassEffect } from '@/hooks/useGlassEffect';
 import { CRMDeal } from '@/hooks/useCRMDeals';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { format } from 'date-fns';
@@ -15,6 +16,7 @@ interface DealCardProps {
 }
 
 export function DealCard({ deal, isDragging, onClick, stageColor = '#3B82F6' }: DealCardProps) {
+  const glassRef = useGlassEffect<HTMLDivElement>();
   const {
     attributes,
     listeners,
@@ -23,6 +25,11 @@ export function DealCard({ deal, isDragging, onClick, stageColor = '#3B82F6' }: 
     transition,
     isDragging: isSortableDragging,
   } = useSortable({ id: deal.id });
+
+  const combinedRef = (node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    (glassRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+  };
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -35,7 +42,7 @@ export function DealCard({ deal, isDragging, onClick, stageColor = '#3B82F6' }: 
 
   return (
     <motion.div
-      ref={setNodeRef}
+      ref={combinedRef}
       style={style}
       {...attributes}
       {...listeners}

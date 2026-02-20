@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useAIUsageLogs } from '@/hooks/useSuperAdminStats';
 import { RefreshCw, FileText, Brain } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { AppCard } from '@/components/ui/app-card';
 
 export function SystemLogs() {
   const { data: aiLogs, isLoading, refetch } = useAIUsageLogs(30);
@@ -42,7 +43,7 @@ export function SystemLogs() {
       </div>
 
       {/* AI Usage Summary */}
-      <div className="glass-component p-0 shadow-lg border-border bg-card">
+      <AppCard className="p-0 shadow-lg border-border bg-card">
         <div className="flex flex-col space-y-1.5 p-6 pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
@@ -64,9 +65,9 @@ export function SystemLogs() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {(aiLogs || []).map((log) => (
-                <div
+                <AppCard
                   key={log.provider}
-                  className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70"
+                  className="p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:translate-y-[-2px] hover:shadow-xl cursor-pointer border-border bg-card hover:bg-secondary/70"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <Badge className={getProviderColor(log.provider)}>
@@ -84,7 +85,7 @@ export function SystemLogs() {
                       {log.tokens.toLocaleString('pt-BR')} tokens
                     </p>
                   </div>
-                </div>
+                </AppCard>
               ))}
               {(!aiLogs || aiLogs.length === 0) && (
                 <div className="col-span-3 text-center py-8 text-muted-foreground">
@@ -96,10 +97,10 @@ export function SystemLogs() {
             </div>
           )}
         </div>
-      </div>
+      </AppCard>
 
       {/* Future: Activity Logs */}
-      <div className="glass-component p-0 shadow-lg border-border bg-card">
+      <AppCard className="p-0 shadow-lg border-border bg-card">
         <div className="flex flex-col space-y-1.5 p-6 pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
@@ -118,7 +119,7 @@ export function SystemLogs() {
             <p className="text-sm mt-1">Em breve: rastreamento de ações de usuários e admins</p>
           </div>
         </div>
-      </div>
+      </AppCard>
     </div>
   );
 }
