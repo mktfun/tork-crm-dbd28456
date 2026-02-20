@@ -130,40 +130,35 @@ export function AIAutomationDashboard() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="flex-shrink-0 border-b border-border px-6 py-4 flex items-center gap-4">
-        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Bot className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <h1 className="font-semibold text-base text-foreground leading-none">Automação de Vendas</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Configure a IA no funil e teste o comportamento</p>
-        </div>
-      </div>
-
+    <div className="h-full flex flex-col">
       {/* Tabs */}
       <Tabs defaultValue="etapas" className="flex-1 flex flex-col min-h-0">
         <div className="border-b border-border px-6">
-          <TabsList className="bg-transparent p-0 h-11 gap-4">
+          <TabsList className="h-auto p-0 bg-transparent rounded-none gap-0">
             <TabsTrigger
               value="etapas"
-              className="px-0 pb-3 pt-2 h-auto rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent text-sm font-medium text-muted-foreground"
+              className="px-0 pb-3 pt-2 mr-6 h-auto rounded-none border-b-2 border-transparent
+                         text-sm font-medium text-muted-foreground bg-transparent shadow-none
+                         data-[state=active]:border-primary data-[state=active]:text-foreground
+                         data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               Configurar Etapas
             </TabsTrigger>
             <TabsTrigger
               value="configuracoes"
-              className="px-0 pb-3 pt-2 h-auto rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent text-sm font-medium text-muted-foreground"
+              className="px-0 pb-3 pt-2 h-auto rounded-none border-b-2 border-transparent
+                         text-sm font-medium text-muted-foreground bg-transparent shadow-none
+                         data-[state=active]:border-primary data-[state=active]:text-foreground
+                         data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               Configurações
             </TabsTrigger>
           </TabsList>
         </div>
 
-        <TabsContent value="etapas" className="flex-1 m-0 p-4 overflow-hidden">
-          <div className="h-full grid grid-cols-1 lg:grid-cols-5 gap-4 min-h-0 overflow-hidden">
-            <div className="lg:col-span-3 min-h-0 overflow-hidden">
+        <TabsContent value="etapas" className="flex-1 m-0 overflow-hidden">
+          <div className="h-full grid grid-cols-1 lg:grid-cols-5 min-h-0">
+            <div className="lg:col-span-3 overflow-y-auto p-4">
               <SalesFlowTimeline
                 pipelines={pipelines}
                 selectedPipelineId={selectedPipelineId}
@@ -184,7 +179,7 @@ export function AIAutomationDashboard() {
                 isSaving={upsertSetting.isPending}
               />
             </div>
-            <div className="lg:col-span-2 min-h-0 overflow-hidden">
+            <div className="lg:col-span-2 border-l border-border overflow-hidden flex flex-col">
               <AISandbox
                 selectedStage={selectedStage}
                 selectedPipeline={selectedPipeline}
