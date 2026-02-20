@@ -167,9 +167,8 @@ DEPENDÊNCIAS CRÍTICAS:
     0 8px 32px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 hsl(var(--foreground) / 0.05);
 
-  border-radius: 16px;
+  border-radius: var(--radius);
   position: relative;
-  overflow: hidden;
 }
 
 /* 🌟 EFEITO MÁGICO - BRILHO QUE SEGUE O MOUSE 🌟 */
