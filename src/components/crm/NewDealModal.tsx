@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useCRMDeals, useCRMStages } from '@/hooks/useCRMDeals';
+import { useCRMPipelines } from '@/hooks/useCRMPipelines';
 import type { CRMStage } from '@/hooks/useCRMDeals';
 import { ClientSearchCombobox, type ClientOption } from './ClientSearchCombobox';
 import {
@@ -22,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Save, Sparkles } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface NewDealModalProps {
@@ -36,12 +37,13 @@ interface NewDealModalProps {
 
 export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClientId, defaultTitle, defaultNotes }: NewDealModalProps) {
   const { user } = useAuth();
-  const { stages, isLoading: loadingStages } = useCRMStages();
-  const { createDeal, deals } = useCRMDeals();
+  const { pipelines, isLoading: loadingPipelines } = useCRMPipelines();
+  const [pipelineId, setPipelineId] = useState<string>('');
+  const { stages, isLoading: loadingStages } = useCRMStages(pipelineId || null);
+  const { createDeal, deals } = useCRMDeals(pipelineId || null);
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [loadingClients, setLoadingClients] = useState(false);
-  const [autoFillApplied, setAutoFillApplied] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -51,6 +53,14 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
     expected_close_date: '',
     notes: ''
   });
+
+  // Auto-select default pipeline when pipelines load
+  useEffect(() => {
+    if (pipelines.length > 0 && !pipelineId) {
+      const defaultPipeline = pipelines.find(p => p.is_default) || pipelines[0];
+      setPipelineId(defaultPipeline.id);
+    }
+  }, [pipelines]);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -63,7 +73,6 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
         expected_close_date: '',
         notes: defaultNotes || ''
       });
-      setAutoFillApplied(false);
     }
   }, [open, defaultStageId, defaultClientId, defaultTitle, defaultNotes]);
 
@@ -73,13 +82,6 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
       fetchClients();
     }
   }, [open, user]);
-
-  // Auto-fill from last policy when client is selected
-  useEffect(() => {
-    if (formData.client_id && user && !autoFillApplied) {
-      fetchLastPolicyAndAutoFill(formData.client_id);
-    }
-  }, [formData.client_id, user]);
 
   const fetchClients = async () => {
     setLoadingClients(true);
@@ -92,7 +94,23 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
         .limit(500);
 
       if (error) throw error;
-      setClients(data || []);
+      
+      let clientList = data || [];
+      
+      // If defaultClientId exists but isn't in the list, fetch individually
+      if (defaultClientId && !clientList.find(c => c.id === defaultClientId)) {
+        const { data: singleClient } = await supabase
+          .from('clientes')
+          .select('id, name, phone, email')
+          .eq('id', defaultClientId)
+          .single();
+        
+        if (singleClient) {
+          clientList = [singleClient, ...clientList];
+        }
+      }
+      
+      setClients(clientList);
     } catch (error) {
       console.error('Error fetching clients:', error);
     } finally {
@@ -100,50 +118,8 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
     }
   };
 
-  const fetchLastPolicyAndAutoFill = async (clientId: string) => {
-    try {
-      const { data: policy, error } = await supabase
-        .from('apolices')
-        .select('premium_value, expiration_date')
-        .eq('client_id', clientId)
-        .eq('user_id', user!.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching last policy:', error);
-        return;
-      }
-
-      if (policy) {
-        // Calculate suggested close date (expiration + 30 days or today + 30 days)
-        let suggestedDate = '';
-        if (policy.expiration_date) {
-          const expirationDate = new Date(policy.expiration_date);
-          expirationDate.setDate(expirationDate.getDate() + 30);
-          suggestedDate = expirationDate.toISOString().split('T')[0];
-        }
-
-        setFormData(prev => ({
-          ...prev,
-          value: policy.premium_value?.toString() || prev.value,
-          expected_close_date: suggestedDate || prev.expected_close_date
-        }));
-        setAutoFillApplied(true);
-        toast.info('Dados da última apólice carregados automaticamente', {
-          icon: <Sparkles className="h-4 w-4" />,
-          duration: 3000
-        });
-      }
-    } catch (error) {
-      console.error('Error in auto-fill:', error);
-    }
-  };
-
   // Sync deal attributes to Chatwoot in background (non-blocking)
   const syncChatwootInBackground = async (dealId: string) => {
-    // Toast imediato de "sincronizando"
     toast.loading('Sincronizando negócio com Chat Tork...', { id: 'chattork-sync' });
     
     try {
@@ -171,11 +147,9 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
 
     setLoading(true);
     try {
-      // Calculate position for new deal
       const dealsInStage = deals.filter(d => d.stage_id === formData.stage_id);
       const position = dealsInStage.length;
 
-      // 1. Create deal in Supabase FIRST
       const newDeal = await createDeal.mutateAsync({
         title: formData.title,
         client_id: formData.client_id || null,
@@ -186,9 +160,7 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
         position
       });
 
-      // 2. Sync to Chatwoot in background (non-blocking)
       if (formData.client_id) {
-        // Fire and forget - don't await
         syncChatwootInBackground(newDeal.id);
       }
 
@@ -200,12 +172,9 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
     }
   };
 
-  const handleClientChange = (clientId: string) => {
-    // Reset auto-fill flag when client changes
-    if (clientId !== formData.client_id) {
-      setAutoFillApplied(false);
-    }
-    setFormData({ ...formData, client_id: clientId });
+  const handlePipelineChange = (value: string) => {
+    setPipelineId(value);
+    setFormData(prev => ({ ...prev, stage_id: '' }));
   };
 
   return (
@@ -233,16 +202,27 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
             <ClientSearchCombobox
               clients={clients}
               value={formData.client_id}
-              onValueChange={handleClientChange}
+              onValueChange={(clientId) => setFormData({ ...formData, client_id: clientId })}
               isLoading={loadingClients}
               placeholder="Buscar por nome, telefone ou email..."
             />
-            {autoFillApplied && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Sparkles className="h-3 w-3" />
-                Valor e data preenchidos da última apólice
-              </p>
-            )}
+          </div>
+
+          {/* Pipeline selector */}
+          <div className="space-y-2">
+            <Label>Funil de Vendas *</Label>
+            <Select value={pipelineId} onValueChange={handlePipelineChange}>
+              <SelectTrigger>
+                <SelectValue placeholder={loadingPipelines ? "Carregando..." : "Selecione o funil"} />
+              </SelectTrigger>
+              <SelectContent>
+                {pipelines.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}{p.is_default ? ' (padrão)' : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
