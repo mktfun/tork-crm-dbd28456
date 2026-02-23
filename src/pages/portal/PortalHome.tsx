@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Shield, FileText, CreditCard, Calendar, AlertCircle, Loader2, Plus, FileEdit, AlertTriangle, Inbox } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { motion } from 'framer-motion';
 
 interface Policy {
   id: string;
@@ -113,165 +112,162 @@ export default function PortalHome() {
     }
   };
 
-  const hasQuickActions = portalConfig.show_policies || portalConfig.show_cards;
-
   return (
-    <div className="space-y-4">
-      {/* Welcome Card */}
-      <Card className="bg-primary/5 border-border">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center shadow-sm border border-border">
-              <Shield className="w-6 h-6 text-muted-foreground" />
-            </div>
-            <div>
-              <h2 className="text-foreground font-light text-lg tracking-wide">Bem-vindo(a)!</h2>
-              <p className="text-muted-foreground text-sm">{clientName}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-5">
+      {/* Welcome Row */}
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
+          <Shield className="w-6 h-6 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-foreground font-medium text-lg tracking-tight">
+            Olá, {clientName.split(' ')[0]} 👋
+          </h2>
+          <p className="text-muted-foreground text-sm">O que você precisa hoje?</p>
+        </div>
+      </div>
 
-      {/* Nova Solicitação */}
-      <Card className="bg-card/80 border-border backdrop-blur-xl">
-        <CardContent className="p-4 space-y-3">
-          <h3 className="text-foreground font-light tracking-wide flex items-center gap-2">
-            <Plus className="w-4 h-4 text-muted-foreground" />
-            Nova Solicitação
-          </h3>
-          <div className="grid grid-cols-3 gap-2">
-            <Button
-              variant="outline"
-              className="h-auto py-3 flex flex-col items-center gap-1.5 bg-card/60 border-border hover:bg-accent hover:border-primary/30 transition-all duration-200 active:scale-[0.98]"
-              onClick={() => navigate(`/${slug}/portal/wizard?type=cotacao`)}
-            >
-              <Plus className="w-5 h-5 text-muted-foreground" />
-              <span className="text-xs text-foreground font-light">Nova Cotação</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-auto py-3 flex flex-col items-center gap-1.5 bg-card/60 border-border hover:bg-accent hover:border-primary/30 transition-all duration-200 active:scale-[0.98]"
-              onClick={() => navigate(`/${slug}/portal/wizard?type=endosso`)}
-            >
-              <FileEdit className="w-5 h-5 text-muted-foreground" />
-              <span className="text-xs text-foreground font-light">Endosso</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-auto py-3 flex flex-col items-center gap-1.5 bg-card/60 border-border hover:bg-accent hover:border-primary/30 transition-all duration-200 active:scale-[0.98]"
-              onClick={() => navigate(`/${slug}/portal/wizard?type=sinistro`)}
-            >
-              <AlertTriangle className="w-5 h-5 text-muted-foreground" />
-              <span className="text-xs text-foreground font-light">Sinistro</span>
-            </Button>
+      {/* BENTO GRID — Nova Solicitação */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Nova Cotação — col-span-2 */}
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate(`/${slug}/portal/wizard?type=cotacao`)}
+          className="col-span-2 bg-card/80 border border-border backdrop-blur-xl rounded-2xl p-5 flex items-center justify-between text-left hover:border-primary/20 transition-all duration-200"
+        >
+          <div>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Solicitar</p>
+            <p className="text-foreground font-semibold text-lg mt-0.5">Nova Cotação</p>
+            <p className="text-muted-foreground text-sm mt-1">Auto, Vida, Residencial e mais</p>
           </div>
-        </CardContent>
-      </Card>
+          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 ml-4">
+            <Plus className="w-6 h-6 text-primary" />
+          </div>
+        </motion.button>
 
-      {/* Quick Actions */}
-      {hasQuickActions && (
-        <div className="grid grid-cols-2 gap-3">
+        {/* Endosso */}
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => navigate(`/${slug}/portal/wizard?type=endosso`)}
+          className="bg-card/80 border border-border backdrop-blur-xl rounded-2xl p-4 flex flex-col justify-between text-left hover:border-primary/20 transition-all duration-200 min-h-[120px]"
+        >
+          <div className="w-10 h-10 rounded-xl bg-muted/60 flex items-center justify-center">
+            <FileEdit className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <div className="mt-3">
+            <p className="text-foreground font-medium text-sm">Endosso</p>
+            <p className="text-muted-foreground text-xs mt-0.5">Alteração na apólice</p>
+          </div>
+        </motion.button>
+
+        {/* Sinistro */}
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => navigate(`/${slug}/portal/wizard?type=sinistro`)}
+          className="bg-card/80 border border-border backdrop-blur-xl rounded-2xl p-4 flex flex-col justify-between text-left hover:border-primary/20 transition-all duration-200 min-h-[120px]"
+        >
+          <div className="w-10 h-10 rounded-xl bg-muted/60 flex items-center justify-center">
+            <AlertTriangle className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <div className="mt-3">
+            <p className="text-foreground font-medium text-sm">Sinistro</p>
+            <p className="text-muted-foreground text-xs mt-0.5">Reportar ocorrência</p>
+          </div>
+        </motion.button>
+      </div>
+
+      {/* Quick Access Row */}
+      {(portalConfig.show_policies || portalConfig.show_cards) && (
+        <div className="grid grid-cols-3 gap-2">
           {portalConfig.show_policies && (
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2 bg-card/80 border-border hover:bg-accent hover:border-primary/30 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
+            <motion.button
+              whileTap={{ scale: 0.96 }}
               onClick={() => navigate(`/${slug}/portal/policies`)}
+              className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-muted/40 hover:bg-muted/70 transition-all duration-200"
             >
-              <FileText className="w-6 h-6 text-muted-foreground" />
-              <span className="text-sm text-foreground font-light">Meus Seguros</span>
-            </Button>
+              <FileText className="w-5 h-5 text-muted-foreground" />
+              <span className="text-xs text-foreground font-medium">Seguros</span>
+            </motion.button>
           )}
           {portalConfig.show_cards && (
-            <Button
-              variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2 bg-card/80 border-border hover:bg-accent hover:border-primary/30 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
+            <motion.button
+              whileTap={{ scale: 0.96 }}
               onClick={() => navigate(`/${slug}/portal/cards`)}
+              className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-muted/40 hover:bg-muted/70 transition-all duration-200"
             >
-              <CreditCard className="w-6 h-6 text-muted-foreground" />
-              <span className="text-sm text-foreground font-light">Carteirinhas</span>
-            </Button>
+              <CreditCard className="w-5 h-5 text-muted-foreground" />
+              <span className="text-xs text-foreground font-medium">Carteiras</span>
+            </motion.button>
           )}
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center gap-2 bg-card/80 border-border hover:bg-accent hover:border-primary/30 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
+          <motion.button
+            whileTap={{ scale: 0.96 }}
             onClick={() => navigate(`/${slug}/portal/solicitacoes`)}
+            className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-muted/40 hover:bg-muted/70 transition-all duration-200"
           >
-            <Inbox className="w-6 h-6 text-muted-foreground" />
-            <span className="text-sm text-foreground font-light">Pedidos</span>
-          </Button>
+            <Inbox className="w-5 h-5 text-muted-foreground" />
+            <span className="text-xs text-foreground font-medium">Inbox</span>
+          </motion.button>
         </div>
       )}
 
-      {/* Active Policies */}
-      <Card className="bg-card/80 border-border backdrop-blur-xl">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-foreground font-light flex items-center gap-2 tracking-wide">
-            <Shield className="w-5 h-5 text-muted-foreground" />
-            Seguros Ativos
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
-            </div>
-          ) : policies.length === 0 ? (
-            <div className="text-center py-8">
-              <AlertCircle className="w-10 h-10 text-muted-foreground/50 mx-auto mb-2" />
-              <p className="text-muted-foreground font-light">Nenhum seguro ativo encontrado.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {policies.slice(0, 3).map((policy) => (
-                <div
-                  key={policy.id}
-                  className="flex justify-between items-center p-3 bg-muted/50 rounded-lg border border-border transition-all duration-200 hover:bg-accent"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-light text-foreground truncate">
-                      {policy.insured_asset || 'Apólice'}
-                    </p>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="w-3 h-3" />
-                      <span>
-                        Vence: {format(new Date(policy.expiration_date), 'dd/MM/yyyy', { locale: ptBR })}
-                      </span>
-                    </div>
-                  </div>
-                  {getExpirationBadge(policy.expiration_date)}
-                </div>
-              ))}
-
-              {policies.length > 3 && (
-                <Button
-                  variant="ghost"
-                  className="w-full text-muted-foreground hover:text-foreground hover:bg-accent"
-                  onClick={() => navigate(`/${slug}/portal/policies`)}
-                >
-                  Ver todos ({policies.length})
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Help Card */}
-      <Card className="bg-card/80 border-border backdrop-blur-xl">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
-              <AlertCircle className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div>
-              <h3 className="font-light text-foreground">Precisa de ajuda?</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Entre em contato com sua corretora para dúvidas sobre suas apólices ou sinistros.
-              </p>
-            </div>
+      {/* Seguros Ativos — flat section */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-foreground font-medium">
+          <Shield className="w-5 h-5 text-muted-foreground" />
+          Seguros Ativos
+        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
           </div>
-        </CardContent>
-      </Card>
+        ) : policies.length === 0 ? (
+          <div className="text-center py-8">
+            <AlertCircle className="w-10 h-10 text-muted-foreground/50 mx-auto mb-2" />
+            <p className="text-muted-foreground text-sm">Nenhum seguro ativo encontrado.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {policies.slice(0, 3).map((policy) => (
+              <div
+                key={policy.id}
+                className="flex justify-between items-center p-3 bg-muted/30 rounded-xl border border-border/40 transition-all duration-200 hover:bg-accent/50"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground text-sm truncate">
+                    {policy.insured_asset || 'Apólice'}
+                  </p>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                    <Calendar className="w-3 h-3" />
+                    <span>
+                      Vence: {format(new Date(policy.expiration_date), 'dd/MM/yyyy', { locale: ptBR })}
+                    </span>
+                  </div>
+                </div>
+                {getExpirationBadge(policy.expiration_date)}
+              </div>
+            ))}
+            {policies.length > 3 && (
+              <button
+                onClick={() => navigate(`/${slug}/portal/policies`)}
+                className="w-full text-xs text-muted-foreground hover:text-foreground py-2 transition-colors"
+              >
+                Ver todos ({policies.length}) →
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Help — flat */}
+      <div className="flex items-start gap-3 py-3">
+        <AlertCircle className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-foreground text-sm font-medium">Precisa de ajuda?</p>
+          <p className="text-muted-foreground text-xs mt-0.5">
+            Entre em contato com sua corretora para dúvidas sobre apólices ou sinistros.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Home, FileText, CreditCard, User, LogOut, Loader2, Shield, Inbox, Sun, Moon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from 'next-themes';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 interface PortalClient {
   id: string;
@@ -111,8 +113,50 @@ export function PortalLayout() {
 
   const isActive = (path: string) => location.pathname === `/${brokerageSlug}/portal/${path}`;
 
+  const LABEL_WIDTH = 56;
+  const renderNavItem = ({
+    path,
+    label,
+    icon: Icon,
+    onClick,
+  }: {
+    path: string;
+    label: string;
+    icon: React.ElementType;
+    onClick: () => void;
+  }) => {
+    const active = isActive(path);
+    return (
+      <button
+        key={path}
+        onClick={onClick}
+        className={cn(
+          'relative flex items-center gap-1.5 px-3 py-2 rounded-xl transition-colors duration-200',
+          active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+        )}
+      >
+        {active && (
+          <motion.div
+            layoutId="portal-nav-pill"
+            className="absolute inset-0 bg-primary/10 rounded-xl"
+            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+          />
+        )}
+        <Icon className="w-5 h-5 relative z-10" />
+        <motion.span
+          className="text-xs font-medium relative z-10 overflow-hidden whitespace-nowrap"
+          initial={false}
+          animate={{ width: active ? LABEL_WIDTH : 0, opacity: active ? 1 : 0 }}
+          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+        >
+          {label}
+        </motion.span>
+      </button>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-28">
       {/* Header */}
       <header className="bg-background/80 backdrop-blur-2xl border-b border-border px-3 py-3 sm:p-4 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center justify-between">
@@ -169,77 +213,14 @@ export function PortalLayout() {
         </div>
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-2xl border-t border-border safe-area-pb">
-        <div className="max-w-lg mx-auto flex justify-around py-3">
-          <Button
-            variant="ghost"
-            className={`relative flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('home')
-                ? 'text-primary scale-110'
-                : 'text-muted-foreground hover:text-foreground'
-              }`}
-            onClick={() => navigate(`/${brokerageSlug}/portal/home`)}
-          >
-            <Home className="w-5 h-5" />
-            <span className="text-xs tracking-wide">Início</span>
-            {isActive('home') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary animate-in fade-in zoom-in-50 duration-300" />}
-          </Button>
-
-          {portalConfig.show_policies && (
-            <Button
-              variant="ghost"
-              className={`relative flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('policies')
-                  ? 'text-primary scale-110'
-                  : 'text-muted-foreground hover:text-foreground'
-                }`}
-              onClick={() => navigate(`/${brokerageSlug}/portal/policies`)}
-            >
-              <FileText className="w-5 h-5" />
-              <span className="text-xs tracking-wide">Seguros</span>
-              {isActive('policies') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary animate-in fade-in zoom-in-50 duration-300" />}
-            </Button>
-          )}
-
-          {portalConfig.show_cards && (
-            <Button
-              variant="ghost"
-              className={`relative flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('cards')
-                  ? 'text-primary scale-110'
-                  : 'text-muted-foreground hover:text-foreground'
-                }`}
-              onClick={() => navigate(`/${brokerageSlug}/portal/cards`)}
-            >
-              <CreditCard className="w-5 h-5" />
-              <span className="text-xs tracking-wide">Carteirinhas</span>
-              {isActive('cards') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary animate-in fade-in zoom-in-50 duration-300" />}
-            </Button>
-          )}
-
-          <Button
-            variant="ghost"
-            className={`relative flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('solicitacoes')
-                ? 'text-primary scale-110'
-                : 'text-muted-foreground hover:text-foreground'
-              }`}
-            onClick={() => navigate(`/${brokerageSlug}/portal/solicitacoes`)}
-          >
-            <Inbox className="w-5 h-5" />
-            <span className="text-xs tracking-wide">Inbox</span>
-            {isActive('solicitacoes') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary animate-in fade-in zoom-in-50 duration-300" />}
-          </Button>
-
-          <Button
-            variant="ghost"
-            className={`relative flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('profile')
-                ? 'text-primary scale-110'
-                : 'text-muted-foreground hover:text-foreground'
-              }`}
-            onClick={() => navigate(`/${brokerageSlug}/portal/profile`)}
-          >
-            <User className="w-5 h-5" />
-            <span className="text-xs tracking-wide">Perfil</span>
-            {isActive('profile') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary animate-in fade-in zoom-in-50 duration-300" />}
-          </Button>
+      {/* Bottom Navigation — Framer Motion Pill Nav */}
+      <nav className="fixed bottom-4 left-4 right-4 z-50 safe-area-pb">
+        <div className="max-w-lg mx-auto bg-background/80 backdrop-blur-2xl border border-border rounded-2xl shadow-lg px-2 py-2 flex justify-around items-center">
+          {renderNavItem({ path: 'home', label: 'Início', icon: Home, onClick: () => navigate(`/${brokerageSlug}/portal/home`) })}
+          {portalConfig.show_policies && renderNavItem({ path: 'policies', label: 'Seguros', icon: FileText, onClick: () => navigate(`/${brokerageSlug}/portal/policies`) })}
+          {portalConfig.show_cards && renderNavItem({ path: 'cards', label: 'Carteiras', icon: CreditCard, onClick: () => navigate(`/${brokerageSlug}/portal/cards`) })}
+          {renderNavItem({ path: 'solicitacoes', label: 'Inbox', icon: Inbox, onClick: () => navigate(`/${brokerageSlug}/portal/solicitacoes`) })}
+          {renderNavItem({ path: 'profile', label: 'Perfil', icon: User, onClick: () => navigate(`/${brokerageSlug}/portal/profile`) })}
         </div>
       </nav>
     </div>
