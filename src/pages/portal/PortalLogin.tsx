@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
+// Card/CardContent removed — login uses full-screen layout now
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -278,8 +278,7 @@ export default function PortalLogin() {
   if (!isValidBrokerage) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="relative w-full max-w-md bg-card/80 backdrop-blur-2xl border border-border shadow-xl">
-          <CardContent className="p-8 text-center">
+        <div className="relative w-full max-w-md bg-card/80 backdrop-blur-2xl border border-border shadow-xl rounded-xl p-8 text-center">
             <div className="mx-auto w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-4 border border-border">
               <Shield className="w-8 h-8 text-muted-foreground" />
             </div>
@@ -287,167 +286,151 @@ export default function PortalLogin() {
             <p className="text-muted-foreground font-light">
               O portal solicitado não existe ou não está disponível.
             </p>
-          </CardContent>
-        </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="relative w-full max-w-md bg-card/80 backdrop-blur-2xl border border-border shadow-xl">
-        <CardContent className="p-8 space-y-6">
-          {/* Brokerage Logo/Name */}
-          <div className="text-center space-y-4">
-            {brokerage?.logo_url ? (
-              <img
-                src={brokerage.logo_url}
-                alt={brokerage.name}
-                className="h-16 object-contain mx-auto"
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* Branding — top section */}
+      <div className="flex-1 flex flex-col items-center justify-end pb-8 pt-16 px-6">
+        {brokerage?.logo_url ? (
+          <img
+            src={brokerage.logo_url}
+            alt={brokerage.name}
+            className="h-20 object-contain mb-4 animate-in fade-in zoom-in-95 duration-500"
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-3 animate-in fade-in zoom-in-95 duration-500">
+            <div className="w-16 h-16 rounded-2xl bg-muted border border-border flex items-center justify-center">
+              <Shield className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h1 className="text-2xl font-light tracking-widest text-foreground">
+              {brokerage?.name || 'PORTAL'}
+            </h1>
+          </div>
+        )}
+        <p className="text-muted-foreground text-sm tracking-wide font-light mt-3">
+          Acesse suas apólices e informações
+        </p>
+      </div>
+
+      {/* Form — bottom sheet style */}
+      <div className="bg-card/80 backdrop-blur-xl border-t border-border rounded-t-3xl px-6 pt-8 pb-10 sm:px-8 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="w-10 h-1 rounded-full bg-border mx-auto mb-2" />
+
+        {needsPassword && selectedClient ? (
+          <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+            {selectedClient.portal_first_access && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                <p className="text-amber-600 dark:text-amber-200 text-sm font-medium">
+                  Primeiro acesso detectado!
+                </p>
+                <p className="text-amber-600/70 dark:text-amber-400/70 text-xs mt-1">
+                  Sua senha provisória é <strong className="text-amber-700 dark:text-amber-200">123456</strong>
+                </p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label className="text-muted-foreground text-sm font-light tracking-wide">Senha</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+                <Input
+                  type="password"
+                  placeholder="Digite sua senha"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                  onKeyPress={handleKeyPress}
+                  className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 pl-10 h-12 rounded-xl"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <button type="button" onClick={resetForm} className="text-muted-foreground text-sm hover:text-foreground transition-colors">
+              ← Voltar
+            </button>
+          </div>
+        ) : !needsConfirmation ? (
+          <div className="space-y-2">
+            <Label htmlFor="identifier" className="text-muted-foreground text-sm font-light tracking-wide">
+              CPF, E-mail ou Nome Completo
+            </Label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+              <Input
+                id="identifier"
+                type="text"
+                placeholder="Digite seu CPF, e-mail ou nome"
+                value={identifier}
+                onChange={(e) => { setIdentifier(formatIdentifier(e.target.value)); setError(''); }}
+                onKeyPress={handleKeyPress}
+                className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 pl-10 h-12 rounded-xl"
               />
-            ) : (
-              <h1 className="text-3xl font-light tracking-widest text-foreground">
-                {brokerage?.name || 'PORTAL'}
-              </h1>
-            )}
-            <p className="text-muted-foreground text-sm tracking-wide font-light">
-              Acesse suas apólices e informações
-            </p>
+            </div>
           </div>
-
-          {/* Login Form */}
-          <div className="space-y-4">
-            {needsPassword && selectedClient ? (
-              // Password stage
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                {selectedClient.portal_first_access && (
-                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
-                    <p className="text-amber-600 dark:text-amber-200 text-sm font-medium">
-                      Primeiro acesso detectado!
-                    </p>
-                    <p className="text-amber-600/70 dark:text-amber-400/70 text-xs mt-1">
-                      Sua senha provisória é <strong className="text-amber-700 dark:text-amber-200">123456</strong>
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground text-sm font-light tracking-wide">
-                    Senha
-                  </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
-                    <Input
-                      type="password"
-                      placeholder="Digite sua senha"
-                      value={password}
-                      onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                      onKeyPress={handleKeyPress}
-                      className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 pl-10 h-12 rounded-xl"
-                      autoFocus
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="text-muted-foreground text-sm hover:text-foreground transition-colors"
-                >
-                  ← Voltar
-                </button>
-              </div>
-            ) : !needsConfirmation ? (
-              // Initial form
-              <div className="space-y-2">
-                <Label htmlFor="identifier" className="text-muted-foreground text-sm font-light tracking-wide">
-                  CPF, E-mail ou Nome Completo
-                </Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
-                  <Input
-                    id="identifier"
-                    type="text"
-                    placeholder="Digite seu CPF, e-mail ou nome"
-                    value={identifier}
-                    onChange={(e) => { setIdentifier(formatIdentifier(e.target.value)); setError(''); }}
-                    onKeyPress={handleKeyPress}
-                    className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 pl-10 h-12 rounded-xl"
-                  />
+        ) : (
+          <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-amber-600 dark:text-amber-200 text-sm font-medium">
+                    Encontramos {matchedClients.length} clientes com esse nome
+                  </p>
+                  <p className="text-amber-600/70 dark:text-amber-400/70 text-xs mt-1">
+                    Para sua segurança, confirme sua identidade
+                  </p>
                 </div>
               </div>
-            ) : (
-              // Confirmation form (homônimos)
-              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-amber-600 dark:text-amber-200 text-sm font-medium">
-                        Encontramos {matchedClients.length} clientes com esse nome
-                      </p>
-                      <p className="text-amber-600/70 dark:text-amber-400/70 text-xs mt-1">
-                        Para sua segurança, confirme sua identidade
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmation" className="text-muted-foreground text-sm font-light tracking-wide">
-                    Confirme seu CPF ou E-mail
-                  </Label>
-                  <Input
-                    id="confirmation"
-                    type="text"
-                    placeholder="Digite seu CPF ou e-mail"
-                    value={confirmationInput}
-                    onChange={(e) => { setConfirmationInput(formatIdentifier(e.target.value)); setError(''); }}
-                    onKeyPress={handleKeyPress}
-                    className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 h-12 rounded-xl"
-                    autoFocus
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="text-muted-foreground text-sm hover:text-foreground transition-colors"
-                >
-                  ← Voltar
-                </button>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-                <p className="text-red-500 dark:text-red-400 text-sm text-center font-light">{error}</p>
-              </div>
-            )}
-
-            {/* Primary Button */}
-            <Button
-              onClick={needsPassword ? handlePasswordSubmit : needsConfirmation ? handleConfirmation : handleLogin}
-              className="w-full h-12 rounded-xl text-base tracking-wide transition-all active:scale-[0.98]"
-              variant="silver"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Entrando...
-                </>
-              ) : needsPassword ? (
-                'Entrar'
-              ) : needsConfirmation ? (
-                'Confirmar e Entrar'
-              ) : (
-                'Entrar'
-              )}
-            </Button>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmation" className="text-muted-foreground text-sm font-light tracking-wide">
+                Confirme seu CPF ou E-mail
+              </Label>
+              <Input
+                id="confirmation"
+                type="text"
+                placeholder="Digite seu CPF ou e-mail"
+                value={confirmationInput}
+                onChange={(e) => { setConfirmationInput(formatIdentifier(e.target.value)); setError(''); }}
+                onKeyPress={handleKeyPress}
+                className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 h-12 rounded-xl"
+                autoFocus
+              />
+            </div>
+            <button type="button" onClick={resetForm} className="text-muted-foreground text-sm hover:text-foreground transition-colors">
+              ← Voltar
+            </button>
           </div>
-        </CardContent>
-      </Card>
+        )}
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+            <p className="text-red-500 dark:text-red-400 text-sm text-center font-light">{error}</p>
+          </div>
+        )}
+
+        <Button
+          onClick={needsPassword ? handlePasswordSubmit : needsConfirmation ? handleConfirmation : handleLogin}
+          className="w-full h-12 rounded-xl text-base tracking-wide transition-all active:scale-[0.98]"
+          variant="silver"
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Entrando...
+            </>
+          ) : needsPassword ? (
+            'Entrar'
+          ) : needsConfirmation ? (
+            'Confirmar e Entrar'
+          ) : (
+            'Entrar'
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

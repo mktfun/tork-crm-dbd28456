@@ -174,7 +174,7 @@ export function PortalLayout() {
         <div className="max-w-lg mx-auto flex justify-around py-3">
           <Button
             variant="ghost"
-            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('home')
+            className={`relative flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('home')
                 ? 'text-primary scale-110'
                 : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -182,12 +182,13 @@ export function PortalLayout() {
           >
             <Home className="w-5 h-5" />
             <span className="text-xs tracking-wide">Início</span>
+            {isActive('home') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary animate-in fade-in zoom-in-50 duration-300" />}
           </Button>
 
           {portalConfig.show_policies && (
             <Button
               variant="ghost"
-              className={`flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('policies')
+              className={`relative flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('policies')
                   ? 'text-primary scale-110'
                   : 'text-muted-foreground hover:text-foreground'
                 }`}
@@ -195,13 +196,14 @@ export function PortalLayout() {
             >
               <FileText className="w-5 h-5" />
               <span className="text-xs tracking-wide">Seguros</span>
+              {isActive('policies') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary animate-in fade-in zoom-in-50 duration-300" />}
             </Button>
           )}
 
           {portalConfig.show_cards && (
             <Button
               variant="ghost"
-              className={`flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('cards')
+              className={`relative flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('cards')
                   ? 'text-primary scale-110'
                   : 'text-muted-foreground hover:text-foreground'
                 }`}
@@ -209,12 +211,13 @@ export function PortalLayout() {
             >
               <CreditCard className="w-5 h-5" />
               <span className="text-xs tracking-wide">Carteirinhas</span>
+              {isActive('cards') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary animate-in fade-in zoom-in-50 duration-300" />}
             </Button>
           )}
 
           <Button
             variant="ghost"
-            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('solicitacoes')
+            className={`relative flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('solicitacoes')
                 ? 'text-primary scale-110'
                 : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -222,11 +225,12 @@ export function PortalLayout() {
           >
             <Inbox className="w-5 h-5" />
             <span className="text-xs tracking-wide">Inbox</span>
+            {isActive('solicitacoes') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary animate-in fade-in zoom-in-50 duration-300" />}
           </Button>
 
           <Button
             variant="ghost"
-            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('profile')
+            className={`relative flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('profile')
                 ? 'text-primary scale-110'
                 : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -234,6 +238,7 @@ export function PortalLayout() {
           >
             <User className="w-5 h-5" />
             <span className="text-xs tracking-wide">Perfil</span>
+            {isActive('profile') && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary animate-in fade-in zoom-in-50 duration-300" />}
           </Button>
         </div>
       </nav>
