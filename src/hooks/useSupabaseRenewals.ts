@@ -60,7 +60,8 @@ export const useSupabaseRenewals = (
           companies:insurance_company(id, name)
         `, { count: 'exact' })
         .eq('user_id', user.id)
-        .eq('status', 'Ativa');
+        .eq('status', 'Ativa')
+        .eq('automatic_renewal', true);
 
       // Aplicar filtro de período apenas se NÃO for "todas" (period !== -1)
       if (filters.period !== -1) {
@@ -73,6 +74,9 @@ export const useSupabaseRenewals = (
       // Aplicar filtro de status de renovação se especificado
       if (filters.renewalStatus && filters.renewalStatus !== 'all') {
         query = query.eq('renewal_status', filters.renewalStatus);
+      } else {
+        // Na exibição padrão oculta as "Não Renovada", permitindo vazios
+        query = query.or('renewal_status.neq.Não Renovada,renewal_status.is.null');
       }
 
       // Aplicar ordenação
@@ -94,7 +98,7 @@ export const useSupabaseRenewals = (
         const today = new Date();
         const expirationDate = parseISO(item.expiration_date);
         const daysUntilExpiration = differenceInDays(expirationDate, today);
-        
+
         return {
           id: item.id,
           clientId: item.client_id,
