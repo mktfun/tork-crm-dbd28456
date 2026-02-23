@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Shield, FileText, CreditCard, Calendar, AlertCircle, Loader2, Plus, FileEdit, AlertTriangle } from 'lucide-react';
+import { Shield, FileText, CreditCard, Calendar, AlertCircle, Loader2, Plus, FileEdit, AlertTriangle, Inbox } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -46,7 +46,7 @@ export default function PortalHome() {
   useEffect(() => {
     const clientData = sessionStorage.getItem('portal_client');
     const storedSlug = sessionStorage.getItem('portal_brokerage_slug');
-    
+
     if (clientData && storedSlug) {
       const client: ClientData = JSON.parse(clientData);
       setClientName(client.name || '');
@@ -104,7 +104,7 @@ export default function PortalHome() {
 
   const getExpirationBadge = (expirationDate: string) => {
     const days = differenceInDays(new Date(expirationDate), new Date());
-    
+
     if (days < 0) {
       return <Badge className="bg-red-500/10 text-red-400 border-red-500/20">Vencida</Badge>;
     } else if (days <= 30) {
@@ -173,8 +173,8 @@ export default function PortalHome() {
       {hasQuickActions && (
         <div className="grid grid-cols-2 gap-3">
           {portalConfig.show_policies && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-4 flex flex-col items-center gap-2 bg-black/70 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
               onClick={() => navigate(`/${slug}/portal/policies`)}
             >
@@ -183,8 +183,8 @@ export default function PortalHome() {
             </Button>
           )}
           {portalConfig.show_cards && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="h-auto py-4 flex flex-col items-center gap-2 bg-black/70 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
               onClick={() => navigate(`/${slug}/portal/cards`)}
             >
@@ -192,6 +192,14 @@ export default function PortalHome() {
               <span className="text-sm text-white font-light">Carteirinhas</span>
             </Button>
           )}
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-2 bg-black/70 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
+            onClick={() => navigate(`/${slug}/portal/solicitacoes`)}
+          >
+            <Inbox className="w-6 h-6 text-zinc-400" />
+            <span className="text-sm text-white font-light">Pedidos</span>
+          </Button>
         </div>
       )}
 
@@ -216,8 +224,8 @@ export default function PortalHome() {
           ) : (
             <div className="space-y-3">
               {policies.slice(0, 3).map((policy) => (
-                <div 
-                  key={policy.id} 
+                <div
+                  key={policy.id}
                   className="flex justify-between items-center p-3 bg-zinc-900/50 rounded-lg border border-white/[0.06]"
                 >
                   <div className="flex-1 min-w-0">
@@ -234,10 +242,10 @@ export default function PortalHome() {
                   {getExpirationBadge(policy.expiration_date)}
                 </div>
               ))}
-              
+
               {policies.length > 3 && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="w-full text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                   onClick={() => navigate(`/${slug}/portal/policies`)}
                 >

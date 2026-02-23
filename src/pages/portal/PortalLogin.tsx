@@ -42,6 +42,21 @@ export default function PortalLogin() {
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const navigate = useNavigate();
 
+  const formatIdentifier = (value: string) => {
+    // Se o valor conter apenas números, pontos e traços, tratamos como CPF mascarado
+    if (/^[\d.-]+$/.test(value)) {
+      const digits = value.replace(/\D/g, '');
+      if (digits.length <= 11) {
+        return digits
+          .replace(/(\d{3})(\d)/, '$1.$2')
+          .replace(/(\d{3})(\d)/, '$1.$2')
+          .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+          .replace(/(-\d{2})\d+?$/, '$1');
+      }
+    }
+    return value;
+  };
+
   // Fetch brokerage data on mount
   useEffect(() => {
     const fetchBrokerage = async () => {
@@ -83,8 +98,13 @@ export default function PortalLogin() {
   }, [brokerageSlug]);
 
   const handleLogin = async () => {
-    const cleanIdentifier = identifier.trim();
-    
+    let cleanIdentifier = identifier.trim();
+
+    // Se for um CPF formatado, removemos a pontuação antes de mandar para o backend
+    if (/^[\d.-]+$/.test(cleanIdentifier) && cleanIdentifier.replace(/\D/g, '').length === 11) {
+      cleanIdentifier = cleanIdentifier.replace(/\D/g, '');
+    }
+
     if (!cleanIdentifier) {
       setError('Digite seu CPF, e-mail ou nome completo');
       return;
@@ -99,8 +119,8 @@ export default function PortalLogin() {
     setError('');
 
     // DEBUG: Log de pré-vôo
-    console.log('🔍 DEBUG LOGIN - Enviando:', { 
-      slug: brokerageSlug, 
+    console.log('🔍 DEBUG LOGIN - Enviando:', {
+      slug: brokerageSlug,
       identifier: cleanIdentifier,
       identifierLength: cleanIdentifier.length
     });
@@ -113,8 +133,8 @@ export default function PortalLogin() {
       });
 
       // DEBUG: Log de resposta
-      console.log('📊 DEBUG LOGIN - Resposta RPC:', { 
-        data, 
+      console.log('📊 DEBUG LOGIN - Resposta RPC:', {
+        data,
         error: rpcError,
         dataType: typeof data,
         dataLength: Array.isArray(data) ? data.length : 'não é array'
@@ -175,7 +195,7 @@ export default function PortalLogin() {
     const matched = matchedClients.find(client => {
       const clientCpf = client.cpf_cnpj?.replace(/\D/g, '') || '';
       const clientEmail = client.email?.toLowerCase() || '';
-      
+
       return clientCpf === cleanCpf || clientEmail === cleanInput;
     });
 
@@ -235,7 +255,7 @@ export default function PortalLogin() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black p-4">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(39,39,42,0.25)_0%,_transparent_55%)]" />
-        <Card 
+        <Card
           className="relative w-full max-w-md bg-black/70 backdrop-blur-2xl border border-white/[0.06]"
           style={{ boxShadow: '0 0 60px -15px rgba(255,255,255,0.07)' }}
         >
@@ -257,8 +277,8 @@ export default function PortalLogin() {
     <div className="min-h-screen flex items-center justify-center bg-black p-4">
       {/* Subtle radial gradient - Silver */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(39,39,42,0.25)_0%,_transparent_55%)] pointer-events-none" />
-      
-      <Card 
+
+      <Card
         className="relative w-full max-w-md bg-black/70 backdrop-blur-2xl border border-white/[0.06]"
         style={{ boxShadow: '0 0 60px -15px rgba(255,255,255,0.07)' }}
       >
@@ -266,9 +286,9 @@ export default function PortalLogin() {
           {/* Brokerage Logo/Name */}
           <div className="text-center space-y-4">
             {brokerage?.logo_url ? (
-              <img 
-                src={brokerage.logo_url} 
-                alt={brokerage.name} 
+              <img
+                src={brokerage.logo_url}
+                alt={brokerage.name}
                 className="h-16 object-contain mx-auto"
               />
             ) : (
@@ -296,7 +316,7 @@ export default function PortalLogin() {
                     type="text"
                     placeholder="Digite seu CPF, e-mail ou nome"
                     value={identifier}
-                    onChange={(e) => { setIdentifier(e.target.value); setError(''); }}
+                    onChange={(e) => { setIdentifier(formatIdentifier(e.target.value)); setError(''); }}
                     onKeyPress={handleKeyPress}
                     className="bg-black/60 border-zinc-700/50 text-white placeholder:text-zinc-600 pl-10 h-12 rounded-xl focus:border-zinc-400/60 focus:ring-1 focus:ring-zinc-400/20"
                   />
@@ -328,7 +348,7 @@ export default function PortalLogin() {
                     type="text"
                     placeholder="Digite seu CPF ou e-mail"
                     value={confirmationInput}
-                    onChange={(e) => { setConfirmationInput(e.target.value); setError(''); }}
+                    onChange={(e) => { setConfirmationInput(formatIdentifier(e.target.value)); setError(''); }}
                     onKeyPress={handleKeyPress}
                     className="bg-black/60 border-zinc-700/50 text-white placeholder:text-zinc-600 h-12 rounded-xl focus:border-zinc-400/60 focus:ring-1 focus:ring-zinc-400/20"
                     autoFocus
@@ -352,8 +372,8 @@ export default function PortalLogin() {
             )}
 
             {/* Silver Metallic Button */}
-            <Button 
-              onClick={needsConfirmation ? handleConfirmation : handleLogin} 
+            <Button
+              onClick={needsConfirmation ? handleConfirmation : handleLogin}
               className="w-full h-12 bg-zinc-100 hover:bg-white text-zinc-950 font-semibold rounded-xl text-base tracking-wide transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_-5px_rgba(255,255,255,0.5)]"
               disabled={isLoading}
             >

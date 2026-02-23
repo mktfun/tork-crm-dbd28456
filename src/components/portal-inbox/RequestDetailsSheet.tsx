@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ChevronDown, Plus, Link2, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PortalRequestRow } from './RequestsList';
+import { NewDealModal } from '@/components/crm/NewDealModal';
 
 const statusOptions = [
   { value: 'pendente', label: 'Pendente' },
@@ -71,6 +72,7 @@ export function RequestDetailsSheet({
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [newDealOpen, setNewDealOpen] = useState(false);
 
   if (!request) return null;
 
@@ -96,10 +98,13 @@ export function RequestDetailsSheet({
   };
 
   const handleCreateDeal = () => {
-    toast({ title: 'Em breve', description: 'A criação de oportunidade será implementada em breve.' });
+    setNewDealOpen(true);
   };
 
   const hasCustomFields = request.custom_fields && Object.keys(request.custom_fields).length > 0;
+
+  const deafultTitleTxt = `Solicitação Portal: ${typeLabels[request.request_type] || request.request_type} - ${ramoLabels[request.insurance_type] || request.insurance_type}`;
+  const defaultNotesTxt = request.qar_report ? `[ORIGEM: PORTAL DO CLIENTE]\n\n${request.qar_report}` : `[ORIGEM: PORTAL DO CLIENTE]\nSolicitação sem relatório detalhado.`;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -186,6 +191,14 @@ export function RequestDetailsSheet({
           </Button>
         </div>
       </SheetContent>
+
+      <NewDealModal
+        open={newDealOpen}
+        onOpenChange={setNewDealOpen}
+        defaultClientId={request.client_id}
+        defaultTitle={deafultTitleTxt}
+        defaultNotes={defaultNotesTxt}
+      />
     </Sheet>
   );
 }
