@@ -155,7 +155,6 @@ export default function PortalLogin() {
         return;
       }
 
-      // Múltiplos clientes (homônimos) - solicitar confirmação
       setMatchedClients(clients);
       setNeedsConfirmation(true);
       setIsLoading(false);
@@ -217,7 +216,6 @@ export default function PortalLogin() {
         return;
       }
 
-      // Login OK → salvar sessão COM portal_first_access
       const clientSession = {
         ...selectedClient,
         portal_first_access: selectedClient.portal_first_access,
@@ -231,7 +229,6 @@ export default function PortalLogin() {
 
       toast.success(`Bem-vindo, ${selectedClient.name?.split(' ')[0]}!`);
 
-      // Redirect baseado no primeiro acesso
       if (selectedClient.portal_first_access) {
         navigate(`/${brokerageSlug}/portal/onboarding`, { replace: true });
       } else {
@@ -268,11 +265,10 @@ export default function PortalLogin() {
   // Loading state
   if (isLoadingBrokerage) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(39,39,42,0.25)_0%,_transparent_55%)]" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="relative flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
-          <p className="text-zinc-500 tracking-widest text-sm font-light">CARREGANDO</p>
+          <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+          <p className="text-muted-foreground tracking-widest text-sm font-light">CARREGANDO</p>
         </div>
       </div>
     );
@@ -281,18 +277,14 @@ export default function PortalLogin() {
   // Invalid brokerage
   if (!isValidBrokerage) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black p-4">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(39,39,42,0.25)_0%,_transparent_55%)]" />
-        <Card
-          className="relative w-full max-w-md bg-black/70 backdrop-blur-2xl border border-white/[0.06]"
-          style={{ boxShadow: '0 0 60px -15px rgba(255,255,255,0.07)' }}
-        >
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="relative w-full max-w-md bg-card/80 backdrop-blur-2xl border border-border shadow-xl">
           <CardContent className="p-8 text-center">
-            <div className="mx-auto w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center mb-4 border border-white/[0.06]">
-              <Shield className="w-8 h-8 text-zinc-600" />
+            <div className="mx-auto w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-4 border border-border">
+              <Shield className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h2 className="text-xl text-white font-light tracking-wide mb-2">Portal não encontrado</h2>
-            <p className="text-zinc-500 font-light">
+            <h2 className="text-xl text-foreground font-light tracking-wide mb-2">Portal não encontrado</h2>
+            <p className="text-muted-foreground font-light">
               O portal solicitado não existe ou não está disponível.
             </p>
           </CardContent>
@@ -302,13 +294,8 @@ export default function PortalLogin() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black p-4">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(39,39,42,0.25)_0%,_transparent_55%)] pointer-events-none" />
-
-      <Card
-        className="relative w-full max-w-md bg-black/70 backdrop-blur-2xl border border-white/[0.06]"
-        style={{ boxShadow: '0 0 60px -15px rgba(255,255,255,0.07)' }}
-      >
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="relative w-full max-w-md bg-card/80 backdrop-blur-2xl border border-border shadow-xl">
         <CardContent className="p-8 space-y-6">
           {/* Brokerage Logo/Name */}
           <div className="text-center space-y-4">
@@ -319,11 +306,11 @@ export default function PortalLogin() {
                 className="h-16 object-contain mx-auto"
               />
             ) : (
-              <h1 className="text-3xl font-light tracking-widest text-white">
+              <h1 className="text-3xl font-light tracking-widest text-foreground">
                 {brokerage?.name || 'PORTAL'}
               </h1>
             )}
-            <p className="text-zinc-500 text-sm tracking-wide font-light">
+            <p className="text-muted-foreground text-sm tracking-wide font-light">
               Acesse suas apólices e informações
             </p>
           </div>
@@ -332,31 +319,31 @@ export default function PortalLogin() {
           <div className="space-y-4">
             {needsPassword && selectedClient ? (
               // Password stage
-              <div className="space-y-4">
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
                 {selectedClient.portal_first_access && (
                   <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
-                    <p className="text-amber-200 text-sm font-medium">
+                    <p className="text-amber-600 dark:text-amber-200 text-sm font-medium">
                       Primeiro acesso detectado!
                     </p>
-                    <p className="text-amber-400/70 text-xs mt-1">
-                      Sua senha provisória é <strong className="text-amber-200">123456</strong>
+                    <p className="text-amber-600/70 dark:text-amber-400/70 text-xs mt-1">
+                      Sua senha provisória é <strong className="text-amber-700 dark:text-amber-200">123456</strong>
                     </p>
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <Label className="text-zinc-400 text-sm font-light tracking-wide">
+                  <Label className="text-muted-foreground text-sm font-light tracking-wide">
                     Senha
                   </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
                     <Input
                       type="password"
                       placeholder="Digite sua senha"
                       value={password}
                       onChange={(e) => { setPassword(e.target.value); setError(''); }}
                       onKeyPress={handleKeyPress}
-                      className="bg-black/60 border-zinc-700/50 text-white placeholder:text-zinc-600 pl-10 h-12 rounded-xl focus:border-zinc-400/60 focus:ring-1 focus:ring-zinc-400/20"
+                      className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 pl-10 h-12 rounded-xl"
                       autoFocus
                     />
                   </div>
@@ -365,7 +352,7 @@ export default function PortalLogin() {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="text-zinc-500 text-sm hover:text-zinc-300 transition-colors"
+                  className="text-muted-foreground text-sm hover:text-foreground transition-colors"
                 >
                   ← Voltar
                 </button>
@@ -373,11 +360,11 @@ export default function PortalLogin() {
             ) : !needsConfirmation ? (
               // Initial form
               <div className="space-y-2">
-                <Label htmlFor="identifier" className="text-zinc-400 text-sm font-light tracking-wide">
+                <Label htmlFor="identifier" className="text-muted-foreground text-sm font-light tracking-wide">
                   CPF, E-mail ou Nome Completo
                 </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
                   <Input
                     id="identifier"
                     type="text"
@@ -385,21 +372,21 @@ export default function PortalLogin() {
                     value={identifier}
                     onChange={(e) => { setIdentifier(formatIdentifier(e.target.value)); setError(''); }}
                     onKeyPress={handleKeyPress}
-                    className="bg-black/60 border-zinc-700/50 text-white placeholder:text-zinc-600 pl-10 h-12 rounded-xl focus:border-zinc-400/60 focus:ring-1 focus:ring-zinc-400/20"
+                    className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 pl-10 h-12 rounded-xl"
                   />
                 </div>
               </div>
             ) : (
               // Confirmation form (homônimos)
-              <div className="space-y-4">
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-amber-200 text-sm font-medium">
+                      <p className="text-amber-600 dark:text-amber-200 text-sm font-medium">
                         Encontramos {matchedClients.length} clientes com esse nome
                       </p>
-                      <p className="text-amber-400/70 text-xs mt-1">
+                      <p className="text-amber-600/70 dark:text-amber-400/70 text-xs mt-1">
                         Para sua segurança, confirme sua identidade
                       </p>
                     </div>
@@ -407,7 +394,7 @@ export default function PortalLogin() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmation" className="text-zinc-400 text-sm font-light tracking-wide">
+                  <Label htmlFor="confirmation" className="text-muted-foreground text-sm font-light tracking-wide">
                     Confirme seu CPF ou E-mail
                   </Label>
                   <Input
@@ -417,7 +404,7 @@ export default function PortalLogin() {
                     value={confirmationInput}
                     onChange={(e) => { setConfirmationInput(formatIdentifier(e.target.value)); setError(''); }}
                     onKeyPress={handleKeyPress}
-                    className="bg-black/60 border-zinc-700/50 text-white placeholder:text-zinc-600 h-12 rounded-xl focus:border-zinc-400/60 focus:ring-1 focus:ring-zinc-400/20"
+                    className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 h-12 rounded-xl"
                     autoFocus
                   />
                 </div>
@@ -425,7 +412,7 @@ export default function PortalLogin() {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="text-zinc-500 text-sm hover:text-zinc-300 transition-colors"
+                  className="text-muted-foreground text-sm hover:text-foreground transition-colors"
                 >
                   ← Voltar
                 </button>
@@ -434,14 +421,15 @@ export default function PortalLogin() {
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-                <p className="text-red-400 text-sm text-center font-light">{error}</p>
+                <p className="text-red-500 dark:text-red-400 text-sm text-center font-light">{error}</p>
               </div>
             )}
 
-            {/* Silver Metallic Button */}
+            {/* Primary Button */}
             <Button
               onClick={needsPassword ? handlePasswordSubmit : needsConfirmation ? handleConfirmation : handleLogin}
-              className="w-full h-12 bg-zinc-100 hover:bg-white text-zinc-950 font-semibold rounded-xl text-base tracking-wide transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_-5px_rgba(255,255,255,0.5)]"
+              className="w-full h-12 rounded-xl text-base tracking-wide transition-all active:scale-[0.98]"
+              variant="silver"
               disabled={isLoading}
             >
               {isLoading ? (

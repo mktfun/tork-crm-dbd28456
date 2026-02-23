@@ -18,9 +18,9 @@ interface PortalRequest {
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-  pendente: { label: 'Pendente', className: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-  em_atendimento: { label: 'Em Atendimento', className: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-  concluido: { label: 'Concluído', className: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+  pendente: { label: 'Pendente', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
+  em_atendimento: { label: 'Em Atendimento', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
+  concluido: { label: 'Concluído', className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
 };
 
 const typeLabels: Record<string, string> = {
@@ -67,9 +67,9 @@ export default function PortalSolicitacoes() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-48 bg-zinc-800" />
+        <Skeleton className="h-8 w-48 bg-muted" />
         {[1, 2, 3].map(i => (
-          <Skeleton key={i} className="h-20 w-full bg-zinc-800" />
+          <Skeleton key={i} className="h-20 w-full bg-muted" />
         ))}
       </div>
     );
@@ -77,13 +77,13 @@ export default function PortalSolicitacoes() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-light text-white tracking-wide">Minhas Solicitações</h2>
+      <h2 className="text-xl font-light text-foreground tracking-wide">Minhas Solicitações</h2>
 
       {requests.length === 0 ? (
-        <Card className="bg-black/70 border-white/[0.06] backdrop-blur-2xl">
+        <Card className="bg-card/80 border-border backdrop-blur-xl">
           <CardContent className="p-8 text-center">
-            <Inbox className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-            <p className="text-zinc-500 font-light">Nenhuma solicitação enviada ainda.</p>
+            <Inbox className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
+            <p className="text-muted-foreground font-light">Nenhuma solicitação enviada ainda.</p>
           </CardContent>
         </Card>
       ) : (
@@ -93,26 +93,26 @@ export default function PortalSolicitacoes() {
             return (
               <Card
                 key={req.id}
-                className="bg-black/70 border-white/[0.06] backdrop-blur-2xl"
+                className="bg-card/80 border-border backdrop-blur-xl transition-all duration-200 hover:shadow-md"
               >
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-zinc-800/80 rounded-lg flex items-center justify-center text-zinc-400 flex-shrink-0 border border-white/[0.06]">
+                    <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center text-muted-foreground flex-shrink-0 border border-border">
                       <FileText className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <h3 className="font-light text-white">
+                          <h3 className="font-light text-foreground">
                             {typeLabels[req.request_type] || req.request_type}
                           </h3>
-                          <p className="text-sm text-zinc-500">
+                          <p className="text-sm text-muted-foreground">
                             {req.insurance_type || 'Seguro'}
                           </p>
                         </div>
                         <Badge className={status.className}>{status.label}</Badge>
                       </div>
-                      <div className="flex items-center gap-1 text-xs text-zinc-600 mt-2">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground/70 mt-2">
                         <Clock className="w-3 h-3" />
                         <span>{format(new Date(req.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
                       </div>

@@ -49,7 +49,6 @@ export default function PortalPolicies() {
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
   const [clientData, setClientData] = useState<ClientData | null>(null);
   
-  // Hook centralizado de permissões
   const { canDownloadPolicies, isLoading: permissionsLoading } = usePortalPermissions();
 
   useEffect(() => {
@@ -108,14 +107,14 @@ export default function PortalPolicies() {
     const days = differenceInDays(new Date(expirationDate), new Date());
     
     if (status.toLowerCase() === 'cancelada') {
-      return <Badge className="bg-red-500/10 text-red-400 border-red-500/20">Cancelada</Badge>;
+      return <Badge className="bg-red-500/10 text-red-500 dark:text-red-400 border-red-500/20">Cancelada</Badge>;
     }
     if (days < 0) {
-      return <Badge className="bg-red-500/10 text-red-400 border-red-500/20">Vencida</Badge>;
+      return <Badge className="bg-red-500/10 text-red-500 dark:text-red-400 border-red-500/20">Vencida</Badge>;
     } else if (days <= 30) {
-      return <Badge className="bg-zinc-400/10 text-zinc-300 border-zinc-400/20">Vence em {days}d</Badge>;
+      return <Badge className="bg-muted text-muted-foreground border-border">Vence em {days}d</Badge>;
     } else {
-      return <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Ativa</Badge>;
+      return <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">Ativa</Badge>;
     }
   };
 
@@ -126,9 +125,9 @@ export default function PortalPolicies() {
   if (isLoading || permissionsLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-48 bg-zinc-800" />
+        <Skeleton className="h-8 w-48 bg-muted" />
         {[1, 2, 3].map(i => (
-          <Skeleton key={i} className="h-32 w-full bg-zinc-800" />
+          <Skeleton key={i} className="h-32 w-full bg-muted" />
         ))}
       </div>
     );
@@ -136,23 +135,22 @@ export default function PortalPolicies() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-light text-white tracking-wide">Meus Seguros</h2>
+      <h2 className="text-xl font-light text-foreground tracking-wide">Meus Seguros</h2>
 
-      {/* Alert de restrição de download */}
       {!canDownloadPolicies && (
-        <Alert className="bg-zinc-900/80 border-zinc-700/50 text-zinc-300">
-          <Lock className="h-4 w-4 text-zinc-400" />
-          <AlertDescription className="text-zinc-400">
+        <Alert className="bg-muted/80 border-border text-foreground">
+          <Lock className="h-4 w-4 text-muted-foreground" />
+          <AlertDescription className="text-muted-foreground">
             O download de documentos está temporariamente desabilitado. Entre em contato com sua corretora para solicitar a apólice.
           </AlertDescription>
         </Alert>
       )}
 
       {policies.length === 0 ? (
-        <Card className="bg-black/70 border-white/[0.06] backdrop-blur-2xl">
+        <Card className="bg-card/80 border-border backdrop-blur-xl">
           <CardContent className="p-8 text-center">
-            <AlertCircle className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-            <p className="text-zinc-500 font-light">Nenhum seguro encontrado.</p>
+            <AlertCircle className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
+            <p className="text-muted-foreground font-light">Nenhum seguro encontrado.</p>
           </CardContent>
         </Card>
       ) : (
@@ -160,34 +158,34 @@ export default function PortalPolicies() {
           {policies.map((policy) => (
             <Card 
               key={policy.id} 
-              className="bg-black/70 border-white/[0.06] backdrop-blur-2xl cursor-pointer hover:bg-zinc-900/50 transition-colors"
+              className="bg-card/80 border-border backdrop-blur-xl cursor-pointer hover:bg-accent transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
               onClick={() => handlePolicyClick(policy)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-zinc-800/80 rounded-lg flex items-center justify-center text-zinc-400 flex-shrink-0 border border-white/[0.06]">
+                  <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center text-muted-foreground flex-shrink-0 border border-border">
                     {getTypeIcon(policy.type)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-light text-white truncate">
+                      <h3 className="font-light text-foreground truncate">
                         {policy.insured_asset || policy.type || 'Apólice'}
                       </h3>
                       {getStatusBadge(policy.status, policy.expiration_date)}
                     </div>
                     
                     {policy.policy_number && (
-                      <p className="text-sm text-zinc-500 mt-1">Nº {policy.policy_number}</p>
+                      <p className="text-sm text-muted-foreground mt-1">Nº {policy.policy_number}</p>
                     )}
                     
                     {policy.insurance_company && companies[policy.insurance_company] && (
-                      <div className="flex items-center gap-1 text-sm text-zinc-500 mt-1">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                         <Building2 className="w-3 h-3" />
                         <span>{companies[policy.insurance_company]}</span>
                       </div>
                     )}
                     
-                    <div className="flex items-center gap-4 mt-2 text-xs text-zinc-600">
+                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground/70">
                       <div className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         <span>
@@ -202,7 +200,7 @@ export default function PortalPolicies() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 px-2 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                          className="h-6 px-2 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 hover:bg-amber-500/10"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(`/${brokerageSlug}/portal/wizard?type=renovacao&ramo=${(policy.type || 'auto').toLowerCase()}`);
@@ -214,7 +212,7 @@ export default function PortalPolicies() {
                       )}
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-zinc-600 flex-shrink-0" />
+                  <ChevronRight className="w-5 h-5 text-muted-foreground/50 flex-shrink-0" />
                 </div>
               </CardContent>
             </Card>
@@ -222,7 +220,6 @@ export default function PortalPolicies() {
         </div>
       )}
 
-      {/* Modal de Detalhes */}
       {clientData && (
         <PolicyDetailModal
           policy={selectedPolicy}

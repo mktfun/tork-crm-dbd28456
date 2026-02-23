@@ -51,7 +51,6 @@ export default function PortalHome() {
       const client: ClientData = JSON.parse(clientData);
       setClientName(client.name || '');
       setSlug(storedSlug);
-      // Busca híbrida: client_id + CPF + email
       fetchPoliciesHybrid(client);
       fetchPortalConfig(client.user_id);
     }
@@ -106,11 +105,11 @@ export default function PortalHome() {
     const days = differenceInDays(new Date(expirationDate), new Date());
 
     if (days < 0) {
-      return <Badge className="bg-red-500/10 text-red-400 border-red-500/20">Vencida</Badge>;
+      return <Badge className="bg-red-500/10 text-red-500 dark:text-red-400 border-red-500/20">Vencida</Badge>;
     } else if (days <= 30) {
-      return <Badge className="bg-zinc-400/10 text-zinc-300 border-zinc-400/20">Vence em {days} dias</Badge>;
+      return <Badge className="bg-muted text-muted-foreground border-border">Vence em {days} dias</Badge>;
     } else {
-      return <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Vigente</Badge>;
+      return <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">Vigente</Badge>;
     }
   };
 
@@ -118,121 +117,121 @@ export default function PortalHome() {
 
   return (
     <div className="space-y-4">
-      {/* Welcome Card - Black & Silver */}
-      <Card className="bg-gradient-to-br from-zinc-900/80 to-zinc-950 border-white/[0.06]">
+      {/* Welcome Card */}
+      <Card className="bg-primary/5 border-border">
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center shadow-lg border border-white/[0.06]">
-              <Shield className="w-6 h-6 text-zinc-300" />
+            <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center shadow-sm border border-border">
+              <Shield className="w-6 h-6 text-muted-foreground" />
             </div>
             <div>
-              <h2 className="text-white font-light text-lg tracking-wide">Bem-vindo(a)!</h2>
-              <p className="text-zinc-500 text-sm">{clientName}</p>
+              <h2 className="text-foreground font-light text-lg tracking-wide">Bem-vindo(a)!</h2>
+              <p className="text-muted-foreground text-sm">{clientName}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Nova Solicitação */}
-      <Card className="bg-black/70 border-white/[0.06] backdrop-blur-2xl">
+      <Card className="bg-card/80 border-border backdrop-blur-xl">
         <CardContent className="p-4 space-y-3">
-          <h3 className="text-white font-light tracking-wide flex items-center gap-2">
-            <Plus className="w-4 h-4 text-zinc-400" />
+          <h3 className="text-foreground font-light tracking-wide flex items-center gap-2">
+            <Plus className="w-4 h-4 text-muted-foreground" />
             Nova Solicitação
           </h3>
           <div className="grid grid-cols-3 gap-2">
             <Button
               variant="outline"
-              className="h-auto py-3 flex flex-col items-center gap-1.5 bg-black/50 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
+              className="h-auto py-3 flex flex-col items-center gap-1.5 bg-card/60 border-border hover:bg-accent hover:border-primary/30 transition-all duration-200 active:scale-[0.98]"
               onClick={() => navigate(`/${slug}/portal/wizard?type=cotacao`)}
             >
-              <Plus className="w-5 h-5 text-zinc-400" />
-              <span className="text-xs text-white font-light">Nova Cotação</span>
+              <Plus className="w-5 h-5 text-muted-foreground" />
+              <span className="text-xs text-foreground font-light">Nova Cotação</span>
             </Button>
             <Button
               variant="outline"
-              className="h-auto py-3 flex flex-col items-center gap-1.5 bg-black/50 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
+              className="h-auto py-3 flex flex-col items-center gap-1.5 bg-card/60 border-border hover:bg-accent hover:border-primary/30 transition-all duration-200 active:scale-[0.98]"
               onClick={() => navigate(`/${slug}/portal/wizard?type=endosso`)}
             >
-              <FileEdit className="w-5 h-5 text-zinc-400" />
-              <span className="text-xs text-white font-light">Endosso</span>
+              <FileEdit className="w-5 h-5 text-muted-foreground" />
+              <span className="text-xs text-foreground font-light">Endosso</span>
             </Button>
             <Button
               variant="outline"
-              className="h-auto py-3 flex flex-col items-center gap-1.5 bg-black/50 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
+              className="h-auto py-3 flex flex-col items-center gap-1.5 bg-card/60 border-border hover:bg-accent hover:border-primary/30 transition-all duration-200 active:scale-[0.98]"
               onClick={() => navigate(`/${slug}/portal/wizard?type=sinistro`)}
             >
-              <AlertTriangle className="w-5 h-5 text-zinc-400" />
-              <span className="text-xs text-white font-light">Sinistro</span>
+              <AlertTriangle className="w-5 h-5 text-muted-foreground" />
+              <span className="text-xs text-foreground font-light">Sinistro</span>
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Quick Actions - Black & Silver */}
+      {/* Quick Actions */}
       {hasQuickActions && (
         <div className="grid grid-cols-2 gap-3">
           {portalConfig.show_policies && (
             <Button
               variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2 bg-black/70 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
+              className="h-auto py-4 flex flex-col items-center gap-2 bg-card/80 border-border hover:bg-accent hover:border-primary/30 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
               onClick={() => navigate(`/${slug}/portal/policies`)}
             >
-              <FileText className="w-6 h-6 text-zinc-400" />
-              <span className="text-sm text-white font-light">Meus Seguros</span>
+              <FileText className="w-6 h-6 text-muted-foreground" />
+              <span className="text-sm text-foreground font-light">Meus Seguros</span>
             </Button>
           )}
           {portalConfig.show_cards && (
             <Button
               variant="outline"
-              className="h-auto py-4 flex flex-col items-center gap-2 bg-black/70 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
+              className="h-auto py-4 flex flex-col items-center gap-2 bg-card/80 border-border hover:bg-accent hover:border-primary/30 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
               onClick={() => navigate(`/${slug}/portal/cards`)}
             >
-              <CreditCard className="w-6 h-6 text-zinc-400" />
-              <span className="text-sm text-white font-light">Carteirinhas</span>
+              <CreditCard className="w-6 h-6 text-muted-foreground" />
+              <span className="text-sm text-foreground font-light">Carteirinhas</span>
             </Button>
           )}
           <Button
             variant="outline"
-            className="h-auto py-4 flex flex-col items-center gap-2 bg-black/70 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
+            className="h-auto py-4 flex flex-col items-center gap-2 bg-card/80 border-border hover:bg-accent hover:border-primary/30 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
             onClick={() => navigate(`/${slug}/portal/solicitacoes`)}
           >
-            <Inbox className="w-6 h-6 text-zinc-400" />
-            <span className="text-sm text-white font-light">Pedidos</span>
+            <Inbox className="w-6 h-6 text-muted-foreground" />
+            <span className="text-sm text-foreground font-light">Pedidos</span>
           </Button>
         </div>
       )}
 
-      {/* Active Policies - Black & Silver */}
-      <Card className="bg-black/70 border-white/[0.06] backdrop-blur-2xl">
+      {/* Active Policies */}
+      <Card className="bg-card/80 border-border backdrop-blur-xl">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-white font-light flex items-center gap-2 tracking-wide">
-            <Shield className="w-5 h-5 text-zinc-400" />
+          <CardTitle className="text-lg text-foreground font-light flex items-center gap-2 tracking-wide">
+            <Shield className="w-5 h-5 text-muted-foreground" />
             Seguros Ativos
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 text-zinc-400 animate-spin" />
+              <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
             </div>
           ) : policies.length === 0 ? (
             <div className="text-center py-8">
-              <AlertCircle className="w-10 h-10 text-zinc-600 mx-auto mb-2" />
-              <p className="text-zinc-500 font-light">Nenhum seguro ativo encontrado.</p>
+              <AlertCircle className="w-10 h-10 text-muted-foreground/50 mx-auto mb-2" />
+              <p className="text-muted-foreground font-light">Nenhum seguro ativo encontrado.</p>
             </div>
           ) : (
             <div className="space-y-3">
               {policies.slice(0, 3).map((policy) => (
                 <div
                   key={policy.id}
-                  className="flex justify-between items-center p-3 bg-zinc-900/50 rounded-lg border border-white/[0.06]"
+                  className="flex justify-between items-center p-3 bg-muted/50 rounded-lg border border-border transition-all duration-200 hover:bg-accent"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-light text-white truncate">
+                    <p className="font-light text-foreground truncate">
                       {policy.insured_asset || 'Apólice'}
                     </p>
-                    <div className="flex items-center gap-2 text-sm text-zinc-500">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="w-3 h-3" />
                       <span>
                         Vence: {format(new Date(policy.expiration_date), 'dd/MM/yyyy', { locale: ptBR })}
@@ -246,7 +245,7 @@ export default function PortalHome() {
               {policies.length > 3 && (
                 <Button
                   variant="ghost"
-                  className="w-full text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+                  className="w-full text-muted-foreground hover:text-foreground hover:bg-accent"
                   onClick={() => navigate(`/${slug}/portal/policies`)}
                 >
                   Ver todos ({policies.length})
@@ -257,16 +256,16 @@ export default function PortalHome() {
         </CardContent>
       </Card>
 
-      {/* Help Card - Black & Silver */}
-      <Card className="bg-black/70 border-white/[0.06] backdrop-blur-2xl">
+      {/* Help Card */}
+      <Card className="bg-card/80 border-border backdrop-blur-xl">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-zinc-900 rounded-lg flex items-center justify-center flex-shrink-0 border border-white/[0.06]">
-              <AlertCircle className="w-5 h-5 text-zinc-500" />
+            <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
+              <AlertCircle className="w-5 h-5 text-muted-foreground" />
             </div>
             <div>
-              <h3 className="font-light text-white">Precisa de ajuda?</h3>
-              <p className="text-sm text-zinc-500 mt-1">
+              <h3 className="font-light text-foreground">Precisa de ajuda?</h3>
+              <p className="text-sm text-muted-foreground mt-1">
                 Entre em contato com sua corretora para dúvidas sobre suas apólices ou sinistros.
               </p>
             </div>

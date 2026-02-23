@@ -40,7 +40,6 @@ export default function PortalCards() {
   const [clientData, setClientData] = useState<{ name: string; cpf_cnpj: string | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Hook centralizado de permissões
   const { canDownloadCards, isLoading: permissionsLoading } = usePortalPermissions();
 
   useEffect(() => {
@@ -101,9 +100,9 @@ export default function PortalCards() {
   if (isLoading || permissionsLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-48 bg-zinc-800" />
+        <Skeleton className="h-8 w-48 bg-muted" />
         {[1, 2].map(i => (
-          <Skeleton key={i} className="h-72 w-full bg-zinc-800 rounded-2xl" />
+          <Skeleton key={i} className="h-72 w-full bg-muted rounded-2xl" />
         ))}
       </div>
     );
@@ -112,9 +111,9 @@ export default function PortalCards() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-light text-white tracking-wide">Minhas Carteirinhas</h2>
+        <h2 className="text-xl font-light text-foreground tracking-wide">Minhas Carteirinhas</h2>
         {!canDownloadCards && (
-          <Badge variant="outline" className="border-zinc-700 text-zinc-400 gap-1">
+          <Badge variant="outline" className="border-border text-muted-foreground gap-1">
             <Eye className="w-3 h-3" />
             Visualização apenas
           </Badge>
@@ -122,11 +121,11 @@ export default function PortalCards() {
       </div>
 
       {policies.length === 0 ? (
-        <Card className="bg-black/70 border-white/[0.06] backdrop-blur-2xl">
+        <Card className="bg-card/80 border-border backdrop-blur-xl">
           <CardContent className="p-8 text-center">
-            <CreditCard className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-            <p className="text-zinc-500 font-light">Nenhuma carteirinha disponível.</p>
-            <p className="text-zinc-600 text-sm mt-1">
+            <CreditCard className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
+            <p className="text-muted-foreground font-light">Nenhuma carteirinha disponível.</p>
+            <p className="text-muted-foreground/70 text-sm mt-1">
               Suas carteirinhas aparecerão aqui quando houver seguros ativos.
             </p>
           </CardContent>
@@ -151,13 +150,13 @@ export default function PortalCards() {
         </div>
       )}
 
-      <Card className="bg-black/70 border-white/[0.06] backdrop-blur-2xl">
+      <Card className="bg-card/80 border-border backdrop-blur-xl">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 bg-zinc-900 rounded-lg flex items-center justify-center flex-shrink-0 border border-white/[0.06]">
-              <AlertCircle className="w-4 h-4 text-zinc-500" />
+            <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
+              <AlertCircle className="w-4 h-4 text-muted-foreground" />
             </div>
-            <p className="text-sm text-zinc-500 font-light">
+            <p className="text-sm text-muted-foreground font-light">
               Apresente esta carteirinha digital em caso de sinistro ou quando solicitado.
             </p>
           </div>
