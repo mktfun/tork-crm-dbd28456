@@ -67,7 +67,7 @@ export default function PortalWizard() {
           variant="ghost"
           size="sm"
           onClick={() => navigate(`/${brokerageSlug}/portal/home`)}
-          className="text-zinc-400 hover:text-white"
+          className="text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
@@ -85,16 +85,16 @@ export default function PortalWizard() {
           variant="ghost"
           size="sm"
           onClick={() => navigate(`/${brokerageSlug}/portal/home`)}
-          className="text-zinc-400 hover:text-white"
+          className="text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
 
-        <h2 className="text-xl font-light text-white tracking-wide">
+        <h2 className="text-xl font-light text-foreground tracking-wide">
           {type === 'sinistro' ? 'Avisar Sinistro' : 'Nova Cotação'}
         </h2>
-        <p className="text-zinc-500 text-sm">Selecione o tipo de seguro:</p>
+        <p className="text-muted-foreground text-sm">Selecione o tipo de seguro:</p>
 
         <div className="grid grid-cols-2 gap-3">
           {RAMOS.map((ramo) => {
@@ -102,14 +102,14 @@ export default function PortalWizard() {
             return (
               <Card
                 key={ramo.id}
-                className="bg-black/70 border-white/[0.06] backdrop-blur-2xl cursor-pointer hover:bg-zinc-900/50 hover:border-zinc-600/30 transition-colors"
+                className="bg-card/80 border-border backdrop-blur-xl cursor-pointer hover:bg-accent hover:border-primary/30 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
                 onClick={() => setSelectedRamo(ramo.id)}
               >
                 <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
-                  <div className="w-12 h-12 bg-zinc-800/80 rounded-xl flex items-center justify-center border border-white/[0.06]">
-                    <Icon className="w-6 h-6 text-zinc-400" />
+                  <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center border border-border">
+                    <Icon className="w-6 h-6 text-muted-foreground" />
                   </div>
-                  <span className="text-sm text-white font-light">{ramo.label}</span>
+                  <span className="text-sm text-foreground font-light">{ramo.label}</span>
                 </CardContent>
               </Card>
             );
@@ -137,7 +137,7 @@ export default function PortalWizard() {
       case 'smartphone':
         return <SmartphoneWizard onComplete={handleComplete} />;
       default:
-        return <p className="text-zinc-400">Wizard não encontrado.</p>;
+        return <p className="text-muted-foreground">Wizard não encontrado.</p>;
     }
   };
 
@@ -147,7 +147,7 @@ export default function PortalWizard() {
         variant="ghost"
         size="sm"
         onClick={() => setSelectedRamo(null)}
-        className="text-zinc-400 hover:text-white"
+        className="text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="w-4 h-4 mr-2" />
         Trocar ramo

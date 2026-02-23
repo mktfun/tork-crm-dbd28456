@@ -42,7 +42,6 @@ export default function PortalProfile() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [slug, setSlug] = useState('');
 
-  // Hook centralizado de permissões
   const { canEditProfile, isLoading: permissionsLoading } = usePortalPermissions();
 
   useEffect(() => {
@@ -156,43 +155,42 @@ export default function PortalProfile() {
   if (isLoading || permissionsLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-8 w-48 bg-zinc-800" />
-        <Skeleton className="h-64 w-full bg-zinc-800" />
+        <Skeleton className="h-8 w-48 bg-muted" />
+        <Skeleton className="h-64 w-full bg-muted" />
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-light text-white tracking-wide">Meus Dados</h2>
+      <h2 className="text-xl font-light text-foreground tracking-wide">Meus Dados</h2>
 
-      {/* Alert de restrição de edição */}
       {!canEditProfile && (
-        <Alert className="bg-zinc-900/80 border-zinc-700/50 text-zinc-300">
-          <Lock className="h-4 w-4 text-zinc-400" />
-          <AlertDescription className="text-zinc-400">
+        <Alert className="bg-muted/80 border-border text-foreground">
+          <Lock className="h-4 w-4 text-muted-foreground" />
+          <AlertDescription className="text-muted-foreground">
             As alterações de cadastro devem ser solicitadas diretamente à sua corretora.
           </AlertDescription>
         </Alert>
       )}
 
       {/* Profile Card */}
-      <Card className="bg-[#0A0A0A] border-white/5 backdrop-blur-xl">
+      <Card className="bg-card border-border backdrop-blur-xl">
         <CardHeader className="pb-2">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gradient-to-br from-[#D4AF37] to-[#C5A028] rounded-full flex items-center justify-center shadow-lg shadow-[#D4AF37]/20">
               <User className="w-6 h-6 text-black" />
             </div>
             <div>
-              <CardTitle className="text-lg text-white font-light">{clientName}</CardTitle>
-              <p className="text-sm text-zinc-500">Segurado</p>
+              <CardTitle className="text-lg text-foreground font-light">{clientName}</CardTitle>
+              <p className="text-sm text-muted-foreground">Segurado</p>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Phone */}
           <div className="space-y-2">
-            <Label className="text-zinc-400 text-sm font-light flex items-center gap-2">
+            <Label className="text-muted-foreground text-sm font-light flex items-center gap-2">
               <Phone className="w-4 h-4" /> Telefone
             </Label>
             <Input
@@ -202,7 +200,7 @@ export default function PortalProfile() {
               onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
               maxLength={15}
               readOnly={!canEditProfile}
-              className={`bg-zinc-950/50 border-white/10 text-white h-11 ${
+              className={`bg-muted/50 border-input text-foreground h-11 ${
                 canEditProfile 
                   ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
                   : 'cursor-not-allowed opacity-60'
@@ -212,7 +210,7 @@ export default function PortalProfile() {
 
           {/* Email */}
           <div className="space-y-2">
-            <Label className="text-zinc-400 text-sm font-light flex items-center gap-2">
+            <Label className="text-muted-foreground text-sm font-light flex items-center gap-2">
               <Mail className="w-4 h-4" /> Email
             </Label>
             <Input
@@ -221,7 +219,7 @@ export default function PortalProfile() {
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               readOnly={!canEditProfile}
-              className={`bg-zinc-950/50 border-white/10 text-white h-11 ${
+              className={`bg-muted/50 border-input text-foreground h-11 ${
                 canEditProfile 
                   ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
                   : 'cursor-not-allowed opacity-60'
@@ -231,7 +229,7 @@ export default function PortalProfile() {
 
           {/* CEP */}
           <div className="space-y-2">
-            <Label className="text-zinc-400 text-sm font-light">CEP</Label>
+            <Label className="text-muted-foreground text-sm font-light">CEP</Label>
             <Input
               type="text"
               placeholder="00000-000"
@@ -239,7 +237,7 @@ export default function PortalProfile() {
               onChange={(e) => setForm({ ...form, cep: formatCep(e.target.value) })}
               maxLength={9}
               readOnly={!canEditProfile}
-              className={`bg-zinc-950/50 border-white/10 text-white h-11 ${
+              className={`bg-muted/50 border-input text-foreground h-11 ${
                 canEditProfile 
                   ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
                   : 'cursor-not-allowed opacity-60'
@@ -249,7 +247,7 @@ export default function PortalProfile() {
 
           {/* Address */}
           <div className="space-y-2">
-            <Label className="text-zinc-400 text-sm font-light flex items-center gap-2">
+            <Label className="text-muted-foreground text-sm font-light flex items-center gap-2">
               <MapPin className="w-4 h-4" /> Endereço
             </Label>
             <Input
@@ -258,7 +256,7 @@ export default function PortalProfile() {
               value={form.address || ''}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
               readOnly={!canEditProfile}
-              className={`bg-zinc-950/50 border-white/10 text-white h-11 ${
+              className={`bg-muted/50 border-input text-foreground h-11 ${
                 canEditProfile 
                   ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
                   : 'cursor-not-allowed opacity-60'
@@ -269,14 +267,14 @@ export default function PortalProfile() {
           {/* City / State */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-zinc-400 text-sm font-light">Cidade</Label>
+              <Label className="text-muted-foreground text-sm font-light">Cidade</Label>
               <Input
                 type="text"
                 placeholder="Cidade"
                 value={form.city || ''}
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
                 readOnly={!canEditProfile}
-                className={`bg-zinc-950/50 border-white/10 text-white h-11 ${
+                className={`bg-muted/50 border-input text-foreground h-11 ${
                   canEditProfile 
                     ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
                     : 'cursor-not-allowed opacity-60'
@@ -284,7 +282,7 @@ export default function PortalProfile() {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-zinc-400 text-sm font-light">Estado</Label>
+              <Label className="text-muted-foreground text-sm font-light">Estado</Label>
               <Input
                 type="text"
                 placeholder="UF"
@@ -292,7 +290,7 @@ export default function PortalProfile() {
                 onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })}
                 maxLength={2}
                 readOnly={!canEditProfile}
-                className={`bg-zinc-950/50 border-white/10 text-white h-11 ${
+                className={`bg-muted/50 border-input text-foreground h-11 ${
                   canEditProfile 
                     ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
                     : 'cursor-not-allowed opacity-60'
@@ -301,12 +299,12 @@ export default function PortalProfile() {
             </div>
           </div>
 
-          {/* Save Button - only show if editing is allowed */}
+          {/* Save Button */}
           {canEditProfile && (
             <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="w-full bg-white text-black font-medium hover:bg-zinc-200 h-12"
+              className="w-full bg-foreground text-background font-medium hover:bg-foreground/90 h-12"
             >
               {isSaving ? (
                 <>
@@ -324,12 +322,12 @@ export default function PortalProfile() {
         </CardContent>
       </Card>
 
-      {/* Change Password - always available */}
-      <Card className="bg-[#0A0A0A] border-white/5 backdrop-blur-xl">
+      {/* Change Password */}
+      <Card className="bg-card border-border backdrop-blur-xl">
         <CardContent className="p-4">
           <Button
             variant="outline"
-            className="w-full border-white/10 text-zinc-400 hover:bg-zinc-800 hover:text-white h-12"
+            className="w-full border-border text-muted-foreground hover:bg-accent hover:text-foreground h-12"
             onClick={() => navigate(`/${slug}/portal/change-password`)}
           >
             <KeyRound className="w-4 h-4 mr-2" />

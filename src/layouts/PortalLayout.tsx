@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Home, FileText, CreditCard, User, LogOut, Loader2, Shield, Inbox } from 'lucide-react';
+import { Home, FileText, CreditCard, User, LogOut, Loader2, Shield, Inbox, Sun, Moon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTheme } from 'next-themes';
 
 interface PortalClient {
   id: string;
@@ -36,6 +37,7 @@ export function PortalLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { brokerageSlug } = useParams<{ brokerageSlug: string }>();
+  const { theme, setTheme } = useTheme();
   const [client, setClient] = useState<PortalClient | null>(null);
   const [brokerage, setBrokerage] = useState<PortalBrokerage | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,11 +63,9 @@ export function PortalLayout() {
       if (clientData && storedSlug === brokerageSlug) {
         setClient(JSON.parse(clientData));
 
-        // Load brokerage from session or fetch it
         if (brokerageData) {
           setBrokerage(JSON.parse(brokerageData));
         } else if (brokerageSlug) {
-          // Fetch brokerage data if not in session
           try {
             const { data } = await supabase.rpc('get_brokerage_by_slug', {
               p_slug: brokerageSlug
@@ -86,20 +86,18 @@ export function PortalLayout() {
     loadData();
   }, [brokerageSlug]);
 
-  // Loading state - Black & Silver
+  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(39,39,42,0.25)_0%,_transparent_55%)]" />
         <div className="relative flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 text-zinc-400 animate-spin" />
+          <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
           <p className="text-muted-foreground tracking-widest text-sm font-light">CARREGANDO</p>
         </div>
       </div>
     );
   }
 
-  // Navegação em progresso
   if (!client) {
     return null;
   }
@@ -115,11 +113,10 @@ export function PortalLayout() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Header - Black & Silver */}
-      <header className="bg-background/80 backdrop-blur-2xl border-b border-white/[0.06] p-4 sticky top-0 z-10">
+      {/* Header */}
+      <header className="bg-background/80 backdrop-blur-2xl border-b border-border px-3 py-3 sm:p-4 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* Brokerage Logo */}
             {brokerage?.logo_url ? (
               <img
                 src={brokerage.logo_url}
@@ -140,30 +137,46 @@ export function PortalLayout() {
               </p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleLogout}
-            className="text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
-          >
-            <LogOut className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="text-muted-foreground hover:text-foreground transition-all duration-300"
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-5 h-5 transition-transform duration-500 rotate-0 hover:rotate-90" />
+              ) : (
+                <Moon className="w-5 h-5 transition-transform duration-500 rotate-0 hover:-rotate-12" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleLogout}
+              className="text-muted-foreground hover:text-foreground hover:bg-accent"
+            >
+              <LogOut className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="p-4 max-w-lg mx-auto">
-        <Outlet />
+      <main className="px-3 py-4 sm:px-6 sm:py-6 max-w-lg mx-auto">
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <Outlet />
+        </div>
       </main>
 
-      {/* Bottom Navigation - Black & Silver */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-2xl border-t border-white/[0.06] safe-area-pb">
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-2xl border-t border-border safe-area-pb">
         <div className="max-w-lg mx-auto flex justify-around py-3">
           <Button
             variant="ghost"
-            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${isActive('home')
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:text-zinc-300'
+            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('home')
+                ? 'text-primary scale-110'
+                : 'text-muted-foreground hover:text-foreground'
               }`}
             onClick={() => navigate(`/${brokerageSlug}/portal/home`)}
           >
@@ -174,9 +187,9 @@ export function PortalLayout() {
           {portalConfig.show_policies && (
             <Button
               variant="ghost"
-              className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${isActive('policies')
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-zinc-300'
+              className={`flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('policies')
+                  ? 'text-primary scale-110'
+                  : 'text-muted-foreground hover:text-foreground'
                 }`}
               onClick={() => navigate(`/${brokerageSlug}/portal/policies`)}
             >
@@ -188,9 +201,9 @@ export function PortalLayout() {
           {portalConfig.show_cards && (
             <Button
               variant="ghost"
-              className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${isActive('cards')
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-zinc-300'
+              className={`flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('cards')
+                  ? 'text-primary scale-110'
+                  : 'text-muted-foreground hover:text-foreground'
                 }`}
               onClick={() => navigate(`/${brokerageSlug}/portal/cards`)}
             >
@@ -201,9 +214,9 @@ export function PortalLayout() {
 
           <Button
             variant="ghost"
-            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${isActive('solicitacoes')
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:text-zinc-300'
+            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('solicitacoes')
+                ? 'text-primary scale-110'
+                : 'text-muted-foreground hover:text-foreground'
               }`}
             onClick={() => navigate(`/${brokerageSlug}/portal/solicitacoes`)}
           >
@@ -213,9 +226,9 @@ export function PortalLayout() {
 
           <Button
             variant="ghost"
-            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 ${isActive('profile')
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:text-zinc-300'
+            className={`flex flex-col items-center gap-1 h-auto py-2 px-4 transition-all duration-200 ${isActive('profile')
+                ? 'text-primary scale-110'
+                : 'text-muted-foreground hover:text-foreground'
               }`}
             onClick={() => navigate(`/${brokerageSlug}/portal/profile`)}
           >
