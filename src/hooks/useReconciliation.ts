@@ -40,6 +40,8 @@ export interface PendingReconciliationItem {
     insurer_name?: string | null;
     branch_name?: string | null;
     item_name?: string | null;
+    /** Origin entity type: 'policy', 'legacy_transaction', or null for manual entries */
+    related_entity_type?: string | null;
 }
 // ...
 
@@ -185,7 +187,7 @@ export function usePendingReconciliation(
                     status: item.status || 'pending',
                     matched_id: null,
                     type: itemType,
-                    bank_account_id: item.bank_account_id || null,
+                    bank_account_id: item.bank_account_id ?? null,
                     total_amount: item.total_amount ?? null,
                     paid_amount: item.paid_amount ?? null,
                     remaining_amount: item.remaining_amount ?? null,
@@ -193,6 +195,7 @@ export function usePendingReconciliation(
                     insurer_name: item.insurer_name ?? null,
                     branch_name: item.branch_name ?? null,
                     item_name: item.item_name ?? null,
+                    related_entity_type: item.related_entity_type ?? null,
                 };
             });
 

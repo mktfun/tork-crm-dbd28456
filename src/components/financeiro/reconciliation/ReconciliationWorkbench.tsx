@@ -221,7 +221,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const [systemSearch, setSystemSearch] = useState('');
     const [showPartialModal, setShowPartialModal] = useState(false);
     const [showUnassigned, setShowUnassigned] = useState(false);
-    
+
     // On-demand bank selection modal state
     const [showBankModal, setShowBankModal] = useState(false);
     const [selectedBankForMatch, setSelectedBankForMatch] = useState('');
@@ -290,21 +290,37 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const isPerfectMatch = hasBothSides && Math.abs(diff) < 0.01;
     const isMissingTransaction = hasLeftSelection && !hasRightSelection;
 
+    /**
+     * True if any selected System item is a pure manual entry.
+     * Manual = related_entity_type is null (not 'policy' and not 'legacy_transaction').
+     * Partial reconciliation is only allowed for policy commissions and legacy commissions.
+     */
+    const hasManualSystemItems = useMemo(() => {
+        if (selectedSystemIds.length === 0) return false;
+        return selectedSystemIds.some(id => {
+            const item = systemItems.find(i => i.id === id);
+            if (!item) return false;
+            const entityType = item.related_entity_type;
+            // Allow partial for policies and legacy commissions, block for manual entries (null)
+            return entityType !== 'policy' && entityType !== 'legacy_transaction';
+        });
+    }, [selectedSystemIds, systemItems]);
+
     // Determine the target bank for reconciliation
     const getTargetBankId = (): string | null => {
         // If a specific bank is selected (Mode B), use it
         if (bankAccountId) return bankAccountId;
-        
+
         // Check if any selected statement item has a bank
         const selectedStmts = statementItems.filter(i => selectedStatementIds.includes(i.id));
         const stmtWithBank = selectedStmts.find(i => i.bank_account_id);
         if (stmtWithBank?.bank_account_id) return stmtWithBank.bank_account_id;
-        
+
         // Check if any selected system item has a bank
         const selectedSys = systemItems.filter(i => selectedSystemIds.includes(i.id));
         const sysWithBank = selectedSys.find(i => i.bank_account_id);
         if (sysWithBank?.bank_account_id) return sysWithBank.bank_account_id;
-        
+
         return null; // Both sides unassigned
     };
 
@@ -335,12 +351,19 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
 
     // Reconcile handler (1:1 or N:M via multiple calls)
     const handleReconcile = async () => {
-        // If mismatch detected, open partial modal instead
+        // If mismatch detected, check if partial is allowed
         if (!isPerfectMatch && hasBothSides) {
+            if (hasManualSystemItems) {
+                toast.error(
+                    'Lançamentos manuais exigem valor exato. Apenas comissões de apólices aceitam baixa parcial.',
+                    { duration: 5000 }
+                );
+                return;
+            }
             setShowPartialModal(true);
             return;
         }
-        
+
         const targetBankId = getTargetBankId();
         if (!targetBankId) {
             // Both sides unassigned -> ask user which bank
@@ -348,7 +371,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
             setShowBankModal(true);
             return;
         }
-        
+
         await executeReconcile(targetBankId);
     };
 
@@ -620,7 +643,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                 </Button>
                             )}
 
-                            {hasBothSides && !isPerfectMatch && (
+                            {hasBothSides && !isPerfectMatch && !hasManualSystemItems && (
                                 <Button
                                     size="sm"
                                     className="gap-2 font-semibold bg-amber-600 hover:bg-amber-700 text-white"
@@ -628,6 +651,18 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                 >
                                     <AlertTriangle className="w-4 h-4" />
                                     Baixa Parcial
+                                </Button>
+                            )}
+
+                            {hasBothSides && !isPerfectMatch && hasManualSystemItems && (
+                                <Button
+                                    size="sm"
+                                    disabled
+                                    title="Lançamentos manuais exigem valor exato. Baixa parcial não permitida."
+                                    className="gap-2 font-semibold opacity-50 cursor-not-allowed bg-amber-600 text-white"
+                                >
+                                    <AlertTriangle className="w-4 h-4" />
+                                    Valores Divergentes
                                 </Button>
                             )}
 
