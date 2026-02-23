@@ -45,7 +45,7 @@ export const usePartialLead = () => {
         .single();
 
       if (error) {
-        console.error('❌ Erro ao salvar lead parcial:', error);
+        console.warn('⚠️ Lead parcial não salvo (não-crítico):', error);
         return null;
       }
 
@@ -57,7 +57,7 @@ export const usePartialLead = () => {
       
       return id;
     } catch (error) {
-      console.error('💥 Erro crítico ao salvar lead parcial:', error);
+      console.warn('⚠️ Lead parcial não salvo (não-crítico):', error);
       return null;
     }
   }, []);
@@ -78,10 +78,10 @@ export const usePartialLead = () => {
         .eq('id', leadId);
 
       if (error) {
-        console.error('❌ Erro ao atualizar step index:', error);
+        console.warn('⚠️ Erro ao atualizar step index (não-crítico):', error);
       }
     } catch (error) {
-      console.error('💥 Erro ao atualizar step index:', error);
+      console.warn('⚠️ Erro ao atualizar step index (não-crítico):', error);
     }
   }, []);
 
