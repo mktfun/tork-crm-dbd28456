@@ -63,6 +63,26 @@ export const LifeWizard: React.FC<LifeWizardProps> = ({ onComplete }) => {
   const [email, setEmail] = React.useState("");
   const [profession, setProfession] = React.useState("");
 
+  // Pré-preenchimento via sessão do portal
+  React.useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('portal_client');
+      if (!raw) return;
+      const client = JSON.parse(raw);
+      if (client.name && !name) setName(client.name);
+      if (client.email && !email) setEmail(client.email);
+      if (client.phone && !phone) setPhone(formatPhone(client.phone));
+      if (client.cpf_cnpj) {
+        const digits = client.cpf_cnpj.replace(/\D/g, '');
+        if (digits.length <= 11) {
+          setCpf(formatCPF(client.cpf_cnpj));
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao pré-preencher:', e);
+    }
+  }, []);
+
   // Step 2: Health Profile
   const [isSmoker, setIsSmoker] = React.useState(false);
   const [practicesSports, setPracticesSports] = React.useState(false);

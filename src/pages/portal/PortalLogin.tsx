@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Shield, Loader2, User, AlertCircle } from 'lucide-react';
+import { Shield, Loader2, User, AlertCircle, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -27,6 +27,7 @@ interface ClientMatch {
   email: string | null;
   cpf_cnpj: string | null;
   user_id: string;
+  portal_first_access: boolean;
 }
 
 export default function PortalLogin() {
@@ -40,10 +41,15 @@ export default function PortalLogin() {
   const [isValidBrokerage, setIsValidBrokerage] = useState(true);
   const [matchedClients, setMatchedClients] = useState<ClientMatch[]>([]);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
+
+  // Password stage states
+  const [selectedClient, setSelectedClient] = useState<ClientMatch | null>(null);
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [password, setPassword] = useState('');
+
   const navigate = useNavigate();
 
   const formatIdentifier = (value: string) => {
-    // Se o valor conter apenas números, pontos e traços, tratamos como CPF mascarado
     if (/^[\d.-]+$/.test(value)) {
       const digits = value.replace(/\D/g, '');
       if (digits.length <= 11) {
@@ -97,10 +103,15 @@ export default function PortalLogin() {
     fetchBrokerage();
   }, [brokerageSlug]);
 
+  const goToPasswordStage = (client: ClientMatch) => {
+    setSelectedClient(client);
+    setNeedsPassword(true);
+    setIsLoading(false);
+  };
+
   const handleLogin = async () => {
     let cleanIdentifier = identifier.trim();
 
-    // Se for um CPF formatado, removemos a pontuação antes de mandar para o backend
     if (/^[\d.-]+$/.test(cleanIdentifier) && cleanIdentifier.replace(/\D/g, '').length === 11) {
       cleanIdentifier = cleanIdentifier.replace(/\D/g, '');
     }
@@ -118,35 +129,14 @@ export default function PortalLogin() {
     setIsLoading(true);
     setError('');
 
-    // DEBUG: Log de pré-vôo
-    console.log('🔍 DEBUG LOGIN - Enviando:', {
-      slug: brokerageSlug,
-      identifier: cleanIdentifier,
-      identifierLength: cleanIdentifier.length
-    });
-
     try {
-      // Chama a nova função de identificação sem senha
       const { data, error: rpcError } = await supabase.rpc('identify_portal_client', {
         p_identifier: cleanIdentifier,
         p_brokerage_slug: brokerageSlug
       });
 
-      // DEBUG: Log de resposta
-      console.log('📊 DEBUG LOGIN - Resposta RPC:', {
-        data,
-        error: rpcError,
-        dataType: typeof data,
-        dataLength: Array.isArray(data) ? data.length : 'não é array'
-      });
-
       if (rpcError) {
-        console.error('❌ RPC Error completo:', {
-          message: rpcError.message,
-          code: rpcError.code,
-          details: rpcError.details,
-          hint: rpcError.hint
-        });
+        console.error('RPC Error:', rpcError);
         setError(`Erro ao realizar login (${rpcError.code || 'RPC_FAIL'})`);
         setIsLoading(false);
         return;
@@ -155,18 +145,13 @@ export default function PortalLogin() {
       const clients = (data as unknown as ClientMatch[]) || [];
 
       if (clients.length === 0) {
-        // Nenhum cliente encontrado - mensagem detalhada para debug
-        console.warn('⚠️ Nenhum cliente encontrado. Params:', { slug: brokerageSlug, identifier: cleanIdentifier });
-        setError(`Cliente não encontrado para esta corretora (Slug: ${brokerageSlug})`);
+        setError(`Cliente não encontrado para esta corretora`);
         setIsLoading(false);
         return;
       }
 
-      console.log('✅ Cliente(s) encontrado(s):', clients.length, clients);
-
       if (clients.length === 1) {
-        // Login direto - único cliente encontrado
-        completeLogin(clients[0]);
+        goToPasswordStage(clients[0]);
         return;
       }
 
@@ -176,7 +161,7 @@ export default function PortalLogin() {
       setIsLoading(false);
 
     } catch (err) {
-      console.error('💥 Login catch error:', err);
+      console.error('Login catch error:', err);
       setError('Erro inesperado ao realizar login');
       setIsLoading(false);
     }
@@ -191,11 +176,9 @@ export default function PortalLogin() {
     const cleanInput = confirmationInput.trim().toLowerCase();
     const cleanCpf = confirmationInput.replace(/\D/g, '');
 
-    // Filtra pelo CPF ou email
     const matched = matchedClients.find(client => {
       const clientCpf = client.cpf_cnpj?.replace(/\D/g, '') || '';
       const clientEmail = client.email?.toLowerCase() || '';
-
       return clientCpf === cleanCpf || clientEmail === cleanInput;
     });
 
@@ -204,25 +187,67 @@ export default function PortalLogin() {
       return;
     }
 
-    setIsLoading(true);
-    completeLogin(matched);
+    goToPasswordStage(matched);
   };
 
-  const completeLogin = (client: ClientMatch) => {
-    // Salva os dados na sessão
-    sessionStorage.setItem('portal_client', JSON.stringify(client));
-    sessionStorage.setItem('portal_brokerage_slug', brokerageSlug!);
-    if (brokerage) {
-      sessionStorage.setItem('portal_brokerage', JSON.stringify(brokerage));
+  const handlePasswordSubmit = async () => {
+    if (!password.trim() || !selectedClient) {
+      setError('Digite sua senha');
+      return;
     }
 
-    toast.success(`Bem-vindo, ${client.name?.split(' ')[0]}!`);
-    navigate(`/${brokerageSlug}/portal/home`, { replace: true });
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const { data, error: rpcError } = await supabase.rpc(
+        'authenticate_portal_client',
+        { p_client_id: selectedClient.id, p_password: password }
+      );
+
+      if (rpcError) {
+        setError('Erro ao validar senha');
+        setIsLoading(false);
+        return;
+      }
+
+      if (data === false) {
+        setError('Senha incorreta. Tente novamente.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Login OK → salvar sessão COM portal_first_access
+      const clientSession = {
+        ...selectedClient,
+        portal_first_access: selectedClient.portal_first_access,
+      };
+
+      sessionStorage.setItem('portal_client', JSON.stringify(clientSession));
+      sessionStorage.setItem('portal_brokerage_slug', brokerageSlug!);
+      if (brokerage) {
+        sessionStorage.setItem('portal_brokerage', JSON.stringify(brokerage));
+      }
+
+      toast.success(`Bem-vindo, ${selectedClient.name?.split(' ')[0]}!`);
+
+      // Redirect baseado no primeiro acesso
+      if (selectedClient.portal_first_access) {
+        navigate(`/${brokerageSlug}/portal/onboarding`, { replace: true });
+      } else {
+        navigate(`/${brokerageSlug}/portal/home`, { replace: true });
+      }
+    } catch (err) {
+      setError('Erro inesperado');
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      if (needsConfirmation) {
+      if (needsPassword) {
+        handlePasswordSubmit();
+      } else if (needsConfirmation) {
         handleConfirmation();
       } else {
         handleLogin();
@@ -232,12 +257,15 @@ export default function PortalLogin() {
 
   const resetForm = () => {
     setNeedsConfirmation(false);
+    setNeedsPassword(false);
+    setSelectedClient(null);
+    setPassword('');
     setMatchedClients([]);
     setConfirmationInput('');
     setError('');
   };
 
-  // Loading state - Black & Silver
+  // Loading state
   if (isLoadingBrokerage) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
@@ -250,7 +278,7 @@ export default function PortalLogin() {
     );
   }
 
-  // Invalid brokerage - Black & Silver
+  // Invalid brokerage
   if (!isValidBrokerage) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black p-4">
@@ -275,7 +303,6 @@ export default function PortalLogin() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-black p-4">
-      {/* Subtle radial gradient - Silver */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(39,39,42,0.25)_0%,_transparent_55%)] pointer-events-none" />
 
       <Card
@@ -303,8 +330,48 @@ export default function PortalLogin() {
 
           {/* Login Form */}
           <div className="space-y-4">
-            {!needsConfirmation ? (
-              // Formulário inicial - apenas identificador
+            {needsPassword && selectedClient ? (
+              // Password stage
+              <div className="space-y-4">
+                {selectedClient.portal_first_access && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                    <p className="text-amber-200 text-sm font-medium">
+                      Primeiro acesso detectado!
+                    </p>
+                    <p className="text-amber-400/70 text-xs mt-1">
+                      Sua senha provisória é <strong className="text-amber-200">123456</strong>
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label className="text-zinc-400 text-sm font-light tracking-wide">
+                    Senha
+                  </Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                    <Input
+                      type="password"
+                      placeholder="Digite sua senha"
+                      value={password}
+                      onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                      onKeyPress={handleKeyPress}
+                      className="bg-black/60 border-zinc-700/50 text-white placeholder:text-zinc-600 pl-10 h-12 rounded-xl focus:border-zinc-400/60 focus:ring-1 focus:ring-zinc-400/20"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="text-zinc-500 text-sm hover:text-zinc-300 transition-colors"
+                >
+                  ← Voltar
+                </button>
+              </div>
+            ) : !needsConfirmation ? (
+              // Initial form
               <div className="space-y-2">
                 <Label htmlFor="identifier" className="text-zinc-400 text-sm font-light tracking-wide">
                   CPF, E-mail ou Nome Completo
@@ -323,7 +390,7 @@ export default function PortalLogin() {
                 </div>
               </div>
             ) : (
-              // Formulário de confirmação (homônimos)
+              // Confirmation form (homônimos)
               <div className="space-y-4">
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
                   <div className="flex items-start gap-3">
@@ -373,7 +440,7 @@ export default function PortalLogin() {
 
             {/* Silver Metallic Button */}
             <Button
-              onClick={needsConfirmation ? handleConfirmation : handleLogin}
+              onClick={needsPassword ? handlePasswordSubmit : needsConfirmation ? handleConfirmation : handleLogin}
               className="w-full h-12 bg-zinc-100 hover:bg-white text-zinc-950 font-semibold rounded-xl text-base tracking-wide transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_-5px_rgba(255,255,255,0.5)]"
               disabled={isLoading}
             >
@@ -382,6 +449,8 @@ export default function PortalLogin() {
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Entrando...
                 </>
+              ) : needsPassword ? (
+                'Entrar'
               ) : needsConfirmation ? (
                 'Confirmar e Entrar'
               ) : (

@@ -3286,6 +3286,10 @@ export type Database = {
           transaction_id: string
         }[]
       }
+      authenticate_portal_client: {
+        Args: { p_client_id: string; p_password: string }
+        Returns: boolean
+      }
       backfill_legacy_transactions: { Args: never; Returns: Json }
       batch_update_transactions: {
         Args: { p_user_id: string; updates: Json }
@@ -4114,6 +4118,7 @@ export type Database = {
           email: string
           id: string
           name: string
+          portal_first_access: boolean
           user_id: string
         }[]
       }
@@ -4297,6 +4302,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      update_portal_client_password: {
+        Args: { p_client_id: string; p_new_password: string }
+        Returns: boolean
       }
       update_portal_profile: {
         Args: {

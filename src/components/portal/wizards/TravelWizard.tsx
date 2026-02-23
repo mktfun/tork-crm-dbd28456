@@ -74,6 +74,33 @@ export const TravelWizard: React.FC<TravelWizardProps> = ({ onComplete }) => {
     { id: "1", name: "", cpf: "", birthDate: "" },
   ]);
 
+  // Pré-preenchimento via sessão do portal
+  React.useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('portal_client');
+      if (!raw) return;
+      const client = JSON.parse(raw);
+      if (client.phone && !contactPhone) setContactPhone(formatPhone(client.phone));
+      if (client.email && !contactEmail) setContactEmail(client.email);
+      // Preencher primeiro viajante
+      if (client.name || client.cpf_cnpj) {
+        setTravelers(prev => {
+          const first = prev[0];
+          if (!first) return prev;
+          const updated = { ...first };
+          if (client.name && !updated.name) updated.name = client.name;
+          if (client.cpf_cnpj && !updated.cpf) {
+            const digits = client.cpf_cnpj.replace(/\D/g, '');
+            if (digits.length <= 11) updated.cpf = formatCPF(client.cpf_cnpj);
+          }
+          return [updated, ...prev.slice(1)];
+        });
+      }
+    } catch (e) {
+      console.error('Erro ao pré-preencher:', e);
+    }
+  }, []);
+
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [touched, setTouched] = React.useState<Record<string, boolean>>({});
 

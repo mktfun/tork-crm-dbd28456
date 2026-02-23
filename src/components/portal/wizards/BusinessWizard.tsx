@@ -63,6 +63,26 @@ export const BusinessWizard: React.FC<BusinessWizardProps> = ({ onComplete }) =>
   const [phone, setPhone] = React.useState("");
   const [email, setEmail] = React.useState("");
 
+  // Pré-preenchimento via sessão do portal
+  React.useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('portal_client');
+      if (!raw) return;
+      const client = JSON.parse(raw);
+      if (client.name && !contactName) setContactName(client.name);
+      if (client.email && !email) setEmail(client.email);
+      if (client.phone && !phone) setPhone(formatPhone(client.phone));
+      if (client.cpf_cnpj) {
+        const digits = client.cpf_cnpj.replace(/\D/g, '');
+        if (digits.length > 11) {
+          setCnpj(formatCNPJ(client.cpf_cnpj));
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao pré-preencher:', e);
+    }
+  }, []);
+
   // Step 2: Activity
   const [activityType, setActivityType] = React.useState("commerce");
   const [employeeCount, setEmployeeCount] = React.useState("1-10");
