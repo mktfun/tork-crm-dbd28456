@@ -301,9 +301,10 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
         return selectedSystemIds.some(id => {
             const item = systemItems.find(i => i.id === id);
             if (!item) return false;
-            const entityType = item.related_entity_type;
-            // Allow partial for policies and legacy commissions, block for manual entries (null)
-            return entityType !== 'policy' && entityType !== 'legacy_transaction';
+            // If it's an automatic commission (by type OR description fallback), allow partial
+            if (item.is_automatic_commission) return false;
+            // Otherwise it's manual → block partial
+            return true;
         });
     }, [selectedSystemIds, systemItems]);
 
