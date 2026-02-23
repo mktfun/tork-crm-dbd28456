@@ -42,6 +42,8 @@ export interface PendingReconciliationItem {
     item_name?: string | null;
     /** Origin entity type: 'policy', 'legacy_transaction', or null for manual entries */
     related_entity_type?: string | null;
+    /** Computed flag: true if this is an automatic commission (by entity type OR description fallback) */
+    is_automatic_commission?: boolean;
 }
 // ...
 
@@ -177,6 +179,16 @@ export function usePendingReconciliation(
                 const signedAmount = (itemType === 'expense' || itemType === 'despesa')
                     ? -Math.abs(remainingAmt)
                     : Math.abs(remainingAmt);
+
+                const entityType = item.related_entity_type ?? null;
+                const isKnownCommission =
+                    entityType === 'policy' ||
+                    entityType === 'legacy_transaction' ||
+                    (item.description && (
+                        item.description.toLowerCase().startsWith('comissão') ||
+                        item.description.toLowerCase().startsWith('comissao')
+                    ));
+
                 return {
                     source: 'system',
                     id: item.id,
@@ -195,7 +207,8 @@ export function usePendingReconciliation(
                     insurer_name: item.insurer_name ?? null,
                     branch_name: item.branch_name ?? null,
                     item_name: item.item_name ?? null,
-                    related_entity_type: item.related_entity_type ?? null,
+                    related_entity_type: entityType,
+                    is_automatic_commission: !!isKnownCommission,
                 };
             });
 
