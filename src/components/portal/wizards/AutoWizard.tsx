@@ -130,6 +130,30 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
   const [maritalStatus, setMaritalStatus] = React.useState("");
   const [profession, setProfession] = React.useState("");
 
+  // Pré-preenchimento via sessão do portal
+  React.useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('portal_client');
+      if (!raw) return;
+      const client = JSON.parse(raw);
+      if (client.name && !name) setName(client.name);
+      if (client.email && !email) setEmail(client.email);
+      if (client.phone && !phone) setPhone(formatPhone(client.phone));
+      if (client.cpf_cnpj) {
+        const digits = client.cpf_cnpj.replace(/\D/g, '');
+        if (digits.length > 11) {
+          setPersonType('pj');
+          setCpfCnpj(formatCNPJ(client.cpf_cnpj));
+        } else {
+          setPersonType('pf');
+          setCpfCnpj(formatCPF(client.cpf_cnpj));
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao pré-preencher:', e);
+    }
+  }, []);
+
   // Form state - Step 2 (Veículo + CEP)
   const [plate, setPlate] = React.useState("");
   const [model, setModel] = React.useState("");

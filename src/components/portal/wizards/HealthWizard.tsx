@@ -195,7 +195,25 @@ export const HealthWizard: React.FC<HealthWizardProps> = ({ onComplete }) => {
     loadConfig();
   }, []);
 
-  // Track ViewContent no Step 1
+  // Pré-preenchimento via sessão do portal
+  React.useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('portal_client');
+      if (!raw) return;
+      const client = JSON.parse(raw);
+      const updates: Partial<HealthWizardData> = {};
+      if (client.name && !data.name) updates.name = client.name;
+      if (client.email && !data.email) updates.email = client.email;
+      if (client.phone && !data.phone) updates.phone = client.phone;
+      if (Object.keys(updates).length > 0) {
+        saveData(updates);
+      }
+    } catch (e) {
+      console.error('Erro ao pré-preencher:', e);
+    }
+  }, []);
+
+
   React.useEffect(() => {
     if (currentStep === 0) {
       trackViewContent('Plano de Saúde');
