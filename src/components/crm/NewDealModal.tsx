@@ -29,9 +29,12 @@ interface NewDealModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultStageId?: string | null;
+  defaultClientId?: string;
+  defaultTitle?: string;
+  defaultNotes?: string;
 }
 
-export function NewDealModal({ open, onOpenChange, defaultStageId }: NewDealModalProps) {
+export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClientId, defaultTitle, defaultNotes }: NewDealModalProps) {
   const { user } = useAuth();
   const { stages, isLoading: loadingStages } = useCRMStages();
   const { createDeal, deals } = useCRMDeals();
@@ -53,16 +56,16 @@ export function NewDealModal({ open, onOpenChange, defaultStageId }: NewDealModa
   useEffect(() => {
     if (open) {
       setFormData({
-        title: '',
-        client_id: '',
+        title: defaultTitle || '',
+        client_id: defaultClientId || '',
         stage_id: defaultStageId || '',
         value: '',
         expected_close_date: '',
-        notes: ''
+        notes: defaultNotes || ''
       });
       setAutoFillApplied(false);
     }
-  }, [open, defaultStageId]);
+  }, [open, defaultStageId, defaultClientId, defaultTitle, defaultNotes]);
 
   // Fetch clients when modal opens
   useEffect(() => {
