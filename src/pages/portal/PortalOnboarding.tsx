@@ -30,7 +30,7 @@ export default function PortalOnboarding() {
   const [client, setClient] = useState<ClientData | null>(null);
   const [currentPassword, setCurrentPassword] = useState('123456');
   const [slug, setSlug] = useState('');
-  
+
   // Form data
   const [cpf, setCpf] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -39,24 +39,24 @@ export default function PortalOnboarding() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  
+
   const navigate = useNavigate();
 
   useEffect(() => {
     const storedClient = sessionStorage.getItem('portal_client');
     const storedSlug = sessionStorage.getItem('portal_brokerage_slug');
-    
+
     if (!storedClient || !storedSlug) {
       navigate('/');
       return;
     }
-    
+
     setSlug(storedSlug);
     const clientData = JSON.parse(storedClient);
     setClient(clientData);
-    
+
     setCurrentPassword(clientData.portal_password || '123456');
-    
+
     if (clientData.cpf_cnpj) setCpf(formatCpf(clientData.cpf_cnpj));
     if (clientData.birth_date) setBirthDate(clientData.birth_date);
     if (clientData.phone) setPhone(formatPhone(clientData.phone));
@@ -90,13 +90,13 @@ export default function PortalOnboarding() {
     const digits = cpf.replace(/\D/g, '');
     if (digits.length !== 11) return false;
     if (/^(\d)\1+$/.test(digits)) return false;
-    
+
     let sum = 0;
     for (let i = 0; i < 9; i++) sum += parseInt(digits[i]) * (10 - i);
     let check = 11 - (sum % 11);
     if (check >= 10) check = 0;
     if (check !== parseInt(digits[9])) return false;
-    
+
     sum = 0;
     for (let i = 0; i < 10; i++) sum += parseInt(digits[i]) * (11 - i);
     check = 11 - (sum % 11);
@@ -106,7 +106,7 @@ export default function PortalOnboarding() {
 
   const handleNext = () => {
     setError('');
-    
+
     if (step === 1) {
       const normalizedCpf = cpf.replace(/\D/g, '');
       if (!normalizedCpf || normalizedCpf.length < 11) {
@@ -118,7 +118,7 @@ export default function PortalOnboarding() {
         return;
       }
     }
-    
+
     if (step === 2) {
       if (!phone || phone.replace(/\D/g, '').length < 10) {
         setError('Telefone é obrigatório');
@@ -129,7 +129,7 @@ export default function PortalOnboarding() {
         return;
       }
     }
-    
+
     setStep(step + 1);
   };
 
@@ -140,7 +140,7 @@ export default function PortalOnboarding() {
 
   const handleSubmit = async () => {
     setError('');
-    
+
     if (!password || password.length < 6) {
       setError('A senha deve ter pelo menos 6 caracteres');
       return;
@@ -155,18 +155,18 @@ export default function PortalOnboarding() {
 
     try {
       const normalizedCpf = cpf.replace(/\D/g, '');
-      
-      const { data: existingClients, error: checkError } = await supabase
-        .from('clientes')
-        .select('id, name')
-        .eq('user_id', client.user_id)
-        .neq('id', client.id)
-        .or(`cpf_cnpj.ilike.%${normalizedCpf}%`);
+
+      const { data: dupCheck, error: checkError } = await supabase.rpc('check_portal_cpf_duplicate' as any, {
+        p_client_id: client.id,
+        p_user_id: client.user_id,
+        p_cpf: normalizedCpf
+      });
 
       if (checkError) throw checkError;
 
-      if (existingClients && existingClients.length > 0) {
-        setError(`Este CPF já está cadastrado para "${existingClients[0].name}". Entre em contato com a corretora.`);
+      const dupResult = dupCheck as any;
+      if (dupResult?.duplicate) {
+        setError(`Este CPF já está cadastrado para "${dupResult.name}". Entre em contato com a corretora.`);
         setIsLoading(false);
         return;
       }
@@ -189,7 +189,7 @@ export default function PortalOnboarding() {
       }
 
       const response = result as unknown as UpdateProfileResponse;
-      
+
       if (!response?.success) {
         setError(response?.error || 'Erro ao salvar dados');
         setIsLoading(false);
@@ -209,7 +209,7 @@ export default function PortalOnboarding() {
 
       toast.success('Cadastro atualizado com sucesso!');
       navigate(`/${slug}/portal/home`);
-      
+
     } catch (err) {
       console.error('Onboarding error:', err);
       setError('Erro ao salvar dados. Tente novamente.');
@@ -235,16 +235,15 @@ export default function PortalOnboarding() {
           <CardDescription className="text-muted-foreground">
             Complete seu cadastro para continuar
           </CardDescription>
-          
+
           {/* Progress Steps */}
           <div className="flex justify-center gap-2 pt-4">
             {steps.map((s) => (
               <div key={s.number} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
-                  step >= s.number 
-                    ? 'bg-gradient-to-br from-[#D4AF37] to-[#C5A028] text-black shadow-lg shadow-[#D4AF37]/20' 
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${step >= s.number
+                    ? 'bg-gradient-to-br from-[#D4AF37] to-[#C5A028] text-black shadow-lg shadow-[#D4AF37]/20'
                     : 'bg-muted text-muted-foreground border border-border'
-                }`}>
+                  }`}>
                   {step > s.number ? <Check className="w-4 h-4" /> : s.number}
                 </div>
                 {s.number < 3 && (
@@ -254,7 +253,7 @@ export default function PortalOnboarding() {
             ))}
           </div>
         </CardHeader>
-        
+
         <CardContent className="space-y-4">
           {/* Step 1: Identification */}
           {step === 1 && (
@@ -350,8 +349,8 @@ export default function PortalOnboarding() {
           {/* Navigation Buttons */}
           <div className="flex gap-3 pt-2">
             {step > 1 && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={handleBack}
                 className="flex-1 border-border text-muted-foreground hover:bg-accent hover:text-foreground h-12"
               >
@@ -359,9 +358,9 @@ export default function PortalOnboarding() {
                 Voltar
               </Button>
             )}
-            
+
             {step < 3 ? (
-              <Button 
+              <Button
                 onClick={handleNext}
                 className="flex-1 bg-foreground text-background font-medium hover:bg-foreground/90 h-12"
               >
@@ -369,7 +368,7 @@ export default function PortalOnboarding() {
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             ) : (
-              <Button 
+              <Button
                 onClick={handleSubmit}
                 disabled={isLoading}
                 className="flex-1 bg-gradient-to-r from-[#D4AF37] to-[#C5A028] text-black hover:from-[#E5C048] hover:to-[#D4AF37] h-12 font-medium"

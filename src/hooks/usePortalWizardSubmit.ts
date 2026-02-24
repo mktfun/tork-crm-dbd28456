@@ -25,17 +25,18 @@ export const usePortalWizardSubmit = () => {
 
             const insuranceType = payload?.customFields?.cf_tipo_solicitacao_seguro || 'Desconhecido';
 
-            const { error } = await supabase.from('portal_requests').insert({
-                client_id: client.id,
-                brokerage_user_id: brokerage.user_id,
-                request_type: requestType,
-                insurance_type: insuranceType,
-                qar_report: qarReport,
-                custom_fields: payload?.customFields || payload || {},
-                is_qualified: isQualified,
-                disqualification_reason: disqualificationReason,
-                status: 'pendente'
+            const { data: result, error } = await supabase.rpc('insert_portal_request' as any, {
+                p_client_id: client.id,
+                p_brokerage_user_id: brokerage.user_id,
+                p_request_type: requestType,
+                p_insurance_type: insuranceType,
+                p_qar_report: qarReport,
+                p_custom_fields: payload?.customFields || payload || {},
+                p_is_qualified: isQualified,
+                p_disqualification_reason: disqualificationReason || null
             });
+
+            const res = result as any;
 
             if (error) {
                 console.error('Error submitting request:', error);
