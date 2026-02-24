@@ -74,7 +74,7 @@ export default function PortalLogin() {
 
       try {
         const { data, error: rpcError } = await supabase.rpc('get_brokerage_by_slug', {
-          p_slug: brokerageSlug
+          p_slug: brokerageSlug.toLowerCase()
         });
 
         if (rpcError) {
@@ -132,7 +132,7 @@ export default function PortalLogin() {
     try {
       const { data, error: rpcError } = await supabase.rpc('identify_portal_client', {
         p_identifier: cleanIdentifier,
-        p_brokerage_slug: brokerageSlug
+        p_brokerage_slug: brokerageSlug.toLowerCase()
       });
 
       if (rpcError) {
