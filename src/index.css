@@ -353,7 +353,7 @@ DEPENDÊNCIAS CRÍTICAS:
 /* ESTILIZAÇÃO DARK MODE PARA O FULLCALENDAR */
 .fc {
   --fc-border-color: hsl(var(--border));
-  --fc-today-bg-color: hsl(var(--accent) / 0.3);
+  --fc-today-bg-color: hsl(var(--primary) / 0.05);
   color: hsl(var(--foreground));
 }
 
@@ -374,18 +374,24 @@ DEPENDÊNCIAS CRÍTICAS:
   color: hsl(var(--muted-foreground) / 0.5);
 }
 
+/* Washed pastel events — no solid blocks */
 .fc .fc-daygrid-event {
-  background-color: hsl(var(--primary) / 0.2);
-  border: 1px solid hsl(var(--primary) / 0.5);
-  padding: 2px 4px;
+  background-color: transparent;
+  border: none;
+  padding: 1px 2px;
   border-radius: var(--radius);
   font-size: 0.75rem;
   font-weight: 500;
-  color: hsl(var(--primary-foreground));
 }
 
 .fc .fc-event-title {
-  color: hsl(var(--primary-foreground));
+  color: inherit;
+}
+
+/* Today cell: subtle primary highlight */
+.fc .fc-day-today {
+  background-color: hsl(var(--primary) / 0.05) !important;
+  border: 1px solid hsl(var(--primary) / 0.2) !important;
 }
 
 .fc-theme-standard .fc-scrollgrid {
