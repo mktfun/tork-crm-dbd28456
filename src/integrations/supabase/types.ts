@@ -3317,6 +3317,10 @@ export type Database = {
           projected_balance: number
         }[]
       }
+      check_portal_cpf_duplicate: {
+        Args: { p_client_id: string; p_cpf: string; p_user_id: string }
+        Returns: Json
+      }
       check_upcoming_appointments: { Args: never; Returns: undefined }
       count_ledger_entries_by_account: {
         Args: { p_account_id: string }
@@ -4132,6 +4136,19 @@ export type Database = {
           p_entries: Json
           p_file_name: string
           p_total_amount: number
+        }
+        Returns: Json
+      }
+      insert_portal_request: {
+        Args: {
+          p_brokerage_user_id: string
+          p_client_id: string
+          p_custom_fields: Json
+          p_disqualification_reason?: string
+          p_insurance_type: string
+          p_is_qualified?: boolean
+          p_qar_report: string
+          p_request_type: string
         }
         Returns: Json
       }

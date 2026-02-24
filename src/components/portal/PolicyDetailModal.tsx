@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+  DialogOverlay,
+  DialogPortal,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
   Download,
   ExternalLink,
@@ -15,17 +11,18 @@ import {
   Calendar,
   Building2,
   Shield,
-  AlertTriangle,
   Car,
   Home,
   Heart,
   Briefcase,
-  MessageSquare,
+  User,
 } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PolicyHistoryTimeline } from './PolicyHistoryTimeline';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 interface Policy {
   id: string;
@@ -55,6 +52,27 @@ interface PolicyDetailModalProps {
   canDownloadPdf: boolean;
 }
 
+interface DetailRowProps {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  isLast?: boolean;
+}
+
+function DetailRow({ icon: Icon, label, value, isLast }: DetailRowProps) {
+  return (
+    <div className={cn('flex items-start gap-3 py-4', !isLast && 'border-b border-muted/50')}>
+      <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <Icon className="w-4 h-4 text-muted-foreground" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">{label}</p>
+        <p className="text-foreground text-base font-medium tracking-tight truncate">{value}</p>
+      </div>
+    </div>
+  );
+}
+
 export function PolicyDetailModal({
   policy,
   isOpen,
@@ -68,22 +86,14 @@ export function PolicyDetailModal({
   canDownloadPdf,
 }: PolicyDetailModalProps) {
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
-  const [pdfLoadError, setPdfLoadError] = useState(false);
 
-  // Criar URL do PDF a partir do Base64
   useEffect(() => {
     if (policy?.pdf_attached_data && canViewPdf) {
       try {
-        // Verificar se é Base64 válido
-        const base64Data = policy.pdf_attached_data;
-        
-        // Extrair a parte do Base64 se tiver prefixo data:
-        let pureBase64 = base64Data;
-        if (base64Data.includes(',')) {
-          pureBase64 = base64Data.split(',')[1];
+        let pureBase64 = policy.pdf_attached_data;
+        if (pureBase64.includes(',')) {
+          pureBase64 = pureBase64.split(',')[1];
         }
-
-        // Converter Base64 para Blob
         const byteCharacters = atob(pureBase64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -91,38 +101,25 @@ export function PolicyDetailModal({
         }
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: 'application/pdf' });
-        
         const url = URL.createObjectURL(blob);
         setPdfBlobUrl(url);
-        setPdfLoadError(false);
       } catch (error) {
         console.error('Error creating PDF blob:', error);
-        setPdfLoadError(true);
       }
     } else {
       setPdfBlobUrl(null);
     }
-
-    // Cleanup
     return () => {
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
-      }
+      if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
     };
   }, [policy?.pdf_attached_data, canViewPdf]);
 
   const handleDownload = () => {
-    if (!policy?.pdf_attached_data && !policy?.pdf_url) {
-      toast.error('PDF não disponível');
-      return;
-    }
-
+    if (!policy) return;
     if (policy.pdf_url) {
-      // PDF externo - abrir em nova aba
       window.open(policy.pdf_url, '_blank');
       return;
     }
-
     if (pdfBlobUrl) {
       const link = document.createElement('a');
       link.href = pdfBlobUrl;
@@ -132,229 +129,111 @@ export function PolicyDetailModal({
     }
   };
 
-  const handleOpenExternal = () => {
-    if (policy?.pdf_url) {
-      window.open(policy.pdf_url, '_blank');
-    }
-  };
-
   const getTypeIcon = (type: string | null) => {
     const t = type?.toLowerCase() || '';
-    if (t.includes('auto') || t.includes('carro')) return <Car className="w-5 h-5" />;
-    if (t.includes('resid') || t.includes('casa')) return <Home className="w-5 h-5" />;
-    if (t.includes('vida') || t.includes('saúde') || t.includes('saude')) return <Heart className="w-5 h-5" />;
-    if (t.includes('empres')) return <Briefcase className="w-5 h-5" />;
-    return <Shield className="w-5 h-5" />;
+    if (t.includes('auto') || t.includes('carro')) return Car;
+    if (t.includes('resid') || t.includes('casa')) return Home;
+    if (t.includes('vida') || t.includes('saúde') || t.includes('saude')) return Heart;
+    if (t.includes('empres')) return Briefcase;
+    return Shield;
   };
-
-  const getStatusBadge = (status: string, expirationDate: string) => {
-    const days = differenceInDays(new Date(expirationDate), new Date());
-
-    if (status.toLowerCase() === 'cancelada') {
-      return <Badge className="bg-red-500/10 text-red-400 border-red-500/20">Cancelada</Badge>;
-    }
-    if (days < 0) {
-      return <Badge className="bg-red-500/10 text-red-400 border-red-500/20">Vencida</Badge>;
-    } else if (days <= 30) {
-      return (
-        <Badge className="bg-zinc-400/10 text-zinc-300 border-zinc-400/20">
-          Vence em {days}d
-        </Badge>
-      );
-    }
-    return <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Ativa</Badge>;
-  };
-
-  // Determinar modo de visualização
-  const hasPdf = !!(policy?.pdf_attached_data || policy?.pdf_url);
-  const isExternalPdf = !!(policy?.pdf_url && !policy?.pdf_attached_data);
-  const showPdfPreview = hasPdf && canViewPdf && !pdfLoadError;
-  const showDetailCard = !showPdfPreview || pdfLoadError;
 
   if (!policy) return null;
 
+  const hasPdf = !!(policy.pdf_attached_data || policy.pdf_url);
+  const canDownload = canDownloadPdf && hasPdf;
+  const TypeIcon = getTypeIcon(policy.type);
+
+  const vigencia = `${
+    policy.start_date
+      ? format(new Date(policy.start_date), 'dd/MM/yyyy', { locale: ptBR })
+      : '---'
+  } → ${format(new Date(policy.expiration_date), 'dd/MM/yyyy', { locale: ptBR })}`;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl bg-black/95 backdrop-blur-2xl border-white/[0.06] text-white max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-zinc-800/80 rounded-lg flex items-center justify-center text-zinc-400 border border-white/[0.06]">
-              {getTypeIcon(policy.type)}
+      <DialogPortal>
+        {/* Overlay with blur */}
+        <DialogOverlay className="bg-black/60 backdrop-blur-md" />
+
+        {/* Bottom Sheet Content */}
+        <motion.div
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          className="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg rounded-t-[32px] rounded-b-none border-0 shadow-[0_-20px_50px_rgba(0,0,0,0.1)] bg-background p-0 overflow-hidden"
+          style={{ maxHeight: '90vh' }}
+        >
+          {/* Drag pill */}
+          <div className="w-12 h-1.5 bg-muted rounded-full mx-auto mt-4 mb-2" />
+
+          {/* Header */}
+          <div className="px-6 pb-4 flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-muted/60 flex items-center justify-center">
+              <TypeIcon className="w-5 h-5 text-foreground" />
             </div>
-            <div>
-              <span className="block font-light">{policy.insured_asset || policy.type || 'Apólice'}</span>
-              <span className="text-sm text-zinc-500 font-normal">
-                {policy.policy_number || 'Sem número'}
-              </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-foreground font-semibold text-lg tracking-tight truncate">
+                {policy.insured_asset || policy.type || 'Apólice'}
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                {policy.policy_number ? `Nº ${policy.policy_number}` : 'Sem número'}
+              </p>
             </div>
-            {getStatusBadge(policy.status, policy.expiration_date)}
-          </DialogTitle>
-        </DialogHeader>
+          </div>
 
-        <div className="space-y-6 mt-4">
-          {/* PDF Preview Section */}
-          {showPdfPreview && (
-            <div className="space-y-3">
-              {isExternalPdf ? (
-                // PDF externo - mostrar botão para abrir
-                <Card className="bg-zinc-900/50 border-white/[0.06]">
-                  <CardContent className="p-6 text-center">
-                    <FileText className="w-12 h-12 text-zinc-500 mx-auto mb-3" />
-                    <p className="text-white mb-2 font-light">PDF disponível em link externo</p>
-                    <Button onClick={handleOpenExternal} className="bg-zinc-100 hover:bg-white text-zinc-950">
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Abrir PDF
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                // PDF Base64 - mostrar preview
-                <div
-                  className="relative rounded-lg overflow-hidden border border-white/[0.06]"
-                  onContextMenu={(e) => {
-                    if (!canDownloadPdf) {
-                      e.preventDefault();
-                    }
-                  }}
-                >
-                  <iframe
-                    src={pdfBlobUrl || ''}
-                    className="w-full h-[400px] bg-zinc-900"
-                    title="Preview do PDF"
-                  />
-                  {!canDownloadPdf && (
-                    <div className="absolute inset-0 pointer-events-none" />
-                  )}
-                </div>
-              )}
+          {/* Receipt body */}
+          <div className="px-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 180px)' }}>
+            <DetailRow icon={User} label="Segurado" value={clientName} />
+            {companyName && (
+              <DetailRow icon={Building2} label="Seguradora" value={companyName} />
+            )}
+            <DetailRow icon={Calendar} label="Vigência" value={vigencia} />
+            {policy.insured_asset && (
+              <DetailRow icon={Shield} label="Bem Segurado" value={policy.insured_asset} />
+            )}
+            {clientCpf && (
+              <DetailRow icon={FileText} label="CPF / CNPJ" value={clientCpf} isLast={!policy.ramo_id} />
+            )}
 
-              {/* Download Button - Silver */}
-              {canDownloadPdf && hasPdf && (
-                <Button
-                  onClick={handleDownload}
-                  className="w-full bg-zinc-100 hover:bg-white text-zinc-950 font-medium"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Baixar PDF da Apólice
-                </Button>
-              )}
+            {/* Timeline */}
+            {policy.ramo_id && (
+              <div className="py-4">
+                <PolicyHistoryTimeline
+                  clientId={clientId}
+                  ramoId={policy.ramo_id}
+                  currentPolicyId={policy.id}
+                  userId={userId}
+                />
+              </div>
+            )}
+          </div>
 
-              {!canDownloadPdf && hasPdf && (
-                <Card className="bg-zinc-900/50 border-zinc-700/50">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <AlertTriangle className="w-5 h-5 text-zinc-500 flex-shrink-0" />
-                    <div>
-                      <p className="text-zinc-400 text-sm font-light">
-                        O download de documentos está temporariamente desabilitado.
-                      </p>
-                      <p className="text-zinc-500 text-xs mt-1">
-                        Entre em contato com sua corretora para solicitar a apólice.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {/* No PDF Available Message */}
-          {!hasPdf && (
-            <Card className="bg-zinc-900/50 border-white/[0.06]">
-              <CardContent className="p-6 text-center">
-                <FileText className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
-                <p className="text-zinc-400 font-light">Documento original não disponível.</p>
-                <p className="text-zinc-500 text-sm mt-1">
-                  Entre em contato com seu corretor para obter a apólice.
-                </p>
-                <div className="flex items-center justify-center gap-2 mt-3 text-zinc-500 text-sm">
-                  <MessageSquare className="w-4 h-4" />
-                  <span>Fale com sua corretora</span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Detail Card Section */}
-          {showDetailCard && (
-            <div className="space-y-4">
-              {pdfLoadError && (
-                <Card className="bg-amber-500/10 border-amber-500/20">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <AlertTriangle className="w-5 h-5 text-amber-400" />
-                    <p className="text-amber-400 text-sm font-light">
-                      Não foi possível carregar o PDF. Veja os detalhes abaixo.
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Dados Principais */}
-              <Card className="bg-zinc-900/50 border-white/[0.06]">
-                <CardContent className="p-4 space-y-4">
-                  <h4 className="text-white font-light flex items-center gap-2 tracking-wide">
-                    <FileText className="w-4 h-4 text-zinc-400" />
-                    Dados da Apólice
-                  </h4>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-zinc-500 text-xs uppercase tracking-wide">Segurado</p>
-                      <p className="text-white font-light">{clientName}</p>
-                    </div>
-                    {clientCpf && (
-                      <div>
-                        <p className="text-zinc-500 text-xs uppercase tracking-wide">CPF/CNPJ</p>
-                        <p className="text-white font-mono text-sm">{clientCpf}</p>
-                      </div>
-                    )}
-                    {companyName && (
-                      <div>
-                        <p className="text-zinc-500 text-xs uppercase tracking-wide flex items-center gap-1">
-                          <Building2 className="w-3 h-3" /> Seguradora
-                        </p>
-                        <p className="text-white font-light">{companyName}</p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-zinc-500 text-xs uppercase tracking-wide flex items-center gap-1">
-                        <Calendar className="w-3 h-3" /> Vigência
-                      </p>
-                      <p className="text-white text-sm font-light">
-                        {policy.start_date
-                          ? format(new Date(policy.start_date), 'dd/MM/yyyy', { locale: ptBR })
-                          : '---'}
-                        {' → '}
-                        {format(new Date(policy.expiration_date), 'dd/MM/yyyy', { locale: ptBR })}
-                      </p>
-                    </div>
-                  </div>
-
-                  {policy.insured_asset && (
-                    <div>
-                      <p className="text-zinc-500 text-xs uppercase tracking-wide">Bem Segurado</p>
-                      <p className="text-white font-light">{policy.insured_asset}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Timeline de Histórico */}
-              {policy.ramo_id && (
-                <Card className="bg-zinc-900/50 border-white/[0.06]">
-                  <CardContent className="p-4">
-                    <PolicyHistoryTimeline
-                      clientId={clientId}
-                      ramoId={policy.ramo_id}
-                      currentPolicyId={policy.id}
-                      userId={userId}
-                    />
-                  </CardContent>
-                </Card>
-              )}
+          {/* Footer: Download pill */}
+          {canDownload && (
+            <div className="px-6 py-5 border-t border-muted/30">
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                onClick={handleDownload}
+                className="w-full flex items-center justify-center gap-2 bg-[#1A1C1E] text-white font-medium text-base py-4 rounded-full shadow-lg active:shadow-md transition-shadow"
+              >
+                {policy.pdf_url && !policy.pdf_attached_data ? (
+                  <>
+                    <ExternalLink className="w-5 h-5" />
+                    Abrir PDF
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-5 h-5" />
+                    Baixar Apólice
+                  </>
+                )}
+              </motion.button>
             </div>
           )}
-        </div>
-      </DialogContent>
+        </motion.div>
+      </DialogPortal>
     </Dialog>
   );
 }
