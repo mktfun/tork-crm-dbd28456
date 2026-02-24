@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Repeat } from 'lucide-react';
 
 interface RecurrenceConfigProps {
   onRecurrenceChange: (rule: string | null) => void;
+  inline?: boolean;
 }
 
-const RecurrenceConfig = ({ onRecurrenceChange }: RecurrenceConfigProps) => {
+const RecurrenceConfig = ({ onRecurrenceChange, inline }: RecurrenceConfigProps) => {
   const [freq, setFreq] = useState('none');
   const [interval, setInterval] = useState(1);
 
@@ -43,12 +44,52 @@ const RecurrenceConfig = ({ onRecurrenceChange }: RecurrenceConfigProps) => {
     return labels[freq];
   };
 
+  if (inline) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2.5 text-sm text-foreground/80">
+            <Repeat className="w-4 h-4 text-muted-foreground" />
+            Recorrência
+          </span>
+          <Select value={freq} onValueChange={setFreq}>
+            <SelectTrigger className="w-[150px] border-0 bg-transparent shadow-none focus:ring-0 text-right text-muted-foreground text-sm h-auto py-0 px-0 justify-end gap-1.5 [&>svg]:text-muted-foreground/50">
+              <SelectValue placeholder="Não repetir" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Não repetir</SelectItem>
+              <SelectItem value="daily">Diariamente</SelectItem>
+              <SelectItem value="weekly">Semanalmente</SelectItem>
+              <SelectItem value="monthly">Mensalmente</SelectItem>
+              <SelectItem value="yearly">Anualmente</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {freq !== 'none' && (
+          <div className="flex items-center gap-2 pl-7 text-sm">
+            <span className="text-muted-foreground">a cada</span>
+            <Input
+              type="number"
+              value={interval}
+              onChange={handleIntervalChange}
+              className="w-14 text-center border-0 bg-muted/30 rounded-lg text-foreground text-sm h-8 shadow-none focus-visible:ring-1 focus-visible:ring-primary/30 px-1"
+              min="1"
+            />
+            <span className="text-muted-foreground">{getIntervalLabel()}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Legacy layout (non-inline)
   return (
     <div className="space-y-2">
-      <Label className="text-slate-300">Recorrência</Label>
+      <span className="text-sm text-muted-foreground">Recorrência</span>
       <div className="flex items-center gap-2">
         <Select value={freq} onValueChange={setFreq}>
-          <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+          <SelectTrigger>
             <SelectValue placeholder="Repetir..." />
           </SelectTrigger>
           <SelectContent>
@@ -62,15 +103,15 @@ const RecurrenceConfig = ({ onRecurrenceChange }: RecurrenceConfigProps) => {
 
         {freq !== 'none' && (
           <div className="flex items-center gap-2 flex-1">
-            <span className="text-slate-300 text-sm">a cada</span>
+            <span className="text-muted-foreground text-sm">a cada</span>
             <Input
               type="number"
               value={interval}
               onChange={handleIntervalChange}
-              className="w-16 text-center bg-slate-800 border-slate-600 text-white"
+              className="w-16 text-center"
               min="1"
             />
-            <span className="text-slate-300 text-sm">{getIntervalLabel()}</span>
+            <span className="text-muted-foreground text-sm">{getIntervalLabel()}</span>
           </div>
         )}
       </div>

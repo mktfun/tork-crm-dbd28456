@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
@@ -10,7 +8,7 @@ import { useClients, usePolicies } from '@/hooks/useAppData';
 import { useSupabaseAppointments } from '@/hooks/useSupabaseAppointments';
 import { useCompanyNames } from '@/hooks/useCompanyNames';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar, Clock, Flag, Repeat, User, FileText } from 'lucide-react';
 import RecurrenceConfig from './RecurrenceConfig';
 
 interface AppointmentModalProps {
@@ -114,116 +112,161 @@ export function AppointmentModal({
     }))
   ];
 
-  const dialogHeader = (
-    <DialogHeader className="pb-2">
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <CalendarIcon className="w-5 h-5 text-primary" />
+  const modalContent = (
+    <DialogContent className="sm:max-w-xl bg-background/95 backdrop-blur-3xl border border-border/30 shadow-[0_30px_60px_rgba(0,0,0,0.4)] sm:rounded-[2rem] p-0 overflow-hidden gap-0">
+      <form onSubmit={handleSubmit} className="flex flex-col">
+        {/* ── Header: Ambientação de Evento ── */}
+        <div className="p-6 bg-muted/20 border-b border-border/10">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner shrink-0">
+              <Calendar className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">
+                {initialDate
+                  ? `Agendar para ${initialDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}`
+                  : 'Novo Agendamento'}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5">Configure os detalhes do evento</p>
+            </div>
+          </div>
         </div>
-        <div>
-          <DialogTitle className="text-lg font-semibold">
-            {initialDate
-              ? `Agendar para ${initialDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}`
-              : 'Novo Agendamento'}
-          </DialogTitle>
-          <p className="text-sm text-muted-foreground mt-0.5">Preencha os dados do agendamento</p>
+
+        {/* ── Body ── */}
+        <div className="p-6 space-y-5 max-h-[60vh] overflow-y-auto">
+          {/* Campo Rei: Título */}
+          <Input
+            value={formData.title}
+            onChange={e => handleInputChange('title', e.target.value)}
+            placeholder="Do que se trata este agendamento?"
+            className="w-full text-xl font-semibold bg-transparent border-0 border-b-2 border-transparent hover:border-muted focus-visible:border-primary focus-visible:ring-0 rounded-none px-1 py-4 shadow-none placeholder:text-muted-foreground/40 transition-all h-auto"
+          />
+
+          {/* ── Ilha de Metadados (iOS Settings List) ── */}
+          <div className="bg-card/50 rounded-2xl border border-border/10 divide-y divide-border/10 overflow-hidden">
+            {/* Data */}
+            <div className="flex items-center justify-between px-4 py-3 hover:bg-accent/5 transition-colors">
+              <span className="flex items-center gap-2.5 text-sm text-foreground/80">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                Data
+              </span>
+              <Input
+                type="date"
+                value={formData.date}
+                onChange={e => handleInputChange('date', e.target.value)}
+                className="w-[160px] border-0 bg-transparent text-right focus-visible:ring-0 shadow-none text-muted-foreground font-mono text-sm h-auto py-0 px-0"
+              />
+            </div>
+
+            {/* Hora */}
+            <div className="flex items-center justify-between px-4 py-3 hover:bg-accent/5 transition-colors">
+              <span className="flex items-center gap-2.5 text-sm text-foreground/80">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                Horário
+              </span>
+              <Input
+                type="time"
+                value={formData.time}
+                onChange={e => handleInputChange('time', e.target.value)}
+                className="w-[120px] border-0 bg-transparent text-right focus-visible:ring-0 shadow-none text-muted-foreground font-mono text-sm h-auto py-0 px-0"
+              />
+            </div>
+
+            {/* Prioridade */}
+            <div className="flex items-center justify-between px-4 py-3 hover:bg-accent/5 transition-colors">
+              <span className="flex items-center gap-2.5 text-sm text-foreground/80">
+                <Flag className="w-4 h-4 text-muted-foreground" />
+                Prioridade
+              </span>
+              <Select value={formData.priority} onValueChange={value => handleInputChange('priority', value)}>
+                <SelectTrigger className="w-[130px] border-0 bg-transparent shadow-none focus:ring-0 text-right text-muted-foreground text-sm h-auto py-0 px-0 justify-end gap-1.5 [&>svg]:text-muted-foreground/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Baixa">Baixa</SelectItem>
+                  <SelectItem value="Normal">Normal</SelectItem>
+                  <SelectItem value="Alta">Alta</SelectItem>
+                  <SelectItem value="Urgente">Urgente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Recorrência */}
+            <div className="px-4 py-3 hover:bg-accent/5 transition-colors">
+              <RecurrenceConfig onRecurrenceChange={setRecurrenceRule} inline />
+            </div>
+          </div>
+
+          {/* ── Ilha de Associações (Cliente & Apólice) ── */}
+          <div className="bg-card/50 rounded-2xl border border-border/10 divide-y divide-border/10 overflow-hidden">
+            <div className="px-4 py-3">
+              <div className="flex items-center gap-2.5 text-sm text-foreground/80 mb-2">
+                <User className="w-4 h-4 text-muted-foreground" />
+                Cliente
+              </div>
+              <Combobox
+                options={clientOptions}
+                value={formData.clientId}
+                onValueChange={value => handleInputChange('clientId', value)}
+                placeholder="Associar a um cliente (opcional)"
+                searchPlaceholder="Buscar cliente por nome, telefone ou email..."
+                emptyText="Nenhum cliente encontrado"
+                className="border-0 bg-transparent shadow-none hover:bg-accent/5 h-9 px-0"
+              />
+            </div>
+
+            <div className="px-4 py-3">
+              <div className="flex items-center gap-2.5 text-sm text-foreground/80 mb-2">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                Apólice
+              </div>
+              <Combobox
+                options={policyOptions}
+                value={formData.policyId}
+                onValueChange={value => handleInputChange('policyId', value)}
+                placeholder="Associar a uma apólice (opcional)"
+                searchPlaceholder="Buscar apólice por tipo, seguradora ou número..."
+                emptyText="Nenhuma apólice encontrada"
+                className="border-0 bg-transparent shadow-none hover:bg-accent/5 h-9 px-0"
+              />
+            </div>
+          </div>
+
+          {/* ── Notas ── */}
+          <Textarea
+            value={formData.notes}
+            onChange={e => handleInputChange('notes', e.target.value)}
+            placeholder="Adicionar notas ou avisos importantes..."
+            className="min-h-[100px] resize-none border-0 bg-muted/20 rounded-2xl p-4 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/50 text-sm shadow-none"
+            rows={3}
+          />
         </div>
-      </div>
-    </DialogHeader>
-  );
 
-  const formContent = (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="title">Título do Agendamento *</Label>
-        <Input
-          id="title"
-          value={formData.title}
-          onChange={e => handleInputChange('title', e.target.value)}
-          placeholder="Ex: Renovação de Seguro Auto"
-        />
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="date">Data *</Label>
-          <Input id="date" type="date" value={formData.date} onChange={e => handleInputChange('date', e.target.value)} />
+        {/* ── Rodapé Apple Wallet Style ── */}
+        <div className="p-6 bg-background/50 backdrop-blur-sm border-t border-border/10 flex gap-3">
+          <button
+            type="button"
+            onClick={() => setModalOpen(false)}
+            className="h-12 w-1/3 rounded-xl bg-accent/10 hover:bg-accent/20 text-foreground font-medium transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={isAdding}
+            className="h-12 flex-1 rounded-xl bg-primary hover:brightness-110 text-primary-foreground font-semibold shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {isAdding ? 'Criando...' : 'Criar Agendamento'}
+          </button>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="time">Horário *</Label>
-          <Input id="time" type="time" value={formData.time} onChange={e => handleInputChange('time', e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="priority">Prioridade</Label>
-          <Select value={formData.priority} onValueChange={value => handleInputChange('priority', value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione a prioridade" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Baixa">Baixa</SelectItem>
-              <SelectItem value="Normal">Normal</SelectItem>
-              <SelectItem value="Alta">Alta</SelectItem>
-              <SelectItem value="Urgente">Urgente</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="clientId">Cliente (opcional)</Label>
-        <Combobox
-          options={clientOptions}
-          value={formData.clientId}
-          onValueChange={value => handleInputChange('clientId', value)}
-          placeholder="Selecione um cliente"
-          searchPlaceholder="Buscar cliente por nome, telefone ou email..."
-          emptyText="Nenhum cliente encontrado"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="policyId">Apólice (opcional)</Label>
-        <Combobox
-          options={policyOptions}
-          value={formData.policyId}
-          onValueChange={value => handleInputChange('policyId', value)}
-          placeholder="Selecione uma apólice"
-          searchPlaceholder="Buscar apólice por tipo, seguradora ou número..."
-          emptyText="Nenhuma apólice encontrada"
-        />
-      </div>
-
-      <RecurrenceConfig onRecurrenceChange={setRecurrenceRule} />
-
-      <div className="space-y-2">
-        <Label htmlFor="notes">Observações (opcional)</Label>
-        <Textarea
-          id="notes"
-          value={formData.notes}
-          onChange={e => handleInputChange('notes', e.target.value)}
-          placeholder="Observações sobre o agendamento..."
-          rows={3}
-        />
-      </div>
-
-      <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
-          Cancelar
-        </Button>
-        <Button type="submit" disabled={isAdding}>
-          {isAdding ? 'Criando...' : 'Criar Agendamento'}
-        </Button>
-      </div>
-    </form>
+      </form>
+    </DialogContent>
   );
 
   if (!triggerButton) {
     return (
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          {dialogHeader}
-          {formContent}
-        </DialogContent>
+        {modalContent}
       </Dialog>
     );
   }
@@ -231,10 +274,7 @@ export function AppointmentModal({
   return (
     <Dialog open={modalOpen} onOpenChange={setModalOpen}>
       <DialogTrigger asChild>{triggerButton}</DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        {dialogHeader}
-        {formContent}
-      </DialogContent>
+      {modalContent}
     </Dialog>
   );
 }
