@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface SegmentedControlOption {
@@ -14,28 +15,41 @@ interface SegmentedControlProps {
   onChange: (value: string) => void;
   label?: string;
   className?: string;
+  layoutId?: string;
 }
 
-export function SegmentedControl({ options, value, onChange, label, className }: SegmentedControlProps) {
+export function SegmentedControl({ options, value, onChange, label, className, layoutId }: SegmentedControlProps) {
+  const pillId = layoutId || `segmented-${label?.replace(/\s+/g, '-') || 'default'}`;
+
   return (
     <div className={cn("space-y-2", className)}>
       {label && <p className="text-sm font-medium text-foreground">{label}</p>}
-      <div className="inline-flex rounded-lg border border-border bg-muted/30 p-1">
+      <div className="bg-muted/60 p-1 rounded-2xl flex items-center shadow-inner relative">
         {options.map((option) => (
-          <button
+          <motion.button
             key={option.value}
             type="button"
+            whileTap={{ scale: 0.96 }}
             onClick={() => onChange(option.value)}
             className={cn(
-              "inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
+              "flex-1 py-2.5 text-sm font-semibold rounded-xl text-center transition-colors relative z-10",
               value === option.value
-                ? "bg-background text-foreground shadow-sm"
+                ? "text-background"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            {option.icon}
-            {option.label}
-          </button>
+            {value === option.value && (
+              <motion.div
+                layoutId={pillId}
+                className="absolute inset-0 bg-foreground rounded-xl shadow-md -z-10"
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              />
+            )}
+            <span className="flex items-center justify-center gap-2">
+              {option.icon}
+              {option.label}
+            </span>
+          </motion.button>
         ))}
       </div>
     </div>

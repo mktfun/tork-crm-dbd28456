@@ -1,10 +1,10 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Stepper, type Step } from "@/components/ui/stepper";
 import { FormCard } from "@/components/ui/form-card";
 import { FormInput } from "@/components/ui/form-input";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -477,32 +477,32 @@ export const SmartphoneWizard: React.FC<SmartphoneWizardProps> = ({ onComplete }
         )}
       </div>
 
-      {/* Navigation */}
-      <div className="flex justify-between mt-8 gap-4">
-        <Button
-          variant="outline"
+      <div className="flex items-center justify-between mt-8 gap-4">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
           onClick={prevStep}
           disabled={currentStep === 0}
-          className="gap-2"
+          className="w-14 h-14 rounded-full bg-card shadow-sm flex items-center justify-center hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <ArrowLeft size={18} />
-          Voltar
-        </Button>
+          <ArrowLeft className="w-6 h-6 text-foreground" strokeWidth={1.5} />
+        </motion.button>
 
         {currentStep < steps.length - 1 ? (
-          <Button
+          <motion.button
+            whileTap={{ scale: 0.95 }}
             onClick={nextStep}
             disabled={!isStepValid(currentStep)}
-            className="gap-2"
+            className="flex-1 h-14 rounded-full bg-foreground text-background font-semibold text-[1.05rem] shadow-lg flex items-center justify-center gap-2 hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Próximo
-            <ArrowRight size={18} />
-          </Button>
+            Continuar
+            <ArrowRight className="w-5 h-5" strokeWidth={2} />
+          </motion.button>
         ) : (
-          <Button
+          <motion.button
+            whileTap={{ scale: 0.95 }}
             onClick={handleSubmit}
             disabled={!isStepValid(currentStep) || isSubmitting}
-            className="gap-2 bg-primary hover:bg-primary/90"
+            className="flex-1 h-14 rounded-full bg-foreground text-background font-semibold text-[1.05rem] shadow-lg flex items-center justify-center gap-2 hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <>
@@ -512,10 +512,10 @@ export const SmartphoneWizard: React.FC<SmartphoneWizardProps> = ({ onComplete }
             ) : (
               <>
                 Finalizar Cotação
-                <ArrowRight size={18} />
+                <ArrowRight className="w-5 h-5" strokeWidth={2} />
               </>
             )}
-          </Button>
+          </motion.button>
         )}
       </div>
     </div>

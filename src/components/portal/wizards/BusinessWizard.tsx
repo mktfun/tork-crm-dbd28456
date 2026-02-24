@@ -1,11 +1,11 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Stepper, type Step } from "@/components/ui/stepper";
 import { FormCard } from "@/components/ui/form-card";
 import { FormInput } from "@/components/ui/form-input";
 import { RadioCardGroup } from "@/components/ui/radio-card";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
-import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { buildBusinessPayload } from "@/utils/dataProcessor";
@@ -379,33 +379,32 @@ export const BusinessWizard: React.FC<BusinessWizardProps> = ({ onComplete }) =>
         </div>
       )}
 
-      <div className="flex items-center justify-between mt-8">
-        <Button
-          variant="outline-subtle"
+      <div className="flex items-center justify-between mt-8 gap-4">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
           onClick={prevStep}
           disabled={currentStep === 0}
-          className="gap-2"
+          className="w-14 h-14 rounded-full bg-card shadow-sm flex items-center justify-center hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <ArrowLeft size={18} />
-          Voltar
-        </Button>
+          <ArrowLeft className="w-6 h-6 text-foreground" strokeWidth={1.5} />
+        </motion.button>
 
         {currentStep < steps.length - 1 ? (
-          <Button
-            variant="cta"
+          <motion.button
+            whileTap={{ scale: 0.95 }}
             onClick={nextStep}
             disabled={!isStepValid(currentStep)}
-            className="gap-2"
+            className="flex-1 h-14 rounded-full bg-foreground text-background font-semibold text-[1.05rem] shadow-lg flex items-center justify-center gap-2 hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Próximo
-            <ArrowRight size={18} />
-          </Button>
+            Continuar
+            <ArrowRight className="w-5 h-5" strokeWidth={2} />
+          </motion.button>
         ) : (
-          <Button
-            variant="cta"
+          <motion.button
+            whileTap={{ scale: 0.95 }}
             onClick={handleSubmit}
             disabled={!isStepValid(currentStep) || isSubmitting || !acceptedTerms || !acceptedPrivacy}
-            className="gap-2"
+            className="flex-1 h-14 rounded-full bg-foreground text-background font-semibold text-[1.05rem] shadow-lg flex items-center justify-center gap-2 hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <>
@@ -415,19 +414,19 @@ export const BusinessWizard: React.FC<BusinessWizardProps> = ({ onComplete }) =>
             ) : (
               <>
                 Enviar Cotação
-                <ArrowRight size={18} />
+                <ArrowRight className="w-5 h-5" strokeWidth={2} />
               </>
             )}
-          </Button>
+          </motion.button>
         )}
       </div>
 
       <div className="flex items-center justify-center mt-6 mb-4">
         <p className="text-xs text-muted-foreground text-center flex items-center gap-1.5">
-          <svg className="w-3.5 h-3.5 text-success" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-3.5 h-3.5 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
           </svg>
-          Seus dados estão seguros e não serão compartilhados com terceiros.
+          Seus dados estão seguros e protegidos.
         </p>
       </div>
     </div>
