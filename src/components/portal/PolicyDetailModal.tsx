@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogOverlay,
-  DialogPortal,
-} from '@/components/ui/dialog';
+import { Drawer as DrawerPrimitive } from 'vaul';
 import {
   Download,
   ExternalLink,
@@ -21,7 +17,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PolicyHistoryTimeline } from './PolicyHistoryTimeline';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface Policy {
@@ -151,22 +147,15 @@ export function PolicyDetailModal({
   } → ${format(new Date(policy.expiration_date), 'dd/MM/yyyy', { locale: ptBR })}`;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogPortal>
-        {/* Overlay with blur */}
-        <DialogOverlay className="bg-black/60 backdrop-blur-md" />
-
-        {/* Bottom Sheet Content */}
-        <motion.div
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          className="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg rounded-t-[32px] rounded-b-none border-0 shadow-[0_-20px_50px_rgba(0,0,0,0.1)] bg-background p-0 overflow-hidden"
+    <DrawerPrimitive.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DrawerPrimitive.Portal>
+        <DrawerPrimitive.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-md z-50" />
+        <DrawerPrimitive.Content
+          className="fixed bottom-0 left-0 right-0 z-50 mt-24 rounded-t-[32px] border-0 bg-background p-0 overflow-hidden outline-none"
           style={{ maxHeight: '90vh' }}
         >
-          {/* Drag pill */}
-          <div className="w-12 h-1.5 bg-muted rounded-full mx-auto mt-4 mb-2" />
+          {/* Drag handle */}
+          <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted mt-4 mb-2" />
 
           {/* Header */}
           <div className="px-6 pb-4 flex items-center gap-3">
@@ -174,9 +163,9 @@ export function PolicyDetailModal({
               <TypeIcon className="w-5 h-5 text-foreground" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-foreground font-semibold text-lg tracking-tight truncate">
+              <DrawerPrimitive.Title className="text-foreground font-semibold text-lg tracking-tight truncate">
                 {policy.insured_asset || policy.type || 'Apólice'}
-              </h2>
+              </DrawerPrimitive.Title>
               <p className="text-muted-foreground text-sm">
                 {policy.policy_number ? `Nº ${policy.policy_number}` : 'Sem número'}
               </p>
@@ -232,8 +221,8 @@ export function PolicyDetailModal({
               </motion.button>
             </div>
           )}
-        </motion.div>
-      </DialogPortal>
-    </Dialog>
+        </DrawerPrimitive.Content>
+      </DrawerPrimitive.Portal>
+    </DrawerPrimitive.Root>
   );
 }
