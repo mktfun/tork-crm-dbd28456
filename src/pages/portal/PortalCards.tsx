@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreditCard, AlertCircle, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -102,7 +101,7 @@ export default function PortalCards() {
       <div className="space-y-4">
         <Skeleton className="h-8 w-48 bg-muted" />
         {[1, 2].map(i => (
-          <Skeleton key={i} className="h-72 w-full bg-muted rounded-2xl" />
+          <Skeleton key={i} className="h-72 w-full bg-muted rounded-3xl" />
         ))}
       </div>
     );
@@ -111,9 +110,9 @@ export default function PortalCards() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-light text-foreground tracking-wide">Minhas Carteirinhas</h2>
+        <h2 className="text-xl font-semibold text-foreground tracking-tight">Minhas Carteirinhas</h2>
         {!canDownloadCards && (
-          <Badge variant="outline" className="border-border text-muted-foreground gap-1">
+          <Badge variant="outline" className="border-muted text-muted-foreground gap-1">
             <Eye className="w-3 h-3" />
             Visualização apenas
           </Badge>
@@ -121,15 +120,13 @@ export default function PortalCards() {
       </div>
 
       {policies.length === 0 ? (
-        <Card className="bg-card/80 border-border backdrop-blur-xl">
-          <CardContent className="p-8 text-center">
-            <CreditCard className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
-            <p className="text-muted-foreground font-light">Nenhuma carteirinha disponível.</p>
-            <p className="text-muted-foreground/70 text-sm mt-1">
-              Suas carteirinhas aparecerão aqui quando houver seguros ativos.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="bg-card rounded-3xl shadow-sm p-8 text-center">
+          <CreditCard className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="text-muted-foreground">Nenhuma carteirinha disponível.</p>
+          <p className="text-muted-foreground/70 text-sm mt-1">
+            Suas carteirinhas aparecerão aqui quando houver seguros ativos.
+          </p>
+        </div>
       ) : (
         <div className="space-y-6">
           {policies.map((policy) => {
@@ -150,18 +147,14 @@ export default function PortalCards() {
         </div>
       )}
 
-      <Card className="bg-card/80 border-border backdrop-blur-xl">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
-              <AlertCircle className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <p className="text-sm text-muted-foreground font-light">
-              Apresente esta carteirinha digital em caso de sinistro ou quando solicitado.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-card rounded-3xl shadow-sm p-5">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-muted-foreground">
+            Apresente esta carteirinha digital em caso de sinistro ou quando solicitado.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

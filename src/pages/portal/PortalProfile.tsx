@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { User, Phone, Mail, MapPin, Loader2, Check, KeyRound, Lock } from 'lucide-react';
+import { User, Phone, Mail, MapPin, Loader2, Check, KeyRound, Lock, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { usePortalPermissions } from '@/hooks/usePortalPermissions';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 interface ClientProfile {
   phone: string;
@@ -156,17 +155,37 @@ export default function PortalProfile() {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-48 bg-muted" />
-        <Skeleton className="h-64 w-full bg-muted" />
+        <Skeleton className="h-64 w-full bg-muted rounded-3xl" />
       </div>
     );
   }
 
+  const ProfileRow = ({ icon: Icon, label, children, isLast = false }: { icon: React.ElementType; label: string; children: React.ReactNode; isLast?: boolean }) => (
+    <div className={cn('flex items-start gap-3 p-5', !isLast && 'border-b border-muted/50')}>
+      <Icon className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-muted-foreground text-xs mb-0.5">{label}</p>
+        {children}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-light text-foreground tracking-wide">Meus Dados</h2>
+    <div className="space-y-5">
+      {/* Neobank Profile Header */}
+      <h2 className="text-xl font-semibold text-foreground text-center tracking-tight">Perfil</h2>
+
+      {/* Avatar */}
+      <div className="flex justify-center">
+        <div className="w-24 h-24 rounded-full bg-foreground flex items-center justify-center shadow-lg">
+          <User className="w-10 h-10 text-background" />
+        </div>
+      </div>
+      <p className="text-center text-foreground font-semibold text-lg">{clientName}</p>
+      <p className="text-center text-muted-foreground text-sm -mt-3">Segurado</p>
 
       {!canEditProfile && (
-        <Alert className="bg-muted/80 border-border text-foreground">
+        <Alert className="bg-card rounded-2xl border-transparent shadow-sm text-foreground">
           <Lock className="h-4 w-4 text-muted-foreground" />
           <AlertDescription className="text-muted-foreground">
             As alterações de cadastro devem ser solicitadas diretamente à sua corretora.
@@ -174,167 +193,126 @@ export default function PortalProfile() {
         </Alert>
       )}
 
-      {/* Profile Card */}
-      <Card className="bg-card border-border backdrop-blur-xl">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-[#D4AF37] to-[#C5A028] rounded-full flex items-center justify-center shadow-lg shadow-[#D4AF37]/20">
-              <User className="w-6 h-6 text-black" />
-            </div>
-            <div>
-              <CardTitle className="text-lg text-foreground font-light">{clientName}</CardTitle>
-              <p className="text-sm text-muted-foreground">Segurado</p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Phone */}
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm font-light flex items-center gap-2">
-              <Phone className="w-4 h-4" /> Telefone
-            </Label>
-            <Input
-              type="tel"
-              placeholder="(00) 00000-0000"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
-              maxLength={15}
-              readOnly={!canEditProfile}
-              className={`bg-muted/50 border-input text-foreground h-11 ${
-                canEditProfile 
-                  ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
-                  : 'cursor-not-allowed opacity-60'
-              }`}
-            />
-          </div>
-
-          {/* Email */}
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm font-light flex items-center gap-2">
-              <Mail className="w-4 h-4" /> Email
-            </Label>
-            <Input
-              type="email"
-              placeholder="seu@email.com"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              readOnly={!canEditProfile}
-              className={`bg-muted/50 border-input text-foreground h-11 ${
-                canEditProfile 
-                  ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
-                  : 'cursor-not-allowed opacity-60'
-              }`}
-            />
-          </div>
-
-          {/* CEP */}
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm font-light">CEP</Label>
-            <Input
-              type="text"
-              placeholder="00000-000"
-              value={form.cep || ''}
-              onChange={(e) => setForm({ ...form, cep: formatCep(e.target.value) })}
-              maxLength={9}
-              readOnly={!canEditProfile}
-              className={`bg-muted/50 border-input text-foreground h-11 ${
-                canEditProfile 
-                  ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
-                  : 'cursor-not-allowed opacity-60'
-              }`}
-            />
-          </div>
-
-          {/* Address */}
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm font-light flex items-center gap-2">
-              <MapPin className="w-4 h-4" /> Endereço
-            </Label>
-            <Input
-              type="text"
-              placeholder="Rua, número"
-              value={form.address || ''}
-              onChange={(e) => setForm({ ...form, address: e.target.value })}
-              readOnly={!canEditProfile}
-              className={`bg-muted/50 border-input text-foreground h-11 ${
-                canEditProfile 
-                  ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
-                  : 'cursor-not-allowed opacity-60'
-              }`}
-            />
-          </div>
-
-          {/* City / State */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-sm font-light">Cidade</Label>
-              <Input
-                type="text"
-                placeholder="Cidade"
-                value={form.city || ''}
-                onChange={(e) => setForm({ ...form, city: e.target.value })}
-                readOnly={!canEditProfile}
-                className={`bg-muted/50 border-input text-foreground h-11 ${
-                  canEditProfile 
-                    ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
-                    : 'cursor-not-allowed opacity-60'
-                }`}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-muted-foreground text-sm font-light">Estado</Label>
-              <Input
-                type="text"
-                placeholder="UF"
-                value={form.state || ''}
-                onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })}
-                maxLength={2}
-                readOnly={!canEditProfile}
-                className={`bg-muted/50 border-input text-foreground h-11 ${
-                  canEditProfile 
-                    ? 'focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20' 
-                    : 'cursor-not-allowed opacity-60'
-                }`}
-              />
-            </div>
-          </div>
-
-          {/* Save Button */}
+      {/* Personal Info Card */}
+      <div className="bg-card rounded-3xl shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-muted/50">
+          <h3 className="text-foreground font-semibold text-base">Informações Pessoais</h3>
           {canEditProfile && (
-            <Button
+            <button
               onClick={handleSave}
               disabled={isSaving}
-              className="w-full bg-foreground text-background font-medium hover:bg-foreground/90 h-12"
+              className="text-sm font-medium text-foreground underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-foreground transition-colors disabled:opacity-50"
             >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                <>
-                  <Check className="w-4 h-4 mr-2" />
-                  Salvar Alterações
-                </>
-              )}
-            </Button>
+              {isSaving ? 'Salvando...' : 'Salvar'}
+            </button>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Change Password */}
-      <Card className="bg-card border-border backdrop-blur-xl">
-        <CardContent className="p-4">
-          <Button
-            variant="outline"
-            className="w-full border-border text-muted-foreground hover:bg-accent hover:text-foreground h-12"
-            onClick={() => navigate(`/${slug}/portal/change-password`)}
-          >
-            <KeyRound className="w-4 h-4 mr-2" />
-            Alterar Senha
-          </Button>
-        </CardContent>
-      </Card>
+        <ProfileRow icon={User} label="Nome">
+          <p className="text-foreground text-[0.95rem] font-semibold">{clientName}</p>
+        </ProfileRow>
+
+        <ProfileRow icon={Mail} label="E-mail">
+          <input
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            readOnly={!canEditProfile}
+            className={cn(
+              'w-full bg-transparent text-foreground text-[0.95rem] font-semibold focus:outline-none',
+              !canEditProfile && 'cursor-not-allowed opacity-60'
+            )}
+            placeholder="Atualize seu e-mail"
+          />
+        </ProfileRow>
+
+        <ProfileRow icon={Phone} label="Telefone">
+          <input
+            type="tel"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
+            readOnly={!canEditProfile}
+            maxLength={15}
+            className={cn(
+              'w-full bg-transparent text-foreground text-[0.95rem] font-semibold focus:outline-none',
+              !canEditProfile && 'cursor-not-allowed opacity-60'
+            )}
+            placeholder="(00) 00000-0000"
+          />
+        </ProfileRow>
+
+        <ProfileRow icon={MapPin} label="Endereço">
+          <input
+            type="text"
+            value={form.address || ''}
+            onChange={(e) => setForm({ ...form, address: e.target.value })}
+            readOnly={!canEditProfile}
+            className={cn(
+              'w-full bg-transparent text-foreground text-[0.95rem] font-semibold focus:outline-none',
+              !canEditProfile && 'cursor-not-allowed opacity-60'
+            )}
+            placeholder="Rua, número"
+          />
+        </ProfileRow>
+
+        <ProfileRow icon={MapPin} label="Cidade / Estado">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={form.city || ''}
+              onChange={(e) => setForm({ ...form, city: e.target.value })}
+              readOnly={!canEditProfile}
+              className={cn(
+                'flex-1 bg-transparent text-foreground text-[0.95rem] font-semibold focus:outline-none',
+                !canEditProfile && 'cursor-not-allowed opacity-60'
+              )}
+              placeholder="Cidade"
+            />
+            <input
+              type="text"
+              value={form.state || ''}
+              onChange={(e) => setForm({ ...form, state: e.target.value.toUpperCase() })}
+              readOnly={!canEditProfile}
+              maxLength={2}
+              className={cn(
+                'w-12 bg-transparent text-foreground text-[0.95rem] font-semibold focus:outline-none text-right',
+                !canEditProfile && 'cursor-not-allowed opacity-60'
+              )}
+              placeholder="UF"
+            />
+          </div>
+        </ProfileRow>
+
+        <ProfileRow icon={MapPin} label="CEP" isLast>
+          <input
+            type="text"
+            value={form.cep || ''}
+            onChange={(e) => setForm({ ...form, cep: formatCep(e.target.value) })}
+            readOnly={!canEditProfile}
+            maxLength={9}
+            className={cn(
+              'w-full bg-transparent text-foreground text-[0.95rem] font-semibold focus:outline-none',
+              !canEditProfile && 'cursor-not-allowed opacity-60'
+            )}
+            placeholder="00000-000"
+          />
+        </ProfileRow>
+      </div>
+
+      {/* Account Settings */}
+      <div className="bg-card rounded-3xl shadow-sm overflow-hidden">
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate(`/${slug}/portal/change-password`)}
+          className="w-full text-left p-5 flex justify-between items-center hover:bg-muted/30 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <KeyRound className="w-5 h-5 text-muted-foreground" />
+            <span className="text-foreground font-medium">Alterar Senha</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
+        </motion.button>
+      </div>
     </div>
   );
 }

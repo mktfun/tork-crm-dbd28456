@@ -317,7 +317,7 @@ export default function PortalLogin() {
       </div>
 
       {/* Form — bottom sheet style */}
-      <div className="bg-card/80 backdrop-blur-xl border-t border-border rounded-t-3xl px-6 pt-8 pb-10 sm:px-8 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-card backdrop-blur-xl border-t border-border rounded-t-3xl px-6 pt-8 pb-10 sm:px-8 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="w-10 h-1 rounded-full bg-border mx-auto mb-2" />
 
         {needsPassword && selectedClient ? (
@@ -413,7 +413,7 @@ export default function PortalLogin() {
 
         <Button
           onClick={needsPassword ? handlePasswordSubmit : needsConfirmation ? handleConfirmation : handleLogin}
-          className="w-full h-12 rounded-xl text-base tracking-wide transition-all active:scale-[0.98]"
+          className="w-full h-12 rounded-full text-base tracking-wide transition-all active:scale-[0.98]"
           variant="silver"
           disabled={isLoading}
         >

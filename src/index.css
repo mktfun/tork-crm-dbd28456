@@ -1,36 +1,37 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* ── LIGHT THEME ── */
-    --background: 0 0% 100%;
-    /* #ffffff */
-    --foreground: 240 10% 3.9%;
-    /* #09090b */
-    --card: 0 0% 98%;
-    /* #fafafa */
-    --card-foreground: 240 10% 3.9%;
+    /* ── LIGHT THEME — TripGlide / Neobank ── */
+    --background: 210 7% 96%;
+    /* #f5f6f7 — ice background */
+    --foreground: 210 11% 15%;
+    /* #212529 — night text */
+    --card: 0 0% 100%;
+    /* #ffffff — pure white cards */
+    --card-foreground: 210 11% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
+    --popover-foreground: 210 11% 15%;
     --primary: 217 91% 60%;
     /* blue-500 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 96%;
-    /* zinc-100 */
-    --secondary-foreground: 240 6% 10%;
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
-    /* zinc-500 */
+    --secondary: 210 4% 93%;
+    /* light grey */
+    --secondary-foreground: 210 11% 15%;
+    --muted: 210 4% 91%;
+    /* #e8e9ea */
+    --muted-foreground: 210 5% 46%;
+    /* #6c757d */
     --accent: 217 91% 60%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 6% 90%;
-    /* zinc-200 */
-    --input: 240 6% 90%;
+    --border: 210 4% 93%;
+    /* near-invisible border */
+    --input: 210 4% 91%;
     --ring: 217 91% 60%;
     --chart-1: 217 91% 60%;
     --chart-2: 160 60% 45%;
@@ -94,7 +95,8 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Instrument Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
 
   #root {
@@ -132,6 +134,10 @@
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--muted) / 0.3);
   }
+
+  /* No scrollbar utility */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
 /*

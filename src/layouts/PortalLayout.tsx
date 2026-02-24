@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Home, FileText, CreditCard, User, LogOut, Loader2, Shield, Inbox, Sun, Moon } from 'lucide-react';
+import { Home, FileText, CreditCard, User, LogOut, Loader2, Shield, Inbox, Sun, Moon, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from 'next-themes';
 import { motion } from 'framer-motion';
@@ -34,6 +34,8 @@ interface GetBrokerageResponse {
   success: boolean;
   brokerage?: PortalBrokerage;
 }
+
+const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
 export function PortalLayout() {
   const navigate = useNavigate();
@@ -131,15 +133,15 @@ export function PortalLayout() {
         key={path}
         onClick={onClick}
         className={cn(
-          'relative flex items-center gap-1.5 px-3 py-2 rounded-xl transition-colors duration-200',
-          active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+          'relative flex items-center gap-1.5 px-3 py-2 rounded-full transition-colors duration-200',
+          active ? 'text-white' : 'text-white/50 hover:text-white/80'
         )}
       >
         {active && (
           <motion.div
             layoutId="portal-nav-pill"
-            className="absolute inset-0 bg-primary/10 rounded-xl"
-            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            className="absolute inset-0 bg-white/20 rounded-full"
+            transition={springTransition}
           />
         )}
         <Icon className="w-5 h-5 relative z-10" />
@@ -147,7 +149,7 @@ export function PortalLayout() {
           className="text-xs font-medium relative z-10 overflow-hidden whitespace-nowrap"
           initial={false}
           animate={{ width: active ? LABEL_WIDTH : 0, opacity: active ? 1 : 0 }}
-          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+          transition={springTransition}
         >
           {label}
         </motion.span>
@@ -157,65 +159,55 @@ export function PortalLayout() {
 
   return (
     <div className="min-h-screen bg-background pb-28">
-      {/* Header */}
-      <header className="bg-background/80 backdrop-blur-2xl border-b border-border px-3 py-3 sm:p-4 sticky top-0 z-10">
+      {/* Header — TripGlide style: no border, greeting left, actions right */}
+      <header className="bg-background px-4 py-4 sm:px-6 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {brokerage?.logo_url ? (
-              <img
-                src={brokerage.logo_url}
-                alt={brokerage.name}
-                className="h-10 object-contain"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-xl bg-card border border-border flex items-center justify-center">
-                <Shield className="w-5 h-5 text-muted-foreground" />
-              </div>
-            )}
-            <div>
-              <h1 className="text-foreground font-light tracking-wide">
-                Olá, {client.name?.split(' ')[0]}
-              </h1>
-              <p className="text-muted-foreground text-xs tracking-wide">
-                {brokerage?.name || 'Portal do Segurado'}
-              </p>
-            </div>
+          <div>
+            <h1 className="text-foreground font-semibold text-lg tracking-tight">
+              Olá, {client.name?.split(' ')[0]}
+            </h1>
+            <p className="text-muted-foreground text-xs tracking-wide">
+              {brokerage?.name || 'Bem-vindo ao portal'}
+            </p>
           </div>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="text-muted-foreground hover:text-foreground transition-all duration-300"
+              className="text-muted-foreground hover:text-foreground rounded-full"
             >
-              {theme === 'dark' ? (
-                <Sun className="w-5 h-5 transition-transform duration-500 rotate-0 hover:rotate-90" />
-              ) : (
-                <Moon className="w-5 h-5 transition-transform duration-500 rotate-0 hover:-rotate-12" />
-              )}
+              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </Button>
             <Button
               variant="ghost"
               size="icon"
               onClick={handleLogout}
-              className="text-muted-foreground hover:text-foreground hover:bg-accent"
+              className="text-muted-foreground hover:text-foreground rounded-full"
             >
               <LogOut className="w-5 h-5" />
             </Button>
+            {/* Avatar */}
+            <button
+              onClick={() => navigate(`/${brokerageSlug}/portal/profile`)}
+              className="w-10 h-10 rounded-full bg-foreground flex items-center justify-center ml-1"
+            >
+              <User className="w-5 h-5 text-background" />
+            </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="px-3 py-4 sm:px-6 sm:py-6 max-w-lg mx-auto">
+      <main className="px-4 py-4 sm:px-6 max-w-lg mx-auto">
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           <Outlet />
         </div>
       </main>
 
-      {/* Bottom Navigation — Framer Motion Pill Nav */}
+      {/* Bottom Navigation — Dark Pill Nav */}
       <nav className="fixed bottom-4 left-4 right-4 z-50 safe-area-pb">
-        <div className="max-w-lg mx-auto bg-background/80 backdrop-blur-2xl border border-border rounded-2xl shadow-lg px-2 py-2 flex justify-around items-center">
+        <div className="max-w-lg mx-auto bg-foreground rounded-full shadow-lg px-2 py-2 flex justify-around items-center">
           {renderNavItem({ path: 'home', label: 'Início', icon: Home, onClick: () => navigate(`/${brokerageSlug}/portal/home`) })}
           {portalConfig.show_policies && renderNavItem({ path: 'policies', label: 'Seguros', icon: FileText, onClick: () => navigate(`/${brokerageSlug}/portal/policies`) })}
           {portalConfig.show_cards && renderNavItem({ path: 'cards', label: 'Carteiras', icon: CreditCard, onClick: () => navigate(`/${brokerageSlug}/portal/cards`) })}
