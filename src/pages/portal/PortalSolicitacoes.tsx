@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Clock, CheckCircle2, AlertCircle, Inbox } from 'lucide-react';
+import { FileText, Clock, Inbox, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 interface PortalRequest {
   id: string;
@@ -68,58 +68,54 @@ export default function PortalSolicitacoes() {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-48 bg-muted" />
-        {[1, 2, 3].map(i => (
-          <Skeleton key={i} className="h-20 w-full bg-muted" />
-        ))}
+        <Skeleton className="h-20 w-full bg-muted rounded-3xl" />
+        <Skeleton className="h-20 w-full bg-muted rounded-3xl" />
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-light text-foreground tracking-wide">Minhas Solicitações</h2>
+      <h2 className="text-xl font-semibold text-foreground tracking-tight">Minhas Solicitações</h2>
 
       {requests.length === 0 ? (
-        <Card className="bg-card/80 border-border backdrop-blur-xl">
-          <CardContent className="p-8 text-center">
-            <Inbox className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
-            <p className="text-muted-foreground font-light">Nenhuma solicitação enviada ainda.</p>
-          </CardContent>
-        </Card>
+        <div className="bg-card rounded-3xl shadow-sm p-8 text-center">
+          <Inbox className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="text-muted-foreground">Nenhuma solicitação enviada ainda.</p>
+        </div>
       ) : (
-        <div className="space-y-3">
-          {requests.map((req) => {
+        <div className="bg-card rounded-3xl shadow-sm overflow-hidden">
+          {requests.map((req, idx) => {
             const status = statusConfig[req.status] || statusConfig.pendente;
             return (
-              <Card
+              <div
                 key={req.id}
-                className="bg-card/80 border-border backdrop-blur-xl transition-all duration-200 hover:shadow-md"
+                className={cn(
+                  'flex items-center gap-3 p-5 transition-colors',
+                  idx !== requests.length - 1 && 'border-b border-muted/50'
+                )}
               >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center text-muted-foreground flex-shrink-0 border border-border">
-                      <FileText className="w-5 h-5" />
+                <div className="w-10 h-10 bg-muted/50 rounded-xl flex items-center justify-center text-muted-foreground flex-shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-semibold text-foreground text-sm">
+                        {typeLabels[req.request_type] || req.request_type}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {req.insurance_type || 'Seguro'}
+                      </p>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="font-light text-foreground">
-                            {typeLabels[req.request_type] || req.request_type}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            {req.insurance_type || 'Seguro'}
-                          </p>
-                        </div>
-                        <Badge className={status.className}>{status.label}</Badge>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground/70 mt-2">
-                        <Clock className="w-3 h-3" />
-                        <span>{format(new Date(req.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
-                      </div>
-                    </div>
+                    <Badge className={status.className}>{status.label}</Badge>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground/70 mt-2">
+                    <Clock className="w-3 h-3" />
+                    <span>{format(new Date(req.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+                  </div>
+                </div>
+              </div>
             );
           })}
         </div>

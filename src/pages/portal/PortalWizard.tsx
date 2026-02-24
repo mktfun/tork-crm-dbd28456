@@ -105,15 +105,15 @@ export default function PortalWizard() {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05, duration: 0.3 }}
-                whileHover={{ scale: 1.02 }}
+                whileHover={{ scale: 1.015 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setSelectedRamo(ramo.id)}
-                className="flex flex-col items-start gap-3 p-4 rounded-2xl bg-muted/40 hover:bg-muted/70 border border-transparent hover:border-primary/20 transition-all duration-200 text-left"
+                className="bg-card rounded-3xl shadow-sm p-5 flex flex-col items-center justify-center text-center gap-3 border border-transparent hover:border-muted-foreground/10 transition-all"
               >
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Icon className="w-5 h-5 text-primary" strokeWidth={1.5} />
+                <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
+                  <Icon className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
                 </div>
-                <span className="text-foreground text-sm font-medium tracking-wide">
+                <span className="text-foreground text-sm font-medium">
                   {ramo.label}
                 </span>
               </motion.button>
