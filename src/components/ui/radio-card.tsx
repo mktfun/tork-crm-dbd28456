@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface RadioCardOption {
@@ -29,23 +30,42 @@ export function RadioCardGroup({ options, value, onChange, label, className, col
         className
       )}>
         {options.map((option) => (
-          <button
+          <motion.button
             key={option.value}
             type="button"
+            whileTap={{ scale: 0.97 }}
+            whileHover={{ scale: 1.015 }}
             onClick={() => onChange(option.value)}
             className={cn(
-              "flex flex-col items-start gap-1 rounded-xl border p-4 text-left transition-all",
+              "flex flex-col items-start gap-1 rounded-2xl p-4 text-left transition-all",
               value === option.value
-                ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                : "border-border bg-card/50 hover:border-border/80 hover:bg-muted/30"
+                ? "bg-foreground text-background shadow-md"
+                : "bg-muted/40 text-foreground hover:bg-muted/60"
             )}
           >
-            {option.icon && <div className="mb-1">{option.icon}</div>}
-            <span className="text-sm font-medium text-foreground">{option.label}</span>
-            {option.description && (
-              <span className="text-xs text-muted-foreground">{option.description}</span>
+            {option.icon && (
+              <div className={cn(
+                "mb-1",
+                value === option.value ? "text-background" : "text-muted-foreground"
+              )}>
+                {option.icon}
+              </div>
             )}
-          </button>
+            <span className={cn(
+              "text-sm font-semibold",
+              value === option.value ? "text-background" : "text-foreground"
+            )}>
+              {option.label}
+            </span>
+            {option.description && (
+              <span className={cn(
+                "text-xs",
+                value === option.value ? "text-background/70" : "text-muted-foreground"
+              )}>
+                {option.description}
+              </span>
+            )}
+          </motion.button>
         ))}
       </div>
     </div>

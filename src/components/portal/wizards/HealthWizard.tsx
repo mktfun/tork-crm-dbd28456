@@ -450,16 +450,16 @@ export const HealthWizard: React.FC<HealthWizardProps> = ({ onComplete }) => {
 
   return (
     <div className="w-full">
-      {/* Progress Stepper - Minimalista */}
+      {/* Progress Stepper - Ice/Night */}
       <div className="mb-10">
         <div className="flex items-center justify-between relative">
           {/* Progress Line */}
-          <div className="absolute top-5 left-0 right-0 h-0.5 bg-border">
+          <div className="absolute top-5 left-0 right-0 h-1 bg-muted rounded-full">
             <motion.div
-              className="h-full bg-primary"
+              className="h-full bg-foreground rounded-full"
               initial={{ width: 0 }}
               animate={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.5, ease: "easeInOut" }}
             />
           </div>
 
@@ -473,12 +473,12 @@ export const HealthWizard: React.FC<HealthWizardProps> = ({ onComplete }) => {
                 <motion.div
                   className={`
                     w-10 h-10 rounded-full flex items-center justify-center
-                    transition-all duration-300
+                    transition-all duration-500
                     ${isCompleted
-                      ? 'bg-primary text-primary-foreground'
+                      ? 'bg-foreground text-background'
                       : isActive
-                        ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
-                        : 'bg-muted/40 border border-transparent text-muted-foreground'
+                        ? 'bg-card shadow-[0_4px_12px_rgba(0,0,0,0.1)] text-foreground'
+                        : 'bg-muted text-muted-foreground'
                     }
                   `}
                   whileHover={{ scale: 1.05 }}
@@ -491,7 +491,7 @@ export const HealthWizard: React.FC<HealthWizardProps> = ({ onComplete }) => {
                 </motion.div>
                 <span className={`
                   mt-2 text-xs font-medium transition-colors
-                  ${isActive ? 'text-foreground' : 'text-muted-foreground'}
+                  ${isActive ? 'text-foreground font-semibold' : 'text-muted-foreground'}
                 `}>
                   {step.title}
                 </span>
@@ -503,7 +503,7 @@ export const HealthWizard: React.FC<HealthWizardProps> = ({ onComplete }) => {
 
       {/* Step Content - Glassmorphism Card */}
       <motion.div
-        className="bg-card/80 backdrop-blur-md rounded-2xl border border-border/50 shadow-xl overflow-hidden"
+        className="bg-card rounded-[2rem] shadow-sm overflow-hidden"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
@@ -538,52 +538,32 @@ export const HealthWizard: React.FC<HealthWizardProps> = ({ onComplete }) => {
         </motion.div>
       )}
 
-      {/* Navigation Buttons */}
-      <div className="flex items-center justify-between mt-8">
-        <button
+      <div className="flex items-center justify-between mt-8 gap-4">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
           onClick={prevStep}
           disabled={currentStep === 0}
-          className={`
-            flex items-center gap-2 px-6 py-3 rounded-full
-            font-medium transition-all duration-300
-            ${currentStep === 0
-              ? 'text-muted-foreground cursor-not-allowed opacity-50'
-              : 'text-foreground hover:bg-muted'
-            }
-          `}
+          className="w-14 h-14 rounded-full bg-card shadow-sm flex items-center justify-center hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <ArrowLeft className="w-4 h-4" />
-          Voltar
-        </button>
+          <ArrowLeft className="w-6 h-6 text-foreground" strokeWidth={1.5} />
+        </motion.button>
 
         {currentStep < steps.length - 1 ? (
-          <button
+          <motion.button
+            whileTap={{ scale: 0.95 }}
             onClick={nextStep}
             disabled={!isStepValid(currentStep)}
-            className={`
-              flex items-center gap-2 px-8 py-3 rounded-full
-              font-semibold transition-all duration-300
-              ${isStepValid(currentStep)
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg hover:shadow-xl'
-                : 'bg-muted text-muted-foreground cursor-not-allowed'
-              }
-            `}
+            className="flex-1 h-14 rounded-full bg-foreground text-background font-semibold text-[1.05rem] shadow-lg flex items-center justify-center gap-2 hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Próximo
-            <ArrowRight className="w-4 h-4" />
-          </button>
+            Continuar
+            <ArrowRight className="w-5 h-5" strokeWidth={2} />
+          </motion.button>
         ) : (
-          <button
+          <motion.button
+            whileTap={{ scale: 0.95 }}
             onClick={handleSubmit}
             disabled={!isStepValid(currentStep) || isSubmitting || !acceptedTerms || !acceptedPrivacy}
-            className={`
-              flex items-center gap-2 px-8 py-3 rounded-full
-              font-semibold transition-all duration-300
-              ${(isStepValid(currentStep) && acceptedTerms && acceptedPrivacy && !isSubmitting)
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg hover:shadow-xl'
-                : 'bg-muted text-muted-foreground cursor-not-allowed'
-              }
-            `}
+            className="flex-1 h-14 rounded-full bg-foreground text-background font-semibold text-[1.05rem] shadow-lg flex items-center justify-center gap-2 hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <>
@@ -593,17 +573,17 @@ export const HealthWizard: React.FC<HealthWizardProps> = ({ onComplete }) => {
             ) : (
               <>
                 Enviar Cotação
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-5 h-5" strokeWidth={2} />
               </>
             )}
-          </button>
+          </motion.button>
         )}
       </div>
 
       {/* Security Badge */}
       <div className="flex items-center justify-center mt-6">
         <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-          <svg className="w-3.5 h-3.5 text-success" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-3.5 h-3.5 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
           </svg>
           Seus dados estão seguros e protegidos.

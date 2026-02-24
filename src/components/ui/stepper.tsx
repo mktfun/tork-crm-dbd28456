@@ -31,12 +31,12 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
             <div className="flex flex-col items-center">
               <div
                 className={cn(
-                  "flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-all duration-300",
+                  "flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full transition-all duration-500",
                   isCompleted
-                    ? "bg-primary/20 border-primary text-primary"
+                    ? "bg-foreground text-background"
                     : isActive
-                      ? "bg-primary border-primary text-primary-foreground shadow-[0_0_15px_-3px_hsl(var(--primary)/0.4)]"
-                      : "bg-muted/50 border-border text-muted-foreground"
+                      ? "bg-card shadow-[0_4px_12px_rgba(0,0,0,0.1)] text-foreground"
+                      : "bg-muted text-muted-foreground"
                 )}
               >
                 {isCompleted ? (
@@ -49,7 +49,7 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
                 className={cn(
                   "mt-2 text-[10px] sm:text-xs font-medium transition-colors duration-200 max-w-[56px] sm:max-w-none text-center leading-tight truncate",
                   isActive
-                    ? "text-primary font-semibold"
+                    ? "text-foreground font-semibold"
                     : isCompleted
                       ? "text-foreground"
                       : "text-muted-foreground"
@@ -59,12 +59,12 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
               </span>
             </div>
             {index < steps.length - 1 && (
-              <div className="relative h-0.5 w-6 sm:w-12 md:w-20 mx-1 sm:mx-2 md:mx-4">
-                <div className="absolute inset-0 bg-border rounded-full" />
+              <div className="relative h-1 w-10 sm:w-16 mx-2 sm:mx-3">
+                <div className="absolute inset-0 bg-muted rounded-full" />
                 <div
                   className={cn(
-                    "absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out",
-                    stepNumber < currentStep ? "w-full bg-primary" : "w-0 bg-primary"
+                    "absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-in-out",
+                    stepNumber < currentStep ? "w-full bg-foreground" : "w-0 bg-foreground"
                   )}
                 />
               </div>

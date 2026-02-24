@@ -1,9 +1,9 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Stepper, type Step } from "@/components/ui/stepper";
 import { FormCard } from "@/components/ui/form-card";
 import { FormInput } from "@/components/ui/form-input";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -332,33 +332,39 @@ export const EndorsementWizard: React.FC<EndorsementWizardProps> = ({ isUber = f
                 const isSelected = endorsementType === option.type;
 
                 return (
-                  <button
+                  <motion.button
                     key={option.type}
                     type="button"
+                    whileTap={{ scale: 0.97 }}
+                    whileHover={{ scale: 1.015 }}
                     onClick={() => setEndorsementType(option.type)}
-                    className={`group relative flex flex-col items-center justify-center p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 gap-3 h-36 ${isSelected
-                        ? `border-primary bg-primary/5 shadow-md scale-[1.02]`
-                        : "border-muted bg-background hover:border-muted-foreground/30 hover:bg-muted/30"
+                    className={`group relative flex flex-col items-center justify-center p-6 rounded-2xl cursor-pointer transition-all duration-200 gap-3 h-36 ${isSelected
+                        ? `bg-foreground text-background shadow-md`
+                        : "bg-muted/40 hover:bg-muted/60"
                       }`}
                   >
-                    <div className={`p-3 rounded-full ${option.bgColor} transition-colors`}>
-                      <Icon size={28} className={option.color} />
+                    <div className={`p-3 rounded-full ${isSelected ? 'bg-background/20' : 'bg-muted/60'} transition-colors`}>
+                      <Icon size={28} className={isSelected ? 'text-background' : 'text-muted-foreground'} />
                     </div>
                     <div className="text-center">
-                      <span className="font-bold text-sm block mb-1">{option.label}</span>
-                      <span className="text-xs text-muted-foreground">{option.description}</span>
+                      <span className="font-semibold text-sm block mb-1">{option.label}</span>
+                      <span className={`text-xs ${isSelected ? 'text-background/70' : 'text-muted-foreground'}`}>{option.description}</span>
                     </div>
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
 
             {endorsementType && (
               <div className="mt-6 flex justify-end">
-                <Button onClick={nextStep} className="gap-2">
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={nextStep}
+                  className="flex items-center gap-2 px-8 py-3 rounded-full bg-foreground text-background font-semibold shadow-lg hover:bg-foreground/90 transition-colors"
+                >
                   Continuar
                   <ArrowRight size={16} />
-                </Button>
+                </motion.button>
               </div>
             )}
           </FormCard>
@@ -618,16 +624,23 @@ export const EndorsementWizard: React.FC<EndorsementWizardProps> = ({ isUber = f
               )}
             </div>
 
-            {/* Navegação */}
-            <div className="mt-8 flex justify-between">
-              <Button type="button" variant="ghost" onClick={prevStep} className="gap-2">
-                <ArrowLeft size={16} />
-                Voltar
-              </Button>
-              <Button onClick={nextStep} disabled={!isStepValid(1)} className="gap-2">
+            <div className="mt-8 flex justify-between gap-4">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={prevStep}
+                className="w-14 h-14 rounded-full bg-card shadow-sm flex items-center justify-center hover:bg-muted transition-colors"
+              >
+                <ArrowLeft className="w-6 h-6 text-foreground" strokeWidth={1.5} />
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={nextStep}
+                disabled={!isStepValid(1)}
+                className="flex-1 h-14 rounded-full bg-foreground text-background font-semibold shadow-lg flex items-center justify-center gap-2 hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Continuar
-                <ArrowRight size={16} />
-              </Button>
+                <ArrowRight className="w-5 h-5" strokeWidth={2} />
+              </motion.button>
             </div>
           </FormCard>
         )}
@@ -659,16 +672,19 @@ export const EndorsementWizard: React.FC<EndorsementWizardProps> = ({ isUber = f
               />
             </div>
 
-            {/* Navegação */}
-            <div className="mt-8 flex justify-between">
-              <Button type="button" variant="ghost" onClick={prevStep} className="gap-2">
-                <ArrowLeft size={16} />
-                Voltar
-              </Button>
-              <Button
+            <div className="mt-8 flex justify-between gap-4">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={prevStep}
+                className="w-14 h-14 rounded-full bg-card shadow-sm flex items-center justify-center hover:bg-muted transition-colors"
+              >
+                <ArrowLeft className="w-6 h-6 text-foreground" strokeWidth={1.5} />
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 onClick={handleSubmit}
                 disabled={!isStepValid(2) || isSubmitting}
-                className={`gap-2 ${endorsementType === "cancelamento" ? "bg-rose-600 hover:bg-rose-700" : ""}`}
+                className={`flex-1 h-14 rounded-full font-semibold shadow-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${endorsementType === "cancelamento" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : "bg-foreground text-background hover:bg-foreground/90"}`}
               >
                 {isSubmitting ? (
                   <>
@@ -678,10 +694,10 @@ export const EndorsementWizard: React.FC<EndorsementWizardProps> = ({ isUber = f
                 ) : (
                   <>
                     {endorsementType === "cancelamento" ? "Solicitar Cancelamento" : "Enviar Solicitação"}
-                    <ArrowRight size={16} />
+                    <ArrowRight className="w-5 h-5" strokeWidth={2} />
                   </>
                 )}
-              </Button>
+              </motion.button>
             </div>
           </FormCard>
         )}

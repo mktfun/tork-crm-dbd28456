@@ -1,10 +1,10 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Stepper, type Step } from "@/components/ui/stepper";
 import { FormCard } from "@/components/ui/form-card";
 import { FormInput } from "@/components/ui/form-input";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -55,17 +55,19 @@ interface OptionCardProps {
 }
 
 const OptionCard: React.FC<OptionCardProps> = ({ icon, label, selected, onClick }) => (
-  <button
+  <motion.button
     type="button"
+    whileTap={{ scale: 0.97 }}
+    whileHover={{ scale: 1.015 }}
     onClick={onClick}
-    className={`flex flex-col items-center justify-center p-3 rounded-xl cursor-pointer transition-all duration-200 gap-2 h-20 ${selected
-        ? "bg-primary/10 text-primary border border-primary/30 shadow-sm scale-[1.02]"
-        : "bg-muted/40 text-muted-foreground border border-transparent hover:bg-muted/60"
+    className={`flex flex-col items-center justify-center p-3 rounded-2xl cursor-pointer transition-all duration-200 gap-2 h-20 ${selected
+        ? "bg-foreground text-background shadow-md"
+        : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
       }`}
   >
-    <span className={selected ? "text-primary" : "text-muted-foreground"}>{icon}</span>
-    <span className="font-bold text-sm text-center leading-tight">{label}</span>
-  </button>
+    <span className={selected ? "text-background" : "text-muted-foreground"}>{icon}</span>
+    <span className="font-semibold text-sm text-center leading-tight">{label}</span>
+  </motion.button>
 );
 
 // NOVO: Componente YesNoToggle com visual refinado
@@ -75,33 +77,35 @@ interface YesNoToggleProps {
   onChange: (value: "sim" | "nao") => void;
 }
 
-const YesNoToggle: React.FC<YesNoToggleProps> = ({ label, value, onChange }) => (
-  <div className="space-y-2">
-    <Label className="text-sm font-medium">{label}</Label>
-    <div className="grid grid-cols-2 gap-3 w-full">
-      <button
-        type="button"
-        onClick={() => onChange("sim")}
-        className={`h-10 flex items-center justify-center rounded-xl text-sm font-medium transition-all duration-200 ${value === "sim"
-            ? "bg-primary text-primary-foreground shadow-sm"
-            : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
-          }`}
-      >
-        Sim
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("nao")}
-        className={`h-10 flex items-center justify-center rounded-xl text-sm font-medium transition-all duration-200 ${value === "nao"
-            ? "bg-primary text-primary-foreground shadow-sm"
-            : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
-          }`}
-      >
-        Não
-      </button>
+const YesNoToggle: React.FC<YesNoToggleProps> = ({ label, value, onChange }) => {
+  const pillId = `yesno-${label.replace(/\s+/g, '-').slice(0, 20)}`;
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm font-medium">{label}</Label>
+      <div className="bg-muted/60 p-1 rounded-2xl flex items-center shadow-inner relative">
+        {(['sim', 'nao'] as const).map((option) => (
+          <motion.button
+            key={option}
+            type="button"
+            whileTap={{ scale: 0.96 }}
+            onClick={() => onChange(option)}
+            className="flex-1 py-2.5 text-sm font-semibold rounded-xl text-center transition-colors relative z-10"
+            style={{ color: value === option ? 'hsl(var(--background))' : 'hsl(var(--muted-foreground))' }}
+          >
+            {value === option && (
+              <motion.div
+                layoutId={pillId}
+                className="absolute inset-0 bg-foreground rounded-xl shadow-md -z-10"
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              />
+            )}
+            {option === 'sim' ? 'Sim' : 'Não'}
+          </motion.button>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 interface AutoWizardProps {
   dealType?: "renovacao" | "novo" | null;
@@ -901,28 +905,44 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
         </div>
       )}
 
-      <div className="flex items-center justify-between mt-8">
-        <Button variant="outline-subtle" onClick={prevStep} disabled={currentStep === 0} className="gap-2">
-          <ArrowLeft size={18} /> Voltar
-        </Button>
+      <div className="flex items-center justify-between mt-8 gap-4">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={prevStep}
+          disabled={currentStep === 0}
+          className="w-14 h-14 rounded-full bg-card shadow-sm flex items-center justify-center hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <ArrowLeft className="w-6 h-6 text-foreground" strokeWidth={1.5} />
+        </motion.button>
 
         {currentStep < steps.length - 1 ? (
-          <Button variant="cta" onClick={nextStep} disabled={!isStepValid(currentStep)} className="gap-2">
-            Próximo <ArrowRight size={18} />
-          </Button>
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={nextStep}
+            disabled={!isStepValid(currentStep)}
+            className="flex-1 h-14 rounded-full bg-foreground text-background font-semibold text-[1.05rem] shadow-lg flex items-center justify-center gap-2 hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Continuar
+            <ArrowRight className="w-5 h-5" strokeWidth={2} />
+          </motion.button>
         ) : (
-          <Button variant="cta" onClick={handleSubmit} disabled={!isStepValid(currentStep) || isSubmitting || !acceptedTerms || !acceptedPrivacy} className="gap-2">
-            {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <>Enviar Cotação <ArrowRight size={18} /></>}
-          </Button>
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={handleSubmit}
+            disabled={!isStepValid(currentStep) || isSubmitting || !acceptedTerms || !acceptedPrivacy}
+            className="flex-1 h-14 rounded-full bg-foreground text-background font-semibold text-[1.05rem] shadow-lg flex items-center justify-center gap-2 hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <>Enviar Cotação <ArrowRight className="w-5 h-5" strokeWidth={2} /></>}
+          </motion.button>
         )}
       </div>
 
       <div className="flex items-center justify-center mt-6 mb-4">
         <p className="text-xs text-muted-foreground text-center flex items-center gap-1.5">
-          <svg className="w-3.5 h-3.5 text-success" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-3.5 h-3.5 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
           </svg>
-          Seus dados estão seguros e não serão compartilhados com terceiros.
+          Seus dados estão seguros e protegidos.
         </p>
       </div>
     </div>
