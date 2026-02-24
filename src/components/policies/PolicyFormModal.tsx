@@ -6,13 +6,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { format, addYears } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Combobox } from '@/components/ui/combobox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Stepper } from '@/components/ui/stepper';
 import {
   User, Building2, DollarSign, Users2,
   Shield, Activity, Tag, Hash,
@@ -31,7 +29,6 @@ import { useRamosByCompany } from '@/hooks/useRamosByCompany';
 import { useSupabaseProducers } from '@/hooks/useSupabaseProducers';
 import { useSupabaseBrokerages } from '@/hooks/useSupabaseBrokerages';
 import { useSupabaseCompanyBranches } from '@/hooks/useSupabaseCompanyBranches';
-import { Separator } from '@/components/ui/separator';
 import { policyFormSchema, PolicyFormData } from '@/schemas/policySchema';
 import { Policy } from '@/types';
 import { toast } from 'sonner';
@@ -73,6 +70,34 @@ const STEP_META = [
   },
 ];
 
+/* ── Settings Row helper ── */
+function SettingsRow({ icon: Icon, label, required, children, error }: {
+  icon: React.ElementType;
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+  error?: string;
+}) {
+  return (
+    <div className="px-5 py-4 space-y-2">
+      <div className="flex items-center gap-2">
+        <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          {label}
+          {required && <span className="text-destructive ml-1">*</span>}
+        </p>
+      </div>
+      {children}
+      {error && (
+        <p className="text-destructive text-xs flex items-center gap-1">
+          <AlertCircle className="w-3 h-3" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAdded }: PolicyFormModalProps) {
   const { clients, refetch: refetchClients } = useClients();
   const { addPolicy, updatePolicy } = usePolicies();
@@ -86,7 +111,7 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
   const [isManualDueDate, setIsManualDueDate] = useState(false);
   const [pendingRamo, setPendingRamo] = useState<{ id?: string; name?: string } | null>(null);
 
-  // Preparar valores default baseado no modo (criar ou editar)
+  // ── Default values (create vs edit) ──
   const getDefaultValues = (): Partial<PolicyFormData> => {
     if (isEditing && policy) {
       return {
@@ -105,7 +130,6 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
         automaticRenewal: policy.automaticRenewal ?? true,
       };
     }
-
     return {
       status: 'Orçamento' as const,
       commissionRate: 20,
@@ -131,7 +155,7 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
   const selectedCompanyId = watch('insuranceCompany');
   const { data: availableBranches = [] } = useRamosByCompany(selectedCompanyId);
 
-  // Seleção reativa do ramo assim que os ramos da seguradora estiverem disponíveis
+  // ── Reactive ramo selection ──
   React.useEffect(() => {
     if (!pendingRamo) return;
     if (!selectedCompanyId) return;
@@ -230,16 +254,11 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
 
   const getFieldsForStep = (step: number): (keyof PolicyFormData)[] => {
     switch (step) {
-      case 1:
-        return ['clientId', 'insuredAsset', 'status'];
-      case 2:
-        return ['insuranceCompany', 'type', 'policyNumber'];
-      case 3:
-        return ['premiumValue', 'commissionRate', 'startDate', 'expirationDate'];
-      case 4:
-        return ['producerId', 'brokerageId'];
-      default:
-        return [];
+      case 1: return ['clientId', 'insuredAsset', 'status'];
+      case 2: return ['insuranceCompany', 'type', 'policyNumber'];
+      case 3: return ['premiumValue', 'commissionRate', 'startDate', 'expirationDate'];
+      case 4: return ['producerId', 'brokerageId'];
+      default: return [];
     }
   };
 
@@ -247,7 +266,6 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
     e?.preventDefault();
     const fieldsToValidate = getFieldsForStep(currentStep);
     const isStepValid = await trigger(fieldsToValidate);
-
     if (isStepValid && currentStep < STEPS.length) {
       setCurrentStep(currentStep + 1);
     }
@@ -263,7 +281,6 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
   const onSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     setIsSubmitting(true);
-
     try {
       const data = watch();
       const finalData = {
@@ -271,13 +288,11 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
         brokerageId: data.brokerageId ? parseInt(data.brokerageId) : undefined,
         expirationDate: data.expirationDate || (startDate ? format(addYears(new Date(startDate), 1), 'yyyy-MM-dd') : undefined),
       };
-
       if (isEditing && policy) {
         await updatePolicy(policy.id, finalData);
       } else {
         await addPolicy(finalData);
       }
-
       reset();
       setCurrentStep(1);
       setIsManualDueDate(false);
@@ -300,84 +315,53 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
     setValue('clientId', newClient.id);
   };
 
-  const renderStepHeader = () => {
-    const meta = STEP_META[currentStep - 1];
-    const MetaIcon = meta.icon;
-    return (
-      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border/50">
-        <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
-          <MetaIcon className="w-5 h-5" />
-        </div>
-        <div>
-          <h3 className="text-base font-semibold text-foreground">{meta.title}</h3>
-          <p className="text-sm text-muted-foreground">{meta.subtitle}</p>
-        </div>
-      </div>
-    );
-  };
+  /* ═══════════════════════════════════════════════
+     RENDER: STEP CONTENT
+     ═══════════════════════════════════════════════ */
 
   const renderStepContent = () => {
+    const meta = STEP_META[currentStep - 1];
+    const MetaIcon = meta.icon;
+
     const content = (() => {
       switch (currentStep) {
+        /* ── STEP 1: Informações Principais ── */
         case 1:
           return (
-            <div className="space-y-5">
-              {/* Cliente */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-muted-foreground" />
-                  Cliente
-                  <span className="text-destructive text-xs">*</span>
-                </Label>
-                <div className="flex gap-2">
-                  <div className="flex-1">
+            <div className="space-y-4">
+              {/* Settings Island: Cliente + Bem Segurado */}
+              <div className="bg-card rounded-2xl overflow-hidden divide-y divide-muted/30">
+                <SettingsRow icon={User} label="Cliente" required error={errors.clientId?.message}>
+                  <div className="flex gap-2">
                     <Combobox
                       options={clientOptions}
                       value={watch('clientId')}
                       onValueChange={(value) => setValue('clientId', value)}
                       placeholder="Buscar e selecionar cliente..."
-                      searchPlaceholder="Digite o nome ou telefone do cliente..."
+                      searchPlaceholder="Digite o nome ou telefone..."
                       emptyText="Nenhum cliente encontrado."
+                      className="flex-1 border-0 bg-transparent shadow-none"
                     />
+                    <QuickAddClientModal onClientCreated={handleClientCreated} />
                   </div>
-                  <QuickAddClientModal onClientCreated={handleClientCreated} />
-                </div>
-                {errors.clientId && (
-                  <p className="text-destructive text-xs flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    {errors.clientId.message}
-                  </p>
-                )}
+                </SettingsRow>
+
+                <SettingsRow icon={Shield} label="Bem Segurado" required error={errors.insuredAsset?.message}>
+                  <Textarea
+                    {...register('insuredAsset')}
+                    className="border-0 bg-transparent shadow-none resize-none p-0 focus-visible:ring-0 text-foreground placeholder:text-muted-foreground/50 min-h-[60px]"
+                    placeholder="Descreva o bem segurado..."
+                    rows={2}
+                  />
+                </SettingsRow>
               </div>
 
-              {/* Bem Segurado */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-muted-foreground" />
-                  Bem Segurado
-                  <span className="text-destructive text-xs">*</span>
-                </Label>
-                <Textarea
-                  {...register('insuredAsset')}
-                  className="bg-background border-border text-foreground placeholder:text-muted-foreground focus:border-primary/50"
-                  placeholder="Descreva o bem segurado..."
-                  rows={3}
-                />
-                {errors.insuredAsset && (
-                  <p className="text-destructive text-xs flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    {errors.insuredAsset.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Status — Pill Buttons */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+              {/* Status Pills */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1 flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5" />
                   Status
-                  <span className="text-destructive text-xs">*</span>
-                </Label>
+                </p>
                 <div className="flex gap-2 flex-wrap">
                   {[
                     { value: 'Orçamento', label: 'Orçamento', color: 'blue' },
@@ -389,13 +373,13 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
                       type="button"
                       onClick={() => setValue('status', opt.value as any)}
                       className={cn(
-                        "px-4 py-2 rounded-full text-sm font-medium border-2 transition-all duration-200",
+                        "px-4 py-2 rounded-full text-sm font-medium border transition-all duration-200",
                         watch('status') === opt.value
                           ? opt.color === 'blue'
-                            ? "bg-blue-500/15 border-blue-500 text-blue-400"
+                            ? "bg-blue-500/15 border-blue-500/40 text-blue-500 dark:text-blue-400"
                             : opt.color === 'amber'
-                              ? "bg-amber-500/15 border-amber-500 text-amber-400"
-                              : "bg-emerald-500/15 border-emerald-500 text-emerald-400"
+                              ? "bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                              : "bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
                           : "bg-transparent border-border text-muted-foreground hover:border-border/80 hover:bg-muted/30"
                       )}
                     >
@@ -407,136 +391,92 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
             </div>
           );
 
+        /* ── STEP 2: Detalhes do Seguro ── */
         case 2:
           return (
-            <div className="space-y-5">
-              {/* Seguradora */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
-                  Seguradora
-                  {currentStatus !== 'Orçamento' && <span className="text-destructive text-xs">*</span>}
-                </Label>
-                <Select value={watch('insuranceCompany')} onValueChange={(value) => setValue('insuranceCompany', value)}>
-                  <SelectTrigger className="bg-background border-border text-foreground focus:border-primary/50">
-                    <SelectValue placeholder="Selecione a seguradora" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    {companies.map((company) => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.insuranceCompany && (
-                  <p className="text-destructive text-xs flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    {errors.insuranceCompany.message}
-                  </p>
-                )}
-              </div>
+            <div className="space-y-4">
+              <div className="bg-card rounded-2xl overflow-hidden divide-y divide-muted/30">
+                <SettingsRow icon={Building2} label="Seguradora" required={currentStatus !== 'Orçamento'} error={errors.insuranceCompany?.message}>
+                  <Select value={watch('insuranceCompany')} onValueChange={(value) => setValue('insuranceCompany', value)}>
+                    <SelectTrigger className="border-0 bg-transparent shadow-none focus:ring-0 px-0">
+                      <SelectValue placeholder="Selecione a seguradora" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </SettingsRow>
 
-              {/* Ramo */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                  <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-                  Ramo
-                  {currentStatus !== 'Orçamento' && <span className="text-destructive text-xs">*</span>}
-                </Label>
-                <Select value={watch('type')} onValueChange={(value) => setValue('type', value)}>
-                  <SelectTrigger className="bg-background border-border text-foreground focus:border-primary/50">
-                    <SelectValue placeholder="Selecione o ramo" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    {availableBranches.map((ramo) => (
-                      <SelectItem key={ramo.id} value={ramo.id}>
-                        {ramo.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {!selectedCompanyId && (
-                  <p className="text-xs text-muted-foreground mt-1">Selecione a seguradora primeiro</p>
-                )}
-                {errors.type && (
-                  <p className="text-destructive text-xs flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    {errors.type.message}
-                  </p>
-                )}
-              </div>
+                <SettingsRow icon={Tag} label="Ramo" required={currentStatus !== 'Orçamento'} error={errors.type?.message}>
+                  <Select value={watch('type')} onValueChange={(value) => setValue('type', value)}>
+                    <SelectTrigger className="border-0 bg-transparent shadow-none focus:ring-0 px-0">
+                      <SelectValue placeholder={selectedCompanyId ? "Selecione o ramo" : "Selecione a seguradora primeiro"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableBranches.map((ramo) => (
+                        <SelectItem key={ramo.id} value={ramo.id}>
+                          {ramo.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </SettingsRow>
 
-              {/* Número da Apólice */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                  <Hash className="w-3.5 h-3.5 text-muted-foreground" />
-                  Número da Apólice
-                </Label>
-                <Input
-                  {...register('policyNumber')}
-                  className="bg-background border-border text-foreground placeholder:text-muted-foreground focus:border-primary/50"
-                  placeholder="Ex: 12345678"
-                />
+                <SettingsRow icon={Hash} label="Nº da Apólice" error={errors.policyNumber?.message}>
+                  <Input
+                    {...register('policyNumber')}
+                    className="border-0 bg-transparent shadow-none focus-visible:ring-0 px-0 text-foreground placeholder:text-muted-foreground/50"
+                    placeholder="Ex: 12345678"
+                  />
+                </SettingsRow>
               </div>
             </div>
           );
 
+        /* ── STEP 3: Valores e Vigência ── */
         case 3:
           return (
-            <div className="space-y-5">
-              {/* Valores */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                    <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
-                    Valor do Prêmio
-                    <span className="text-destructive text-xs">*</span>
-                  </Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground font-medium">
-                      R$
-                    </span>
+            <div className="space-y-4">
+              {/* Hero Numbers */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-card rounded-2xl p-5 text-center space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Valor do Prêmio</p>
+                  <div className="flex items-center justify-center gap-1">
+                    <span className="text-muted-foreground text-lg">R$</span>
                     <Input
                       {...register('premiumValue', { valueAsNumber: true })}
                       type="number"
                       step="0.01"
                       min="0"
-                      className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground"
+                      className="text-center text-3xl font-bold border-0 bg-transparent shadow-none focus-visible:ring-0 w-full"
                       placeholder="0,00"
                     />
                   </div>
                   {errors.premiumValue && (
-                    <p className="text-destructive text-xs flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      {errors.premiumValue.message}
-                    </p>
+                    <p className="text-destructive text-xs">{errors.premiumValue.message}</p>
                   )}
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                    <Percent className="w-3.5 h-3.5 text-muted-foreground" />
-                    Taxa de Comissão
-                    <span className="text-destructive text-xs">*</span>
-                  </Label>
-                  <div className="relative">
+                <div className="bg-card rounded-2xl p-5 text-center space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Comissão</p>
+                  <div className="flex items-center justify-center gap-1">
                     <Input
                       {...register('commissionRate', { valueAsNumber: true })}
                       type="number"
                       step="0.01"
                       min="0"
                       max="100"
-                      className="pr-9 bg-background border-border text-foreground"
+                      className="text-center text-3xl font-bold border-0 bg-transparent shadow-none focus-visible:ring-0 w-full"
                       placeholder="20"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                    <span className="text-muted-foreground text-lg">%</span>
                   </div>
                   {errors.commissionRate && (
-                    <p className="text-destructive text-xs flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      {errors.commissionRate.message}
-                    </p>
+                    <p className="text-destructive text-xs">{errors.commissionRate.message}</p>
                   )}
                 </div>
               </div>
@@ -548,9 +488,9 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
                 if (premium && rate) {
                   const commissionValue = premium * (rate / 100);
                   return (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                      <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <p className="text-sm text-emerald-400">
+                    <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                      <TrendingUp className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <p className="text-sm text-emerald-600 dark:text-emerald-400">
                         Comissão estimada:{' '}
                         <span className="font-semibold">
                           {commissionValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -562,12 +502,12 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
                 return null;
               })()}
 
-              {/* Toggle Renovação Automática */}
-              <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-muted/30 border border-border/50">
+              {/* Renewal Toggle */}
+              <div className="flex items-center justify-between px-5 py-4 rounded-2xl bg-card">
                 <div>
                   <p className="text-sm font-medium text-foreground">Renovação Automática</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Gera alerta de renovação próximo ao vencimento
+                    Gera alerta próximo ao vencimento
                   </p>
                 </div>
                 <Switch
@@ -577,36 +517,45 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
                 />
               </div>
 
-              {/* Datas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                    Data de Início
-                    <span className="text-destructive text-xs">*</span>
-                  </Label>
+              {/* Dates Settings Island */}
+              <div className="bg-card rounded-2xl overflow-hidden divide-y divide-muted/30">
+                <div className="flex items-center justify-between px-5 py-4">
+                  <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <Calendar className="w-3.5 h-3.5" />
+                    Data de Início <span className="text-destructive">*</span>
+                  </span>
                   <Input
                     {...register('startDate')}
                     type="date"
-                    className="bg-background border-border text-foreground"
+                    className="w-[160px] border-0 bg-transparent text-right shadow-none focus-visible:ring-0 font-mono text-sm text-foreground"
                   />
-                  {errors.startDate && (
-                    <p className="text-destructive text-xs flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      {errors.startDate.message}
-                    </p>
-                  )}
                 </div>
+                {errors.startDate && (
+                  <div className="px-5 pb-2">
+                    <p className="text-destructive text-xs">{errors.startDate.message}</p>
+                  </div>
+                )}
 
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                      Vencimento
-                    </Label>
+                <div className="flex items-center justify-between px-5 py-4">
+                  <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <Calendar className="w-3.5 h-3.5" />
+                    Vencimento
                     {!isManualDueDate && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
-                        Auto +1 ano
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium normal-case tracking-normal">
+                        Auto
+                      </span>
+                    )}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {isManualDueDate ? (
+                      <Input
+                        {...register('expirationDate')}
+                        type="date"
+                        className="w-[160px] border-0 bg-transparent text-right shadow-none focus-visible:ring-0 font-mono text-sm text-foreground"
+                      />
+                    ) : (
+                      <span className="text-sm text-muted-foreground font-mono">
+                        {startDate ? format(addYears(new Date(startDate), 1), 'dd/MM/yyyy') : '—'}
                       </span>
                     )}
                     <Tooltip>
@@ -616,47 +565,32 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
                           variant="ghost"
                           size="sm"
                           onClick={handleToggleDueDateMode}
-                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground rounded-full"
                         >
                           {isManualDueDate ? <X size={13} /> : <Edit3 size={13} />}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>{isManualDueDate ? 'Voltar para cálculo automático' : 'Definir data manual'}</p>
+                        <p>{isManualDueDate ? 'Voltar para automático' : 'Definir data manual'}</p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
-
-                  {isManualDueDate ? (
-                    <Input
-                      {...register('expirationDate')}
-                      type="date"
-                      className="bg-background border-border text-foreground"
-                    />
-                  ) : (
-                    <div className="flex h-10 w-full items-center rounded-md border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
-                      Calculado automaticamente a partir do início
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
           );
 
+        /* ── STEP 4: Envolvidos ── */
         case 4:
           return (
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                    <User2 className="w-3.5 h-3.5 text-muted-foreground" />
-                    Produtor
-                  </Label>
+            <div className="space-y-4">
+              <div className="bg-card rounded-2xl overflow-hidden divide-y divide-muted/30">
+                <SettingsRow icon={User2} label="Produtor">
                   <Select value={watch('producerId')} onValueChange={(value) => setValue('producerId', value)}>
-                    <SelectTrigger className="bg-background border-border text-foreground focus:border-primary/50">
+                    <SelectTrigger className="border-0 bg-transparent shadow-none focus:ring-0 px-0">
                       <SelectValue placeholder="Selecione o produtor" />
                     </SelectTrigger>
-                    <SelectContent className="bg-popover border-border">
+                    <SelectContent>
                       {producers.map((producer) => (
                         <SelectItem key={producer.id} value={producer.id}>
                           {producer.name}
@@ -664,18 +598,14 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </SettingsRow>
 
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                    <Briefcase className="w-3.5 h-3.5 text-muted-foreground" />
-                    Corretora
-                  </Label>
+                <SettingsRow icon={Briefcase} label="Corretora">
                   <Select value={watch('brokerageId')} onValueChange={(value) => setValue('brokerageId', value)}>
-                    <SelectTrigger className="bg-background border-border text-foreground focus:border-primary/50">
+                    <SelectTrigger className="border-0 bg-transparent shadow-none focus:ring-0 px-0">
                       <SelectValue placeholder="Selecione a corretora" />
                     </SelectTrigger>
-                    <SelectContent className="bg-popover border-border">
+                    <SelectContent>
                       {brokerages.map((brokerage) => (
                         <SelectItem key={brokerage.id} value={brokerage.id.toString()}>
                           {brokerage.name}
@@ -683,36 +613,46 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </SettingsRow>
               </div>
 
-              {/* Summary Card */}
+              {/* Summary Ticket */}
               {(() => {
                 const clienteName = clients.find(c => c.id === watch('clientId'))?.name;
                 const companyName = companies.find(c => c.id === watch('insuranceCompany'))?.name;
                 const premium = watch('premiumValue');
+                const rate = watch('commissionRate');
                 if (!clienteName && !companyName) return null;
                 return (
-                  <div className="mt-4 p-4 rounded-xl bg-muted/30 border border-border/50 space-y-2">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Resumo da Apólice</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="bg-primary/5 rounded-2xl p-5 border border-primary/10 space-y-3">
+                    <p className="text-xs font-bold text-primary uppercase tracking-widest">Resumo da Apólice</p>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
                       {clienteName && (
                         <div className="flex items-center gap-2">
-                          <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <User className="w-3.5 h-3.5 text-primary/60 shrink-0" />
                           <span className="text-foreground truncate">{clienteName}</span>
                         </div>
                       )}
                       {companyName && (
                         <div className="flex items-center gap-2">
-                          <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <Building2 className="w-3.5 h-3.5 text-primary/60 shrink-0" />
                           <span className="text-foreground truncate">{companyName}</span>
                         </div>
                       )}
                       {premium > 0 && (
                         <div className="flex items-center gap-2">
-                          <DollarSign className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                          <span className="text-foreground">
+                          <DollarSign className="w-3.5 h-3.5 text-primary/60 shrink-0" />
+                          <span className="text-foreground font-semibold">
                             {premium.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </span>
+                        </div>
+                      )}
+                      {premium > 0 && rate > 0 && (
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="w-3.5 h-3.5 text-primary/60 shrink-0" />
+                          <span className="text-foreground">
+                            {(premium * (rate / 100)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            <span className="text-muted-foreground text-xs ml-1">({rate}%)</span>
                           </span>
                         </div>
                       )}
@@ -733,76 +673,94 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
         key={currentStep}
         className="animate-in fade-in slide-in-from-right-4 duration-300"
       >
-        {renderStepHeader()}
+        {/* Step Header */}
+        <div className="flex items-center gap-3 mb-5 pb-4 border-b border-muted/20">
+          <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+            <MetaIcon className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-foreground">{meta.title}</h3>
+            <p className="text-xs text-muted-foreground">{meta.subtitle}</p>
+          </div>
+        </div>
         {content}
       </div>
     );
   };
 
-  const renderNavigationButtons = () => (
-    <div className="flex justify-between items-center pt-5 mt-5 border-t border-border/50">
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={currentStep === 1 ? onClose : handleBack}
-        className="text-muted-foreground hover:text-foreground gap-1.5"
-      >
-        {currentStep === 1 ? (
-          <>
-            <X className="w-4 h-4" />
-            Cancelar
-          </>
-        ) : (
-          <>
-            <ChevronLeft className="w-4 h-4" />
-            Voltar
-          </>
-        )}
-      </Button>
-
-      {currentStep < STEPS.length ? (
-        <Button
-          type="button"
-          onClick={handleNext}
-          className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground px-6"
-        >
-          Avançar
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      ) : (
-        <Button
-          type="button"
-          onClick={onSubmit}
-          disabled={isSubmitting}
-          className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground px-6 min-w-[130px]"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              {isEditing ? 'Salvando...' : 'Criando...'}
-            </>
-          ) : (
-            <>
-              <Check className="w-4 h-4" />
-              {isEditing ? 'Salvar Alterações' : 'Criar Apólice'}
-            </>
-          )}
-        </Button>
-      )}
-    </div>
-  );
+  /* ═══════════════════════════════════════════════
+     RENDER: MAIN
+     ═══════════════════════════════════════════════ */
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
-        <Stepper steps={STEPS} currentStep={currentStep} />
-
-        <div>
-          <div className="min-h-[400px]">
-            {renderStepContent()}
+      <div className="flex flex-col">
+        {/* Progress Bar */}
+        <div className="px-6 pt-6 space-y-3">
+          <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${(currentStep / STEPS.length) * 100}%` }}
+            />
           </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
+              Etapa {currentStep} de {STEPS.length}
+            </p>
+            <p className="text-xs text-muted-foreground">{STEPS[currentStep - 1]}</p>
+          </div>
+        </div>
 
-          {renderNavigationButtons()}
+        {/* Step Content */}
+        <div className="px-6 py-5 min-h-[380px]">
+          {renderStepContent()}
+        </div>
+
+        {/* Navigation Footer */}
+        <div className="px-6 py-5 border-t border-muted/20 flex gap-3 flex-shrink-0">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={currentStep === 1 ? onClose : handleBack}
+            className="h-12 w-1/3 rounded-xl text-muted-foreground hover:text-foreground font-medium"
+          >
+            {currentStep === 1 ? 'Cancelar' : (
+              <span className="flex items-center gap-1.5">
+                <ChevronLeft className="w-4 h-4" />
+                Voltar
+              </span>
+            )}
+          </Button>
+
+          {currentStep < STEPS.length ? (
+            <Button
+              type="button"
+              onClick={handleNext}
+              className="h-12 flex-1 rounded-xl bg-primary text-primary-foreground font-semibold shadow-lg hover:shadow-xl active:scale-[0.97] transition-all"
+            >
+              Avançar
+              <ChevronRight className="w-4 h-4 ml-1.5" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={onSubmit}
+              disabled={isSubmitting}
+              className="h-12 flex-1 rounded-xl bg-primary text-primary-foreground font-semibold shadow-lg hover:shadow-xl active:scale-[0.97] transition-all min-w-[130px]"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                  {isEditing ? 'Salvando...' : 'Criando...'}
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 mr-1.5" />
+                  {isEditing ? 'Salvar Alterações' : 'Criar Apólice'}
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
     </TooltipProvider>

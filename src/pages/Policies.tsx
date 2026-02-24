@@ -661,23 +661,25 @@ export default function Policies() {
 
       {/* Modal Nova Apólice */}
       {isNewPolicyModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
-          <div className="bg-popover border border-border rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-foreground">Nova Apólice</h2>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
+          <div className="bg-background w-full sm:max-w-2xl sm:rounded-[2rem] rounded-t-[2rem] rounded-b-none border-0 shadow-[0_-20px_60px_rgba(0,0,0,0.2)] max-h-[92vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-muted/30 flex-shrink-0">
+              <h2 className="text-xl font-bold text-foreground tracking-tight">Nova Apólice</h2>
               <Button
                 onClick={handleCloseNewPolicyModal}
                 variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-foreground"
+                size="icon"
+                className="rounded-full hover:bg-muted"
               >
-                ×
+                <X className="w-5 h-5" />
               </Button>
             </div>
-            <PolicyFormModal
-              onClose={handleCloseNewPolicyModal}
-              onPolicyAdded={() => { }}
-            />
+            <div className="flex-1 overflow-y-auto">
+              <PolicyFormModal
+                onClose={handleCloseNewPolicyModal}
+                onPolicyAdded={() => { }}
+              />
+            </div>
           </div>
         </div>
       )}
