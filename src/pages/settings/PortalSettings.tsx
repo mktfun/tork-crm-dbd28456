@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Globe, Copy, Check, Loader2, Save } from 'lucide-react';
+import { Globe, Copy, Check, Loader2, Save, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
-import { SettingsPanel } from '@/components/settings/SettingsPanel';
 
 interface PortalConfig {
   portal_enabled: boolean;
@@ -36,14 +33,12 @@ export default function PortalSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // URL dinâmica baseada no ambiente atual
   const baseUrl = window.location.origin;
   const portalLink = brokerageSlug ? `${baseUrl}/${brokerageSlug}/portal` : null;
 
   useEffect(() => {
     const fetchBrokerage = async () => {
       if (!user?.id) return;
-
       try {
         const { data, error } = await supabase
           .from('brokerages')
@@ -84,9 +79,7 @@ export default function PortalSettings() {
       toast.error('Nenhuma corretora cadastrada. Cadastre uma corretora primeiro.');
       return;
     }
-
     setIsSaving(true);
-
     try {
       const { error } = await supabase
         .from('brokerages')
@@ -100,12 +93,7 @@ export default function PortalSettings() {
         })
         .eq('id', brokerageId);
 
-      if (error) {
-        console.error('Error saving settings:', error);
-        toast.error('Erro ao salvar configurações');
-        return;
-      }
-
+      if (error) throw error;
       toast.success('Configurações salvas com sucesso!');
     } catch (err) {
       console.error('Error:', err);
@@ -116,10 +104,7 @@ export default function PortalSettings() {
   };
 
   const copyLink = async () => {
-    if (!portalLink) {
-      toast.error('Configure um slug para a corretora primeiro');
-      return;
-    }
+    if (!portalLink) return toast.error('Configure um slug para a corretora primeiro');
     try {
       await navigator.clipboard.writeText(portalLink);
       setCopied(true);
@@ -133,254 +118,153 @@ export default function PortalSettings() {
   const updateSetting = (key: keyof PortalConfig, value: boolean) => {
     setSettings(prev => {
       const newSettings = { ...prev, [key]: value };
-      
-      // Se desabilitar a exibição, desabilita o download também
-      if (key === 'portal_show_policies' && !value) {
-        newSettings.portal_allow_policy_download = false;
-      }
-      if (key === 'portal_show_cards' && !value) {
-        newSettings.portal_allow_card_download = false;
-      }
-      
+      if (key === 'portal_show_policies' && !value) newSettings.portal_allow_policy_download = false;
+      if (key === 'portal_show_cards' && !value) newSettings.portal_allow_card_download = false;
       return newSettings;
     });
   };
 
-  if (isLoading) {
-    return (
-      <SettingsPanel
-        title="Portal do Cliente"
-        description="Configure o acesso dos seus clientes ao portal"
-        icon={Globe}
-      >
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-primary animate-spin" />
-        </div>
-      </SettingsPanel>
-    );
-  }
+  if (isLoading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Carregando configurações...</div>;
 
   if (!brokerageId) {
     return (
-      <SettingsPanel
-        title="Portal do Cliente"
-        description="Configure o acesso dos seus clientes ao portal"
-        icon={Globe}
-      >
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardContent className="p-6 text-center">
-            <p className="text-slate-400">
-              Você precisa cadastrar uma corretora antes de configurar o Portal do Cliente.
-            </p>
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => window.location.href = '/dashboard/settings/brokerages'}
-            >
-              Ir para Corretoras
-            </Button>
-          </CardContent>
-        </Card>
-      </SettingsPanel>
+      <div className="flex flex-col h-full bg-card rounded-2xl border border-white/5 shadow-sm max-w-4xl mx-auto p-12 text-center items-center justify-center">
+        <Globe className="w-16 h-16 opacity-20 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium text-foreground">Portal Indisponível</h3>
+        <p className="text-muted-foreground mt-2 max-w-sm">Você precisa cadastrar uma corretora ativa antes de configurar o Portal do Cliente.</p>
+      </div>
     );
   }
 
   return (
-    <SettingsPanel
-      title="Portal do Cliente"
-      description="Configure o acesso dos seus clientes ao portal"
-      icon={Globe}
-    >
-      <div className="space-y-6">
-        {/* Link de Acesso */}
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-lg text-white">Link de Acesso</CardTitle>
-            <CardDescription className="text-slate-400">
-              Envie este link para seus clientes acessarem o portal
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {portalLink ? (
-              <>
-                <div className="flex gap-2">
-                  <Input
-                    value={portalLink}
-                    readOnly
-                    className="bg-slate-900/50 border-slate-600 text-white font-mono text-sm"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={copyLink}
-                    className="shrink-0 border-slate-600 hover:bg-slate-700"
-                  >
-                    {copied ? (
-                      <Check className="w-4 h-4 text-green-400" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
-                  </Button>
-                </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  Dica: Envie este link via WhatsApp junto com a senha padrão (123456) para primeiro acesso.
-                </p>
-              </>
-            ) : (
-              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                <p className="text-amber-400 text-sm">
-                  ⚠️ Configure um Slug (identificador) nas configurações da corretora para gerar o link do portal.
-                </p>
-                <Button
-                  variant="link"
-                  className="text-amber-400 p-0 h-auto mt-2"
-                  onClick={() => window.location.href = '/dashboard/settings/brokerages'}
-                >
-                  Ir para Configurações da Corretora →
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Master Switch */}
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-lg text-white">Ativação</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label className="text-white font-medium">Ativar Portal do Cliente</Label>
-                <p className="text-sm text-slate-400">
-                  Permite que clientes acessem suas apólices e carteirinhas
-                </p>
-              </div>
-              <Switch
-                checked={settings.portal_enabled}
-                onCheckedChange={(v) => updateSetting('portal_enabled', v)}
-              />
+    <div className="flex flex-col min-h-full bg-card rounded-2xl border border-white/5 shadow-sm max-w-4xl mx-auto">
+      <div className="p-6 border-b border-white/5 bg-white/[0.02] flex items-center justify-between sticky top-0 z-10">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-foreground tracking-tight">Portal do Cliente</h2>
+            <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${settings.portal_enabled ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
+              {settings.portal_enabled ? 'ATIVO' : 'INATIVO'}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Módulos */}
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-lg text-white">Módulos Visíveis</CardTitle>
-            <CardDescription className="text-slate-400">
-              Escolha quais funcionalidades estarão disponíveis no portal
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Apólices */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label className="text-white font-medium">Exibir Apólices</Label>
-                  <p className="text-sm text-slate-400">
-                    Mostra a lista de seguros do cliente
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.portal_show_policies}
-                  onCheckedChange={(v) => updateSetting('portal_show_policies', v)}
-                  disabled={!settings.portal_enabled}
-                />
-              </div>
-              
-              {/* Sub-opção de download */}
-              <div className="ml-8 flex items-center gap-3 p-3 bg-slate-900/30 rounded-lg border border-slate-700/50">
-                <Checkbox
-                  id="allow_policy_download"
-                  checked={settings.portal_allow_policy_download}
-                  onCheckedChange={(v) => updateSetting('portal_allow_policy_download', !!v)}
-                  disabled={!settings.portal_enabled || !settings.portal_show_policies}
-                  className="border-slate-500"
-                />
-                <div>
-                  <Label htmlFor="allow_policy_download" className="text-slate-300 text-sm cursor-pointer">
-                    Permitir Download do PDF
-                  </Label>
-                  <p className="text-xs text-slate-500">
-                    Cliente pode baixar o PDF da apólice
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Carteirinhas */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label className="text-white font-medium">Exibir Carteirinhas</Label>
-                  <p className="text-sm text-slate-400">
-                    Mostra carteirinhas digitais de saúde/odonto
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.portal_show_cards}
-                  onCheckedChange={(v) => updateSetting('portal_show_cards', v)}
-                  disabled={!settings.portal_enabled}
-                />
-              </div>
-              
-              {/* Sub-opção de download */}
-              <div className="ml-8 flex items-center gap-3 p-3 bg-slate-900/30 rounded-lg border border-slate-700/50">
-                <Checkbox
-                  id="allow_card_download"
-                  checked={settings.portal_allow_card_download}
-                  onCheckedChange={(v) => updateSetting('portal_allow_card_download', !!v)}
-                  disabled={!settings.portal_enabled || !settings.portal_show_cards}
-                  className="border-slate-500"
-                />
-                <div>
-                  <Label htmlFor="allow_card_download" className="text-slate-300 text-sm cursor-pointer">
-                    Permitir Download da Carteirinha
-                  </Label>
-                  <p className="text-xs text-slate-500">
-                    Cliente pode baixar a carteirinha como imagem
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Edição de Perfil */}
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label className="text-white font-medium">Permitir Edição de Perfil</Label>
-                <p className="text-sm text-slate-400">
-                  Cliente pode atualizar telefone, email e endereço
-                </p>
-              </div>
-              <Switch
-                checked={settings.portal_allow_profile_edit}
-                onCheckedChange={(v) => updateSetting('portal_allow_profile_edit', v)}
-                disabled={!settings.portal_enabled}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Save Button */}
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Personalize o acesso e módulos do aplicativo web de seus clientes
+          </p>
+        </div>
         <Button
           onClick={handleSave}
           disabled={isSaving}
-          className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+          className="rounded-full px-6 bg-primary text-primary-foreground"
         >
-          {isSaving ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Salvando...
-            </>
-          ) : (
-            <>
-              <Save className="w-4 h-4 mr-2" />
-              Salvar Configurações
-            </>
-          )}
+          {isSaving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</> : <><Save className="w-4 h-4 mr-2" />Salvar Alterações</>}
         </Button>
       </div>
-    </SettingsPanel>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-8">
+
+        {/* Link Dinâmico */}
+        <section className="space-y-4">
+          <h3 className="text-xs font-semibold text-primary uppercase tracking-widest pl-2">Acesso</h3>
+          {portalLink ? (
+            <div className="flex flex-col sm:flex-row items-center gap-2 bg-primary/5 border border-primary/20 rounded-2xl p-4">
+              <div className="flex-1 bg-black/20 rounded-xl px-4 py-3 font-mono text-sm text-primary/90 select-all border border-black/40 w-full truncate text-center sm:text-left shadow-inner">
+                {portalLink}
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button
+                  variant="default"
+                  className="flex-1 sm:flex-none rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
+                  onClick={copyLink}
+                >
+                  {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                  {copied ? 'Copiado!' : 'Copiar'}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 sm:flex-none rounded-xl border-white/10 hover:bg-white/5 shadow-sm"
+                  onClick={() => window.open(portalLink, '_blank')}
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" /> Abrir
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-4">
+              <div className="p-2 bg-amber-500/20 rounded-full shrink-0"><Globe className="w-5 h-5 text-amber-500" /></div>
+              <div>
+                <p className="text-amber-400 text-sm font-medium">Link não configurado</p>
+                <p className="text-amber-500/70 text-xs mt-1">Configure um Slug ("apelido_url") nas configurações da sua Corretora para gerar o link único do seu portal.</p>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Master Active */}
+        <section className="space-y-4">
+          <div className="bg-background rounded-2xl border border-white/5 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-5 cursor-pointer hover:bg-white/[0.02] transition-colors" onClick={() => updateSetting('portal_enabled', !settings.portal_enabled)}>
+              <div>
+                <Label className="text-foreground text-base font-semibold pointer-events-none">Portal do Cliente Ativo</Label>
+                <p className="text-sm text-muted-foreground mt-1 pointer-events-none">Permitir que os clientes se conectem com e-mail/telefone e visualizem seu painel.</p>
+              </div>
+              <Switch checked={settings.portal_enabled} onCheckedChange={(v) => updateSetting('portal_enabled', v)} />
+            </div>
+          </div>
+        </section>
+
+        {/* Módulos de Visualização */}
+        <section className={`space-y-4 transition-opacity duration-300 ${!settings.portal_enabled ? 'opacity-40 pointer-events-none grayscale' : ''}`}>
+          <h3 className="text-xs font-semibold text-primary uppercase tracking-widest pl-2">Módulos & Permissões</h3>
+          <div className="bg-background rounded-2xl border border-white/5 overflow-hidden divide-y divide-white/5">
+
+            {/* bloco apolices */}
+            <div className="px-6 py-4 flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-foreground font-medium">Apólices Ativas</Label>
+                  <p className="text-xs text-muted-foreground mt-1">Exibir a guia com apólices vigentes e histórico</p>
+                </div>
+                <Switch checked={settings.portal_show_policies} onCheckedChange={(v) => updateSetting('portal_show_policies', v)} />
+              </div>
+
+              {settings.portal_show_policies && (
+                <div className="ml-4 pl-4 border-l border-white/10 flex items-center justify-between">
+                  <Label className="text-muted-foreground text-sm font-normal">Permitir download do PDF na nuvem</Label>
+                  <Switch checked={settings.portal_allow_policy_download} onCheckedChange={(v) => updateSetting('portal_allow_policy_download', v)} className="data-[state=checked]:bg-slate-600 scale-75" />
+                </div>
+              )}
+            </div>
+
+            {/* bloco carteirinhas */}
+            <div className="px-6 py-4 flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-foreground font-medium">Carteirinhas Digitais</Label>
+                  <p className="text-xs text-muted-foreground mt-1">Exibir carteirinhas de Saúde/Odonto como imagem</p>
+                </div>
+                <Switch checked={settings.portal_show_cards} onCheckedChange={(v) => updateSetting('portal_show_cards', v)} />
+              </div>
+
+              {settings.portal_show_cards && (
+                <div className="ml-4 pl-4 border-l border-white/10 flex items-center justify-between">
+                  <Label className="text-muted-foreground text-sm font-normal">Permitir download da imagem</Label>
+                  <Switch checked={settings.portal_allow_card_download} onCheckedChange={(v) => updateSetting('portal_allow_card_download', v)} className="data-[state=checked]:bg-slate-600 scale-75" />
+                </div>
+              )}
+            </div>
+
+            {/* bloco profile */}
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div>
+                <Label className="text-foreground font-medium">Auto-Acondicionamento de Perfil</Label>
+                <p className="text-xs text-muted-foreground mt-1">Clientes podem atualizar próprios endereços e contatos</p>
+              </div>
+              <Switch checked={settings.portal_allow_profile_edit} onCheckedChange={(v) => updateSetting('portal_allow_profile_edit', v)} />
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+    </div>
   );
 }
