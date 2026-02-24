@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Car, Home, Heart, Briefcase, Plane, Activity, Smartphone } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { usePortalWizardSubmit, type RequestType } from '@/hooks/usePortalWizardSubmit';
 import {
@@ -96,22 +96,27 @@ export default function PortalWizard() {
         </h2>
         <p className="text-muted-foreground text-sm">Selecione o tipo de seguro:</p>
 
-        <div className="grid grid-cols-2 gap-3">
-          {RAMOS.map((ramo) => {
+        <div className="grid grid-cols-2 gap-3 mt-2">
+          {RAMOS.map((ramo, idx) => {
             const Icon = ramo.icon;
             return (
-              <Card
+              <motion.button
                 key={ramo.id}
-                className="bg-card/80 border-border backdrop-blur-xl cursor-pointer hover:bg-accent hover:border-primary/30 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05, duration: 0.3 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => setSelectedRamo(ramo.id)}
+                className="flex flex-col items-start gap-3 p-4 rounded-2xl bg-muted/40 hover:bg-muted/70 border border-transparent hover:border-primary/20 transition-all duration-200 text-left"
               >
-                <CardContent className="p-4 flex flex-col items-center gap-2 text-center">
-                  <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center border border-border">
-                    <Icon className="w-6 h-6 text-muted-foreground" />
-                  </div>
-                  <span className="text-sm text-foreground font-light">{ramo.label}</span>
-                </CardContent>
-              </Card>
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Icon className="w-5 h-5 text-primary" strokeWidth={1.5} />
+                </div>
+                <span className="text-foreground text-sm font-medium tracking-wide">
+                  {ramo.label}
+                </span>
+              </motion.button>
             );
           })}
         </div>

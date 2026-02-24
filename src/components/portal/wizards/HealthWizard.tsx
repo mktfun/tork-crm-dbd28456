@@ -449,7 +449,7 @@ export const HealthWizard: React.FC<HealthWizardProps> = ({ onComplete }) => {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto pb-20">
+    <div className="w-full">
       {/* Progress Stepper - Minimalista */}
       <div className="mb-10">
         <div className="flex items-center justify-between relative">
@@ -478,7 +478,7 @@ export const HealthWizard: React.FC<HealthWizardProps> = ({ onComplete }) => {
                       ? 'bg-primary text-primary-foreground'
                       : isActive
                         ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
-                        : 'bg-card border-2 border-border text-muted-foreground'
+                        : 'bg-muted/40 border border-transparent text-muted-foreground'
                     }
                   `}
                   whileHover={{ scale: 1.05 }}

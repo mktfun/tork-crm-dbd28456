@@ -185,7 +185,7 @@ function App() {
 
               {/* Toast components */}
               <Toaster />
-              <Sonner />
+              <Sonner position="top-center" />
             </TooltipProvider>
           </AuthProvider>
         </QueryClientProvider>

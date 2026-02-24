@@ -212,7 +212,7 @@ export const BusinessWizard: React.FC<BusinessWizardProps> = ({ onComplete }) =>
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto pb-20">
+    <div className="w-full">
       <Stepper steps={steps} currentStep={currentStep} className="mb-8" />
 
       <div className="min-h-[400px]">

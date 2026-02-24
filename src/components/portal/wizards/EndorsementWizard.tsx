@@ -319,7 +319,7 @@ export const EndorsementWizard: React.FC<EndorsementWizardProps> = ({ isUber = f
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
+    <div className="w-full">
       {endorsementType && <Stepper steps={steps} currentStep={currentStep} className="mb-8" />}
 
       <div className="min-h-[400px]">
