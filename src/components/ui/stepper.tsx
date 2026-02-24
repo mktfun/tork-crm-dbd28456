@@ -31,7 +31,7 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
             <div className="flex flex-col items-center">
               <div
                 className={cn(
-                  "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300",
+                  "flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-all duration-300",
                   isCompleted
                     ? "bg-primary/20 border-primary text-primary"
                     : isActive
@@ -47,7 +47,7 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
               </div>
               <span
                 className={cn(
-                  "mt-2 text-xs font-medium transition-colors duration-200 whitespace-nowrap",
+                  "mt-2 text-[10px] sm:text-xs font-medium transition-colors duration-200 max-w-[56px] sm:max-w-none text-center leading-tight truncate",
                   isActive
                     ? "text-primary font-semibold"
                     : isCompleted
@@ -59,7 +59,7 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
               </span>
             </div>
             {index < steps.length - 1 && (
-              <div className="relative h-0.5 w-12 sm:w-20 mx-2 sm:mx-4">
+              <div className="relative h-0.5 w-6 sm:w-12 md:w-20 mx-1 sm:mx-2 md:mx-4">
                 <div className="absolute inset-0 bg-border rounded-full" />
                 <div
                   className={cn(

@@ -58,9 +58,9 @@ const OptionCard: React.FC<OptionCardProps> = ({ icon, label, selected, onClick 
   <button
     type="button"
     onClick={onClick}
-    className={`flex flex-col items-center justify-center p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 gap-2 h-24 ${selected
-        ? "border-primary bg-primary/5 text-primary shadow-sm scale-[1.02]"
-        : "border-muted bg-background text-muted-foreground hover:bg-muted/50 hover:border-muted-foreground/30"
+    className={`flex flex-col items-center justify-center p-3 rounded-xl cursor-pointer transition-all duration-200 gap-2 h-20 ${selected
+        ? "bg-primary/10 text-primary border border-primary/30 shadow-sm scale-[1.02]"
+        : "bg-muted/40 text-muted-foreground border border-transparent hover:bg-muted/60"
       }`}
   >
     <span className={selected ? "text-primary" : "text-muted-foreground"}>{icon}</span>
@@ -82,9 +82,9 @@ const YesNoToggle: React.FC<YesNoToggleProps> = ({ label, value, onChange }) => 
       <button
         type="button"
         onClick={() => onChange("sim")}
-        className={`h-12 flex items-center justify-center rounded-lg border text-sm font-medium transition-all duration-200 ${value === "sim"
-            ? "bg-primary text-primary-foreground border-primary shadow-md scale-[1.02]"
-            : "bg-background text-muted-foreground border-input hover:bg-muted/50"
+        className={`h-10 flex items-center justify-center rounded-xl text-sm font-medium transition-all duration-200 ${value === "sim"
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
           }`}
       >
         Sim
@@ -92,9 +92,9 @@ const YesNoToggle: React.FC<YesNoToggleProps> = ({ label, value, onChange }) => 
       <button
         type="button"
         onClick={() => onChange("nao")}
-        className={`h-12 flex items-center justify-center rounded-lg border text-sm font-medium transition-all duration-200 ${value === "nao"
-            ? "bg-primary text-primary-foreground border-primary shadow-md scale-[1.02]"
-            : "bg-background text-muted-foreground border-input hover:bg-muted/50"
+        className={`h-10 flex items-center justify-center rounded-xl text-sm font-medium transition-all duration-200 ${value === "nao"
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
           }`}
       >
         Não
@@ -407,7 +407,7 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
+    <div className="w-full">
       <Stepper steps={steps} currentStep={currentStep} className="mb-8" />
 
       <div className="min-h-[400px]">
