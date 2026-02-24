@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Save, MessageCircle, ExternalLink, Eye, EyeOff, Loader2, RefreshCw, Wifi } from 'lucide-react';
+import { Save, MessageCircle, ExternalLink, Eye, EyeOff, Loader2, RefreshCw, Wifi, Copy } from 'lucide-react';
 import { InboxAgentMapping } from '@/components/settings/InboxAgentMapping';
 
 interface CRMSettings {
