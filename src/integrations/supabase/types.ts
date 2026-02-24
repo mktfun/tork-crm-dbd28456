@@ -3838,6 +3838,7 @@ export type Database = {
           p_user_id: string
         }
         Returns: {
+          carteirinha_url: string
           expiration_date: string
           id: string
           insurance_company: string
