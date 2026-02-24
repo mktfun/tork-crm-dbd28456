@@ -134,13 +134,13 @@ export function PortalLayout() {
         onClick={onClick}
         className={cn(
           'relative flex items-center gap-1.5 px-3 py-2 rounded-full transition-colors duration-200',
-          active ? 'text-white' : 'text-white/50 hover:text-white/80'
+          active ? 'text-white' : 'text-zinc-500 hover:text-white/80'
         )}
       >
         {active && (
           <motion.div
             layoutId="portal-nav-pill"
-            className="absolute inset-0 bg-white/20 rounded-full"
+            className="absolute inset-0 bg-white/15 rounded-full"
             transition={springTransition}
           />
         )}
@@ -158,7 +158,7 @@ export function PortalLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-28">
+    <div className="min-h-screen bg-background pb-32">
       {/* Header — TripGlide style: no border, greeting left, actions right */}
       <header className="bg-background px-4 py-4 sm:px-6 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center justify-between">
@@ -205,9 +205,9 @@ export function PortalLayout() {
         </div>
       </main>
 
-      {/* Bottom Navigation — Dark Pill Nav */}
-      <nav className="fixed bottom-4 left-4 right-4 z-50 safe-area-pb">
-        <div className="max-w-lg mx-auto bg-foreground rounded-full shadow-lg px-2 py-2 flex justify-around items-center">
+      {/* Bottom Navigation — Dynamic Island Pill */}
+      <nav className="fixed bottom-6 left-0 right-0 z-50 px-4 pointer-events-none flex justify-center">
+        <div className="pointer-events-auto max-w-sm w-full bg-[#1A1C1E] dark:bg-[#1A1C1E] rounded-full px-2 py-2 flex justify-between items-center shadow-[0_24px_50px_rgba(0,0,0,0.5)] border border-white/5">
           {renderNavItem({ path: 'home', label: 'Início', icon: Home, onClick: () => navigate(`/${brokerageSlug}/portal/home`) })}
           {portalConfig.show_policies && renderNavItem({ path: 'policies', label: 'Seguros', icon: FileText, onClick: () => navigate(`/${brokerageSlug}/portal/policies`) })}
           {portalConfig.show_cards && renderNavItem({ path: 'cards', label: 'Carteiras', icon: CreditCard, onClick: () => navigate(`/${brokerageSlug}/portal/cards`) })}
