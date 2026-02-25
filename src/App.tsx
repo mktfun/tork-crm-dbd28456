@@ -2,7 +2,7 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryCache } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -58,6 +58,29 @@ import PortalProfile from "./pages/portal/PortalProfile";
 import PortalNotFound from "./pages/portal/PortalNotFound";
 import PortalWizard from "./pages/portal/PortalWizard";
 import PortalSolicitacoes from "./pages/portal/PortalSolicitacoes";
+import { supabase } from "./integrations/supabase/client";
+import { toast } from "sonner";
+
+// ==========================================
+// CAPACITOR MOBILE APP INTEGRATIONS
+// ==========================================
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+
+// 1. Enforce Mobile CSS Rules if running natively
+if (Capacitor.isNativePlatform()) {
+  document.body.classList.add('is-mobile-app');
+}
+
+// 2. Android Hardware Back Button Handler
+CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+  if (!canGoBack) {
+    CapacitorApp.exitApp();
+  } else {
+    window.history.back();
+  }
+});
+// ==========================================
 
 // Helper to redirect legacy detail routes to dashboard namespace
 function ParamRedirect({ toBase }: { toBase: string }) {
@@ -67,12 +90,49 @@ function ParamRedirect({ toBase }: { toBase: string }) {
   return <Navigate to={to} replace />;
 }
 
-// Create query client with default options
+// Create query client with default options and global error handling
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error: any) => {
+      // Check for Supabase JWT expiration / unauthenticated errors
+      const errorMsg = error?.message?.toLowerCase() || '';
+      const errorCode = error?.code || '';
+
+      const isAuthError =
+        error?.status === 401 ||
+        error?.status === 403 ||
+        errorCode === 'PGRST301' ||
+        errorMsg.includes('jwt') ||
+        errorMsg.includes('jws') ||
+        errorMsg.includes('expired') ||
+        errorMsg.includes('unauthenticated');
+
+      if (isAuthError) {
+        console.warn('⚠️ JWT Expired or Unauthenticated. Forcing logout...');
+
+        // Ensure UI clears out and notifies user immediately
+        toast.error("Sua sessão expirou. Por favor, faça login novamente.");
+
+        // Clear local storage and sign out
+        supabase.auth.signOut().then(() => {
+          window.location.href = '/auth';
+        }).catch(() => {
+          localStorage.clear();
+          window.location.href = '/auth';
+        });
+      }
+    }
+  }),
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
+      retry: (failureCount, error: any) => {
+        // Don't retry auth errors, fail fast to trigger logout
+        const isAuthError = error?.status === 401 || error?.code === 'PGRST301' || error?.message?.toLowerCase().includes('jwt');
+        if (isAuthError) return false;
+
+        return failureCount < 1;
+      },
     },
   },
 });

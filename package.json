@@ -13,6 +13,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor-community/safe-area": "^8.0.1",
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/ios": "^8.1.0",
+    "@capacitor/keyboard": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@fullcalendar/core": "^6.1.18",
@@ -86,6 +94,7 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.1.0",
     "@eslint/js": "^9.9.0",
     "@tailwindcss/typography": "^0.5.15",
     "@types/node": "^22.5.5",

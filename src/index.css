@@ -889,3 +889,34 @@ DEPENDÊNCIAS CRÍTICAS:
     inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
     inset 1px 0 0 0 rgba(255, 255, 255, 0.03);
 }
+
+/* ============================================
+   CAPACITOR MOBILE APP PROTECTIONS
+   ============================================ */
+
+:root {
+  /* Dynamic Safe Area Variables for Notches / Dynamic Island */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+/* Base body lock to prevent site-like behavior in WebViews */
+body.is-mobile-app {
+  /* Prevent pull-to-refresh and top/bottom overscroll elasticity */
+  overscroll-behavior-y: none;
+  
+  /* Prevent accidental text selection which breaks app illusion */
+  user-select: none;
+  -webkit-user-select: none;
+  
+  /* Remove the ugly tap highlight color on mobile browsers */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Standardize safe area padding helpers */
+.safe-area-pt { padding-top: max(16px, var(--sat)); }
+.safe-area-pb { padding-bottom: max(16px, var(--sab)); }
+.safe-area-mt { margin-top: max(16px, var(--sat)); }
+.safe-area-mb { margin-bottom: max(16px, var(--sab)); }
