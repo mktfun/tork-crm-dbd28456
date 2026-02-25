@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { DateRange } from 'react-day-picker';
 import { getCurrentMonthRange } from '@/utils/dateUtils';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+} from '@/components/ui/carousel';
 import { VisaoGeralCarteira } from '@/components/reports/VisaoGeralCarteira';
 import { RelatorioFaturamento } from '@/components/reports/RelatorioFaturamento';
 import { FiltrosAvancados } from '@/components/reports/FiltrosAvancados';
@@ -186,14 +193,24 @@ export default function Reports() {
               <AlertaAtrasoFinanceiro apolices={apolicesFiltradas} transacoes={transacoesFiltradas} />
             </div>
 
-            {/* Análises Avançadas - Grid */}
+            {/* Análises Avançadas - Carousel */}
             <div className="space-y-4">
               <h3 className="text-xl font-semibold text-foreground">Análises Avançadas e Detalhadas</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <EnhancedGrowthChart data={dadosEvolucaoCarteira.data} dateRange={filtrosGlobais.intervalo} insight={dadosEvolucaoCarteira.insight} />
-                <EnhancedProducerPerformanceChart data={dadosPerformanceProdutor.data} insight={dadosPerformanceProdutor.insight} />
-                <EnhancedExpirationCalendarChart data={dadosVencimentosCriticos.data} insight={dadosVencimentosCriticos.insight} />
-              </div>
+              <Carousel className="w-full" opts={{ align: 'start', loop: true }}>
+                <CarouselContent>
+                  <CarouselItem>
+                    <EnhancedGrowthChart data={dadosEvolucaoCarteira.data} dateRange={filtrosGlobais.intervalo} insight={dadosEvolucaoCarteira.insight} />
+                  </CarouselItem>
+                  <CarouselItem>
+                    <EnhancedProducerPerformanceChart data={dadosPerformanceProdutor.data} insight={dadosPerformanceProdutor.insight} />
+                  </CarouselItem>
+                  <CarouselItem>
+                    <EnhancedExpirationCalendarChart data={dadosVencimentosCriticos.data} insight={dadosVencimentosCriticos.insight} />
+                  </CarouselItem>
+                </CarouselContent>
+                <CarouselPrevious />
+                <CarouselNext />
+              </Carousel>
             </div>
             <PlaceholderGraficos />
           </>

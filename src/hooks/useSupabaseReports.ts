@@ -87,16 +87,18 @@ export function useSupabaseReports(filtros: FiltrosGlobais) {
       // O filtro será aplicado no frontend baseado no start_date da apólice associada
 
       // Filtros de seleção múltipla para transações
+      // ✅ BYPASS: Despesas não possuem company_id/ramo_id/producer_id,
+      // então usamos .or() para incluí-las mesmo quando filtros estão ativos
       if (filtros.seguradoraIds.length > 0) {
-        query = query.in('company_id', filtros.seguradoraIds);
+        query = query.or(`company_id.in.(${filtros.seguradoraIds.join(',')}),company_id.is.null`);
       }
 
       if (filtros.ramos.length > 0) {
-        query = query.in('ramo_id', filtros.ramos);
+        query = query.or(`ramo_id.in.(${filtros.ramos.join(',')}),ramo_id.is.null`);
       }
 
       if (filtros.produtorIds.length > 0) {
-        query = query.in('producer_id', filtros.produtorIds);
+        query = query.or(`producer_id.in.(${filtros.produtorIds.join(',')}),producer_id.is.null`);
       }
 
       // Filtro de conciliação: aplicar no frontend pois transactions não tem coluna reconciled
