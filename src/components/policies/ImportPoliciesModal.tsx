@@ -1599,7 +1599,7 @@ export function ImportPoliciesModal({ open, onOpenChange }: ImportPoliciesModalP
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
-        className="max-w-7xl h-[90vh] flex flex-col bg-black/85 backdrop-blur-2xl border border-white/[0.06] p-0 gap-0"
+        className="w-[98vw] max-w-[98vw] h-[95vh] flex flex-col bg-black/85 backdrop-blur-2xl border border-white/[0.06] p-0 gap-0"
         style={{
           boxShadow: `
             0 0 80px -20px rgba(255,255,255,0.05),
