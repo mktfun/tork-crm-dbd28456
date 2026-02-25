@@ -3874,6 +3874,17 @@ export type Database = {
           type: string
         }[]
       }
+      get_portal_requests_by_client: {
+        Args: { p_brokerage_user_id: string; p_client_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          insurance_type: string
+          is_qualified: boolean
+          request_type: string
+          status: string
+        }[]
+      }
       get_producao_por_ramo: {
         Args: { end_range: string; p_user_id: string; start_range: string }
         Returns: {

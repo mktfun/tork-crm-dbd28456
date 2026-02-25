@@ -45,11 +45,14 @@ export default function PortalSolicitacoes() {
 
       const client = JSON.parse(clientData);
 
-      const { data, error } = await (supabase as any)
-        .from('portal_requests')
-        .select('id, request_type, insurance_type, status, created_at, is_qualified')
-        .eq('client_id', client.id)
-        .order('created_at', { ascending: false });
+      const brokerageData = sessionStorage.getItem('portal_brokerage');
+      if (!brokerageData) return;
+      const brokerage = JSON.parse(brokerageData);
+
+      const { data, error } = await (supabase as any).rpc('get_portal_requests_by_client', {
+        p_client_id: client.id,
+        p_brokerage_user_id: brokerage.user_id,
+      });
 
       if (error) {
         console.error('Error fetching requests:', error);
