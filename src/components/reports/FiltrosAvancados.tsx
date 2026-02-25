@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { X, Filter, ChevronDown } from 'lucide-react';
+import { ToggleSwitch } from '@/components/ui/toggle-switch';
 
 interface FiltrosGlobais {
   intervalo: DateRange | undefined;
@@ -16,6 +17,7 @@ interface FiltrosGlobais {
   ramos: string[];
   produtorIds: string[];
   statusIds: string[];
+  onlyConciled?: boolean;
 }
 
 interface FiltrosAvancadosProps {
@@ -105,6 +107,16 @@ export function FiltrosAvancados({
             Limpar Filtros
           </Button>
         )}
+      </div>
+
+      {/* Toggle Conciliado */}
+      <div className="mb-4">
+        <ToggleSwitch
+          label="Apenas Caixa Conciliado"
+          description="Exibir somente transações conciliadas (confirmadas no banco)"
+          checked={filtros.onlyConciled ?? false}
+          onCheckedChange={(checked) => onFiltrosChange({ ...filtros, onlyConciled: checked })}
+        />
       </div>
 
       {/* FILTROS PRINCIPAIS */}
