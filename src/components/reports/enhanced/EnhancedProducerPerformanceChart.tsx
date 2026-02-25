@@ -75,7 +75,7 @@ export function EnhancedProducerPerformanceChart({ data, insight }: EnhancedProd
               <div className="flex justify-between items-center">
                 <span className="text-slate-400">Progresso da Meta:</span>
                 <span className={`font-medium ${data.progressoMeta >= 80 ? 'text-green-400' :
-                    data.progressoMeta >= 60 ? 'text-yellow-400' : 'text-red-400'
+                  data.progressoMeta >= 60 ? 'text-yellow-400' : 'text-red-400'
                   }`}>
                   {data.progressoMeta.toFixed(0)}%
                 </span>
@@ -198,7 +198,7 @@ export function EnhancedProducerPerformanceChart({ data, insight }: EnhancedProd
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={dataWithRankings}
-            layout="horizontal"
+            layout="vertical"
             margin={{ top: 20, right: 30, left: 120, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />

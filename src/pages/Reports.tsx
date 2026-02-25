@@ -31,6 +31,13 @@ import { formatCurrency } from '@/utils/formatCurrency';
 import { BranchDistributionChart } from '@/components/dashboard/charts/BranchDistributionChart';
 import { CompanyDistributionChart } from '@/components/dashboard/charts/CompanyDistributionChart';
 import { ExportManagementModal } from '@/components/reports/ExportManagementModal';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 interface FiltrosGlobais {
   intervalo: DateRange | undefined;
@@ -193,23 +200,27 @@ export default function Reports() {
               <AlertaAtrasoFinanceiro apolices={apolicesFiltradas} transacoes={transacoesFiltradas} />
             </div>
 
-            {/* Análises Avançadas - Carousel */}
+            {/* Análises Avançadas - Carousel Restored */}
             <div className="space-y-4">
-              <h3 className="text-xl font-semibold text-foreground">Análises Avançadas e Detalhadas</h3>
-              <Carousel className="w-full" opts={{ align: 'start', loop: true }}>
-                <CarouselContent>
-                  <CarouselItem>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-foreground">Análises Avançadas e Detalhadas</h3>
+              </div>
+              <Carousel className="w-full" opts={{ align: "start" }}>
+                <CarouselContent className="-ml-4">
+                  <CarouselItem className="pl-4 md:basis-1/2 lg:basis-[80%] xl:basis-[60%]">
                     <EnhancedGrowthChart data={dadosEvolucaoCarteira.data} dateRange={filtrosGlobais.intervalo} insight={dadosEvolucaoCarteira.insight} />
                   </CarouselItem>
-                  <CarouselItem>
+                  <CarouselItem className="pl-4 md:basis-1/2 lg:basis-[80%] xl:basis-[60%]">
                     <EnhancedProducerPerformanceChart data={dadosPerformanceProdutor.data} insight={dadosPerformanceProdutor.insight} />
                   </CarouselItem>
-                  <CarouselItem>
+                  <CarouselItem className="pl-4 md:basis-1/2 lg:basis-[80%] xl:basis-[60%]">
                     <EnhancedExpirationCalendarChart data={dadosVencimentosCriticos.data} insight={dadosVencimentosCriticos.insight} />
                   </CarouselItem>
                 </CarouselContent>
-                <CarouselPrevious />
-                <CarouselNext />
+                <div className="flex justify-end gap-2 mt-4 relative pr-12">
+                  <CarouselPrevious className="relative left-0 top-0 translate-y-0 translate-x-0" />
+                  <CarouselNext className="relative right-0 top-0 translate-y-0 translate-x-0" />
+                </div>
               </Carousel>
             </div>
             <PlaceholderGraficos />

@@ -20,7 +20,7 @@ export function useSupabaseReports(filtros: FiltrosGlobais) {
     queryKey: ['reports-apolices', filtros],
     queryFn: async () => {
       console.log('🔍 Executando query otimizada para apólices:', filtros);
-      
+
       let query = supabase
         .from('apolices')
         .select(`
@@ -55,7 +55,7 @@ export function useSupabaseReports(filtros: FiltrosGlobais) {
       }
 
       const { data, error } = await query;
-      
+
       if (error) {
         console.error('❌ Erro na query de apólices:', error);
         throw error;
@@ -71,7 +71,7 @@ export function useSupabaseReports(filtros: FiltrosGlobais) {
     queryKey: ['reports-transacoes', filtros],
     queryFn: async () => {
       console.log('🔍 Executando query otimizada para transações:', filtros);
-      
+
       let query = supabase
         .from('transactions')
         .select(`
@@ -86,37 +86,36 @@ export function useSupabaseReports(filtros: FiltrosGlobais) {
       // ✅ NÃO FILTRAR TRANSAÇÕES POR PERÍODO AQUI
       // O filtro será aplicado no frontend baseado no start_date da apólice associada
 
-      // Filtros de seleção múltipla para transações
-      // ✅ BYPASS: Despesas não possuem company_id/ramo_id/producer_id,
-      // então usamos .or() para incluí-las mesmo quando filtros estão ativos
+      // Filtros de seleção múltipla para transações. Usamos uma lógica OR distributiva 
+      // para garantir que as transações de DESPESA nunca sejam bloqueadas pelos filtros de IDs estrangeiros.
       if (filtros.seguradoraIds.length > 0) {
-        query = query.or(`company_id.in.(${filtros.seguradoraIds.join(',')}),company_id.is.null`);
+        query = query.or(`company_id.in.(${filtros.seguradoraIds.join(',')}),nature.eq.DESPESA`);
       }
 
       if (filtros.ramos.length > 0) {
-        query = query.or(`ramo_id.in.(${filtros.ramos.join(',')}),ramo_id.is.null`);
+        query = query.or(`ramo_id.in.(${filtros.ramos.join(',')}),nature.eq.DESPESA`);
       }
 
       if (filtros.produtorIds.length > 0) {
-        query = query.or(`producer_id.in.(${filtros.produtorIds.join(',')}),producer_id.is.null`);
+        query = query.or(`producer_id.in.(${filtros.produtorIds.join(',')}),nature.eq.DESPESA`);
       }
 
       // Filtro de conciliação: aplicar no frontend pois transactions não tem coluna reconciled
 
       const { data, error } = await query;
-      
+
       if (error) {
         console.error('❌ Erro na query de transações:', error);
         throw error;
       }
 
       console.log('✅ Transações carregadas:', data?.length);
-      
+
       // Transformar dados incluindo premium_value, commission_value e start_date da apólice
       const allTransactions = data?.map((tx: any) => {
         const policy = tx.apolices;
         const hasPolicyData = policy && policy.premium_value;
-        
+
         return {
           ...transformTransactionData(tx),
           premiumValue: hasPolicyData ? policy.premium_value : tx.amount,
@@ -150,7 +149,7 @@ export function useSupabaseReports(filtros: FiltrosGlobais) {
     queryKey: ['reports-metadados'],
     queryFn: async () => {
       console.log('🔍 Carregando metadados do sistema');
-      
+
       const [produtoresResult, seguradorasResult, ramosResult, apolicesResult] = await Promise.all([
         supabase.from('producers').select('id, name'),
         supabase.from('companies').select('id, name'),
@@ -184,10 +183,10 @@ export function useSupabaseReports(filtros: FiltrosGlobais) {
         name: produtor.name
       }));
 
-      console.log('✅ Metadados carregados:', { 
-        seguradoras: seguradoras.length, 
-        ramos: ramos.length, 
-        produtores: produtores.length 
+      console.log('✅ Metadados carregados:', {
+        seguradoras: seguradoras.length,
+        ramos: ramos.length,
+        produtores: produtores.length
       });
 
       return {
@@ -204,7 +203,7 @@ export function useSupabaseReports(filtros: FiltrosGlobais) {
 
   // Extrair clientes únicos das apólices carregadas
   const clientes = apolicesData?.map(apolice => apolice.clientes).filter(Boolean) || [];
-  const clientesUnicos = clientes.filter((cliente, index, self) => 
+  const clientesUnicos = clientes.filter((cliente, index, self) =>
     index === self.findIndex(c => c.id === cliente.id)
   ).map(transformClientData);
 
@@ -224,26 +223,26 @@ export function useSupabaseReports(filtros: FiltrosGlobais) {
     apolices: apolicesData || [],
     clientes: clientesUnicos,
     transacoes: transacoesData || [],
-    
+
     // Metadados
     seguradoras: metadados?.seguradoras || [],
     ramosDisponiveis: metadados?.ramosDisponiveis || [],
     statusDisponiveis: metadados?.statusDisponiveis || [],
     produtores: metadados?.produtores || [],
-    
+
     // KPIs Financeiros
     totalGanhos,
     totalPerdas,
     saldoLiquido,
-    
+
     // Estados
     isLoading,
-    
+
     // Flags de controle
     temDados: (apolicesData?.length || 0) > 0,
-    temFiltrosAtivos: filtros.seguradoraIds.length > 0 || 
-                     filtros.ramos.length > 0 || 
-                     filtros.produtorIds.length > 0 || 
-                     filtros.statusIds.length > 0
+    temFiltrosAtivos: filtros.seguradoraIds.length > 0 ||
+      filtros.ramos.length > 0 ||
+      filtros.produtorIds.length > 0 ||
+      filtros.statusIds.length > 0
   };
 }
