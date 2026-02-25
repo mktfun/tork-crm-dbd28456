@@ -238,7 +238,7 @@ export function ExportManagementModal({
                   </PopoverTrigger>
                   <PopoverContent className="w-64 bg-card border-border z-[60]">
                     <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {seguradoras.map(s => (
+                      {(seguradoras || []).map(s => (
                         <div key={s.id} className="flex items-center space-x-2">
                           <Checkbox
                             id={`modal-seg-${s.id}`}
@@ -265,7 +265,7 @@ export function ExportManagementModal({
                   </PopoverTrigger>
                   <PopoverContent className="w-64 bg-card border-border z-[60]">
                     <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {ramosDisponiveis.map(r => (
+                      {(ramosDisponiveis || []).map(r => (
                         <div key={r.id} className="flex items-center space-x-2">
                           <Checkbox
                             id={`modal-ramo-${r.id}`}

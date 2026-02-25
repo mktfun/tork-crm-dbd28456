@@ -307,7 +307,7 @@ export function FiltrosAvancados({
       {totalFiltrosAtivos > 0 && (
         <div className="flex flex-wrap gap-2">
           {filtros.seguradoraIds.map(seguradoraId => {
-            const seguradora = seguradoras.find(s => s.id === seguradoraId);
+            const seguradora = (seguradoras || []).find(s => s.id === seguradoraId);
             return (
               <Badge key={seguradoraId} variant="secondary" className="bg-blue-600 text-foreground flex items-center gap-1">
                 {seguradora?.name || 'Seguradora'}
@@ -328,7 +328,7 @@ export function FiltrosAvancados({
             </Badge>
           ))}
           {filtros.produtorIds.map(produtorId => {
-            const produtor = produtores.find(p => p.id === produtorId);
+            const produtor = (produtores || []).find(p => p.id === produtorId);
             return (
               <Badge key={produtorId} variant="secondary" className="bg-purple-600 text-foreground flex items-center gap-1">
                 {produtor?.name || 'Produtor'}
