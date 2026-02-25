@@ -54,6 +54,7 @@ export interface ManagementReportData {
 export interface ReportOptions {
   title: string;
   notes?: string;
+  dataVision?: 'projection' | 'reconciled';
   sections: {
     kpis: boolean;
     financial: boolean;
@@ -419,7 +420,9 @@ export async function generateManagementReport(
   // ========================================
   let yPos = drawPDFHeader(doc, {
     title: reportOptions.title,
-    subtitle: 'RELATÓRIO GERENCIAL',
+    subtitle: reportOptions.dataVision === 'reconciled'
+      ? 'RELATÓRIO GERENCIAL • VISÃO: CAIXA CONCILIADO'
+      : 'RELATÓRIO GERENCIAL • VISÃO: PROJEÇÃO TOTAL',
     period: data.period
   });
   

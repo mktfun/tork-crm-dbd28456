@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FileDown, Loader2, Download, RefreshCw } from 'lucide-react';
+import { FileDown, Loader2, Download, RefreshCw, ChevronDown } from 'lucide-react';
 import { generateManagementReport, ReportOptions } from '@/utils/pdf/generateManagementReport';
 import { toast } from 'sonner';
 import { DateRange } from 'react-day-picker';
@@ -21,9 +21,23 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DatePickerWithRange } from '@/components/ui/date-picker-with-range';
 import { useFilteredDataForReports } from '@/hooks/useFilteredDataForReports';
+import { ToggleSwitch } from '@/components/ui/toggle-switch';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
+interface FiltrosGlobais {
+  intervalo: DateRange | undefined;
+  seguradoraIds: string[];
+  ramos: string[];
+  produtorIds: string[];
+  statusIds: string[];
+  onlyConciled?: boolean;
+}
 
 interface ExportManagementModalProps {
   initialDateRange: DateRange | undefined;
+  filtrosGlobais: FiltrosGlobais;
+  seguradoras: Array<{ id: string; name: string }>;
+  ramosDisponiveis: Array<{ id: string; nome: string }>;
   disabled?: boolean;
 }
 
@@ -39,6 +53,9 @@ type SectionKey = typeof SECTION_OPTIONS[number]['key'];
 
 export function ExportManagementModal({
   initialDateRange,
+  filtrosGlobais,
+  seguradoras,
+  ramosDisponiveis,
   disabled
 }: ExportManagementModalProps) {
   const [open, setOpen] = useState(false);
@@ -49,12 +66,13 @@ export function ExportManagementModal({
     'kpis', 'financial', 'branches', 'companies', 'producers'
   ]);
   
-  // Estado local do período - pode ser alterado dentro do modal
+  // Estado local - inicializa com filtros globais da tela mãe
   const [dateRange, setDateRange] = useState<DateRange | undefined>(initialDateRange);
+  const [localSeguradoraIds, setLocalSeguradoraIds] = useState<string[]>(filtrosGlobais.seguradoraIds);
+  const [localRamos, setLocalRamos] = useState<string[]>(filtrosGlobais.ramos);
+  const [localOnlyConciled, setLocalOnlyConciled] = useState(filtrosGlobais.onlyConciled ?? false);
 
-  // ========================================
-  // BUSCA DE DADOS INTERNA - SEM AGRUPAMENTO "OUTROS"
-  // ========================================
+  // BUSCA DE DADOS com filtros sincronizados
   const { 
     apolicesFiltradas, 
     dadosPerformanceProdutor,
@@ -67,13 +85,13 @@ export function ExportManagementModal({
     isLoading: isLoadingData
   } = useFilteredDataForReports({
     intervalo: dateRange,
-    seguradoraIds: [],
-    ramos: [],
-    produtorIds: [],
-    statusIds: []
-  }, { limitResults: false }); // 🎯 FALSE = Lista completa SEM "Outros"
+    seguradoraIds: localSeguradoraIds,
+    ramos: localRamos,
+    produtorIds: filtrosGlobais.produtorIds,
+    statusIds: filtrosGlobais.statusIds,
+    onlyConciled: localOnlyConciled
+  }, { limitResults: false });
 
-  // Calcular KPIs da carteira
   const portfolioData = useMemo(() => {
     const apolicesAtivas = apolicesFiltradas.filter(p => p.status === 'Ativa');
     const valorTotalCarteira = apolicesAtivas.reduce((sum, p) => sum + (p.premium_value || 0), 0);
@@ -81,20 +99,21 @@ export function ExportManagementModal({
     const numeroApolices = apolicesFiltradas.length;
     const ticketMedio = numeroApolices > 0 ? valorTotalCarteira / numeroApolices : 0;
 
-    return {
-      valorTotalCarteira,
-      numeroClientes,
-      numeroApolices,
-      ticketMedio
-    };
+    return { valorTotalCarteira, numeroClientes, numeroApolices, ticketMedio };
   }, [apolicesFiltradas]);
 
   const handleSectionToggle = (section: SectionKey) => {
     setSelectedSections(prev => 
-      prev.includes(section)
-        ? prev.filter(s => s !== section)
-        : [...prev, section]
+      prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]
     );
+  };
+
+  const handleSeguradoraToggle = (id: string, checked: boolean) => {
+    setLocalSeguradoraIds(prev => checked ? [...prev, id] : prev.filter(v => v !== id));
+  };
+
+  const handleRamoToggle = (id: string, checked: boolean) => {
+    setLocalRamos(prev => checked ? [...prev, id] : prev.filter(v => v !== id));
   };
 
   const handleGenerate = async () => {
@@ -113,6 +132,7 @@ export function ExportManagementModal({
       const options: ReportOptions = {
         title,
         notes: notes.trim() || undefined,
+        dataVision: localOnlyConciled ? 'reconciled' : 'projection',
         sections: {
           kpis: selectedSections.includes('kpis'),
           financial: selectedSections.includes('financial'),
@@ -122,23 +142,10 @@ export function ExportManagementModal({
         }
       };
 
-      console.log('📊 Gerando relatório com dados:', {
-        periodo: dateRange,
-        portfolio: portfolioData,
-        financial: { totalGanhos, totalPerdas, saldoLiquido },
-        branches: branchDistributionDataFromTransactions.length,
-        companies: companyDistributionDataFromTransactions.length,
-        producers: dadosPerformanceProdutor.data.length
-      });
-
       await generateManagementReport({
         period: { from: dateRange?.from, to: dateRange?.to },
         portfolio: portfolioData,
-        financial: {
-          totalGanhos,
-          totalPerdas,
-          saldoLiquido
-        },
+        financial: { totalGanhos, totalPerdas, saldoLiquido },
         branchDistribution: branchDistributionDataFromTransactions,
         companyDistribution: companyDistributionDataFromTransactions,
         producerPerformance: dadosPerformanceProdutor.data
@@ -159,13 +166,18 @@ export function ExportManagementModal({
     setNotes('');
     setSelectedSections(['kpis', 'financial', 'branches', 'companies', 'producers']);
     setDateRange(initialDateRange);
+    setLocalSeguradoraIds(filtrosGlobais.seguradoraIds);
+    setLocalRamos(filtrosGlobais.ramos);
+    setLocalOnlyConciled(filtrosGlobais.onlyConciled ?? false);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (isOpen) {
-      // Ao abrir, sincroniza com o período da tela
       setDateRange(initialDateRange);
+      setLocalSeguradoraIds(filtrosGlobais.seguradoraIds);
+      setLocalRamos(filtrosGlobais.ramos);
+      setLocalOnlyConciled(filtrosGlobais.onlyConciled ?? false);
     } else {
       resetForm();
     }
@@ -183,32 +195,24 @@ export function ExportManagementModal({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          className="gap-2"
-          disabled={disabled}
-        >
+        <Button variant="outline" className="gap-2" disabled={disabled}>
           <FileDown className="h-4 w-4" />
           Baixar Relatório Gerencial
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Configurar Relatório de Gestão</DialogTitle>
           <DialogDescription>
-            Personalize o período e conteúdo do seu relatório antes de exportar.
+            Personalize o período, filtros e conteúdo do relatório antes de exportar.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Seletor de Período */}
+          {/* Período */}
           <div className="space-y-2">
             <Label>Período do Relatório</Label>
-            <DatePickerWithRange 
-              date={dateRange}
-              onDateChange={setDateRange}
-              className="w-full"
-            />
+            <DatePickerWithRange date={dateRange} onDateChange={setDateRange} className="w-full" />
             {isLoadingData && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
                 <RefreshCw className="h-3 w-3 animate-spin" />
@@ -217,27 +221,85 @@ export function ExportManagementModal({
             )}
           </div>
 
+          {/* Filtros do Modal */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-foreground">Filtros de Dados</h4>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {/* Seguradora */}
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Seguradora</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-full justify-between text-xs">
+                      {localSeguradoraIds.length === 0 ? 'Todas' : `${localSeguradoraIds.length} selecionada(s)`}
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 bg-card border-border z-[60]">
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {seguradoras.map(s => (
+                        <div key={s.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`modal-seg-${s.id}`}
+                            checked={localSeguradoraIds.includes(s.id)}
+                            onCheckedChange={(c) => handleSeguradoraToggle(s.id, c as boolean)}
+                          />
+                          <Label htmlFor={`modal-seg-${s.id}`} className="text-xs cursor-pointer">{s.name}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Ramo */}
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Ramo</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-full justify-between text-xs">
+                      {localRamos.length === 0 ? 'Todos' : `${localRamos.length} selecionado(s)`}
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 bg-card border-border z-[60]">
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {ramosDisponiveis.map(r => (
+                        <div key={r.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`modal-ramo-${r.id}`}
+                            checked={localRamos.includes(r.id)}
+                            onCheckedChange={(c) => handleRamoToggle(r.id, c as boolean)}
+                          />
+                          <Label htmlFor={`modal-ramo-${r.id}`} className="text-xs cursor-pointer">{r.nome}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            {/* Toggle Conciliado */}
+            <ToggleSwitch
+              label="Apenas Caixa Conciliado"
+              description="Filtrar somente transações conciliadas (confirmadas no banco)"
+              checked={localOnlyConciled}
+              onCheckedChange={setLocalOnlyConciled}
+            />
+          </div>
+
           {/* Personalização */}
           <div className="space-y-4">
             <h4 className="text-sm font-medium text-foreground">Personalização</h4>
             <div className="space-y-2">
               <Label htmlFor="title">Título do Relatório</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Relatório de Gestão"
-              />
+              <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Relatório de Gestão" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="notes">Observações (opcional)</Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Notas adicionais que aparecerão no final do relatório..."
-                rows={2}
-              />
+              <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notas adicionais..." rows={2} />
             </div>
           </div>
 
@@ -252,9 +314,7 @@ export function ExportManagementModal({
                     checked={selectedSections.includes(section.key)}
                     onCheckedChange={() => handleSectionToggle(section.key)}
                   />
-                  <Label htmlFor={section.key} className="font-normal cursor-pointer">
-                    {section.label}
-                  </Label>
+                  <Label htmlFor={section.key} className="font-normal cursor-pointer">{section.label}</Label>
                 </div>
               ))}
             </div>
@@ -265,6 +325,10 @@ export function ExportManagementModal({
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Período:</span>
               <span className="font-medium">{formatPeriod()}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Visão:</span>
+              <span className="font-medium">{localOnlyConciled ? 'Caixa Conciliado' : 'Projeção Total'}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Seções:</span>
@@ -280,28 +344,17 @@ export function ExportManagementModal({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)} disabled={isGenerating}>
-            Cancelar
-          </Button>
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={isGenerating}>Cancelar</Button>
           <Button 
             onClick={handleGenerate} 
             disabled={isGenerating || selectedSections.length === 0 || isLoadingData || !temDados}
           >
             {isGenerating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Gerando PDF...
-              </>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Gerando PDF...</>
             ) : isLoadingData ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Carregando...
-              </>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Carregando...</>
             ) : (
-              <>
-                <Download className="mr-2 h-4 w-4" />
-                Gerar Relatório
-              </>
+              <><Download className="mr-2 h-4 w-4" />Gerar Relatório</>
             )}
           </Button>
         </DialogFooter>

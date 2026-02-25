@@ -12,6 +12,7 @@ interface FiltrosGlobais {
   ramos: string[];
   produtorIds: string[];
   statusIds: string[];
+  onlyConciled?: boolean;
 }
 
 interface ReportOptions {
@@ -52,16 +53,36 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
   const {
     apolices: apolicesFiltradas,
     clientes: clientesFiltrados,
-    transacoes: transacoesFiltradas,
+    transacoes: transacoesRaw,
     statusDisponiveis,
     produtores,
-    totalGanhos,
-    totalPerdas,
-    saldoLiquido,
+    totalGanhos: totalGanhosRaw,
+    totalPerdas: totalPerdasRaw,
+    saldoLiquido: saldoLiquidoRaw,
     isLoading: supabaseLoading,
     temDados,
     temFiltrosAtivos
   } = useSupabaseReports(filtros);
+
+  // Aplicar filtro onlyConciled no frontend (transactions não tem coluna reconciled)
+  const transacoesFiltradas = useMemo(() => {
+    if (!filtros.onlyConciled || !transacoesRaw) return transacoesRaw;
+    return transacoesRaw.filter((t: any) => t.status === 'PAGO' || t.status === 'REALIZADO');
+  }, [transacoesRaw, filtros.onlyConciled]);
+
+  // Recalcular KPIs quando onlyConciled ativo
+  const { totalGanhos, totalPerdas, saldoLiquido } = useMemo(() => {
+    if (!filtros.onlyConciled) {
+      return { totalGanhos: totalGanhosRaw, totalPerdas: totalPerdasRaw, saldoLiquido: saldoLiquidoRaw };
+    }
+    const ganhos = (transacoesFiltradas || [])
+      .filter((t: any) => t.nature === 'RECEITA' && (t.status === 'PAGO' || t.status === 'REALIZADO'))
+      .reduce((acc: number, t: any) => acc + (t.amount || 0), 0);
+    const perdas = (transacoesFiltradas || [])
+      .filter((t: any) => t.nature === 'DESPESA' && (t.status === 'PAGO' || t.status === 'REALIZADO'))
+      .reduce((acc: number, t: any) => acc + (t.amount || 0), 0);
+    return { totalGanhos: ganhos, totalPerdas: perdas, saldoLiquido: ganhos - perdas };
+  }, [transacoesFiltradas, filtros.onlyConciled, totalGanhosRaw, totalPerdasRaw, saldoLiquidoRaw]);
 
   // 🛡️ GUARD: Verificar se TODOS os dados críticos estão prontos
   const isDataReady = Boolean(

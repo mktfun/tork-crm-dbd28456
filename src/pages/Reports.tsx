@@ -11,7 +11,9 @@ import { PlaceholderGraficos } from '@/components/reports/PlaceholderGraficos';
 import { EnhancedGrowthChart } from '@/components/reports/enhanced/EnhancedGrowthChart';
 import { EnhancedProducerPerformanceChart } from '@/components/reports/enhanced/EnhancedProducerPerformanceChart';
 import { EnhancedExpirationCalendarChart } from '@/components/reports/enhanced/EnhancedExpirationCalendarChart';
-import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
+import { AdimplenciaDonut } from '@/components/reports/AdimplenciaDonut';
+import { DreCompactoBar } from '@/components/reports/DreCompactoBar';
+import { AlertaAtrasoFinanceiro } from '@/components/reports/AlertaAtrasoFinanceiro';
 import { useFilteredDataForReports } from '@/hooks/useFilteredDataForReports';
 import { useClientesPreviewWithStats } from '@/hooks/useClientesPreviewWithStats';
 import { useApolicesPreview } from '@/hooks/useApolicesPreview';
@@ -29,6 +31,7 @@ interface FiltrosGlobais {
   ramos: string[];
   produtorIds: string[];
   statusIds: string[];
+  onlyConciled?: boolean;
 }
 
 export default function Reports() {
@@ -38,6 +41,7 @@ export default function Reports() {
     ramos: [],
     produtorIds: [],
     statusIds: [],
+    onlyConciled: false,
   });
 
   const previewFilters = {
@@ -95,6 +99,9 @@ export default function Reports() {
         </div>
         <ExportManagementModal
           initialDateRange={filtrosGlobais.intervalo}
+          filtrosGlobais={filtrosGlobais}
+          seguradoras={seguradoras}
+          ramosDisponiveis={ramosDisponiveis}
           disabled={isLoading}
         />
       </div>
@@ -171,35 +178,21 @@ export default function Reports() {
             </div>
 
             <RelatorioFaturamento apolices={apolicesFiltradas} clientes={clientesFiltrados} transactions={transacoesFiltradas} intervalo={filtrosGlobais.intervalo} />
-            <div className="flex flex-col gap-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-foreground">Análises Avançadas e Detalhadas</h3>
-                  <p className="text-sm text-muted-foreground">Arraste para navegar • Gráficos interativos com métricas expandidas</p>
-                </div>
-                <Carousel className="w-full" opts={{ align: 'start', loop: true }}>
-                  <div className="flex items-center justify-end gap-2 mb-4">
-                    <CarouselPrevious />
-                    <CarouselNext />
-                  </div>
-                  <CarouselContent>
-                    <CarouselItem>
-                      <div className="h-full">
-                        <EnhancedGrowthChart data={dadosEvolucaoCarteira.data} dateRange={filtrosGlobais.intervalo} insight={dadosEvolucaoCarteira.insight} />
-                      </div>
-                    </CarouselItem>
-                    <CarouselItem>
-                      <div className="h-full">
-                        <EnhancedProducerPerformanceChart data={dadosPerformanceProdutor.data} insight={dadosPerformanceProdutor.insight} />
-                      </div>
-                    </CarouselItem>
-                    <CarouselItem>
-                      <div className="h-full">
-                        <EnhancedExpirationCalendarChart data={dadosVencimentosCriticos.data} insight={dadosVencimentosCriticos.insight} />
-                      </div>
-                    </CarouselItem>
-                  </CarouselContent>
-                </Carousel>
+
+            {/* Insights Financeiros */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <AdimplenciaDonut apolices={apolicesFiltradas} transacoes={transacoesFiltradas} />
+              <DreCompactoBar apolices={apolicesFiltradas} transacoes={transacoesFiltradas} totalGanhos={totalGanhos} totalPerdas={totalPerdas} />
+              <AlertaAtrasoFinanceiro apolices={apolicesFiltradas} transacoes={transacoesFiltradas} />
+            </div>
+
+            {/* Análises Avançadas - Grid */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-foreground">Análises Avançadas e Detalhadas</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <EnhancedGrowthChart data={dadosEvolucaoCarteira.data} dateRange={filtrosGlobais.intervalo} insight={dadosEvolucaoCarteira.insight} />
+                <EnhancedProducerPerformanceChart data={dadosPerformanceProdutor.data} insight={dadosPerformanceProdutor.insight} />
+                <EnhancedExpirationCalendarChart data={dadosVencimentosCriticos.data} insight={dadosVencimentosCriticos.insight} />
               </div>
             </div>
             <PlaceholderGraficos />

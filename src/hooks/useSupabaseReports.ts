@@ -11,6 +11,7 @@ interface FiltrosGlobais {
   ramos: string[];
   produtorIds: string[];
   statusIds: string[];
+  onlyConciled?: boolean;
 }
 
 export function useSupabaseReports(filtros: FiltrosGlobais) {
@@ -97,6 +98,8 @@ export function useSupabaseReports(filtros: FiltrosGlobais) {
       if (filtros.produtorIds.length > 0) {
         query = query.in('producer_id', filtros.produtorIds);
       }
+
+      // Filtro de conciliação: aplicar no frontend pois transactions não tem coluna reconciled
 
       const { data, error } = await query;
       
