@@ -3814,6 +3814,16 @@ export type Database = {
           transaction_date: string
         }[]
       }
+      get_pending_revenue_by_insurance: {
+        Args: { p_user_id: string }
+        Returns: {
+          company_name: string
+          insurance_company_id: string
+          oldest_due_date: string
+          total_amount_pending: number
+          transaction_count: number
+        }[]
+      }
       get_pending_this_month: {
         Args: never
         Returns: {
@@ -4223,6 +4233,10 @@ export type Database = {
         }[]
       }
       promote_user_to_admin: { Args: { user_email: string }; Returns: boolean }
+      reconcile_insurance_aggregate_fifo: {
+        Args: { p_insurance_company_id: string; p_statement_entry_id: string }
+        Returns: Json
+      }
       reconcile_transaction_partial:
         | {
             Args: {
