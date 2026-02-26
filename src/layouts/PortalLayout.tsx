@@ -160,7 +160,7 @@ export function PortalLayout() {
   return (
     <div className="min-h-screen bg-background pb-32">
       {/* Header — TripGlide style: no border, greeting left, actions right */}
-      <header className="bg-background px-4 py-4 sm:px-6 sticky top-0 z-10">
+      <header className="bg-background px-4 pb-4 pt-4 safe-area-pt sm:px-6 sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-foreground font-semibold text-lg tracking-tight">
@@ -206,7 +206,7 @@ export function PortalLayout() {
       </main>
 
       {/* Bottom Navigation — Dynamic Island Pill */}
-      <nav className="fixed bottom-6 left-0 right-0 z-50 px-4 pointer-events-none flex justify-center">
+      <nav className="fixed bottom-6 safe-area-mb left-0 right-0 z-50 px-4 pointer-events-none flex justify-center">
         <div className="pointer-events-auto max-w-sm w-full bg-[#1A1C1E] dark:bg-[#1A1C1E] rounded-full px-2 py-2 flex justify-between items-center shadow-[0_24px_50px_rgba(0,0,0,0.5)] border border-white/5">
           {renderNavItem({ path: 'home', label: 'Início', icon: Home, onClick: () => navigate(`/${brokerageSlug}/portal/home`) })}
           {portalConfig.show_policies && renderNavItem({ path: 'policies', label: 'Seguros', icon: FileText, onClick: () => navigate(`/${brokerageSlug}/portal/policies`) })}

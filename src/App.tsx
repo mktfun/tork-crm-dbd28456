@@ -58,6 +58,7 @@ import PortalProfile from "./pages/portal/PortalProfile";
 import PortalNotFound from "./pages/portal/PortalNotFound";
 import PortalWizard from "./pages/portal/PortalWizard";
 import PortalSolicitacoes from "./pages/portal/PortalSolicitacoes";
+import PortalMobileStart from "./pages/portal/PortalMobileStart";
 import { supabase } from "./integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -66,10 +67,15 @@ import { toast } from "sonner";
 // ==========================================
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
 
 // 1. Enforce Mobile CSS Rules if running natively
 if (Capacitor.isNativePlatform()) {
   document.body.classList.add('is-mobile-app');
+
+  // Force StatusBar to adapt to dark backgrounds (white text)
+  StatusBar.setStyle({ style: Style.Dark }).catch(() => { });
+  StatusBar.setBackgroundColor({ color: '#09090b' }).catch(() => { }); // Tailwind zinc-950
 }
 
 // 2. Android Hardware Back Button Handler
@@ -146,8 +152,8 @@ function App() {
             <TooltipProvider>
               <div className="min-h-screen">
                 <Routes>
-                  {/* Rota principal - Landing page para não autenticados */}
-                  <Route path="/" element={<Landing />} />
+                  {/* Rota principal - Se mobile, bloqueia na tela do APP, senão vai pro Landing Site */}
+                  <Route path="/" element={Capacitor.isNativePlatform() ? <PortalMobileStart /> : <Landing />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/auth/confirm" element={<AuthConfirm />} />
                   <Route path="/auth/reset-password" element={<AuthConfirm />} />

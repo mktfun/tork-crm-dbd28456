@@ -279,13 +279,13 @@ export default function PortalLogin() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="relative w-full max-w-md bg-card/80 backdrop-blur-2xl border border-border shadow-xl rounded-xl p-8 text-center">
-            <div className="mx-auto w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-4 border border-border">
-              <Shield className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <h2 className="text-xl text-foreground font-light tracking-wide mb-2">Portal não encontrado</h2>
-            <p className="text-muted-foreground font-light">
-              O portal solicitado não existe ou não está disponível.
-            </p>
+          <div className="mx-auto w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-4 border border-border">
+            <Shield className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl text-foreground font-light tracking-wide mb-2">Portal não encontrado</h2>
+          <p className="text-muted-foreground font-light">
+            O portal solicitado não existe ou não está disponível.
+          </p>
         </div>
       </div>
     );
@@ -294,7 +294,7 @@ export default function PortalLogin() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Branding — top section */}
-      <div className="flex-1 flex flex-col items-center justify-end pb-8 pt-16 px-6">
+      <div className="flex-1 flex flex-col items-center justify-end safe-area-pt pb-8 pt-16 px-6">
         {brokerage?.logo_url ? (
           <img
             src={brokerage.logo_url}
@@ -317,7 +317,7 @@ export default function PortalLogin() {
       </div>
 
       {/* Form — bottom sheet style */}
-      <div className="bg-card backdrop-blur-xl border-t border-border rounded-t-3xl px-6 pt-8 pb-10 sm:px-8 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-card backdrop-blur-xl border-t border-border rounded-t-3xl px-6 pt-8 pb-10 safe-area-pb sm:px-8 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="w-10 h-1 rounded-full bg-border mx-auto mb-2" />
 
         {needsPassword && selectedClient ? (
