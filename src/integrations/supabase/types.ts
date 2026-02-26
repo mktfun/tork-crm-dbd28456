@@ -3911,6 +3911,15 @@ export type Database = {
           running_balance: number
         }[]
       }
+      get_public_brokerages: {
+        Args: never
+        Returns: {
+          id: number
+          logo_url: string
+          name: string
+          slug: string
+        }[]
+      }
       get_recent_financial_transactions: {
         Args: { p_limit?: number; p_offset?: number; p_type?: string }
         Returns: {
