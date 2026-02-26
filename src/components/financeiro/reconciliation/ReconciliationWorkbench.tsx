@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import {
     ArrowUpRight, ArrowDownRight, CheckCircle2, AlertTriangle,
-    Plus, X, Zap, Wand2, Loader2, Search, Unlink, Landmark
+    Plus, X, Zap, Wand2, Loader2, Search, Unlink, Landmark, Building2
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -33,6 +33,9 @@ import { formatCurrency } from '@/utils/formatCurrency';
 import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
 import { PartialReconciliationModal } from './PartialReconciliationModal';
+import { usePendingInsuranceAggregate, type InsuranceAggregateItem } from '@/hooks/financeiro/usePendingInsuranceAggregate';
+import { useReconcileAggregate } from '@/hooks/financeiro/useReconcileAggregate';
+import { InsuranceAggregateCard } from './InsuranceAggregateCard';
 
 interface BankAccountOption {
     id: string;
@@ -227,6 +230,10 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const [showBankModal, setShowBankModal] = useState(false);
     const [selectedBankForMatch, setSelectedBankForMatch] = useState('');
 
+    // Aggregate FIFO state
+    const [selectedAggregateId, setSelectedAggregateId] = useState<string | null>(null);
+    const [showAggregateModal, setShowAggregateModal] = useState(false);
+
     // Data
     const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined;
     const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined;
@@ -239,6 +246,10 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const reconcileManual = useReconcileManual();
     const reconcilePartial = useReconcilePartial();
     const createFromStatement = useCreateFromStatement();
+    const reconcileAggregate = useReconcileAggregate();
+
+    // Insurance aggregate for consolidated mode
+    const { data: insuranceAggregates = [], isLoading: isLoadingAggregates } = usePendingInsuranceAggregate();
 
     const statementItems = pendingData?.statement || [];
     const systemItems = pendingData?.system || [];
@@ -255,6 +266,19 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
         const q = systemSearch.toLowerCase();
         return systemItems.filter(i => i.description.toLowerCase().includes(q));
     }, [systemItems, systemSearch]);
+
+    // Filter aggregates
+    const filteredAggregates = useMemo(() => {
+        if (!systemSearch) return insuranceAggregates;
+        const q = systemSearch.toLowerCase();
+        return insuranceAggregates.filter(i => i.company_name.toLowerCase().includes(q));
+    }, [insuranceAggregates, systemSearch]);
+
+    // Aggregate total for balance bar
+    const aggregateTotal = useMemo(() =>
+        insuranceAggregates.reduce((s, i) => s + i.total_amount_pending, 0),
+        [insuranceAggregates]
+    );
 
     // Suggested IDs sets
     const suggestedStatementIds = useMemo(() => new Set(suggestions.map(s => s.statement_entry_id)), [suggestions]);
@@ -421,7 +445,34 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const clearSelection = () => {
         setSelectedStatementIds([]);
         setSelectedSystemIds([]);
+        setSelectedAggregateId(null);
     };
+
+    // Aggregate FIFO handler
+    const handleAggregateMatch = () => {
+        if (selectedStatementIds.length !== 1 || !selectedAggregateId) return;
+        setShowAggregateModal(true);
+    };
+
+    const handleAggregateConfirm = async () => {
+        if (selectedStatementIds.length !== 1 || !selectedAggregateId) return;
+        await reconcileAggregate.mutateAsync({
+            statementEntryId: selectedStatementIds[0],
+            insuranceCompanyId: selectedAggregateId,
+        });
+        setShowAggregateModal(false);
+        setSelectedStatementIds([]);
+        setSelectedAggregateId(null);
+    };
+
+    const toggleAggregate = useCallback((id: string) => {
+        setSelectedAggregateId(prev => prev === id ? null : id);
+        // Clear individual system selection when picking aggregate
+        setSelectedSystemIds([]);
+    }, []);
+
+    const hasAggregateSelection = !!selectedAggregateId;
+    const canAggregateMatch = selectedStatementIds.length === 1 && hasAggregateSelection;
 
     // Balance bar totals (when nothing selected, show totals)
     const bankTotal = useMemo(() => statementItems.reduce((s, i) => s + i.amount, 0), [statementItems]);
@@ -431,8 +482,14 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
         return s + signed;
     }, 0), [systemItems]);
     const displayBankSum = hasLeftSelection ? bankSum : bankTotal;
-    const displaySystemSum = hasRightSelection ? systemSum : systemTotal;
-    const displayDiff = hasLeftSelection || hasRightSelection ? diff : bankTotal - systemTotal;
+    const displaySystemSum = isConsolidated
+        ? (hasAggregateSelection
+            ? insuranceAggregates.find(a => a.insurance_company_id === selectedAggregateId)?.total_amount_pending ?? 0
+            : aggregateTotal)
+        : (hasRightSelection ? systemSum : systemTotal);
+    const displayDiff = hasLeftSelection || hasRightSelection || hasAggregateSelection
+        ? (hasLeftSelection ? bankSum : bankTotal) - displaySystemSum
+        : bankTotal - systemTotal;
 
     return (
         <div className="space-y-4">
@@ -475,12 +532,16 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                     </p>
                 </div>
                 <div className="text-right">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Sistema (ERP)</span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        {isConsolidated ? 'Seguradoras (Agregado)' : 'Sistema (ERP)'}
+                    </span>
                     <p className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(displaySystemSum)}</p>
                     <p className="text-xs text-muted-foreground">
-                        {hasRightSelection
-                            ? `${selectedSystemIds.length} selecionados`
-                            : `${systemItems.length} pendentes`
+                        {isConsolidated
+                            ? (hasAggregateSelection ? '1 seguradora selecionada' : `${insuranceAggregates.length} seguradoras`)
+                            : (hasRightSelection
+                                ? `${selectedSystemIds.length} selecionados`
+                                : `${systemItems.length} pendentes`)
                         }
                     </p>
                 </div>
@@ -532,11 +593,13 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
 
                     <ResizableHandle withHandle />
 
-                    {/* Right Panel - System Transactions */}
+                    {/* Right Panel - System Transactions or Insurance Aggregates */}
                     <ResizablePanel defaultSize={50} minSize={30}>
                         <div className="flex flex-col h-full">
                             <div className="p-3 border-b border-border bg-muted/30 flex items-center gap-2">
-                                <Badge variant="secondary" className="text-xs font-semibold">Sistema</Badge>
+                                <Badge variant="secondary" className="text-xs font-semibold">
+                                    {isConsolidated ? 'Seguradoras' : 'Sistema'}
+                                </Badge>
                                 <div className="relative flex-1">
                                     <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
                                     <Input
@@ -546,39 +609,67 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                         onChange={(e) => setSystemSearch(e.target.value)}
                                     />
                                 </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                    <Switch
-                                        id="show-unassigned"
-                                        checked={showUnassigned}
-                                        onCheckedChange={setShowUnassigned}
-                                        className="scale-75"
-                                    />
-                                    <Label htmlFor="show-unassigned" className="text-[10px] text-muted-foreground cursor-pointer whitespace-nowrap">
-                                        Sem Banco
-                                    </Label>
-                                </div>
-                                <span className="text-xs text-muted-foreground shrink-0">{filteredSystem.length}</span>
+                                {!isConsolidated && (
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <Switch
+                                            id="show-unassigned"
+                                            checked={showUnassigned}
+                                            onCheckedChange={setShowUnassigned}
+                                            className="scale-75"
+                                        />
+                                        <Label htmlFor="show-unassigned" className="text-[10px] text-muted-foreground cursor-pointer whitespace-nowrap">
+                                            Sem Banco
+                                        </Label>
+                                    </div>
+                                )}
+                                <span className="text-xs text-muted-foreground shrink-0">
+                                    {isConsolidated ? filteredAggregates.length : filteredSystem.length}
+                                </span>
                             </div>
                             <div className="flex-1 overflow-auto p-2 space-y-1.5">
-                                {isLoading ? (
-                                    Array.from({ length: 5 }).map((_, i) => (
-                                        <Skeleton key={i} className="h-14 w-full rounded-lg" />
-                                    ))
-                                ) : filteredSystem.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
-                                        <p>Nenhuma transação pendente</p>
-                                    </div>
+                                {isConsolidated ? (
+                                    // Consolidated mode: Show Insurance Aggregate Cards
+                                    isLoadingAggregates ? (
+                                        Array.from({ length: 4 }).map((_, i) => (
+                                            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                                        ))
+                                    ) : filteredAggregates.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                                            <Building2 className="w-8 h-8 mb-2 opacity-40" />
+                                            <p>Nenhuma seguradora com pendências</p>
+                                        </div>
+                                    ) : (
+                                        filteredAggregates.map(item => (
+                                            <InsuranceAggregateCard
+                                                key={item.insurance_company_id}
+                                                item={item}
+                                                selected={selectedAggregateId === item.insurance_company_id}
+                                                onClick={() => toggleAggregate(item.insurance_company_id)}
+                                            />
+                                        ))
+                                    )
                                 ) : (
-                                    filteredSystem.map(item => (
-                                        <SystemEntryCard
-                                            key={item.id}
-                                            item={item}
-                                            selected={selectedSystemIds.includes(item.id)}
-                                            suggested={suggestedSystemIds.has(item.id)}
-                                            onClick={() => toggleSystem(item.id)}
-                                            isUnassigned={!item.bank_account_id}
-                                        />
-                                    ))
+                                    // Filtered mode: Show individual system transactions
+                                    isLoading ? (
+                                        Array.from({ length: 5 }).map((_, i) => (
+                                            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                                        ))
+                                    ) : filteredSystem.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                                            <p>Nenhuma transação pendente</p>
+                                        </div>
+                                    ) : (
+                                        filteredSystem.map(item => (
+                                            <SystemEntryCard
+                                                key={item.id}
+                                                item={item}
+                                                selected={selectedSystemIds.includes(item.id)}
+                                                suggested={suggestedSystemIds.has(item.id)}
+                                                onClick={() => toggleSystem(item.id)}
+                                                isUnassigned={!item.bank_account_id}
+                                            />
+                                        ))
+                                    )
                                 )}
                             </div>
                         </div>
@@ -588,7 +679,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
 
             {/* Floating Action Bar */}
             <AnimatePresence>
-                {(hasLeftSelection || hasRightSelection) && (
+                {(hasLeftSelection || hasRightSelection || hasAggregateSelection) && (
                     <motion.div
                         initial={{ y: 80, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
@@ -608,9 +699,11 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                 <span className="text-muted-foreground">×</span>
                                 <div className="flex items-center gap-1.5">
                                     <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
-                                        {selectedSystemIds.length}
+                                        {hasAggregateSelection ? 1 : selectedSystemIds.length}
                                     </div>
-                                    <span className="text-muted-foreground">sistema</span>
+                                    <span className="text-muted-foreground">
+                                        {hasAggregateSelection ? 'seguradora' : 'sistema'}
+                                    </span>
                                 </div>
                             </div>
 
@@ -668,7 +761,24 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                 </Button>
                             )}
 
-                            {isMissingTransaction && (
+                            {/* Aggregate FIFO match button */}
+                            {canAggregateMatch && (
+                                <Button
+                                    size="sm"
+                                    className="gap-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    onClick={handleAggregateMatch}
+                                    disabled={reconcileAggregate.isPending}
+                                >
+                                    {reconcileAggregate.isPending ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <Zap className="w-4 h-4" />
+                                    )}
+                                    Conciliar FIFO
+                                </Button>
+                            )}
+
+                            {isMissingTransaction && !hasAggregateSelection && (
                                 <Button
                                     size="sm"
                                     variant="outline"
@@ -821,6 +931,81 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                             onClick={handleBankModalConfirm}
                         >
                             {reconcilePartial.isPending ? 'Conciliando...' : 'Vincular e Conciliar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Aggregate FIFO Confirmation Modal */}
+            <Dialog open={showAggregateModal} onOpenChange={setShowAggregateModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Zap className="w-5 h-5 text-primary" />
+                            Conciliar Lote da Seguradora
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        {(() => {
+                            const selectedStmt = statementItems.find(i => i.id === selectedStatementIds[0]);
+                            const selectedAgg = insuranceAggregates.find(a => a.insurance_company_id === selectedAggregateId);
+                            return (
+                                <>
+                                    <p className="text-sm text-muted-foreground">
+                                        O valor de{' '}
+                                        <span className="font-bold text-foreground">
+                                            {formatCurrency(Math.abs(selectedStmt?.amount ?? 0))}
+                                        </span>{' '}
+                                        deste extrato será usado para dar baixa nas comissões mais antigas pendentes da empresa{' '}
+                                        <span className="font-bold text-foreground">
+                                            {selectedAgg?.company_name ?? ''}
+                                        </span>
+                                        , automaticamente (Método FIFO).
+                                    </p>
+
+                                    {/* Preview */}
+                                    <div className="space-y-2">
+                                        <div className="p-3 bg-muted/50 rounded-lg border border-border/50">
+                                            <p className="text-xs text-muted-foreground mb-1">Extrato (Depósito)</p>
+                                            <div className="flex justify-between">
+                                                <p className="text-sm font-medium truncate">{selectedStmt?.description}</p>
+                                                <p className="text-sm font-bold text-emerald-400 shrink-0 ml-2">
+                                                    {formatCurrency(Math.abs(selectedStmt?.amount ?? 0))}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="p-3 bg-muted/50 rounded-lg border border-border/50">
+                                            <p className="text-xs text-muted-foreground mb-1">Seguradora (Pendente)</p>
+                                            <div className="flex justify-between">
+                                                <p className="text-sm font-medium">{selectedAgg?.company_name}</p>
+                                                <p className="text-sm font-bold text-foreground shrink-0 ml-2">
+                                                    {formatCurrency(selectedAgg?.total_amount_pending ?? 0)}
+                                                </p>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                {selectedAgg?.transaction_count} comissões pendentes
+                                            </p>
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setShowAggregateModal(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleAggregateConfirm}
+                            disabled={reconcileAggregate.isPending}
+                            className="gap-2"
+                        >
+                            {reconcileAggregate.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Zap className="w-4 h-4" />
+                            )}
+                            Confirmar FIFO
                         </Button>
                     </DialogFooter>
                 </DialogContent>
