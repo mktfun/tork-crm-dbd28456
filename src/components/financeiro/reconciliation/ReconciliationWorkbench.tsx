@@ -450,16 +450,20 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
 
     // Aggregate FIFO handler
     const handleAggregateMatch = () => {
-        if (selectedStatementIds.length !== 1 || !selectedAggregateId) return;
+        if (selectedStatementIds.length < 1 || !selectedAggregateId) return;
         setShowAggregateModal(true);
     };
 
     const handleAggregateConfirm = async () => {
-        if (selectedStatementIds.length !== 1 || !selectedAggregateId) return;
-        await reconcileAggregate.mutateAsync({
-            statementEntryId: selectedStatementIds[0],
-            insuranceCompanyId: selectedAggregateId,
-        });
+        if (selectedStatementIds.length < 1 || !selectedAggregateId) return;
+        for (const stmtId of selectedStatementIds) {
+            try {
+                await reconcileAggregate.mutateAsync({
+                    statementEntryId: stmtId,
+                    insuranceCompanyId: selectedAggregateId,
+                });
+            } catch { /* skip if already reconciled */ }
+        }
         setShowAggregateModal(false);
         setSelectedStatementIds([]);
         setSelectedAggregateId(null);
@@ -472,7 +476,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     }, []);
 
     const hasAggregateSelection = !!selectedAggregateId;
-    const canAggregateMatch = selectedStatementIds.length === 1 && hasAggregateSelection;
+    const canAggregateMatch = selectedStatementIds.length >= 1 && hasAggregateSelection;
 
     // Balance bar totals (when nothing selected, show totals)
     const bankTotal = useMemo(() => statementItems.reduce((s, i) => s + i.amount, 0), [statementItems]);
@@ -765,14 +769,14 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                             {canAggregateMatch && (
                                 <Button
                                     size="sm"
-                                    className="gap-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    className="gap-2 font-semibold bg-amber-600 hover:bg-amber-700 text-white"
                                     onClick={handleAggregateMatch}
                                     disabled={reconcileAggregate.isPending}
                                 >
                                     {reconcileAggregate.isPending ? (
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                     ) : (
-                                        <Zap className="w-4 h-4" />
+                                        <AlertTriangle className="w-4 h-4" />
                                     )}
                                     Conciliar FIFO
                                 </Button>
@@ -947,16 +951,17 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         {(() => {
-                            const selectedStmt = statementItems.find(i => i.id === selectedStatementIds[0]);
+                            const selectedStmts = statementItems.filter(i => selectedStatementIds.includes(i.id));
+                            const totalStmtAmount = selectedStmts.reduce((s, i) => s + Math.abs(i.amount), 0);
                             const selectedAgg = insuranceAggregates.find(a => a.insurance_company_id === selectedAggregateId);
                             return (
                                 <>
                                     <p className="text-sm text-muted-foreground">
-                                        O valor de{' '}
+                                        O valor total de{' '}
                                         <span className="font-bold text-foreground">
-                                            {formatCurrency(Math.abs(selectedStmt?.amount ?? 0))}
+                                            {formatCurrency(totalStmtAmount)}
                                         </span>{' '}
-                                        deste extrato será usado para dar baixa nas comissões mais antigas pendentes da empresa{' '}
+                                        ({selectedStmts.length} extrato{selectedStmts.length > 1 ? 's' : ''}) será usado para dar baixa nas comissões mais antigas pendentes da empresa{' '}
                                         <span className="font-bold text-foreground">
                                             {selectedAgg?.company_name ?? ''}
                                         </span>
@@ -965,14 +970,16 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
 
                                     {/* Preview */}
                                     <div className="space-y-2">
-                                        <div className="p-3 bg-muted/50 rounded-lg border border-border/50">
-                                            <p className="text-xs text-muted-foreground mb-1">Extrato (Depósito)</p>
-                                            <div className="flex justify-between">
-                                                <p className="text-sm font-medium truncate">{selectedStmt?.description}</p>
-                                                <p className="text-sm font-bold text-emerald-400 shrink-0 ml-2">
-                                                    {formatCurrency(Math.abs(selectedStmt?.amount ?? 0))}
-                                                </p>
-                                            </div>
+                                        <div className="p-3 bg-muted/50 rounded-lg border border-border/50 max-h-40 overflow-auto space-y-1.5">
+                                            <p className="text-xs text-muted-foreground mb-1">Extrato ({selectedStmts.length} depósito{selectedStmts.length > 1 ? 's' : ''})</p>
+                                            {selectedStmts.map(stmt => (
+                                                <div key={stmt.id} className="flex justify-between">
+                                                    <p className="text-sm font-medium truncate">{stmt.description}</p>
+                                                    <p className="text-sm font-bold text-emerald-400 shrink-0 ml-2">
+                                                        {formatCurrency(Math.abs(stmt.amount))}
+                                                    </p>
+                                                </div>
+                                            ))}
                                         </div>
                                         <div className="p-3 bg-muted/50 rounded-lg border border-border/50">
                                             <p className="text-xs text-muted-foreground mb-1">Seguradora (Pendente)</p>
