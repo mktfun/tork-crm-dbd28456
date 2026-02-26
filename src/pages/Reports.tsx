@@ -31,13 +31,6 @@ import { formatCurrency } from '@/utils/formatCurrency';
 import { BranchDistributionChart } from '@/components/dashboard/charts/BranchDistributionChart';
 import { CompanyDistributionChart } from '@/components/dashboard/charts/CompanyDistributionChart';
 import { ExportManagementModal } from '@/components/reports/ExportManagementModal';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
 
 interface FiltrosGlobais {
   intervalo: DateRange | undefined;
