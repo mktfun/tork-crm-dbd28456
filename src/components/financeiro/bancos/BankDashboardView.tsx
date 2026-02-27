@@ -231,6 +231,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                         <p className="text-2xl md:text-3xl font-bold text-emerald-500">
                             {formatCurrency(clientTotalIncome)}
                         </p>
+                        <span className="text-xs text-muted-foreground mt-1">(base: transações conciliadas)</span>
                     </div>
 
                     <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
@@ -241,6 +242,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                         <p className="text-2xl md:text-3xl font-bold text-red-500">
                             {formatCurrency(clientTotalExpense)}
                         </p>
+                        <span className="text-xs text-muted-foreground mt-1">(base: transações conciliadas)</span>
                     </div>
 
                     <div className="glass-component p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer border-border bg-card hover:bg-secondary/70">
