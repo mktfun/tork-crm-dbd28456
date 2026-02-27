@@ -4166,7 +4166,7 @@ export type Database = {
       }
       import_bank_statement_batch: {
         Args: {
-          p_bank_account_id?: string
+          p_bank_account_id: string
           p_entries: Json
           p_file_name: string
           p_total_amount: number
