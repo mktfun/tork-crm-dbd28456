@@ -1,114 +1,74 @@
 
-Objetivo: eliminar a divergência entre KPIs, gráfico e análise por dimensão no Financeiro (receitas e despesas), deixando todos os blocos com a mesma regra de cálculo e evitando novos lançamentos inconsistentes.
+# Auditoria dos KPIs da Tela de Conciliacao
 
-Diagnóstico confirmado (com evidência real do seu usuário):
-- KPI principal (get_financial_summary): receita 96.596,89 / despesa 157.857,82
-- Gráfico (get_cash_flow_data): receita 251.992,85 / despesa 0
-- Análise por dimensão (get_revenue_by_dimension): 120.180,32
-- Transações (aba): recebido no período ~35k / pago no período 22.781,72
-- Isso comprova que hoje cada card usa fonte/regra diferente e alguns blocos estão limitados por paginação (50/100) ou por critério distinto (is_confirmed vs reconciled), além de haver lançamentos de despesa contabilizados em conta de receita no ledger.
+## Discrepancias Identificadas (com evidencia SQL)
 
-Causas-raiz (prioridade):
-1) Critério inconsistente entre blocos
-- KPI principal usa financial_transactions.total_amount + reconciled=true.
-- Gráfico usa financial_ledger + tipo da conta contábil (fa.type), não o ft.type.
-- Dimensão usa is_confirmed=true e não reconciled=true.
-- Resultado: números naturalmente divergentes.
+### BUG 1 (CRITICO): Contagem "Registros Encontrados" vs "Progresso" Divergentes
 
-2) “Despesa zerada no gráfico” por classificação contábil incorreta em parte dos lançamentos
-- Há despesas reconciliadas sem linha de ledger em conta expense (foram para revenue/asset).
-- Como o gráfico lê fa.type no ledger, despesa vira receita no chart.
+**Evidencia no screenshot**: O header da lista mostra **488 registros encontrados** mas o card de Progresso mostra **298 de 388 conciliados**. Sao duas fontes diferentes:
+- "488 registros" vem da RPC `get_bank_statement_paginated` (campo `total_count` via `COUNT(*) OVER()`)
+- "388 total / 298 conciliados" vem da RPC `get_reconciliation_kpis` (campo `total_count`)
 
-3) KPIs da aba Transações usando listas truncadas/limitadas
-- Receitas usam get_revenue_transactions com LIMIT 100.
-- Despesas usam get_recent_financial_transactions default LIMIT 50.
-- “Pago/Recebido no período” acaba calculado sobre subconjunto, não sobre o universo do período.
+Ambas as RPCs usam os mesmos filtros base (user_id, banco, datas, is_void). Porem a lista aplica `p_status` e `p_type` como filtros adicionais (mesmo quando "todas/todos" deveria ser identico). A divergencia de 100 itens (488 vs 388) indica que uma das RPCs tem um filtro extra ou diferente.
 
-4) Falha de guarda no fluxo “Criar do extrato”
-- Modal permite escolher qualquer categoria (inclusive tipo incompatível com sinal da entrada), abrindo brecha para lançar despesa com conta de receita.
+**Causa provavel**: A RPC paginada faz LEFT JOIN com `bank_statement_entries` e `profiles` que pode gerar duplicatas via `string_agg` no ledger. Ou a KPI RPC nao filtra por `status IN ('confirmed','completed')` enquanto a lista nao filtra por isso tambem -- porem alguma diferenca sutil no WHERE causa a divergencia.
 
-Plano de correção (sequência segura):
-Fase 1 — Unificar regra de negócio (fonte única)
-1. Definir e aplicar regra única para “realizado” no módulo:
-- Realizado = reconciled = true
-- Período = transaction_date no intervalo selecionado
-- Pendente = reconciled = false com due_date (fallback transaction_date) no intervalo
-2. Aplicar essa regra em:
-- get_financial_summary (já está próximo, manter como referência principal)
-- get_cash_flow_data (migrar cálculo para financial_transactions.type + total_amount; parar de depender de fa.type para classificar receita/despesa)
-- get_revenue_by_dimension (trocar is_confirmed=true por reconciled=true para ficar alinhado ao dashboard de caixa realizado)
+**Correcao**: Unificar: a KPI RPC deve usar EXATAMENTE a mesma CTE/WHERE da lista paginada (sem os filtros de status/type). Alternativamente, adicionar um campo `kpi_total_count` na propria RPC paginada para garantir fonte unica.
 
-Fase 2 — Corrigir UI para não usar subconjunto paginado em KPI
-3. Em TransacoesTab:
-- “Recebido no Período” = summary.current.totalIncome
-- “Pago no Período” = summary.current.totalExpense
-- “Previsão a Receber” = summary.current.pendingIncome
-- “Previsão a Pagar” = summary.current.pendingExpense
-- Manter tabela com paginação para listagem, mas não para KPI.
-4. Manter gráfico de receitas/despesas com useCashFlowData após ajuste da RPC (Fase 1), garantindo coerência com KPI principal.
+---
 
-Fase 3 — Fechar brecha de criação inconsistente
-5. No Workbench (Criar Despesa/Receita a partir do extrato):
-- Filtrar categorias por sinal da entrada selecionada:
-  - valor > 0 -> apenas contas revenue
-  - valor < 0 -> apenas contas expense
-- Se seleção em massa tiver sinais mistos: bloquear criação em lote e orientar separar seleção.
-6. No backend (RPC create_transaction_from_statement):
-- Validar tipo da conta de categoria escolhida vs sinal da entrada.
-- Rejeitar operação incompatível com erro claro.
-- Isso impede regressão mesmo que frontend falhe.
+### BUG 2 (ALTO): Periodo Anterior Removido -- Trends Sempre Nulos
 
-Fase 4 — Tratamento de legado inconsistente já gravado
-7. Entregar SQL de diagnóstico (auditoria) para medir anomalias por usuário:
-- despesas sem ledger expense
-- receitas sem ledger revenue
-8. Aplicar correção de apresentação imediata via RPCs da Fase 1 (sem mutação arriscada no ledger).
-9. Opcional controlado: preparar script de reparo contábil legado (somente após snapshot/backup), com execução por lote e validação transação a transação.
+**Diagnostico**: A versao mais recente de `get_reconciliation_kpis` (migration `20260219141008`) removeu completamente o calculo do periodo anterior. O JSON retornado so tem `current`, sem `previous`. No frontend (linhas 293-300), `calcTrend` sempre retorna `null` porque `previousKpis` esta vazio.
 
-Arquivos e áreas a alterar:
-- supabase/migrations/*
-  - redefine get_cash_flow_data
-  - redefine get_revenue_by_dimension
-  - reforça validação em create_transaction_from_statement
-- src/components/financeiro/TransacoesTab.tsx
-  - KPIs passam a usar useFinancialSummary
-- src/features/finance/components/reconciliation/ReconciliationWorkbench.tsx
-  - filtro de categorias por sinal + bloqueio de lote misto
-- (se necessário) src/hooks/useFinanceiro.ts
-  - ajuste de hooks/chaves para refletir semântica reconciled no breakdown
+**Impacto**: Os badges de tendencia ("+X% vs periodo anterior") nunca aparecem. A comparacao temporal esta desabilitada silenciosamente.
 
-Validação objetiva pós-correção (obrigatória):
-Validador SQL 1 (coerência KPI x gráfico)
-- Para o mesmo usuário e período:
-  - summary.totalIncome == soma(chart.income)
-  - summary.totalExpense == soma(chart.expense)
-- Tolerância máxima: diferença <= R$ 0,01
+**Correcao**: Restaurar o bloco de periodo anterior na RPC, calculando `v_prev_start` e `v_prev_end` da mesma forma que `get_financial_summary` faz (subtraindo a duracao do periodo).
 
-Validador SQL 2 (coerência dimensão)
-- Soma dos itens de get_revenue_by_dimension == summary.totalIncome (mesmo período/regra reconciled)
+---
 
-Validador SQL 3 (sanidade de lançamentos)
-- Contagem de “expense sem ledger expense” deve parar de crescer após bloqueio.
-- Novos lançamentos criados do extrato não podem violar tipo vs sinal.
+### BUG 3 (MEDIO): Modo Consolidado Infla KPIs com Transacoes Sem Banco
 
-Teste funcional ponta a ponta (UI):
-1) Receitas:
-- comparar KPI principal, card “Recebido no Período”, total do gráfico e topo da dimensão no mesmo intervalo.
-2) Despesas:
-- comparar KPI principal, “Pago no Período”, total do gráfico.
-3) Criar do extrato:
-- tentar selecionar categoria incompatível (deve bloquear).
-4) Repetir com período Jan-Fev e com filtro diferente para confirmar estabilidade.
+**Evidencia SQL**: Existem **170 transacoes sem bank_account_id** no periodo Dec-Feb, sendo 105 delas marcadas como `reconciled = true`. Quando filtrado para "Consolidado (Todos)", tanto a KPI quanto a lista incluem essas 170 transacoes.
 
-Riscos e mitigação:
-- Risco: mudança em RPC afetar telas antigas.
-- Mitigação: manter assinatura das funções, só ajustar lógica interna; validar com queries comparativas antes/depois.
-- Risco: legado contábil distorcer DRE histórico.
-- Mitigação: corrigir primeiro a camada de leitura para coerência operacional; reparo histórico fica em fase controlada.
+```text
+Scope               | Total | Reconciled | Pending
+all_transactions     |  497  |    432     |   65
+with_bank_only       |  327  |    327     |    0
+```
 
-Critério de aceite final:
-- Todos os blocos principais do Financeiro exibem o mesmo universo de dados no período (sem “95k aqui, 35k ali, 120k acolá”).
-- Despesas deixam de aparecer zeradas no gráfico quando houver despesa reconciliada.
-- Não é mais possível criar lançamento do extrato com categoria incompatível ao sinal.
+Todos os 65 pendentes sao transacoes SEM banco! Elas aparecem como "aguardando conciliacao" mas nao podem ser conciliadas porque nao estao vinculadas a nenhum banco. O progresso (77%) e artificialmente baixo.
 
-Após aprovação, executo exatamente nessa ordem (DB first -> UI -> validadores SQL -> teste E2E guiado).
+**Correcao**: No modo consolidado, filtrar apenas transacoes COM `bank_account_id IS NOT NULL` na RPC de KPIs e na lista paginada. Alternativamente, separar os KPIs em "Com banco" vs "Sem banco" para dar visibilidade sem distorcer o progresso.
+
+---
+
+### BUG 4 (MEDIO): Type Variants Inconsistentes Entre RPCs
+
+**Diagnostico**: A RPC `get_reconciliation_kpis` verifica `type = 'revenue'` e `type = 'expense'` (exato). Mas `get_financial_summary` e `get_bank_statement_paginated` verificam `type IN ('revenue', 'income', 'Entrada')` e `type IN ('expense', 'despesa', 'Saida')`.
+
+**Status atual**: Nao ha dados com tipos legados (validado por query). Mas e uma brecha: se qualquer fluxo criar transacao com tipo diferente, a KPI de conciliacao vai ignorar.
+
+**Correcao**: Alinhar o `get_reconciliation_kpis` para usar os mesmos IN-lists de tipo que as demais RPCs.
+
+---
+
+## Plano de Execucao
+
+### Passo 1: Reescrever `get_reconciliation_kpis` (Migration SQL)
+- Adicionar filtro `bank_account_id IS NOT NULL` quando em modo consolidado
+- Restaurar calculo de periodo anterior (previous period)
+- Alinhar type checks para `IN ('revenue', 'income', 'Entrada')` / `IN ('expense', 'despesa', 'Saida')`
+- Manter assinatura identica (4 params)
+
+### Passo 2: Alinhar "registros encontrados" com KPI total
+- No `ReconciliationPage.tsx`, substituir `{totalCount} registros encontrados` por `{kpis.totalCount} registros encontrados` para usar a mesma fonte dos KPI cards
+- Ou melhor: manter `totalCount` da lista paginada para refletir filtros ativos (status/tipo), e exibir separadamente "X de Y" nos KPIs
+
+### Passo 3: Corrigir lista paginada para modo consolidado
+- Na RPC `get_bank_statement_paginated`, quando `v_bank_uuid IS NULL`, adicionar `AND t.bank_account_id IS NOT NULL` para excluir transacoes sem banco da tela de conciliacao bancaria
+
+### Passo 4: Validacao cruzada pos-correcao
+- Query SQL comparando `total_count` do KPI vs `COUNT(*)` da lista com mesmos filtros
+- Verificar que `reconciled_count + pending_count + ignored_count = total_count`
+- Confirmar que progresso 100% quando todos os itens com banco estao conciliados
