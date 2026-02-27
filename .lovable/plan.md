@@ -1,113 +1,126 @@
 
-# Plano de Correcao Sequenciado com Validacao SQL (4 Issues)
 
-## Evidencias Coletadas da Auditoria
+# Auditoria Completa do Modulo Financeiro - Bugs e Brechas
 
-### Issue 1: Saldo -64k mas 246k receita e 0 despesa
+## Achados Criticos
 
-**Prova SQL executada:**
-```text
--- financial_transactions.type (usado pelo trigger de saldo - CORRETO)
-type=expense: 134 transacoes, total=R$155.395,96
-type=revenue: 187 transacoes, total=R$ 90.786,83
-Saldo = 90.786 - 155.395 = -64.609 (BATE com current_balance)
+### BUG 1: Cache Key Mismatch - Saldo Bancario Nunca Atualiza Apos Conciliacao (CRITICO)
 
--- get_bank_transactions RPC (usado pela UI - ERRADO)
-account_type retornado: SEMPRE "revenue" para todas 321 transacoes
-```
+**Diagnostico**: O hook `useBankAccounts()` registra dados com a queryKey `['bank-accounts-summary']`. Porem, TODOS os hooks de conciliacao (`useReconcileManual`, `useReconcileTransactionDirectly`, `useUnreconcileTransaction`, `useBulkReconcile`, `useReconcileAggregate`) invalidam apenas `['bank-accounts']` - que e uma key DIFERENTE.
 
-**Causa raiz**: A RPC `get_bank_transactions` usa `CROSS JOIN LATERAL` com `LIMIT 1` no `financial_ledger` + `financial_accounts`, priorizando contas do tipo `revenue` ou `expense`. Como TODAS as transacoes possuem uma conta `revenue` no ledger (Receita de Comissoes, Outras Receitas), o `LIMIT 1` sempre pega a conta revenue. A RPC ignora completamente o campo `financial_transactions.type` que e a fonte verdadeira.
+**Impacto**: Apos qualquer conciliacao, estorno ou operacao FIFO, os cards de saldo bancario na tela de Bancos nao atualizam. O usuario precisa recarregar a pagina manualmente.
 
-**Correcao**: Alterar a RPC `get_bank_transactions` (versao de 4 params usada pelo dashboard) para usar `ft.type` como classificador em vez do LATERAL join. O campo `ft.type` ja esta correto e e o mesmo usado pelo trigger de saldo.
+**Arquivos afetados**:
+- `src/features/finance/api/useReconciliation.ts` (linhas 488, 526, 829)
+- `src/features/finance/api/useReconcileAggregate.ts` (linha 40)
 
-### Issue 2: KPIs divergentes (Conciliacao vs Dashboard de banco)
-
-**Prova SQL:**
-```text
--- bank_statement_entries para Bradesco (datas 2026-01-02 a 2026-02-25):
-194 entradas de extrato
-
--- financial_transactions para Bradesco reconciliadas:
-321 transacoes (134 expense + 187 revenue)
-```
-
-**Causa raiz**: Sao DUAS fontes de dados completamente diferentes:
-- KPIs de Conciliacao = `bank_statement_entries` (194 linhas, classificadas por sinal do `amount`)
-- Dashboard do Banco = `financial_transactions` via RPC (321 linhas, classificadas erroneamente como tudo revenue)
-
-A divergencia e esperada pois os universos sao diferentes. O problema REAL e que o dashboard de banco esta classificando errado (Issue 1). Corrigindo o Issue 1, os numeros do dashboard ficarao coerentes com o saldo.
-
-**Correcao**: Apos corrigir Issue 1, adicionar labels explicativos nos KPIs para distinguir "Movimentacao Bancaria" vs "Extrato Importado".
-
-### Issue 3: Exclusao de banco sem aviso adequado
-
-**Auditoria do codigo atual**: O `DeleteBankAccountDialog.tsx` JA implementa:
-- Contagem de dados vinculados (transactions + statements)
-- Opcao de mover para outro banco via Select
-- Aviso quando e o unico banco
-- Migracao antes da exclusao
-
-**Status**: Este item JA ESTA IMPLEMENTADO CORRETAMENTE no codigo. O dialog mostra contagem, oferece migracao e avisa sobre dados. Nenhuma mudanca necessaria.
-
-### Issue 4: Erro FIFO - ambiguidade de overload
-
-**Prova SQL:**
-```text
--- Duas versoes da RPC no banco:
-1. reconcile_insurance_aggregate_fifo(p_statement_entry_id uuid, p_insurance_company_id uuid)
-2. reconcile_insurance_aggregate_fifo(p_statement_entry_id uuid, p_insurance_company_id uuid, p_target_bank_id uuid DEFAULT NULL)
-```
-
-**Codigo atual do `useReconcileAggregate.ts`** ja envia `p_target_bank_id: null` (verificado no arquivo). PostgREST ainda nao consegue desambiguar porque existem 2 funcoes com nomes identicos e a versao de 2 params aceita os mesmos 2 args.
-
-**Correcao**: Dropar a versao de 2 parametros via migracao SQL, mantendo apenas a de 3 parametros (que tem DEFAULT NULL, entao funciona igual).
+**Correcao**: Adicionar `queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] })` em todos os `onSuccess` dos hooks de conciliacao. Sao 5 hooks afetados.
 
 ---
 
-## Sequencia de Execucao
+### BUG 2: NovaReceitaModal Bypassa Invalidacao de Cache
 
-### Passo 1: Migracao SQL - Dropar overload FIFO (Issue 4)
+**Diagnostico**: O `NovaReceitaModal` chama `registerRevenue()` diretamente do service (linha 100) em vez de usar o hook `useRegisterRevenue()` do React Query. Como consequencia, NENHUM cache e invalidado apos criar uma receita avulsa - nem transacoes, nem saldos, nem fluxo de caixa.
 
-```sql
-DROP FUNCTION IF EXISTS reconcile_insurance_aggregate_fifo(uuid, uuid);
-```
+**Comparacao**: O `NovaDespesaModal` usa corretamente `useCreateFinancialMovement()` (que invalida 5 caches).
 
-**Validacao antes**: `SELECT count(*) FROM pg_proc WHERE proname='reconcile_insurance_aggregate_fifo'` = 2
-**Validacao depois**: mesma query = 1
+**Arquivo afetado**: `src/components/financeiro/NovaReceitaModal.tsx` (linha 100)
 
-### Passo 2: Migracao SQL - Corrigir RPC get_bank_transactions (Issue 1)
-
-Alterar a classificacao de `account_type` no retorno da RPC para usar `ft.type` diretamente em vez do LATERAL join no financial_accounts. A mudanca e cirurgica: trocar `COALESCE(fa.type::TEXT, 'expense') as type` por `COALESCE(ft.type, 'expense') as type` nos dois blocos (totais e paginacao).
-
-**Validacao antes**: Chamar a RPC para Bradesco e verificar que account_type = 'revenue' para todas
-**Validacao depois**: Chamar a RPC e verificar que 134 retornam 'expense' e 187 retornam 'revenue'
-
-### Passo 3: Frontend - Simplificar classifyTransaction (Issue 1)
-
-No `BankDashboardView.tsx`, o `classifyTransaction` pode ser simplificado agora que a RPC retorna o tipo correto. Manter a logica atual (que ja faz fallback pelo sinal do amount) e suficiente -- nao precisa de mudanca se a RPC for corrigida.
-
-### Passo 4: Issue 2 - Labels descritivos
-
-Adicionar subtitulos nos KPIs do `BankDashboardView.tsx`:
-- Card Receitas: subtitulo "(base: transacoes conciliadas)"  
-- Card Despesas: subtitulo "(base: transacoes conciliadas)"
-
-### Passo 5: Nenhuma acao para Issue 3
-
-Ja implementado. Confirmar visualmente que o dialog funciona.
+**Correcao**: Substituir a chamada direta por `useCreateFinancialMovement()` (igual ao NovaDespesaModal), ou envolver a chamada com invalidacao manual de caches.
 
 ---
 
-## Resumo de Arquivos Alterados
+### BUG 3: Teto de 1000 Linhas no Dashboard Bancario
 
-| Arquivo | Mudanca |
-|---------|---------|
-| Migracao SQL | DROP overload FIFO 2-params |
-| Migracao SQL | ALTER RPC `get_bank_transactions` para usar `ft.type` |
-| `src/components/financeiro/bancos/BankDashboardView.tsx` | Adicionar labels descritivos nos KPIs |
+**Diagnostico**: O `BankDashboardView` usa `pageSize = 1000` (linha 41) para buscar todas as transacoes e fazer calculos client-side. Porem o Supabase tem um limite padrao de 1000 linhas por query. Se um banco tiver mais de 1000 transacoes conciliadas, os totais de receita/despesa serao incorretos (truncados silenciosamente).
 
-## O que NAO muda
-- `useReconcileAggregate.ts` (ja envia 3 params corretamente)
-- `DeleteBankAccountDialog.tsx` (ja funciona)
-- `useBancos.ts` (hooks de migracao ja existem)
-- Triggers de saldo (ja usam `ft.type` corretamente)
+**Arquivo afetado**: `src/components/financeiro/bancos/BankDashboardView.tsx` (linha 41)
+
+**Correcao**: Usar os totais (`totalIncome`, `totalExpense`) retornados pela RPC `get_bank_transactions` em vez de calcular client-side. A RPC ja calcula corretamente no SQL sem limitacao de linhas.
+
+---
+
+### BUG 4: Estorno Nao Atualiza Saldo Bancario
+
+**Diagnostico**: Os hooks `useVoidTransaction()` e `useReverseTransaction()` (em `useFinanceiro.ts`) invalidam `['financial-transactions']`, `['cash-flow']`, `['financial-summary']` e `['revenue-transactions']` mas NAO invalidam `['bank-accounts-summary']` nem `['bank-accounts']`. Apos estornar uma transacao, o saldo do banco fica desatualizado na UI.
+
+**Arquivo afetado**: `src/hooks/useFinanceiro.ts` (linhas 134-161)
+
+**Correcao**: Adicionar invalidacao de `['bank-accounts-summary']` e `['bank-transactions']` no `onSuccess` de ambos os hooks.
+
+---
+
+### BUG 5: Erros Silenciosos na Desvinculacao de Banco
+
+**Diagnostico**: No hook `useMigrateAndDeleteBank` (useBancos.ts linhas 316-331), quando o usuario escolhe "Desvincular" (set null), as chamadas de update usam `await` sem verificar os erros retornados. Se qualquer uma falhar, o fluxo continua e deleta o banco mesmo assim, deixando dados orfaos.
+
+```typescript
+// Linhas 318-331 - erros ignorados
+await supabase.from('financial_transactions').update({ bank_account_id: null })...
+await supabase.from('bank_statement_entries').update({ bank_account_id: null })...
+await supabase.from('bank_import_history').update({ bank_account_id: null })...
+```
+
+**Arquivo afetado**: `src/hooks/useBancos.ts` (linhas 316-331)
+
+**Correcao**: Capturar e verificar o `error` de cada operacao, lancar excecao se falhar (igual ao bloco de migracao acima, linhas 297-315).
+
+---
+
+### BUG 6: Invalidacao Incompleta no useCreateFinancialMovement
+
+**Diagnostico**: O hook `useCreateFinancialMovement` invalida `['bank-accounts']` mas nao `['bank-accounts-summary']`. Quando o usuario cria uma despesa com banco atribuido, o saldo no card do banco nao atualiza.
+
+**Arquivo afetado**: `src/hooks/useFinanceiro.ts` (linhas 114-122)
+
+**Correcao**: Adicionar `['bank-accounts-summary']` e `['bank-transactions']` nas invalidacoes.
+
+---
+
+## Achados de Severidade Media
+
+### BRECHA 7: financial_ledger Nao Migrado na Exclusao de Banco
+
+**Diagnostico**: O `useMigrateAndDeleteBank` migra `financial_transactions`, `bank_statement_entries` e `bank_import_history`, mas nao migra entradas do `financial_ledger` que possam referenciar contas contabeis vinculadas. Isso nao causa erro direto (ledger referencia accounts, nao bancos), mas e um ponto de atencao para integridade.
+
+**Status**: Baixo risco - o ledger nao tem coluna `bank_account_id`. Apenas documentar.
+
+### BRECHA 8: useRegisterExpense e useRegisterRevenue Nao Invalidam bank-accounts-summary
+
+**Diagnostico**: Os hooks individuais de receita/despesa (`useRegisterExpense`, `useRegisterRevenue`) invalidam `['bank-accounts']` mas nao `['bank-accounts-summary']` - mesma inconsistencia do Bug 6.
+
+**Arquivo afetado**: `src/hooks/useFinanceiro.ts` (linhas 59-90)
+
+---
+
+## Resumo da Correcao
+
+| # | Bug | Severidade | Arquivo | Tipo |
+|---|-----|-----------|---------|------|
+| 1 | Cache key mismatch conciliacao | CRITICO | useReconciliation.ts, useReconcileAggregate.ts | Frontend |
+| 2 | NovaReceitaModal sem invalidacao | ALTO | NovaReceitaModal.tsx | Frontend |
+| 3 | Teto 1000 linhas dashboard | ALTO | BankDashboardView.tsx | Frontend |
+| 4 | Estorno sem atualizar banco | MEDIO | useFinanceiro.ts | Frontend |
+| 5 | Erros silenciosos desvinculacao | MEDIO | useBancos.ts | Frontend |
+| 6 | CreateMovement invalidacao parcial | MEDIO | useFinanceiro.ts | Frontend |
+
+## Plano de Execucao
+
+### Passo 1: Corrigir cache keys de conciliacao (Bug 1)
+Adicionar `bank-accounts-summary` em 5 hooks dentro de `useReconciliation.ts` e 1 em `useReconcileAggregate.ts`.
+
+### Passo 2: Corrigir NovaReceitaModal (Bug 2)
+Substituir chamada direta a `registerRevenue()` por `useCreateFinancialMovement()` com parametros mapeados, garantindo invalidacao automatica.
+
+### Passo 3: Usar totais da RPC no dashboard (Bug 3)
+No `BankDashboardView.tsx`, usar `transactionsData.totalIncome` e `transactionsData.totalExpense` da RPC em vez de calcular client-side com array potencialmente truncado.
+
+### Passo 4: Adicionar invalidacoes no estorno (Bug 4)
+Em `useVoidTransaction` e `useReverseTransaction`, adicionar `bank-accounts-summary` e `bank-transactions`.
+
+### Passo 5: Tratar erros na desvinculacao (Bug 5)
+Capturar `error` nos 3 updates de desvinculacao e lancar excecao se falhar.
+
+### Passo 6: Completar invalidacoes do useCreateFinancialMovement (Bug 6)
+Adicionar `bank-accounts-summary` e `bank-transactions` nas invalidacoes de `useCreateFinancialMovement`, `useRegisterExpense` e `useRegisterRevenue`.
+
