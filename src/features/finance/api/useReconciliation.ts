@@ -933,9 +933,17 @@ export interface ReconciliationKpis {
     pending_expense: number;
 }
 
+export interface UnlinkedKpis {
+    total_count: number;
+    pending_count: number;
+    reconciled_count: number;
+    total_amount: number;
+}
+
 export interface ReconciliationKpisWithComparison {
     current: ReconciliationKpis;
     previous: ReconciliationKpis;
+    unlinked: UnlinkedKpis;
 }
 
 function parseKpiRow(row: any): ReconciliationKpis {
@@ -956,6 +964,7 @@ function parseKpiRow(row: any): ReconciliationKpis {
 }
 
 const emptyKpis: ReconciliationKpis = { total_count: 0, reconciled_count: 0, pending_count: 0, ignored_count: 0, total_amount: 0, reconciled_amount: 0, pending_amount: 0, reconciled_revenue: 0, reconciled_expense: 0, pending_revenue: 0, pending_expense: 0 };
+const emptyUnlinked: UnlinkedKpis = { total_count: 0, pending_count: 0, reconciled_count: 0, total_amount: 0 };
 
 export function useReconciliationKpis(
     bankAccountId: string | null,
@@ -968,7 +977,7 @@ export function useReconciliationKpis(
     return useQuery({
         queryKey: ['reconciliation-kpis', user?.id, bankAccountId, startDate, endDate, searchTerm],
         queryFn: async (): Promise<ReconciliationKpisWithComparison> => {
-            if (!user) return { current: emptyKpis, previous: emptyKpis };
+            if (!user) return { current: emptyKpis, previous: emptyKpis, unlinked: emptyUnlinked };
 
             const safeBankId = (!bankAccountId || bankAccountId === 'all') ? null : bankAccountId;
 
@@ -1012,6 +1021,12 @@ export function useReconciliationKpis(
                     reconciled_expense: Number(previousData.reconciled_expense) || 0,
                     pending_revenue: Number(previousData.pending_revenue) || 0,
                     pending_expense: Number(previousData.pending_expense) || 0,
+                },
+                unlinked: {
+                    total_count: Number(result.unlinked?.total_count) || 0,
+                    pending_count: Number(result.unlinked?.pending_count) || 0,
+                    reconciled_count: Number(result.unlinked?.reconciled_count) || 0,
+                    total_amount: Number(result.unlinked?.total_amount) || 0,
                 },
             };
         },
