@@ -1,126 +1,114 @@
 
+Objetivo: eliminar a divergência entre KPIs, gráfico e análise por dimensão no Financeiro (receitas e despesas), deixando todos os blocos com a mesma regra de cálculo e evitando novos lançamentos inconsistentes.
 
-# Auditoria Completa do Modulo Financeiro - Bugs e Brechas
+Diagnóstico confirmado (com evidência real do seu usuário):
+- KPI principal (get_financial_summary): receita 96.596,89 / despesa 157.857,82
+- Gráfico (get_cash_flow_data): receita 251.992,85 / despesa 0
+- Análise por dimensão (get_revenue_by_dimension): 120.180,32
+- Transações (aba): recebido no período ~35k / pago no período 22.781,72
+- Isso comprova que hoje cada card usa fonte/regra diferente e alguns blocos estão limitados por paginação (50/100) ou por critério distinto (is_confirmed vs reconciled), além de haver lançamentos de despesa contabilizados em conta de receita no ledger.
 
-## Achados Criticos
+Causas-raiz (prioridade):
+1) Critério inconsistente entre blocos
+- KPI principal usa financial_transactions.total_amount + reconciled=true.
+- Gráfico usa financial_ledger + tipo da conta contábil (fa.type), não o ft.type.
+- Dimensão usa is_confirmed=true e não reconciled=true.
+- Resultado: números naturalmente divergentes.
 
-### BUG 1: Cache Key Mismatch - Saldo Bancario Nunca Atualiza Apos Conciliacao (CRITICO)
+2) “Despesa zerada no gráfico” por classificação contábil incorreta em parte dos lançamentos
+- Há despesas reconciliadas sem linha de ledger em conta expense (foram para revenue/asset).
+- Como o gráfico lê fa.type no ledger, despesa vira receita no chart.
 
-**Diagnostico**: O hook `useBankAccounts()` registra dados com a queryKey `['bank-accounts-summary']`. Porem, TODOS os hooks de conciliacao (`useReconcileManual`, `useReconcileTransactionDirectly`, `useUnreconcileTransaction`, `useBulkReconcile`, `useReconcileAggregate`) invalidam apenas `['bank-accounts']` - que e uma key DIFERENTE.
+3) KPIs da aba Transações usando listas truncadas/limitadas
+- Receitas usam get_revenue_transactions com LIMIT 100.
+- Despesas usam get_recent_financial_transactions default LIMIT 50.
+- “Pago/Recebido no período” acaba calculado sobre subconjunto, não sobre o universo do período.
 
-**Impacto**: Apos qualquer conciliacao, estorno ou operacao FIFO, os cards de saldo bancario na tela de Bancos nao atualizam. O usuario precisa recarregar a pagina manualmente.
+4) Falha de guarda no fluxo “Criar do extrato”
+- Modal permite escolher qualquer categoria (inclusive tipo incompatível com sinal da entrada), abrindo brecha para lançar despesa com conta de receita.
 
-**Arquivos afetados**:
-- `src/features/finance/api/useReconciliation.ts` (linhas 488, 526, 829)
-- `src/features/finance/api/useReconcileAggregate.ts` (linha 40)
+Plano de correção (sequência segura):
+Fase 1 — Unificar regra de negócio (fonte única)
+1. Definir e aplicar regra única para “realizado” no módulo:
+- Realizado = reconciled = true
+- Período = transaction_date no intervalo selecionado
+- Pendente = reconciled = false com due_date (fallback transaction_date) no intervalo
+2. Aplicar essa regra em:
+- get_financial_summary (já está próximo, manter como referência principal)
+- get_cash_flow_data (migrar cálculo para financial_transactions.type + total_amount; parar de depender de fa.type para classificar receita/despesa)
+- get_revenue_by_dimension (trocar is_confirmed=true por reconciled=true para ficar alinhado ao dashboard de caixa realizado)
 
-**Correcao**: Adicionar `queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] })` em todos os `onSuccess` dos hooks de conciliacao. Sao 5 hooks afetados.
+Fase 2 — Corrigir UI para não usar subconjunto paginado em KPI
+3. Em TransacoesTab:
+- “Recebido no Período” = summary.current.totalIncome
+- “Pago no Período” = summary.current.totalExpense
+- “Previsão a Receber” = summary.current.pendingIncome
+- “Previsão a Pagar” = summary.current.pendingExpense
+- Manter tabela com paginação para listagem, mas não para KPI.
+4. Manter gráfico de receitas/despesas com useCashFlowData após ajuste da RPC (Fase 1), garantindo coerência com KPI principal.
 
----
+Fase 3 — Fechar brecha de criação inconsistente
+5. No Workbench (Criar Despesa/Receita a partir do extrato):
+- Filtrar categorias por sinal da entrada selecionada:
+  - valor > 0 -> apenas contas revenue
+  - valor < 0 -> apenas contas expense
+- Se seleção em massa tiver sinais mistos: bloquear criação em lote e orientar separar seleção.
+6. No backend (RPC create_transaction_from_statement):
+- Validar tipo da conta de categoria escolhida vs sinal da entrada.
+- Rejeitar operação incompatível com erro claro.
+- Isso impede regressão mesmo que frontend falhe.
 
-### BUG 2: NovaReceitaModal Bypassa Invalidacao de Cache
+Fase 4 — Tratamento de legado inconsistente já gravado
+7. Entregar SQL de diagnóstico (auditoria) para medir anomalias por usuário:
+- despesas sem ledger expense
+- receitas sem ledger revenue
+8. Aplicar correção de apresentação imediata via RPCs da Fase 1 (sem mutação arriscada no ledger).
+9. Opcional controlado: preparar script de reparo contábil legado (somente após snapshot/backup), com execução por lote e validação transação a transação.
 
-**Diagnostico**: O `NovaReceitaModal` chama `registerRevenue()` diretamente do service (linha 100) em vez de usar o hook `useRegisterRevenue()` do React Query. Como consequencia, NENHUM cache e invalidado apos criar uma receita avulsa - nem transacoes, nem saldos, nem fluxo de caixa.
+Arquivos e áreas a alterar:
+- supabase/migrations/*
+  - redefine get_cash_flow_data
+  - redefine get_revenue_by_dimension
+  - reforça validação em create_transaction_from_statement
+- src/components/financeiro/TransacoesTab.tsx
+  - KPIs passam a usar useFinancialSummary
+- src/features/finance/components/reconciliation/ReconciliationWorkbench.tsx
+  - filtro de categorias por sinal + bloqueio de lote misto
+- (se necessário) src/hooks/useFinanceiro.ts
+  - ajuste de hooks/chaves para refletir semântica reconciled no breakdown
 
-**Comparacao**: O `NovaDespesaModal` usa corretamente `useCreateFinancialMovement()` (que invalida 5 caches).
+Validação objetiva pós-correção (obrigatória):
+Validador SQL 1 (coerência KPI x gráfico)
+- Para o mesmo usuário e período:
+  - summary.totalIncome == soma(chart.income)
+  - summary.totalExpense == soma(chart.expense)
+- Tolerância máxima: diferença <= R$ 0,01
 
-**Arquivo afetado**: `src/components/financeiro/NovaReceitaModal.tsx` (linha 100)
+Validador SQL 2 (coerência dimensão)
+- Soma dos itens de get_revenue_by_dimension == summary.totalIncome (mesmo período/regra reconciled)
 
-**Correcao**: Substituir a chamada direta por `useCreateFinancialMovement()` (igual ao NovaDespesaModal), ou envolver a chamada com invalidacao manual de caches.
+Validador SQL 3 (sanidade de lançamentos)
+- Contagem de “expense sem ledger expense” deve parar de crescer após bloqueio.
+- Novos lançamentos criados do extrato não podem violar tipo vs sinal.
 
----
+Teste funcional ponta a ponta (UI):
+1) Receitas:
+- comparar KPI principal, card “Recebido no Período”, total do gráfico e topo da dimensão no mesmo intervalo.
+2) Despesas:
+- comparar KPI principal, “Pago no Período”, total do gráfico.
+3) Criar do extrato:
+- tentar selecionar categoria incompatível (deve bloquear).
+4) Repetir com período Jan-Fev e com filtro diferente para confirmar estabilidade.
 
-### BUG 3: Teto de 1000 Linhas no Dashboard Bancario
+Riscos e mitigação:
+- Risco: mudança em RPC afetar telas antigas.
+- Mitigação: manter assinatura das funções, só ajustar lógica interna; validar com queries comparativas antes/depois.
+- Risco: legado contábil distorcer DRE histórico.
+- Mitigação: corrigir primeiro a camada de leitura para coerência operacional; reparo histórico fica em fase controlada.
 
-**Diagnostico**: O `BankDashboardView` usa `pageSize = 1000` (linha 41) para buscar todas as transacoes e fazer calculos client-side. Porem o Supabase tem um limite padrao de 1000 linhas por query. Se um banco tiver mais de 1000 transacoes conciliadas, os totais de receita/despesa serao incorretos (truncados silenciosamente).
+Critério de aceite final:
+- Todos os blocos principais do Financeiro exibem o mesmo universo de dados no período (sem “95k aqui, 35k ali, 120k acolá”).
+- Despesas deixam de aparecer zeradas no gráfico quando houver despesa reconciliada.
+- Não é mais possível criar lançamento do extrato com categoria incompatível ao sinal.
 
-**Arquivo afetado**: `src/components/financeiro/bancos/BankDashboardView.tsx` (linha 41)
-
-**Correcao**: Usar os totais (`totalIncome`, `totalExpense`) retornados pela RPC `get_bank_transactions` em vez de calcular client-side. A RPC ja calcula corretamente no SQL sem limitacao de linhas.
-
----
-
-### BUG 4: Estorno Nao Atualiza Saldo Bancario
-
-**Diagnostico**: Os hooks `useVoidTransaction()` e `useReverseTransaction()` (em `useFinanceiro.ts`) invalidam `['financial-transactions']`, `['cash-flow']`, `['financial-summary']` e `['revenue-transactions']` mas NAO invalidam `['bank-accounts-summary']` nem `['bank-accounts']`. Apos estornar uma transacao, o saldo do banco fica desatualizado na UI.
-
-**Arquivo afetado**: `src/hooks/useFinanceiro.ts` (linhas 134-161)
-
-**Correcao**: Adicionar invalidacao de `['bank-accounts-summary']` e `['bank-transactions']` no `onSuccess` de ambos os hooks.
-
----
-
-### BUG 5: Erros Silenciosos na Desvinculacao de Banco
-
-**Diagnostico**: No hook `useMigrateAndDeleteBank` (useBancos.ts linhas 316-331), quando o usuario escolhe "Desvincular" (set null), as chamadas de update usam `await` sem verificar os erros retornados. Se qualquer uma falhar, o fluxo continua e deleta o banco mesmo assim, deixando dados orfaos.
-
-```typescript
-// Linhas 318-331 - erros ignorados
-await supabase.from('financial_transactions').update({ bank_account_id: null })...
-await supabase.from('bank_statement_entries').update({ bank_account_id: null })...
-await supabase.from('bank_import_history').update({ bank_account_id: null })...
-```
-
-**Arquivo afetado**: `src/hooks/useBancos.ts` (linhas 316-331)
-
-**Correcao**: Capturar e verificar o `error` de cada operacao, lancar excecao se falhar (igual ao bloco de migracao acima, linhas 297-315).
-
----
-
-### BUG 6: Invalidacao Incompleta no useCreateFinancialMovement
-
-**Diagnostico**: O hook `useCreateFinancialMovement` invalida `['bank-accounts']` mas nao `['bank-accounts-summary']`. Quando o usuario cria uma despesa com banco atribuido, o saldo no card do banco nao atualiza.
-
-**Arquivo afetado**: `src/hooks/useFinanceiro.ts` (linhas 114-122)
-
-**Correcao**: Adicionar `['bank-accounts-summary']` e `['bank-transactions']` nas invalidacoes.
-
----
-
-## Achados de Severidade Media
-
-### BRECHA 7: financial_ledger Nao Migrado na Exclusao de Banco
-
-**Diagnostico**: O `useMigrateAndDeleteBank` migra `financial_transactions`, `bank_statement_entries` e `bank_import_history`, mas nao migra entradas do `financial_ledger` que possam referenciar contas contabeis vinculadas. Isso nao causa erro direto (ledger referencia accounts, nao bancos), mas e um ponto de atencao para integridade.
-
-**Status**: Baixo risco - o ledger nao tem coluna `bank_account_id`. Apenas documentar.
-
-### BRECHA 8: useRegisterExpense e useRegisterRevenue Nao Invalidam bank-accounts-summary
-
-**Diagnostico**: Os hooks individuais de receita/despesa (`useRegisterExpense`, `useRegisterRevenue`) invalidam `['bank-accounts']` mas nao `['bank-accounts-summary']` - mesma inconsistencia do Bug 6.
-
-**Arquivo afetado**: `src/hooks/useFinanceiro.ts` (linhas 59-90)
-
----
-
-## Resumo da Correcao
-
-| # | Bug | Severidade | Arquivo | Tipo |
-|---|-----|-----------|---------|------|
-| 1 | Cache key mismatch conciliacao | CRITICO | useReconciliation.ts, useReconcileAggregate.ts | Frontend |
-| 2 | NovaReceitaModal sem invalidacao | ALTO | NovaReceitaModal.tsx | Frontend |
-| 3 | Teto 1000 linhas dashboard | ALTO | BankDashboardView.tsx | Frontend |
-| 4 | Estorno sem atualizar banco | MEDIO | useFinanceiro.ts | Frontend |
-| 5 | Erros silenciosos desvinculacao | MEDIO | useBancos.ts | Frontend |
-| 6 | CreateMovement invalidacao parcial | MEDIO | useFinanceiro.ts | Frontend |
-
-## Plano de Execucao
-
-### Passo 1: Corrigir cache keys de conciliacao (Bug 1)
-Adicionar `bank-accounts-summary` em 5 hooks dentro de `useReconciliation.ts` e 1 em `useReconcileAggregate.ts`.
-
-### Passo 2: Corrigir NovaReceitaModal (Bug 2)
-Substituir chamada direta a `registerRevenue()` por `useCreateFinancialMovement()` com parametros mapeados, garantindo invalidacao automatica.
-
-### Passo 3: Usar totais da RPC no dashboard (Bug 3)
-No `BankDashboardView.tsx`, usar `transactionsData.totalIncome` e `transactionsData.totalExpense` da RPC em vez de calcular client-side com array potencialmente truncado.
-
-### Passo 4: Adicionar invalidacoes no estorno (Bug 4)
-Em `useVoidTransaction` e `useReverseTransaction`, adicionar `bank-accounts-summary` e `bank-transactions`.
-
-### Passo 5: Tratar erros na desvinculacao (Bug 5)
-Capturar `error` nos 3 updates de desvinculacao e lancar excecao se falhar.
-
-### Passo 6: Completar invalidacoes do useCreateFinancialMovement (Bug 6)
-Adicionar `bank-accounts-summary` e `bank-transactions` nas invalidacoes de `useCreateFinancialMovement`, `useRegisterExpense` e `useRegisterRevenue`.
-
+Após aprovação, executo exatamente nessa ordem (DB first -> UI -> validadores SQL -> teste E2E guiado).
