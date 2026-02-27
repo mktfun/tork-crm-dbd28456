@@ -3,7 +3,7 @@ import { Building2, FileText, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { cn } from '@/lib/utils';
-import type { InsuranceAggregateItem } from '@/hooks/financeiro/usePendingInsuranceAggregate';
+import type { InsuranceAggregateItem } from '@/features/finance/api/usePendingInsuranceAggregate';
 
 interface InsuranceAggregateCardProps {
   item: InsuranceAggregateItem;

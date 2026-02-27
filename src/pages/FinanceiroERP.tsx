@@ -30,7 +30,7 @@ import { CaixaTab } from '@/components/financeiro/CaixaTab';
 import { TesourariaTab } from '@/components/financeiro/TesourariaTab';
 import { ProvisoesTab } from '@/components/financeiro/ProvisoesTab';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
-import { ReconciliationPage } from '@/components/financeiro/reconciliation';
+import { ReconciliationPage } from '@/features/finance/components/reconciliation';
 import { MetasCard } from '@/components/financeiro/faturamento/MetasCard';
 import { ModuloTesouraria } from '@/components/financeiro/dashboard/ModuloTesouraria';
 import { ModuloMultiBancos } from '@/components/financeiro/dashboard/ModuloMultiBancos';

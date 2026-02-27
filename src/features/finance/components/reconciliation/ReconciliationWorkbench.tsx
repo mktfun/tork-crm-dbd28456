@@ -27,14 +27,14 @@ import {
     useCreateFromStatement,
     type PendingReconciliationItem,
     type MatchSuggestion,
-} from '@/hooks/useReconciliation';
+} from '@/features/finance/api/useReconciliation';
 import { useFinancialAccounts } from '@/hooks/useFinanceiro';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
 import { PartialReconciliationModal } from './PartialReconciliationModal';
-import { usePendingInsuranceAggregate, type InsuranceAggregateItem } from '@/hooks/financeiro/usePendingInsuranceAggregate';
-import { useReconcileAggregate } from '@/hooks/financeiro/useReconcileAggregate';
+import { usePendingInsuranceAggregate, type InsuranceAggregateItem } from '@/features/finance/api/usePendingInsuranceAggregate';
+import { useReconcileAggregate } from '@/features/finance/api/useReconcileAggregate';
 import { InsuranceAggregateCard } from './InsuranceAggregateCard';
 
 interface BankAccountOption {

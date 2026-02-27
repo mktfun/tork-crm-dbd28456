@@ -5,7 +5,7 @@ import { AppCard } from '@/components/ui/app-card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatCurrency } from '@/utils/formatCurrency';
-import { type MatchSuggestion, useApplyMatchSuggestions } from '@/hooks/useReconciliation';
+import { type MatchSuggestion, useApplyMatchSuggestions } from '@/features/finance/api/useReconciliation';
 
 interface MatchSuggestionsProps {
     suggestions: MatchSuggestion[];

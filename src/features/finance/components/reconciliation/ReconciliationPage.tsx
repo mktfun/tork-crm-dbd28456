@@ -75,7 +75,7 @@ import {
     type MatchSuggestion,
     type ImportHistoryItem,
     type BankStatementEntry,
-} from '@/hooks/useReconciliation';
+} from '@/features/finance/api/useReconciliation';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { StatementImporter } from './StatementImporter';
 import { ReconciliationWorkbench } from './ReconciliationWorkbench';

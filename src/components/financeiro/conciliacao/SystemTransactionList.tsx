@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { PendingReconciliationItem } from "@/hooks/useReconciliation";
+import { PendingReconciliationItem } from "@/features/finance/api/useReconciliation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Database, Unlink } from "lucide-react";
