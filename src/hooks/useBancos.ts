@@ -314,21 +314,24 @@ export function useMigrateAndDeleteBank() {
           .eq('bank_account_id', fromBankId);
         if (hiErr) throw hiErr;
       } else {
-        // Desvincular (set null)
-        await supabase
+        // Desvincular (set null) - com verificação de erros
+        const { error: txErr } = await supabase
           .from('financial_transactions' as any)
           .update({ bank_account_id: null })
           .eq('bank_account_id', fromBankId);
+        if (txErr) throw txErr;
 
-        await supabase
+        const { error: stErr } = await supabase
           .from('bank_statement_entries' as any)
           .update({ bank_account_id: null })
           .eq('bank_account_id', fromBankId);
+        if (stErr) throw stErr;
 
-        await supabase
+        const { error: hiErr } = await supabase
           .from('bank_import_history' as any)
           .update({ bank_account_id: null })
           .eq('bank_account_id', fromBankId);
+        if (hiErr) throw hiErr;
       }
 
       // Deletar o banco

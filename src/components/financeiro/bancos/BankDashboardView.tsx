@@ -72,12 +72,12 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
         return t.amount >= 0 ? 'income' : 'expense';
     };
 
-    // Calcular totais com base nos filtrados
-    const clientTotalIncome = validTransactions
+    // Usar totais da RPC (server-side, sem limite de 1000 linhas) quando disponíveis
+    const clientTotalIncome = transactionsData?.totalIncome ?? validTransactions
         .filter(t => classifyTransaction(t) === 'income')
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
-    const clientTotalExpense = validTransactions
+    const clientTotalExpense = transactionsData?.totalExpense ?? validTransactions
         .filter(t => classifyTransaction(t) === 'expense')
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 

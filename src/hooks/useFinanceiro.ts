@@ -67,6 +67,8 @@ export function useRegisterExpense() {
       queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
       queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
     }
   });
 }
@@ -85,6 +87,8 @@ export function useRegisterRevenue() {
       queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
       queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
     }
   });
 }
@@ -117,6 +121,8 @@ export function useCreateFinancialMovement() {
       queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
       queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['revenue-transactions'] });
     }
   });
@@ -137,6 +143,8 @@ export function useVoidTransaction() {
       queryClient.invalidateQueries({ queryKey: ['cash-flow'] });
       queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
       queryClient.invalidateQueries({ queryKey: ['revenue-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
     }
   });
 }
@@ -157,6 +165,8 @@ export function useReverseTransaction() {
       queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
       queryClient.invalidateQueries({ queryKey: ['revenue-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['transaction-details'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
     }
   });
 }
