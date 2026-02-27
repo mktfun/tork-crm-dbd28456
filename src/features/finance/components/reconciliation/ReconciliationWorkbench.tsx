@@ -859,24 +859,46 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                             );
                         })()}
 
-                        {/* Category selector */}
-                        <div>
-                            <label className="text-sm font-medium text-foreground mb-1.5 block">
-                                Categoria (obrigatório)
-                            </label>
-                            <Select value={createCategoryId} onValueChange={setCreateCategoryId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecione a categoria..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {(accounts || []).map((acc: any) => (
-                                        <SelectItem key={acc.id} value={acc.id}>
-                                            {acc.code ? `${acc.code} - ` : ''}{acc.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        {/* Category selector - filtered by sign */}
+                        {(() => {
+                            const selectedEntries = statementItems.filter(i => selectedStatementIds.includes(i.id));
+                            const hasPositive = selectedEntries.some(e => e.amount >= 0);
+                            const hasNegative = selectedEntries.some(e => e.amount < 0);
+                            const hasMixedSigns = hasPositive && hasNegative;
+
+                            if (hasMixedSigns) {
+                                return (
+                                    <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+                                        <AlertTriangle className="w-4 h-4 inline mr-1.5" />
+                                        Seleção contém entradas positivas e negativas. Separe em lotes do mesmo sinal para criar lançamentos.
+                                    </div>
+                                );
+                            }
+
+                            // Filter accounts by sign: positive → revenue, negative → expense
+                            const allowedTypes = hasPositive ? ['revenue'] : ['expense'];
+                            const filteredAccounts = (accounts || []).filter((acc: any) => allowedTypes.includes(acc.type));
+
+                            return (
+                                <div>
+                                    <label className="text-sm font-medium text-foreground mb-1.5 block">
+                                        Categoria ({hasPositive ? 'Receita' : 'Despesa'})
+                                    </label>
+                                    <Select value={createCategoryId} onValueChange={setCreateCategoryId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Selecione a categoria..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {filteredAccounts.map((acc: any) => (
+                                                <SelectItem key={acc.id} value={acc.id}>
+                                                    {acc.code ? `${acc.code} - ` : ''}{acc.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            );
+                        })()}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowCreateModal(false)}>
@@ -884,7 +906,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                         </Button>
                         <Button
                             onClick={handleCreateTransaction}
-                            disabled={!createCategoryId || createFromStatement.isPending || !!bulkProgress}
+                            disabled={!createCategoryId || createFromStatement.isPending || !!bulkProgress || (() => { const sel = statementItems.filter(i => selectedStatementIds.includes(i.id)); return sel.some(e => e.amount >= 0) && sel.some(e => e.amount < 0); })()}
                             className="gap-2"
                         >
                             {bulkProgress ? (

@@ -113,20 +113,17 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
 
     const kpis = useMemo(() => {
         if (transactionType === 'receitas') {
-            const confirmadas = periodRevenue.filter(tx => tx.reconciled);
             return {
-                efetivado: confirmadas.reduce((sum, tx) => sum + (tx.amount || 0), 0),
+                efetivado: summary?.current?.totalIncome ?? 0,
                 pendente: summary?.current?.pendingIncome ?? 0
             };
         } else {
-            const efetivadas = allExpenses.filter(tx => tx.reconciled);
-            const pendentes = allExpenses.filter(tx => !tx.reconciled);
             return {
-                efetivado: efetivadas.reduce((sum, tx) => sum + Math.abs(tx.total_amount || 0), 0),
-                pendente: pendentes.reduce((sum, tx) => sum + Math.abs(tx.total_amount || 0), 0)
+                efetivado: summary?.current?.totalExpense ?? 0,
+                pendente: summary?.current?.pendingExpense ?? 0
             };
         }
-    }, [transactionType, periodRevenue, allExpenses, summary]);
+    }, [transactionType, summary]);
 
     // ========== COMPUTED ==========
 
