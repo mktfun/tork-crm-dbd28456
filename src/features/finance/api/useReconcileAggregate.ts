@@ -38,6 +38,8 @@ export function useReconcileAggregate() {
       queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-financial-kpis'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
 
       toast.success('Conciliação FIFO realizada com sucesso!');
     },

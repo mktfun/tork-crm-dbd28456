@@ -28,12 +28,11 @@ import {
 } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
-import { useFinancialAccountsWithDefaults } from '@/hooks/useFinanceiro';
+import { useFinancialAccountsWithDefaults, useRegisterRevenue } from '@/hooks/useFinanceiro';
 import { useBankAccounts } from '@/hooks/useBancos';
 import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
 import { useSupabaseCompanies } from '@/hooks/useSupabaseCompanies';
 import { useSupabaseProducers } from '@/hooks/useSupabaseProducers';
-import { registerRevenue } from '@/services/financialService';
 
 const revenueSchema = z.object({
   description: z.string().min(3, 'Descrição deve ter pelo menos 3 caracteres'),
@@ -60,6 +59,7 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: accounts = [], isLoading: loadingAccounts } = useFinancialAccountsWithDefaults();
   const { data: bankSummary } = useBankAccounts();
+  const registerRevenueMutation = useRegisterRevenue();
   const { data: ramos = [] } = useSupabaseRamos();
   const { companies = [] } = useSupabaseCompanies();
   const { producers = [] } = useSupabaseProducers();
@@ -97,12 +97,12 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
         throw new Error('Conta de ativo padrão não encontrada');
       }
 
-      await registerRevenue({
+      await registerRevenueMutation.mutateAsync({
         description: data.description,
         amount: data.amount,
         transactionDate: data.transactionDate,
         revenueAccountId: data.revenueAccountId,
-        assetAccountId: defaultAssetAccount.id, // Usa conta padrão para ledger
+        assetAccountId: defaultAssetAccount.id,
         bankAccountId: data.bankAccountId && data.bankAccountId !== 'none' ? data.bankAccountId : undefined,
         referenceNumber: data.referenceNumber,
         memo: data.memo,

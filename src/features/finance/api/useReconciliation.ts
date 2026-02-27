@@ -456,6 +456,8 @@ export function useReconcileManual() {
             queryClient.invalidateQueries({ queryKey: ['match-suggestions'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
             toast.success('Transações conciliadas com sucesso!');
         },
         onError: (error: Error) => {
@@ -495,6 +497,8 @@ export function useReconcileTransactionDirectly() {
             queryClient.invalidateQueries({ queryKey: ['account-balances'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-detailed'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
 
             toast.success('Transação conciliada e saldo bancário atualizado!');
         },
@@ -533,6 +537,8 @@ export function useUnreconcileTransaction() {
             queryClient.invalidateQueries({ queryKey: ['account-balances'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-detailed'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
 
             toast.success('Conciliação desfeita com sucesso!');
         },
@@ -731,6 +737,8 @@ export function useReconcilePartial() {
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
             toast.success('Conciliação parcial realizada com sucesso!');
         },
         onError: (error: Error) => {
@@ -795,6 +803,8 @@ export function useApplyMatchSuggestions() {
             queryClient.invalidateQueries({ queryKey: ['match-suggestions'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
 
             if (result.successCount > 0) {
                 toast.success(`${result.successCount} transações conciliadas automaticamente!`);
@@ -834,6 +844,8 @@ export function useBulkReconcile() {
             queryClient.invalidateQueries({ queryKey: ['account-balances'] });
             queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard-financial-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
             toast.success(`${variables.transactionIds.length} transações conciliadas em massa!`);
         },
         onError: (error: Error) => {
