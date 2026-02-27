@@ -280,6 +280,7 @@ export function ReconciliationPage() {
 
     const currentKpis = kpisData?.current;
     const previousKpis = kpisData?.previous;
+    const unlinkedKpis = kpisData?.unlinked;
 
     const kpis = {
         totalPending: currentKpis?.pending_amount || 0,
@@ -549,6 +550,18 @@ export function ReconciliationPage() {
                     totalCount={kpis.totalCount}
                 />
             </section>
+
+            {/* Unlinked transactions indicator (consolidated mode only) */}
+            {isConsolidated && unlinkedKpis && unlinkedKpis.total_count > 0 && (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <p className="text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">{unlinkedKpis.total_count}</span> transações sem banco vinculado
+                        ({unlinkedKpis.pending_count} pendentes, {unlinkedKpis.reconciled_count} conciliadas)
+                        — não incluídas nos KPIs acima. Vincule-as a um banco para conciliação.
+                    </p>
+                </div>
+            )}
 
             {/* View Mode Tabs */}
             <div className="flex items-center gap-2">
