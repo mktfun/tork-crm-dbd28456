@@ -62,14 +62,24 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
     // O usuário solicitou explicitamente que "não conciliados" não apareçam e não somem
     const validTransactions = allTransactions.filter(t => t.isReconciled);
 
+    // Classificar cada transação como receita ou despesa
+    // Estratégia: usa accountType quando disponível, senão fallback pelo sinal do amount
+    const classifyTransaction = (t: typeof validTransactions[0]) => {
+        const type = (t.accountType || '').toLowerCase();
+        if (['revenue', 'receita', 'income', 'entrada'].includes(type)) return 'income';
+        if (['expense', 'despesa', 'saida'].includes(type)) return 'expense';
+        // Fallback pelo sinal do valor
+        return t.amount >= 0 ? 'income' : 'expense';
+    };
+
     // Calcular totais com base nos filtrados
     const clientTotalIncome = validTransactions
-        .filter(t => ['revenue', 'receita', 'income', 'entrada'].includes((t.accountType || '').toLowerCase()))
-        .reduce((sum, t) => sum + t.amount, 0);
+        .filter(t => classifyTransaction(t) === 'income')
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     const clientTotalExpense = validTransactions
-        .filter(t => ['expense', 'despesa', 'saida'].includes((t.accountType || '').toLowerCase()))
-        .reduce((sum, t) => sum + t.amount, 0);
+        .filter(t => classifyTransaction(t) === 'expense')
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
     const clientTotalCount = validTransactions.length;
 

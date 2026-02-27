@@ -17,6 +17,7 @@ export function useReconcileAggregate() {
         {
           p_statement_entry_id: statementEntryId,
           p_insurance_company_id: insuranceCompanyId,
+          p_target_bank_id: null,
         }
       );
 

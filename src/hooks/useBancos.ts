@@ -256,6 +256,99 @@ export function useDeleteBankAccount() {
 }
 
 /**
+ * Hook para contar transações e entradas de extrato vinculadas a um banco
+ */
+export function useBankLinkedDataCount(bankAccountId: string | null) {
+  return useQuery({
+    queryKey: ['bank-linked-data-count', bankAccountId],
+    queryFn: async () => {
+      if (!bankAccountId) return { transactions: 0, statements: 0 };
+
+      const [txResult, stResult] = await Promise.all([
+        supabase
+          .from('financial_transactions' as any)
+          .select('id', { count: 'exact', head: true })
+          .eq('bank_account_id', bankAccountId),
+        supabase
+          .from('bank_statement_entries' as any)
+          .select('id', { count: 'exact', head: true })
+          .eq('bank_account_id', bankAccountId),
+      ]);
+
+      return {
+        transactions: txResult.count ?? 0,
+        statements: stResult.count ?? 0,
+      };
+    },
+    enabled: !!bankAccountId,
+  });
+}
+
+/**
+ * Hook para migrar dados de um banco para outro e então deletar o original
+ */
+export function useMigrateAndDeleteBank() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ fromBankId, toBankId }: { fromBankId: string; toBankId: string | null }) => {
+      if (toBankId) {
+        // Mover transações
+        const { error: txErr } = await supabase
+          .from('financial_transactions' as any)
+          .update({ bank_account_id: toBankId })
+          .eq('bank_account_id', fromBankId);
+        if (txErr) throw txErr;
+
+        // Mover entradas de extrato
+        const { error: stErr } = await supabase
+          .from('bank_statement_entries' as any)
+          .update({ bank_account_id: toBankId })
+          .eq('bank_account_id', fromBankId);
+        if (stErr) throw stErr;
+
+        // Mover histórico de importação
+        const { error: hiErr } = await supabase
+          .from('bank_import_history' as any)
+          .update({ bank_account_id: toBankId })
+          .eq('bank_account_id', fromBankId);
+        if (hiErr) throw hiErr;
+      } else {
+        // Desvincular (set null)
+        await supabase
+          .from('financial_transactions' as any)
+          .update({ bank_account_id: null })
+          .eq('bank_account_id', fromBankId);
+
+        await supabase
+          .from('bank_statement_entries' as any)
+          .update({ bank_account_id: null })
+          .eq('bank_account_id', fromBankId);
+
+        await supabase
+          .from('bank_import_history' as any)
+          .update({ bank_account_id: null })
+          .eq('bank_account_id', fromBankId);
+      }
+
+      // Deletar o banco
+      const { error: delErr } = await supabase
+        .from('bank_accounts' as any)
+        .delete()
+        .eq('id', fromBankId);
+      if (delErr) throw delErr;
+
+      return { deleted: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-linked-data-count'] });
+    },
+  });
+}
+
+/**
  * Hook para buscar transações sem banco (legadas)
  */
 export function useUnbankedTransactions(limit: number = 100) {
