@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
@@ -427,19 +427,28 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
         setSelectedSystemIds([]);
     };
 
+    const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
+
     const handleCreateTransaction = async () => {
         if (!createCategoryId || selectedStatementIds.length === 0) return;
-        for (const stmtId of selectedStatementIds) {
+        const total = selectedStatementIds.length;
+        let successCount = 0;
+        setBulkProgress({ current: 0, total });
+        for (let i = 0; i < total; i++) {
+            setBulkProgress({ current: i + 1, total });
             try {
                 await createFromStatement.mutateAsync({
-                    statementEntryId: stmtId,
+                    statementEntryId: selectedStatementIds[i],
                     categoryAccountId: createCategoryId,
                 });
+                successCount++;
             } catch { /* skip */ }
         }
+        setBulkProgress(null);
         setShowCreateModal(false);
         setCreateCategoryId('');
         setSelectedStatementIds([]);
+        toast.success(`${successCount} lançamento${successCount > 1 ? 's' : ''} criado${successCount > 1 ? 's' : ''} com sucesso!`);
     };
 
     const clearSelection = () => {
@@ -785,12 +794,12 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                             {isMissingTransaction && !hasAggregateSelection && (
                                 <Button
                                     size="sm"
-                                    variant="outline"
-                                    className="gap-2 font-semibold"
+                                    variant="outline-subtle"
+                                    className="gap-2"
                                     onClick={() => setShowCreateModal(true)}
                                 >
                                     <Plus className="w-4 h-4" />
-                                    Criar Lançamento
+                                    Criar Despesa/Receita
                                 </Button>
                             )}
 
@@ -822,21 +831,33 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                         </p>
 
                         {/* Preview selected entries */}
-                        <div className="space-y-2 max-h-40 overflow-auto">
-                            {statementItems
-                                .filter(i => selectedStatementIds.includes(i.id))
-                                .map(item => (
-                                    <div key={item.id} className="flex justify-between p-2 bg-muted/50 rounded text-sm border border-border/50">
-                                        <div className="min-w-0">
-                                            <p className="font-medium truncate">{item.description}</p>
-                                            <p className="text-xs text-muted-foreground">{item.transaction_date}</p>
-                                        </div>
-                                        <p className={cn('font-semibold shrink-0 ml-2', item.amount >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                                            {formatCurrency(item.amount)}
-                                        </p>
+                        {(() => {
+                            const selectedEntries = statementItems.filter(i => selectedStatementIds.includes(i.id));
+                            const totalSum = selectedEntries.reduce((s, i) => s + i.amount, 0);
+                            return (
+                                <>
+                                    <div className="flex justify-between items-center p-2 bg-primary/10 rounded border border-primary/20">
+                                        <span className="text-sm font-medium">{selectedEntries.length} entrada{selectedEntries.length > 1 ? 's' : ''} selecionada{selectedEntries.length > 1 ? 's' : ''}</span>
+                                        <span className={cn('text-sm font-bold', totalSum >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                                            Total: {formatCurrency(totalSum)}
+                                        </span>
                                     </div>
-                                ))}
-                        </div>
+                                    <div className="space-y-2 max-h-40 overflow-auto">
+                                        {selectedEntries.map(item => (
+                                            <div key={item.id} className="flex justify-between p-2 bg-muted/50 rounded text-sm border border-border/50">
+                                                <div className="min-w-0">
+                                                    <p className="font-medium truncate">{item.description}</p>
+                                                    <p className="text-xs text-muted-foreground">{item.transaction_date}</p>
+                                                </div>
+                                                <p className={cn('font-semibold shrink-0 ml-2', item.amount >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                                                    {formatCurrency(item.amount)}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            );
+                        })()}
 
                         {/* Category selector */}
                         <div>
@@ -863,15 +884,20 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                         </Button>
                         <Button
                             onClick={handleCreateTransaction}
-                            disabled={!createCategoryId || createFromStatement.isPending}
+                            disabled={!createCategoryId || createFromStatement.isPending || !!bulkProgress}
                             className="gap-2"
                         >
-                            {createFromStatement.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                            {bulkProgress ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Criando {bulkProgress.current} de {bulkProgress.total}...
+                                </>
                             ) : (
-                                <Plus className="w-4 h-4" />
+                                <>
+                                    <Plus className="w-4 h-4" />
+                                    Criar e Conciliar
+                                </>
                             )}
-                            Criar e Conciliar
                         </Button>
                     </DialogFooter>
                 </DialogContent>
