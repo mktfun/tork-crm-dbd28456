@@ -4233,10 +4233,22 @@ export type Database = {
         }[]
       }
       promote_user_to_admin: { Args: { user_email: string }; Returns: boolean }
-      reconcile_insurance_aggregate_fifo: {
-        Args: { p_insurance_company_id: string; p_statement_entry_id: string }
-        Returns: Json
-      }
+      reconcile_insurance_aggregate_fifo:
+        | {
+            Args: {
+              p_insurance_company_id: string
+              p_statement_entry_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_insurance_company_id: string
+              p_statement_entry_id: string
+              p_target_bank_id?: string
+            }
+            Returns: Json
+          }
       reconcile_transaction_partial:
         | {
             Args: {
