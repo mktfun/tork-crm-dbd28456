@@ -1,56 +1,75 @@
 
-# Fix Reports.tsx Build Error + Refactor PortalMobileStart.tsx
+# Redesign do Modulo de Conciliacao Bancaria
 
-## Task 1: Fix Duplicate Imports in Reports.tsx
+## Resumo
 
-The file has two identical Carousel import blocks (lines 4-10 and lines 34-40). The second block was added when restoring the Carousel but the original import was never removed.
-
-**Fix:** Remove the duplicate import block at lines 34-40.
-
-**File:** `src/pages/Reports.tsx`
+Refatorar a UX/UI da tela de Conciliacao com 3 melhorias cirurgicas: (1) botoes semanticos distintos no Workbench, (2) modal unica de categoria para criacao em lote, e (3) auditoria com nome do usuario nas mutations de conciliacao.
 
 ---
 
-## Task 2: Refactor PortalMobileStart.tsx to List-Based UX
+## Tarefa 1: Botoes Semanticos e Distintos no Workbench
 
-Replace the text input + search button with a preloaded list of brokerages that users can tap to select.
+**Problema:** Os botoes "Conciliar" e "Criar Lancamento" na Floating Action Bar do Workbench nao tem diferenciacao visual clara o suficiente.
 
-**Data Source:** Query `brokerages` table (since `organizations` table doesn't exist -- the existing `useOrganizations` hook already maps brokerages to organizations). Fetch `id, name, logo_url, slug` where `portal_enabled = true` using the Supabase anon key (public access may require an RPC or adjusting the query). Since the portal user is not authenticated at this point, we'll use the existing `get_brokerage_by_slug` RPC pattern or query brokerages directly if RLS allows anonymous access. Given RLS restricts brokerages to authenticated users, we'll need a different approach -- likely a new RPC function or querying via the existing public endpoint. For simplicity and security, we'll create a lightweight edge function or use an RPC that returns the public list.
+**Solucao:** No `ReconciliationWorkbench.tsx`, ajustar os botoes da barra flutuante:
 
-**Revised approach:** Since we can't query `brokerages` directly without auth (RLS blocks it), we'll fetch all brokerages by attempting the query and falling back gracefully. Alternatively, we can create a simple database function `get_public_brokerages()` that returns only `id, name, logo_url, slug` for portal-enabled brokerages.
+- **Conciliar (match perfeito):** Manter `bg-emerald-600` com icone `CheckCircle2` -- ja esta correto.
+- **Baixa Parcial:** Manter `bg-amber-600` com `AlertTriangle` -- ja esta correto.
+- **Criar Lancamento:** Mudar para `variant="outline"` com estilo mais sutil, adicionando um label descritivo "Criar Despesa/Receita" para nao confundir com a acao de conciliar.
+- **Conciliar FIFO:** Manter `bg-amber-600` com `AlertTriangle`.
 
-### Database Change
+Nenhuma mudanca estrutural grande aqui -- apenas refinamento de labels e estilos ja existentes.
 
-Create a new RPC function `get_public_brokerages` that returns a list of brokerages with `portal_enabled = true`, exposing only safe public fields (id, name, logo_url, slug). This runs with `SECURITY DEFINER` to bypass RLS.
+---
 
-### Component Rewrite
+## Tarefa 2: Modal Unica de Categoria para Criacao em Lote (Bulk Create)
 
-**File:** `src/pages/portal/PortalMobileStart.tsx`
+**Problema atual:** O modal `showCreateModal` no Workbench ja aceita multiplos IDs de extrato (`selectedStatementIds`) e faz loop chamando `createFromStatement.mutateAsync` para cada um com a mesma `createCategoryId`. Porem, o botao "Criar Lancamento" so aparece quando `isMissingTransaction` (selecionou extrato, nao selecionou sistema). Precisa garantir que:
 
-- **State:** `searchQuery` (string for local filter), `brokerages` (array), `isLoading`, `error`
-- **On mount:** Call `supabase.rpc('get_public_brokerages')` to fetch all active brokerages
-- **Keep:** The `useEffect` that checks `localStorage` for saved slug and auto-redirects
-- **Header:** Keep the Shield icon, "Portal do Cliente" title, update subtitle to "Selecione sua corretora para comecar"
-- **Bottom Sheet:** Replace form with:
-  - Search Input with `Search` icon (filters list locally by name)
-  - `ScrollArea` with `max-h-[50vh]` containing brokerage cards
-  - Each card: rounded logo (or `Building2` fallback), brokerage name, chevron right indicator
-  - On tap: save slug to localStorage, navigate to `/{slug}/portal`
-- **Styling:** `bg-card`, `hover:bg-muted/50`, `animate-in` transitions, `safe-area-pt`/`safe-area-pb` preserved
+1. O preview na modal mostre TODAS as entradas selecionadas (ja faz isso).
+2. A categoria seja perguntada UMA UNICA VEZ (ja faz isso).
+3. O loop execute para todas (ja faz isso).
 
-### Technical Details
+**Verificacao:** O codigo atual (linhas 430-443 do Workbench e 810-878) ja implementa a logica correta! O modal mostra todas as entradas selecionadas e pede a categoria uma vez. O loop `for (const stmtId of selectedStatementIds)` ja existe.
 
-| Aspect | Decision |
-|--------|----------|
-| Data fetch | New `get_public_brokerages` RPC (SECURITY DEFINER, returns public fields only) |
-| Local filter | `useDebounce` hook with 200ms delay on search input |
-| Image fallback | `onError` handler on `<img>` swaps to `Building2` icon |
-| Loading state | `Loader2` spinner centered in the list area |
-| Empty state | "Nenhuma corretora encontrada" message when filter yields 0 results |
-| Scroll | Radix `ScrollArea` component already in project |
+**Ajuste necessario:** Apenas melhorar o feedback visual:
+- Adicionar um contador de progresso durante o loop (ex: "Criando 3 de 15...")
+- Adicionar um toast com contagem final ("15 lancamentos criados com sucesso!")
+- No modal, exibir o total somado das entradas selecionadas para contexto
 
-### Execution Order
+---
 
-1. Fix duplicate imports in Reports.tsx (instant)
-2. Create `get_public_brokerages` SQL migration
-3. Rewrite `PortalMobileStart.tsx`
+## Tarefa 3: Auditoria -- Nome do Usuario nas Conciliacoes
+
+**Problema:** As mutations de conciliacao (`reconcile_transactions`, `reconcile_transaction_partial`, `manual_reconcile_transaction`) nao enviam o nome do auditor. Apenas o `StatementImporter` grava `auditor_name` no `bank_import_history`.
+
+**Contexto do banco:** A coluna `matched_by` em `bank_statement_entries` ja existe e armazena o UUID do usuario. A RPC `get_bank_statement_paginated` ja retorna `reconciled_by_name` via join com `profiles`. Logo, o backend ja resolve a auditoria pelo `matched_by` UUID -- nao precisamos enviar nome textual nas mutations de conciliacao, pois as RPCs ja setam `matched_by = auth.uid()` internamente.
+
+**Verificacao necessaria:** Confirmar que as RPCs de conciliacao realmente preenchem `matched_by`. Se sim, nenhuma mudanca de backend e necessaria. Se nao, precisaremos de uma migracao SQL.
+
+**Ajuste no frontend:**
+- Garantir que o tooltip "Conciliado por: X" apareca tambem no Workbench (alem da Lista), mostrando quem fez a conciliacao em cada card apos reconciliado.
+- No historico de importacoes, o `auditor_name` ja e exibido corretamente.
+
+---
+
+## Detalhes Tecnicos
+
+### Arquivos a modificar
+
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/components/financeiro/reconciliation/ReconciliationWorkbench.tsx` | Refinar labels dos botoes, adicionar progresso no bulk create, melhorar feedback |
+| `src/components/financeiro/reconciliation/ReconciliationPage.tsx` | Nenhuma mudanca estrutural -- a lista ja tem auditoria visual |
+
+### O que NAO sera alterado
+- Layout split-screen do Workbench (ja usa `ResizablePanelGroup` 50:50 com scroll independente)
+- Backend/RPCs existentes
+- KPIs e dashboards
+- Painel esquerdo do extrato
+- InsuranceAggregateCard e logica FIFO
+
+### Validacoes de seguranca
+- Null-safe checks em arrays (`statementItems || []`, `accounts || []`)
+- Fallback states para listas vazias
+- Desabilitar botoes durante `isPending`
