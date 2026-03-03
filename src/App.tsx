@@ -154,6 +154,7 @@ function App() {
                 <Routes>
                   {/* Rota principal - Se mobile, bloqueia na tela do APP, senão vai pro Landing Site */}
                   <Route path="/" element={Capacitor.isNativePlatform() ? <PortalMobileStart /> : <Landing />} />
+                  <Route path="/app" element={<PortalMobileStart />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/auth/confirm" element={<AuthConfirm />} />
                   <Route path="/auth/reset-password" element={<AuthConfirm />} />

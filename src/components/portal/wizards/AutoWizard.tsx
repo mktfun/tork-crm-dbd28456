@@ -61,8 +61,8 @@ const OptionCard: React.FC<OptionCardProps> = ({ icon, label, selected, onClick 
     whileHover={{ scale: 1.015 }}
     onClick={onClick}
     className={`flex flex-col items-center justify-center p-3 rounded-2xl cursor-pointer transition-all duration-200 gap-2 h-20 ${selected
-        ? "bg-foreground text-background shadow-md"
-        : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
+      ? "bg-foreground text-background shadow-md"
+      : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
       }`}
   >
     <span className={selected ? "text-background" : "text-muted-foreground"}>{icon}</span>
@@ -134,29 +134,41 @@ export const AutoWizard: React.FC<AutoWizardProps> = ({ dealType, isUber = false
   const [maritalStatus, setMaritalStatus] = React.useState("");
   const [profession, setProfession] = React.useState("");
 
-  // Pré-preenchimento via sessão do portal
+  // Pré-preenchimento via sessão do portal (Cliente e Apólice)
   React.useEffect(() => {
     try {
-      const raw = sessionStorage.getItem('portal_client');
-      if (!raw) return;
-      const client = JSON.parse(raw);
-      if (client.name && !name) setName(client.name);
-      if (client.email && !email) setEmail(client.email);
-      if (client.phone && !phone) setPhone(formatPhone(client.phone));
-      if (client.cpf_cnpj) {
-        const digits = client.cpf_cnpj.replace(/\D/g, '');
-        if (digits.length > 11) {
-          setPersonType('pj');
-          setCpfCnpj(formatCNPJ(client.cpf_cnpj));
-        } else {
-          setPersonType('pf');
-          setCpfCnpj(formatCPF(client.cpf_cnpj));
+      // 1. Dados do Cliente
+      const rawClient = sessionStorage.getItem('portal_client');
+      if (rawClient) {
+        const client = JSON.parse(rawClient);
+        if (client.name && !name) setName(client.name);
+        if (client.email && !email) setEmail(client.email);
+        if (client.phone && !phone) setPhone(formatPhone(client.phone));
+        if (client.cpf_cnpj) {
+          const digits = client.cpf_cnpj.replace(/\D/g, '');
+          if (digits.length > 11) {
+            setPersonType('pj');
+            setCpfCnpj(formatCNPJ(client.cpf_cnpj));
+          } else {
+            setPersonType('pf');
+            setCpfCnpj(formatCPF(client.cpf_cnpj));
+          }
+        }
+      }
+
+      // 2. Dados da Apólice (se for Renovação)
+      const rawPolicy = sessionStorage.getItem('portal_renewal_policy');
+      if (rawPolicy && dealType === 'renovacao') {
+        const policy = JSON.parse(rawPolicy);
+        if (policy.insured_asset && !model) {
+          // O insured_asset geralmente guarda o modelo do veículo
+          setModel(policy.insured_asset);
         }
       }
     } catch (e) {
       console.error('Erro ao pré-preencher:', e);
     }
-  }, []);
+  }, [dealType]);
 
   // Form state - Step 2 (Veículo + CEP)
   const [plate, setPlate] = React.useState("");

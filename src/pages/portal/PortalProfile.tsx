@@ -24,6 +24,16 @@ interface UpdateProfileResponse {
   error?: string;
 }
 
+const ProfileRow = ({ icon: Icon, label, children, isLast = false }: { icon: React.ElementType; label: string; children: React.ReactNode; isLast?: boolean }) => (
+  <div className={cn('flex items-start gap-3 p-5', !isLast && 'border-b border-muted/50')}>
+    <Icon className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+    <div className="flex-1 min-w-0">
+      <p className="text-muted-foreground text-xs mb-0.5">{label}</p>
+      {children}
+    </div>
+  </div>
+);
+
 export default function PortalProfile() {
   const navigate = useNavigate();
   const [form, setForm] = useState<ClientProfile>({
@@ -46,7 +56,7 @@ export default function PortalProfile() {
   useEffect(() => {
     const clientData = sessionStorage.getItem('portal_client');
     const storedSlug = sessionStorage.getItem('portal_brokerage_slug');
-    
+
     if (clientData && storedSlug) {
       const client = JSON.parse(clientData);
       setClientId(client.id);
@@ -160,15 +170,7 @@ export default function PortalProfile() {
     );
   }
 
-  const ProfileRow = ({ icon: Icon, label, children, isLast = false }: { icon: React.ElementType; label: string; children: React.ReactNode; isLast?: boolean }) => (
-    <div className={cn('flex items-start gap-3 p-5', !isLast && 'border-b border-muted/50')}>
-      <Icon className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-      <div className="flex-1 min-w-0">
-        <p className="text-muted-foreground text-xs mb-0.5">{label}</p>
-        {children}
-      </div>
-    </div>
-  );
+
 
   return (
     <div className="space-y-5">

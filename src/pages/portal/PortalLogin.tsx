@@ -50,6 +50,7 @@ export default function PortalLogin() {
   const navigate = useNavigate();
 
   const formatIdentifier = (value: string) => {
+    // We only format if the string is purely numbers or points/dashes
     if (/^[\d.-]+$/.test(value)) {
       const digits = value.replace(/\D/g, '');
       if (digits.length <= 11) {
@@ -57,6 +58,13 @@ export default function PortalLogin() {
           .replace(/(\d{3})(\d)/, '$1.$2')
           .replace(/(\d{3})(\d)/, '$1.$2')
           .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+          .replace(/(-\d{2})\d+?$/, '$1');
+      } else if (digits.length <= 14) {
+        return digits
+          .replace(/^(\d{2})(\d)/, '$1.$2')
+          .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+          .replace(/\.(\d{3})(\d)/, '.$1/$2')
+          .replace(/(\d{4})(\d)/, '$1-$2')
           .replace(/(-\d{2})\d+?$/, '$1');
       }
     }
@@ -112,8 +120,12 @@ export default function PortalLogin() {
   const handleLogin = async () => {
     let cleanIdentifier = identifier.trim();
 
-    if (/^[\d.-]+$/.test(cleanIdentifier) && cleanIdentifier.replace(/\D/g, '').length === 11) {
-      cleanIdentifier = cleanIdentifier.replace(/\D/g, '');
+    // Se só tiver dígitos, pontos e traços, limpa os furos (sendo CPF 11 ou CNPJ 14)
+    if (/^[\d.-]+$/.test(cleanIdentifier)) {
+      const digitsOnly = cleanIdentifier.replace(/\D/g, '');
+      if (digitsOnly.length === 11 || digitsOnly.length === 14) {
+        cleanIdentifier = digitsOnly;
+      }
     }
 
     if (!cleanIdentifier) {

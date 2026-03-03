@@ -49,7 +49,7 @@ export default function PortalPolicies() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
   const [clientData, setClientData] = useState<ClientData | null>(null);
-  
+
   const { canDownloadPolicies, isLoading: permissionsLoading } = usePortalPermissions();
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export default function PortalPolicies() {
 
   const getStatusBadge = (status: string, expirationDate: string) => {
     const days = differenceInDays(new Date(expirationDate), new Date());
-    
+
     if (status.toLowerCase() === 'cancelada') {
       return <Badge className="bg-red-500/10 text-red-500 dark:text-red-400 border-red-500/20">Cancelada</Badge>;
     }
@@ -174,18 +174,18 @@ export default function PortalPolicies() {
                   </h3>
                   {getStatusBadge(policy.status, policy.expiration_date)}
                 </div>
-                
+
                 {policy.policy_number && (
                   <p className="text-xs text-muted-foreground mt-1">Nº {policy.policy_number}</p>
                 )}
-                
+
                 {policy.insurance_company && companies[policy.insurance_company] && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                     <Building2 className="w-3 h-3" />
                     <span>{companies[policy.insurance_company]}</span>
                   </div>
                 )}
-                
+
                 <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground/70">
                   <div className="flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
@@ -196,21 +196,22 @@ export default function PortalPolicies() {
                     </span>
                   </div>
                   {differenceInDays(new Date(policy.expiration_date), new Date()) <= 30 &&
-                   differenceInDays(new Date(policy.expiration_date), new Date()) >= 0 &&
-                   policy.status.toLowerCase() !== 'cancelada' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 hover:bg-amber-500/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/${brokerageSlug}/portal/wizard?type=renovacao&ramo=${(policy.type || 'auto').toLowerCase()}`);
-                      }}
-                    >
-                      <RefreshCw className="w-3 h-3 mr-1" />
-                      Renovar
-                    </Button>
-                  )}
+                    differenceInDays(new Date(policy.expiration_date), new Date()) >= 0 &&
+                    policy.status.toLowerCase() !== 'cancelada' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 hover:bg-amber-500/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sessionStorage.setItem('portal_renewal_policy', JSON.stringify(policy));
+                          navigate(`/${brokerageSlug}/portal/wizard?type=renovacao&ramo=${(policy.type || 'auto').toLowerCase()}`);
+                        }}
+                      >
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        Renovar
+                      </Button>
+                    )}
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground/40 flex-shrink-0 mt-1" />

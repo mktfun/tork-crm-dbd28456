@@ -55,10 +55,11 @@ const formatCurrency = (value: string) => {
 };
 
 interface SmartphoneWizardProps {
+  dealType?: "renovacao" | "novo" | null;
   onComplete?: (payload: any) => void;
 }
 
-export const SmartphoneWizard: React.FC<SmartphoneWizardProps> = ({ onComplete }) => {
+export const SmartphoneWizard: React.FC<SmartphoneWizardProps> = ({ dealType, onComplete }) => {
   const navigate = useNavigate();
   const { savePartialLead, updateStepIndex, getLeadId } = usePartialLead();
   const [currentStep, setCurrentStep] = React.useState(0);
@@ -77,25 +78,47 @@ export const SmartphoneWizard: React.FC<SmartphoneWizardProps> = ({ onComplete }
   const [phone, setPhone] = React.useState("");
   const [profession, setProfession] = React.useState("");
 
+  // Step 2: Endereço do Imóvel
+  const [cep, setCep] = React.useState("");
+  const [street, setStreet] = React.useState("");
+  const [number, setNumber] = React.useState("");
+  const [complement, setComplement] = React.useState("");
+  const [neighborhood, setNeighborhood] = React.useState("");
+  const [city, setCity] = React.useState("");
+  const [state, setState] = React.useState("");
+  const [isVacationHome, setIsVacationHome] = React.useState(false);
+
+  // Step 3: Dados do Smartphone
+  const [smartphoneValue, setSmartphoneValue] = React.useState("");
+
   // Pré-preenchimento via sessão do portal
   React.useEffect(() => {
     try {
-      const raw = sessionStorage.getItem('portal_client');
-      if (!raw) return;
-      const client = JSON.parse(raw);
-      if (client.name && !fullName) setFullName(client.name);
-      if (client.email && !email) setEmail(client.email);
-      if (client.phone && !phone) setPhone(formatPhone(client.phone));
-      if (client.cpf_cnpj) {
-        const digits = client.cpf_cnpj.replace(/\D/g, '');
-        if (digits.length <= 11) {
-          setCpf(formatCPF(client.cpf_cnpj));
+      const rawClient = sessionStorage.getItem('portal_client');
+      if (rawClient) {
+        const client = JSON.parse(rawClient);
+        if (client.name && !fullName) setFullName(client.name);
+        if (client.email && !email) setEmail(client.email);
+        if (client.phone && !phone) setPhone(formatPhone(client.phone));
+        if (client.cpf_cnpj) {
+          const digits = client.cpf_cnpj.replace(/\D/g, '');
+          if (digits.length <= 11) {
+            setCpf(formatCPF(client.cpf_cnpj));
+          }
         }
+      }
+
+      const rawPolicy = sessionStorage.getItem('portal_renewal_policy');
+      if (rawPolicy && dealType === 'renovacao') {
+        const policy = JSON.parse(rawPolicy);
+        // Em smartphone o bem segurado não é armazenado como string no wiz.
+        // O valor do smartphone é um R$, então não dá pra popular `smartphoneValue` do insured_asset,
+        // mas podemos ter no insured_asset o modelo.
       }
     } catch (e) {
       console.error('Erro ao pré-preencher:', e);
     }
-  }, []);
+  }, [dealType]);
 
   // Step 2: Endereço do Imóvel
   const [cep, setCep] = React.useState("");

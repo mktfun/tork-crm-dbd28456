@@ -81,11 +81,13 @@ export default function PortalHome() {
     }
   };
 
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+
   const fetchPortalConfig = async (userId: string) => {
     try {
       const { data } = await supabase
         .from('brokerages')
-        .select('portal_show_policies, portal_show_cards, portal_allow_profile_edit')
+        .select('portal_show_policies, portal_show_cards, portal_allow_profile_edit, whatsapp')
         .eq('user_id', userId)
         .limit(1)
         .maybeSingle();
@@ -96,10 +98,17 @@ export default function PortalHome() {
           show_cards: data.portal_show_cards ?? true,
           allow_profile_edit: data.portal_allow_profile_edit ?? true,
         });
+        if (data.whatsapp) setWhatsappNumber(data.whatsapp);
       }
     } catch (err) {
       console.error('Error fetching portal config:', err);
     }
+  };
+
+  const handleWhatsApp = () => {
+    if (!whatsappNumber) return;
+    const cleanNumber = whatsappNumber.replace(/\D/g, '');
+    window.open(`https://wa.me/55${cleanNumber}`);
   };
 
   const getExpirationBadge = (expirationDate: string) => {
@@ -245,11 +254,21 @@ export default function PortalHome() {
       {/* Help — flat */}
       <div className="flex items-start gap-3 py-3">
         <AlertCircle className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-        <div>
+        <div className="flex-1">
           <p className="text-foreground text-sm font-medium">Precisa de ajuda?</p>
-          <p className="text-muted-foreground text-xs mt-0.5">
+          <p className="text-muted-foreground text-xs mt-0.5 mb-3">
             Entre em contato com sua corretora para dúvidas sobre apólices ou sinistros.
           </p>
+          {whatsappNumber && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleWhatsApp}
+              className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border-emerald-200"
+            >
+              Pedir Ajuda no WhatsApp
+            </Button>
+          )}
         </div>
       </div>
     </div>

@@ -42,10 +42,11 @@ const formatCurrency = (value: string) => {
 };
 
 interface LifeWizardProps {
+  dealType?: "renovacao" | "novo" | null;
   onComplete?: (payload: any) => void;
 }
 
-export const LifeWizard: React.FC<LifeWizardProps> = ({ onComplete }) => {
+export const LifeWizard: React.FC<LifeWizardProps> = ({ dealType, onComplete }) => {
   const navigate = useNavigate();
   const { savePartialLead, updateStepIndex, getLeadId } = usePartialLead();
   const [currentStep, setCurrentStep] = React.useState(0);
@@ -66,22 +67,31 @@ export const LifeWizard: React.FC<LifeWizardProps> = ({ onComplete }) => {
   // Pré-preenchimento via sessão do portal
   React.useEffect(() => {
     try {
-      const raw = sessionStorage.getItem('portal_client');
-      if (!raw) return;
-      const client = JSON.parse(raw);
-      if (client.name && !name) setName(client.name);
-      if (client.email && !email) setEmail(client.email);
-      if (client.phone && !phone) setPhone(formatPhone(client.phone));
-      if (client.cpf_cnpj) {
-        const digits = client.cpf_cnpj.replace(/\D/g, '');
-        if (digits.length <= 11) {
-          setCpf(formatCPF(client.cpf_cnpj));
+      const rawClient = sessionStorage.getItem('portal_client');
+      if (rawClient) {
+        const client = JSON.parse(rawClient);
+        if (client.name && !name) setName(client.name);
+        if (client.email && !email) setEmail(client.email);
+        if (client.phone && !phone) setPhone(formatPhone(client.phone));
+        if (client.cpf_cnpj) {
+          const digits = client.cpf_cnpj.replace(/\D/g, '');
+          if (digits.length <= 11) {
+            setCpf(formatCPF(client.cpf_cnpj));
+          }
         }
+      }
+
+      // 2. Dados da Apólice (se for Renovação)
+      const rawPolicy = sessionStorage.getItem('portal_renewal_policy');
+      if (rawPolicy && dealType === 'renovacao') {
+        const policy = JSON.parse(rawPolicy);
+        // Em seguro de vida, se tiver algo em insured_asset pode ser o nome
+        // mas já temos o cliente. Não tem muito o que pré-preencher aqui.
       }
     } catch (e) {
       console.error('Erro ao pré-preencher:', e);
     }
-  }, []);
+  }, [dealType]);
 
   // Step 2: Health Profile
   const [isSmoker, setIsSmoker] = React.useState(false);

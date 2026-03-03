@@ -43,10 +43,11 @@ interface Traveler {
 }
 
 interface TravelWizardProps {
+  dealType?: "renovacao" | "novo" | null;
   onComplete?: (payload: any) => void;
 }
 
-export const TravelWizard: React.FC<TravelWizardProps> = ({ onComplete }) => {
+export const TravelWizard: React.FC<TravelWizardProps> = ({ dealType, onComplete }) => {
   const navigate = useNavigate();
   const { savePartialLead, updateStepIndex, getLeadId } = usePartialLead();
   const [currentStep, setCurrentStep] = React.useState(0);
@@ -77,29 +78,38 @@ export const TravelWizard: React.FC<TravelWizardProps> = ({ onComplete }) => {
   // Pré-preenchimento via sessão do portal
   React.useEffect(() => {
     try {
-      const raw = sessionStorage.getItem('portal_client');
-      if (!raw) return;
-      const client = JSON.parse(raw);
-      if (client.phone && !contactPhone) setContactPhone(formatPhone(client.phone));
-      if (client.email && !contactEmail) setContactEmail(client.email);
-      // Preencher primeiro viajante
-      if (client.name || client.cpf_cnpj) {
-        setTravelers(prev => {
-          const first = prev[0];
-          if (!first) return prev;
-          const updated = { ...first };
-          if (client.name && !updated.name) updated.name = client.name;
-          if (client.cpf_cnpj && !updated.cpf) {
-            const digits = client.cpf_cnpj.replace(/\D/g, '');
-            if (digits.length <= 11) updated.cpf = formatCPF(client.cpf_cnpj);
-          }
-          return [updated, ...prev.slice(1)];
-        });
+      const rawClient = sessionStorage.getItem('portal_client');
+      if (rawClient) {
+        const client = JSON.parse(rawClient);
+        if (client.phone && !contactPhone) setContactPhone(formatPhone(client.phone));
+        if (client.email && !contactEmail) setContactEmail(client.email);
+        // Preencher primeiro viajante
+        if (client.name || client.cpf_cnpj) {
+          setTravelers(prev => {
+            const first = prev[0];
+            if (!first) return prev;
+            const updated = { ...first };
+            if (client.name && !updated.name) updated.name = client.name;
+            if (client.cpf_cnpj && !updated.cpf) {
+              const digits = client.cpf_cnpj.replace(/\D/g, '');
+              if (digits.length <= 11) updated.cpf = formatCPF(client.cpf_cnpj);
+            }
+            return [updated, ...prev.slice(1)];
+          });
+        }
+      }
+
+      // 2. Dados da Apólice (se for Renovação)
+      const rawPolicy = sessionStorage.getItem('portal_renewal_policy');
+      if (rawPolicy && dealType === 'renovacao') {
+        const policy = JSON.parse(rawPolicy);
+        // Em seguro viagem não temos campos de asset mto diretos, mas se tiver algo útil
+        // podemos deixar a estrutura pronta pra futuras evoluções.
       }
     } catch (e) {
       console.error('Erro ao pré-preencher:', e);
     }
-  }, []);
+  }, [dealType]);
 
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [touched, setTouched] = React.useState<Record<string, boolean>>({});

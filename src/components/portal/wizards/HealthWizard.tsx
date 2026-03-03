@@ -116,10 +116,11 @@ const steps = [
 ];
 
 export interface HealthWizardProps {
+  dealType?: "renovacao" | "novo" | null;
   onComplete?: (payload: any) => void;
 }
 
-export const HealthWizard: React.FC<HealthWizardProps> = ({ onComplete }) => {
+export const HealthWizard: React.FC<HealthWizardProps> = ({ dealType, onComplete }) => {
   const navigate = useNavigate();
   const { savePartialLead, updateStepIndex, getLeadId } = usePartialLead();
 
@@ -198,20 +199,33 @@ export const HealthWizard: React.FC<HealthWizardProps> = ({ onComplete }) => {
   // Pré-preenchimento via sessão do portal
   React.useEffect(() => {
     try {
-      const raw = sessionStorage.getItem('portal_client');
-      if (!raw) return;
-      const client = JSON.parse(raw);
+      const rawClient = sessionStorage.getItem('portal_client');
       const updates: Partial<HealthWizardData> = {};
-      if (client.name && !data.name) updates.name = client.name;
-      if (client.email && !data.email) updates.email = client.email;
-      if (client.phone && !data.phone) updates.phone = client.phone;
+
+      if (rawClient) {
+        const client = JSON.parse(rawClient);
+        if (client.name && !data.name) updates.name = client.name;
+        if (client.email && !data.email) updates.email = client.email;
+        if (client.phone && !data.phone) updates.phone = client.phone;
+      }
+
+      const rawPolicy = sessionStorage.getItem('portal_renewal_policy');
+      if (rawPolicy && dealType === 'renovacao') {
+        const policy = JSON.parse(rawPolicy);
+        if (policy.insured_asset && !data.razaoSocial) {
+          // No saúde ele pode ser empresa ou pf, vamos jogar em razaoSocial ou cpf ? 
+          // Vamos colocar em razaoSocial como um campo geral de asset para Health.
+          updates.razaoSocial = policy.insured_asset;
+        }
+      }
+
       if (Object.keys(updates).length > 0) {
         saveData(updates);
       }
     } catch (e) {
       console.error('Erro ao pré-preencher:', e);
     }
-  }, []);
+  }, [dealType]);
 
 
   React.useEffect(() => {

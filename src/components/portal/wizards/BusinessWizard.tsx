@@ -43,10 +43,11 @@ const formatCurrency = (value: string) => {
 };
 
 interface BusinessWizardProps {
+  dealType?: "renovacao" | "novo" | null;
   onComplete?: (payload: any) => void;
 }
 
-export const BusinessWizard: React.FC<BusinessWizardProps> = ({ onComplete }) => {
+export const BusinessWizard: React.FC<BusinessWizardProps> = ({ dealType, onComplete }) => {
   const navigate = useNavigate();
   const { savePartialLead, updateStepIndex, getLeadId } = usePartialLead();
   const [currentStep, setCurrentStep] = React.useState(0);
@@ -66,22 +67,32 @@ export const BusinessWizard: React.FC<BusinessWizardProps> = ({ onComplete }) =>
   // Pré-preenchimento via sessão do portal
   React.useEffect(() => {
     try {
-      const raw = sessionStorage.getItem('portal_client');
-      if (!raw) return;
-      const client = JSON.parse(raw);
-      if (client.name && !contactName) setContactName(client.name);
-      if (client.email && !email) setEmail(client.email);
-      if (client.phone && !phone) setPhone(formatPhone(client.phone));
-      if (client.cpf_cnpj) {
-        const digits = client.cpf_cnpj.replace(/\D/g, '');
-        if (digits.length > 11) {
-          setCnpj(formatCNPJ(client.cpf_cnpj));
+      const rawClient = sessionStorage.getItem('portal_client');
+      if (rawClient) {
+        const client = JSON.parse(rawClient);
+        if (client.name && !contactName) setContactName(client.name);
+        if (client.email && !email) setEmail(client.email);
+        if (client.phone && !phone) setPhone(formatPhone(client.phone));
+        if (client.cpf_cnpj) {
+          const digits = client.cpf_cnpj.replace(/\D/g, '');
+          if (digits.length > 11) {
+            setCnpj(formatCNPJ(client.cpf_cnpj));
+          }
+        }
+      }
+
+      // 2. Dados da Apólice (se for Renovação)
+      const rawPolicy = sessionStorage.getItem('portal_renewal_policy');
+      if (rawPolicy && dealType === 'renovacao') {
+        const policy = JSON.parse(rawPolicy);
+        if (policy.insured_asset && !companyName) {
+          setCompanyName(policy.insured_asset);
         }
       }
     } catch (e) {
       console.error('Erro ao pré-preencher:', e);
     }
-  }, []);
+  }, [dealType]);
 
   // Step 2: Activity
   const [activityType, setActivityType] = React.useState("commerce");

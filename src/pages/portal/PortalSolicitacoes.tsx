@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Clock, Inbox, ChevronRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { FileText, Clock, Inbox, ChevronRight, CheckCircle2, User, Phone, Mail, FileCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -33,6 +34,7 @@ const typeLabels: Record<string, string> = {
 export default function PortalSolicitacoes() {
   const [requests, setRequests] = useState<PortalRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedRequest, setSelectedRequest] = useState<PortalRequest | null>(null);
 
   useEffect(() => {
     fetchRequests();
@@ -49,10 +51,20 @@ export default function PortalSolicitacoes() {
       if (!brokerageData) return;
       const brokerage = JSON.parse(brokerageData);
 
-      const { data, error } = await (supabase as any).rpc('get_portal_requests_by_client', {
-        p_client_id: client.id,
-        p_brokerage_user_id: brokerage.user_id,
-      });
+      const { data, error } = await supabase
+        .from('requests')
+        .select(`
+          id,
+          request_type,
+          insurance_type,
+          status,
+          created_at,
+          is_qualified,
+          custom_fields
+        `)
+        .eq('client_id', client.id)
+        .eq('brokerage_user_id', brokerage.user_id)
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching requests:', error);
@@ -65,6 +77,19 @@ export default function PortalSolicitacoes() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const parseCustomFields = (fields: any) => {
+    if (!fields) return null;
+    let parsed = fields;
+    if (typeof fields === 'string') {
+      try {
+        parsed = JSON.parse(fields);
+      } catch (e) {
+        return null;
+      }
+    }
+    return parsed;
   };
 
   if (isLoading) {
@@ -91,10 +116,11 @@ export default function PortalSolicitacoes() {
           {requests.map((req, idx) => {
             const status = statusConfig[req.status] || statusConfig.pendente;
             return (
-              <div
+              <button
                 key={req.id}
+                onClick={() => setSelectedRequest(req)}
                 className={cn(
-                  'flex items-center gap-3 p-5 transition-colors',
+                  'w-full flex items-center gap-3 p-5 transition-colors text-left hover:bg-muted/30 focus:outline-none focus:bg-muted/30',
                   idx !== requests.length - 1 && 'border-b border-muted/50'
                 )}
               >
@@ -113,16 +139,99 @@ export default function PortalSolicitacoes() {
                     </div>
                     <Badge className={status.className}>{status.label}</Badge>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground/70 mt-2">
-                    <Clock className="w-3 h-3" />
-                    <span>{format(new Date(req.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground/70">
+                      <Clock className="w-3 h-3" />
+                      <span>{format(new Date(req.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
       )}
+
+      {/* Details Modal */}
+      <Dialog open={!!selectedRequest} onOpenChange={(open) => !open && setSelectedRequest(null)}>
+        <DialogContent className="sm:max-w-[500px] w-[95%] rounded-3xl p-0 overflow-hidden border-0 gap-0">
+          <div className="bg-muted/30 px-6 py-5 border-b border-border/50">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+                <FileCheck className="w-5 h-5 text-primary" />
+                Detalhes da Solicitação
+              </DialogTitle>
+            </DialogHeader>
+            {selectedRequest && (
+              <div className="flex items-center gap-3 mt-3">
+                <Badge className={(statusConfig[selectedRequest.status] || statusConfig.pendente).className}>
+                  {(statusConfig[selectedRequest.status] || statusConfig.pendente).label}
+                </Badge>
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {format(new Date(selectedRequest.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 max-h-[60vh] overflow-y-auto no-scrollbar space-y-6">
+            {selectedRequest && (
+              <>
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tipo</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {typeLabels[selectedRequest.request_type] || selectedRequest.request_type} - {selectedRequest.insurance_type || 'Seguro'}
+                  </p>
+                </div>
+
+                {parseCustomFields(selectedRequest.custom_fields) && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Informações Preenchidas</p>
+                    <div className="bg-muted/20 border border-muted-foreground/10 rounded-2xl p-4 text-sm space-y-3">
+                      {Object.entries(parseCustomFields(selectedRequest.custom_fields)).map(([key, value]) => {
+                        // Ignore specific technical keys
+                        if (['cf_qar_auto', 'cf_qar_residencial', 'cf_qar_vida', 'cf_qar_empresarial', 'cf_qar_viagem', 'cf_qar_saude', 'cf_qar_respondido', 'cf_lead_id'].includes(key)) return null;
+
+                        // Parse qar report inside if present
+                        if (typeof value === 'object' && value !== null) {
+                          return null; // Skip complex objects for now, or stringify
+                        }
+
+                        let displayKey = key.replace('cf_', '').replace(/_/g, ' ');
+                        displayKey = displayKey.charAt(0).toUpperCase() + displayKey.slice(1);
+
+                        // Mapeamento de chaves comuns
+                        const keyMap: Record<string, string> = {
+                          'policy id': 'ID da Apólice',
+                          'policy number': 'Número da Apólice',
+                          'policy insurance company': 'Seguradora',
+                          'policy product': 'Produto',
+                          'policy insured asset': 'Bem Segurado',
+                          'description': 'Descrição',
+                          'request context': 'Contexto',
+                        };
+
+                        displayKey = keyMap[displayKey.toLowerCase()] || displayKey;
+
+                        if (!value) return null;
+
+                        return (
+                          <div key={key} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4 border-b border-border/50 last:border-0 pb-2 last:pb-0">
+                            <span className="text-muted-foreground font-medium min-w-[120px]">{displayKey}:</span>
+                            <span className="text-foreground whitespace-pre-wrap flex-1">{String(value)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
