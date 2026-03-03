@@ -161,7 +161,7 @@ export async function gerarTransacaoDeComissao(policy: Policy) {
       client_id: policy.clientId,
       policy_id: policy.id,
       type_id: commissionTypeId,
-      description: `Comissão da apólice ${policy.policyNumber ?? policy.id?.slice(0, 8) ?? 'Nova'}`,
+      description: `Comissão da apólice ${policy.policyNumber && policy.policyNumber.trim() !== '' ? policy.policyNumber.trim() : (policy.id ? policy.id.slice(0, 8) : 'Nova')}`,
       amount: commissionAmount,
       date: new Date().toISOString().split('T')[0],
       transaction_date: new Date().toISOString().split('T')[0],

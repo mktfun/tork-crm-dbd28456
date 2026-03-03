@@ -152,6 +152,7 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
               <TrendingUp className="w-4 h-4 text-emerald-500" /> Receita Projetada
             </span>
             <span className="text-2xl font-bold text-emerald-600">{formatCurrency(summary.income)}</span>
+            <span className="text-xs text-muted-foreground">pendentes + recorrentes no horizonte</span>
           </CardContent>
         </AppCard>
         <AppCard>
@@ -160,6 +161,7 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
               <TrendingDown className="w-4 h-4 text-rose-500" /> Despesa Projetada
             </span>
             <span className="text-2xl font-bold text-rose-600">{formatCurrency(summary.expense)}</span>
+            <span className="text-xs text-muted-foreground">despesas recorrentes no horizonte</span>
           </CardContent>
         </AppCard>
         <AppCard>
@@ -170,6 +172,7 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
             <span className={`text-2xl font-bold ${summary.balance < 0 ? 'text-rose-600' : 'text-primary'}`}>
               {formatCurrency(summary.balance)}
             </span>
+            <span className="text-xs text-muted-foreground">saldo atual + receitas − despesas projetadas</span>
           </CardContent>
         </AppCard>
       </div>
