@@ -216,9 +216,8 @@ function App() {
                   </Route>
 
                   {/* Portal do Cliente - Rotas dinâmicas por corretora */}
-                  {/* Legacy routes redirect to portal not found */}
-                  <Route path="/portal" element={<PortalNotFound />} />
-                  <Route path="/portal/*" element={<PortalNotFound />} />
+                  <Route path="/portal" element={<PortalMobileStart />} />
+                  <Route path="/portal/*" element={<PortalMobileStart />} />
 
                   {/* Dynamic portal routes with brokerage slug */}
                   <Route path="/:brokerageSlug/portal" element={<PortalLogin />} />
