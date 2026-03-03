@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Shield, FileText, CreditCard, Calendar, AlertCircle, Loader2, Plus, FileEdit, AlertTriangle, Inbox, ChevronRight } from 'lucide-react';
@@ -87,18 +88,17 @@ export default function PortalHome() {
     try {
       const { data } = await supabase
         .from('brokerages')
-        .select('portal_show_policies, portal_show_cards, portal_allow_profile_edit, whatsapp')
+        .select('portal_show_policies, portal_show_cards, portal_allow_profile_edit')
         .eq('user_id', userId)
         .limit(1)
         .maybeSingle();
 
       if (data) {
         setPortalConfig({
-          show_policies: data.portal_show_policies ?? true,
-          show_cards: data.portal_show_cards ?? true,
-          allow_profile_edit: data.portal_allow_profile_edit ?? true,
+          show_policies: (data as any).portal_show_policies ?? true,
+          show_cards: (data as any).portal_show_cards ?? true,
+          allow_profile_edit: (data as any).portal_allow_profile_edit ?? true,
         });
-        if (data.whatsapp) setWhatsappNumber(data.whatsapp);
       }
     } catch (err) {
       console.error('Error fetching portal config:', err);

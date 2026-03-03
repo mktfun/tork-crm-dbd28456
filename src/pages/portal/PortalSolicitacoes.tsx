@@ -16,6 +16,7 @@ interface PortalRequest {
   status: string;
   created_at: string;
   is_qualified: boolean;
+  custom_fields?: any;
 }
 
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -51,8 +52,8 @@ export default function PortalSolicitacoes() {
       if (!brokerageData) return;
       const brokerage = JSON.parse(brokerageData);
 
-      const { data, error } = await supabase
-        .from('requests')
+      const { data, error } = await (supabase
+        .from('requests' as any) as any)
         .select(`
           id,
           request_type,

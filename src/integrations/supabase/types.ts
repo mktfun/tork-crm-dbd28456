@@ -3077,9 +3077,7 @@ export type Database = {
       }
       financial_dre_view: {
         Row: {
-          account_type:
-            | Database["public"]["Enums"]["financial_account_type"]
-            | null
+          account_type: string | null
           category: string | null
           month: number | null
           period: string | null
@@ -4085,9 +4083,7 @@ export type Database = {
       get_user_dre_data: {
         Args: never
         Returns: {
-          account_type:
-            | Database["public"]["Enums"]["financial_account_type"]
-            | null
+          account_type: string | null
           category: string | null
           month: number | null
           period: string | null
