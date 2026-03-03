@@ -141,21 +141,6 @@ export const ResidentialWizard: React.FC<ResidentialWizardProps> = ({ dealType, 
     }
   }, [dealType]);
 
-  // Step 2: Property Type
-  const [propertyType, setPropertyType] = React.useState("house");
-  const [ownershipType, setOwnershipType] = React.useState("owner");
-  const [hasAlarm, setHasAlarm] = React.useState(false);
-  const [hasGatedCommunity, setHasGatedCommunity] = React.useState(false);
-
-  // Step 3: Address
-  const [cep, setCep] = React.useState("");
-  const [street, setStreet] = React.useState("");
-  const [number, setNumber] = React.useState("");
-  const [complement, setComplement] = React.useState("");
-  const [neighborhood, setNeighborhood] = React.useState("");
-  const [city, setCity] = React.useState("");
-  const [state, setState] = React.useState("");
-
   // Step 4: Coverage
   const [wantTheftCoverage, setWantTheftCoverage] = React.useState(true);
   const [wantFireCoverage, setWantFireCoverage] = React.useState(true);

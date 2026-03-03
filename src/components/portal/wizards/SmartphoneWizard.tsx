@@ -120,19 +120,6 @@ export const SmartphoneWizard: React.FC<SmartphoneWizardProps> = ({ dealType, on
     }
   }, [dealType]);
 
-  // Step 2: Endereço do Imóvel
-  const [cep, setCep] = React.useState("");
-  const [street, setStreet] = React.useState("");
-  const [number, setNumber] = React.useState("");
-  const [complement, setComplement] = React.useState("");
-  const [neighborhood, setNeighborhood] = React.useState("");
-  const [city, setCity] = React.useState("");
-  const [state, setState] = React.useState("");
-  const [isVacationHome, setIsVacationHome] = React.useState(false);
-
-  // Step 3: Dados do Smartphone
-  const [smartphoneValue, setSmartphoneValue] = React.useState("");
-
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [touched, setTouched] = React.useState<Record<string, boolean>>({});
 
