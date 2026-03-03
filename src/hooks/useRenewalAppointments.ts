@@ -14,6 +14,7 @@ interface RenewalAppointment {
   client_id: string;
   policyNumber?: string;
   clientName?: string;
+  ramoName?: string;
 }
 
 export function useRenewalAppointments() {
@@ -42,7 +43,8 @@ export function useRenewalAppointments() {
             policy_id,
             client_id,
             apolices!inner(
-              policy_number
+              policy_number,
+              ramo:ramos(nome)
             ),
             clientes!inner(
               name
@@ -66,7 +68,8 @@ export function useRenewalAppointments() {
           policy_id: item.policy_id,
           client_id: item.client_id,
           policyNumber: item.apolices?.policy_number,
-          clientName: item.clientes?.name
+          clientName: item.clientes?.name,
+          ramoName: (item.apolices as any)?.ramo?.nome || null,
         }));
 
         setAppointments(transformedData);
@@ -91,9 +94,9 @@ export function useRenewalAppointments() {
       if (error) throw error;
 
       // Atualizar estado local
-      setAppointments(prev => 
-        prev.map(apt => 
-          apt.id === appointmentId 
+      setAppointments(prev =>
+        prev.map(apt =>
+          apt.id === appointmentId
             ? { ...apt, status: newStatus }
             : apt
         )

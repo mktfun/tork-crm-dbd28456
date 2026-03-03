@@ -94,7 +94,7 @@ export default function Appointments() {
       const colors = getCalendarEventColor(apt);
       return {
         id: apt.id,
-        title: apt.title,
+        title: (apt as any).clientName ? `${(apt as any).clientName}${(apt as any).ramoName ? ` — ${(apt as any).ramoName}` : ''}` : apt.title,
         start: `${apt.date}T${apt.time}`,
         allDay: false,
         extendedProps: {
@@ -106,6 +106,10 @@ export default function Appointments() {
           recurrence_rule: apt.recurrence_rule,
           parent_appointment_id: apt.parent_appointment_id,
           date: apt.date,
+          clientName: (apt as any).clientName,
+          ramoName: (apt as any).ramoName,
+          policyNumber: (apt as any).policyNumber,
+          originalTitle: apt.title,
         },
         ...colors,
       };
@@ -219,6 +223,7 @@ export default function Appointments() {
     const isRecurrence = !!extendedProps.parent_appointment_id;
     const status = extendedProps.status;
     const isCancelled = status === 'Cancelado';
+    const ramoName = extendedProps.ramoName;
 
     return (
       <div className="flex items-center gap-1 px-1.5 py-0.5 w-full overflow-hidden">
@@ -229,6 +234,9 @@ export default function Appointments() {
         )}>
           {eventInfo.event.title}
         </span>
+        {ramoName && (
+          <span className="text-[9px] bg-primary/10 text-primary px-1 rounded flex-shrink-0 hidden sm:inline">{ramoName}</span>
+        )}
         {isRecurrence && (
           <RefreshCw className="w-2.5 h-2.5 opacity-40 flex-shrink-0" />
         )}
@@ -375,6 +383,9 @@ export default function Appointments() {
                   {dayAppointments.map(apt => {
                     const classes = getEventClasses(apt);
                     const isPendingOrOverdue = apt.status === 'Pendente';
+                    const clientName = (apt as any).clientName;
+                    const ramoName = (apt as any).ramoName;
+                    const displayTitle = clientName ? `${clientName}${ramoName ? ` — ${ramoName}` : ''}` : apt.title;
 
                     return (
                       <div
@@ -390,11 +401,18 @@ export default function Appointments() {
                           {apt.time?.substring(0, 5)}
                         </span>
 
-                        {/* Left border indicator + Title */}
+                        {/* Left border indicator + Title + Ramo */}
                         <div className={cn("flex-1 min-w-0 pl-3", classes.border)}>
-                          <p className={cn("text-sm font-medium truncate", classes.text)}>
-                            {apt.title}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className={cn("text-sm font-medium truncate", classes.text)}>
+                              {displayTitle}
+                            </p>
+                            {ramoName && (
+                              <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
+                                {ramoName}
+                              </span>
+                            )}
+                          </div>
                           {apt.notes && (
                             <p className="text-xs text-muted-foreground italic truncate mt-0.5">
                               {apt.notes}

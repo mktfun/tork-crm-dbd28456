@@ -6,6 +6,14 @@ type Appointment = Tables<'appointments'>;
 type AppointmentInsert = TablesInsert<'appointments'>;
 type AppointmentUpdate = TablesUpdate<'appointments'>;
 
+// Enriched appointment with related data (client, policy, ramo)
+export type AppointmentWithRelations = Appointment & {
+  clientName?: string | null;
+  clientPhone?: string | null;
+  policyNumber?: string | null;
+  ramoName?: string | null;
+};
+
 export function useSupabaseAppointments() {
   const queryClient = useQueryClient();
 
@@ -14,15 +22,29 @@ export function useSupabaseAppointments() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('appointments')
-        .select('*')
+        .select(`
+          *,
+          client:clientes(name, phone),
+          policy:apolices(policy_number, ramo:ramos(nome))
+        `)
         .order('date', { ascending: true });
-      
+
       if (error) {
         console.error('Error fetching appointments:', error);
         throw error;
       }
-      
-      return data;
+
+      // Flatten nested relations for easy consumption
+      return (data || []).map((apt: any) => ({
+        ...apt,
+        clientName: apt.client?.name || null,
+        clientPhone: apt.client?.phone || null,
+        policyNumber: apt.policy?.policy_number || null,
+        ramoName: apt.policy?.ramo?.nome || null,
+        // Clean up nested objects to avoid confusion
+        client: undefined,
+        policy: undefined,
+      })) as AppointmentWithRelations[];
     },
     staleTime: 1 * 60 * 1000, // 1 minuto
   });
@@ -80,9 +102,9 @@ export function useSupabaseAppointments() {
           // - É prioritário
           // - É dos próximos dias
           return appointment.isOverdue ||
-                 appointment.isToday ||
-                 appointment.isPriority ||
-                 appointment.isUpcoming;
+            appointment.isToday ||
+            appointment.isPriority ||
+            appointment.isUpcoming;
         })
         .sort((a, b) => {
           // Ordenar por prioridade: atrasados primeiro, depois hoje, depois prioritários, depois futuros
@@ -114,7 +136,7 @@ export function useSupabaseAppointments() {
         .select('status')
         .gte('date', startOfWeek.toISOString().split('T')[0])
         .lte('date', endOfWeek.toISOString().split('T')[0]);
-      
+
       if (error) {
         console.error('Error fetching weekly stats:', error);
         throw error;
@@ -152,7 +174,7 @@ export function useSupabaseAppointments() {
         .lte('date', nextWeek.toISOString().split('T')[0])
         .order('date', { ascending: true })
         .order('time', { ascending: true });
-      
+
       if (error) {
         console.error('Error fetching schedule gaps:', error);
         throw error;
@@ -160,15 +182,15 @@ export function useSupabaseAppointments() {
 
       const gaps = [];
       const today = new Date();
-      
+
       for (let i = 0; i < 7; i++) {
         const checkDate = new Date(today);
         checkDate.setDate(today.getDate() + i);
         const dateStr = checkDate.toISOString().split('T')[0];
-        
-        const morningAppts = data.filter(apt => 
-          apt.date === dateStr && 
-          apt.time >= '06:00:00' && 
+
+        const morningAppts = data.filter(apt =>
+          apt.date === dateStr &&
+          apt.time >= '06:00:00' &&
           apt.time <= '12:00:00'
         );
 
@@ -183,9 +205,9 @@ export function useSupabaseAppointments() {
           });
         }
 
-        const afternoonAppts = data.filter(apt => 
-          apt.date === dateStr && 
-          apt.time >= '13:00:00' && 
+        const afternoonAppts = data.filter(apt =>
+          apt.date === dateStr &&
+          apt.time >= '13:00:00' &&
           apt.time <= '18:00:00'
         );
 
@@ -296,7 +318,7 @@ export function useSupabaseAppointments() {
     isLoadingGaps,
     error,
     addAppointment: addAppointmentMutation.mutateAsync,
-    updateAppointment: (id: string, updates: AppointmentUpdate) => 
+    updateAppointment: (id: string, updates: AppointmentUpdate) =>
       updateAppointmentMutation.mutateAsync({ id, updates }),
     deleteAppointment: deleteAppointmentMutation.mutateAsync,
     isAdding: addAppointmentMutation.isPending,

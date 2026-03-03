@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, User, FileText, CheckCircle, X, Repeat } from 'lucide-react';
+import { Calendar, Clock, User, FileText, CheckCircle, X, Repeat, Shield, Phone } from 'lucide-react';
 import { useSupabaseAppointments } from '@/hooks/useSupabaseAppointments';
 import { useClients } from '@/hooks/useAppData';
 import { useToast } from '@/hooks/use-toast';
@@ -153,8 +153,8 @@ export function AppointmentDetailsModal({ appointment, open, onOpenChange }: App
 
       toast({
         title: "Recorrência configurada",
-        description: newRecurrenceRule 
-          ? "Agendamento agora é recorrente. Ao concluí-lo, a próxima ocorrência será criada automaticamente." 
+        description: newRecurrenceRule
+          ? "Agendamento agora é recorrente. Ao concluí-lo, a próxima ocorrência será criada automaticamente."
           : "Recorrência removida do agendamento."
       });
 
@@ -186,10 +186,16 @@ export function AppointmentDetailsModal({ appointment, open, onOpenChange }: App
           <div className="space-y-6">
             {/* Status Badge */}
             <div className="flex justify-between items-start">
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Badge className={getStatusColor(appointment.status)}>
                   {appointment.status}
                 </Badge>
+                {appointment.ramoName && (
+                  <Badge variant="secondary" className="flex items-center gap-1 bg-primary/15 text-primary">
+                    <Shield className="h-3 w-3" />
+                    {appointment.ramoName}
+                  </Badge>
+                )}
                 {appointment.recurrence_rule ? (
                   <Badge variant="secondary" className="flex items-center gap-1">
                     <Repeat className="h-3 w-3" />
@@ -223,11 +229,31 @@ export function AppointmentDetailsModal({ appointment, open, onOpenChange }: App
               </div>
             </div>
 
-            {/* Cliente */}
-            {client && (
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-slate-300">{client.name}</span>
+            {/* Cliente e Ramo */}
+            {(client || appointment.clientName) && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-slate-300">
+                    {client?.name || appointment.clientName}
+                  </span>
+                </div>
+                {(client?.phone || appointment.clientPhone) && (
+                  <div className="flex items-center gap-2 pl-6">
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs text-slate-400">
+                      {client?.phone || appointment.clientPhone}
+                    </span>
+                  </div>
+                )}
+                {appointment.policyNumber && (
+                  <div className="flex items-center gap-2 pl-6">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs text-slate-400">
+                      Apólice Nº {appointment.policyNumber}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

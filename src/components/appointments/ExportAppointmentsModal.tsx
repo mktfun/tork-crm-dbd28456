@@ -40,17 +40,17 @@ interface ExportAppointmentsModalProps {
 export function ExportAppointmentsModal({ disabled }: ExportAppointmentsModalProps) {
   const [open, setOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  
+
   // Filtros
   const [periodType, setPeriodType] = useState<PeriodType>('today');
   const [customDateFrom, setCustomDateFrom] = useState<Date | undefined>();
   const [customDateTo, setCustomDateTo] = useState<Date | undefined>();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
-  
+
   // Opções de Layout
   const [groupByDay, setGroupByDay] = useState(true);
   const [showNotes, setShowNotes] = useState(true);
-  
+
   // Customização
   const [title, setTitle] = useState('Agenda do Dia');
   const [notes, setNotes] = useState('');
@@ -58,7 +58,7 @@ export function ExportAppointmentsModal({ disabled }: ExportAppointmentsModalPro
   // Calcular período baseado no tipo selecionado
   const calculatedPeriod = useMemo(() => {
     const today = new Date();
-    
+
     switch (periodType) {
       case 'today':
         return {
@@ -144,7 +144,8 @@ export function ExportAppointmentsModal({ disabled }: ExportAppointmentsModalPro
             email
           ),
           apolices:policy_id (
-            policy_number
+            policy_number,
+            ramo:ramos(nome)
           )
         `)
         .eq('user_id', user.id)
@@ -181,7 +182,8 @@ export function ExportAppointmentsModal({ disabled }: ExportAppointmentsModalPro
         clientName: (apt.clientes as any)?.name || null,
         clientPhone: (apt.clientes as any)?.phone || null,
         clientEmail: (apt.clientes as any)?.email || null,
-        policyNumber: (apt.apolices as any)?.policy_number || null
+        policyNumber: (apt.apolices as any)?.policy_number || null,
+        ramoName: (apt.apolices as any)?.ramo?.nome || null,
       }));
 
       // Gerar PDF
@@ -214,14 +216,14 @@ export function ExportAppointmentsModal({ disabled }: ExportAppointmentsModalPro
 
   const formatPeriodDisplay = () => {
     if (!calculatedPeriod.from) return 'Selecione um período';
-    
+
     if (periodType === 'custom') {
       if (customDateFrom && customDateTo) {
         return `${format(customDateFrom, 'dd/MM/yyyy')} a ${format(customDateTo, 'dd/MM/yyyy')}`;
       }
       return customDateFrom ? format(customDateFrom, 'dd/MM/yyyy') : 'Selecione as datas';
     }
-    
+
     return `${format(calculatedPeriod.from, 'dd/MM')} a ${format(calculatedPeriod.to!, 'dd/MM/yyyy')}`;
   };
 
@@ -233,7 +235,7 @@ export function ExportAppointmentsModal({ disabled }: ExportAppointmentsModalPro
           Exportar PDF
         </Button>
       </DialogTrigger>
-      
+
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -261,7 +263,7 @@ export function ExportAppointmentsModal({ disabled }: ExportAppointmentsModalPro
                 <SelectItem value="custom">Personalizado</SelectItem>
               </SelectContent>
             </Select>
-            
+
             {/* Date pickers para período customizado */}
             {periodType === 'custom' && (
               <div className="flex gap-2 mt-2">
@@ -288,7 +290,7 @@ export function ExportAppointmentsModal({ disabled }: ExportAppointmentsModalPro
                     />
                   </PopoverContent>
                 </Popover>
-                
+
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -315,7 +317,7 @@ export function ExportAppointmentsModal({ disabled }: ExportAppointmentsModalPro
                 </Popover>
               </div>
             )}
-            
+
             <p className="text-xs text-muted-foreground">
               {formatPeriodDisplay()}
             </p>
@@ -339,7 +341,7 @@ export function ExportAppointmentsModal({ disabled }: ExportAppointmentsModalPro
           {/* Opções de Layout */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">Layout do Relatório</Label>
-            
+
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="groupByDay"
@@ -350,7 +352,7 @@ export function ExportAppointmentsModal({ disabled }: ExportAppointmentsModalPro
                 Agrupar por dia (seções: Segunda, Terça...)
               </label>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="showNotes"
