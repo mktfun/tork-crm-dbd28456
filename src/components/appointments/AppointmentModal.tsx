@@ -6,9 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Combobox } from '@/components/ui/combobox';
 import { useClients, usePolicies } from '@/hooks/useAppData';
 import { useSupabaseAppointments } from '@/hooks/useSupabaseAppointments';
+import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
 import { useCompanyNames } from '@/hooks/useCompanyNames';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, Clock, Flag, Repeat, User, FileText } from 'lucide-react';
+import { Calendar, Clock, Flag, Repeat, User, FileText, Layers } from 'lucide-react';
 import RecurrenceConfig from './RecurrenceConfig';
 
 interface AppointmentModalProps {
@@ -29,6 +30,7 @@ export function AppointmentModal({
   const [formData, setFormData] = useState({
     clientId: '',
     policyId: '',
+    ramoId: '',
     title: '',
     date: '',
     time: '',
@@ -39,6 +41,7 @@ export function AppointmentModal({
   const { addAppointment, isAdding } = useSupabaseAppointments();
   const { clients } = useClients();
   const { policies } = usePolicies();
+  const { data: ramos = [] } = useSupabaseRamos();
   const { getCompanyName, loading: companiesLoading } = useCompanyNames();
   const { toast } = useToast();
 
@@ -67,6 +70,7 @@ export function AppointmentModal({
       await addAppointment({
         client_id: formData.clientId === 'none' || !formData.clientId ? null : formData.clientId,
         policy_id: formData.policyId === 'none' || !formData.policyId ? null : formData.policyId,
+        ramo_id: formData.ramoId === 'none' || !formData.ramoId ? null : formData.ramoId,
         title: formData.title.trim(),
         date: formData.date,
         time: formData.time,
@@ -79,7 +83,7 @@ export function AppointmentModal({
 
       toast({ title: "Sucesso", description: "Agendamento criado com sucesso!" });
 
-      setFormData({ clientId: '', policyId: '', title: '', date: '', time: '', notes: '', priority: 'Normal' });
+      setFormData({ clientId: '', policyId: '', ramoId: '', title: '', date: '', time: '', notes: '', priority: 'Normal' });
       setRecurrenceRule(null);
       setModalOpen(false);
     } catch (error) {
@@ -109,6 +113,14 @@ export function AppointmentModal({
     ...selectedClientPolicies.map(policy => ({
       value: policy.id,
       label: `${policy.ramos?.nome || policy.type || 'Sem tipo'} - ${policy.companies?.name || 'Seguradora'} ${policy.policyNumber ? `(${policy.policyNumber})` : ''}`
+    }))
+  ];
+
+  const ramoOptions = [
+    { value: 'none', label: 'Nenhum ramo específico' },
+    ...ramos.map(r => ({
+      value: r.id,
+      label: r.nome
     }))
   ];
 
@@ -227,6 +239,22 @@ export function AppointmentModal({
                 placeholder="Associar a uma apólice (opcional)"
                 searchPlaceholder="Buscar apólice por tipo, seguradora ou número..."
                 emptyText="Nenhuma apólice encontrada"
+                className="border-0 bg-transparent shadow-none hover:bg-accent/5 h-9 px-0"
+              />
+            </div>
+
+            <div className="px-4 py-3">
+              <div className="flex items-center gap-2.5 text-sm text-foreground/80 mb-2">
+                <Layers className="w-4 h-4 text-muted-foreground" />
+                Ramo
+              </div>
+              <Combobox
+                options={ramoOptions}
+                value={formData.ramoId}
+                onValueChange={value => handleInputChange('ramoId', value)}
+                placeholder="Selecionar ramo (opcional)"
+                searchPlaceholder="Buscar ramo de seguro..."
+                emptyText="Nenhum ramo encontrado"
                 className="border-0 bg-transparent shadow-none hover:bg-accent/5 h-9 px-0"
               />
             </div>
