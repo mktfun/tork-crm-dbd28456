@@ -314,7 +314,7 @@ export default function FinanceiroERP() {
         onClose={handleCloseDetails}
       />
 
-      <PageDebugger context={activeTab} />
+      {import.meta.env.DEV && <PageDebugger context={activeTab} />}
     </div>
   );
 }
