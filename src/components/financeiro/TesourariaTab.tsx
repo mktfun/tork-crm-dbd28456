@@ -1,6 +1,7 @@
 import { AccountsPayableReceivableTable } from "./tesouraria/AccountsPayableReceivableTable";
 import { AgingReportCard } from "./tesouraria/AgingReportCard";
 import { UpcomingTransactionsList } from "./tesouraria/UpcomingTransactionsList";
+import { ReceivablesBySeguradora } from "./tesouraria/ReceivablesBySeguradora";
 import { Wallet } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
@@ -29,6 +30,9 @@ export function TesourariaTab({ dateRange }: TesourariaTabProps) {
         <UpcomingTransactionsList daysAhead={30} />
         <AgingReportCard defaultType="receivables" />
       </div>
+
+      {/* A Receber por Seguradora */}
+      <ReceivablesBySeguradora />
 
       {/* Main Table */}
       <AccountsPayableReceivableTable />

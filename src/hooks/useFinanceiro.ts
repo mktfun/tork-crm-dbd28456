@@ -879,3 +879,82 @@ export function useDeleteGoal() {
     }
   });
 }
+
+// ============ HOOKS PARA A RECEBER POR SEGURADORA ============
+
+export interface ReceivableBySeguradora {
+  seguradora: string;
+  insuranceCompanyId: string | null;
+  totalPendente: number;
+  qtdTransacoes: number;
+  proximaData: string | null;
+}
+
+/**
+ * Hook para buscar recebíveis pendentes agrupados por seguradora
+ */
+export function useReceivablesBySeguradora() {
+  return useQuery({
+    queryKey: ['receivables-by-seguradora'],
+    queryFn: async (): Promise<ReceivableBySeguradora[]> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Não autenticado');
+
+      const { data, error } = await supabase
+        .from('financial_transactions')
+        .select(`
+          total_amount,
+          due_date,
+          transaction_date,
+          insurance_company_id,
+          companies:insurance_company_id ( name )
+        `)
+        .eq('user_id', user.id)
+        .eq('is_void', false)
+        .in('type', ['revenue', 'income', 'Entrada'])
+        .not('status', 'in', '("ignored","cancelled")')
+        .or('reconciled.is.false,reconciled.is.null')
+        .or('is_confirmed.is.false,is_confirmed.is.null');
+
+      if (error) {
+        console.error('Error fetching receivables by seguradora:', error);
+        throw error;
+      }
+
+      // Agrupar por seguradora no client
+      const grouped = new Map<string, ReceivableBySeguradora>();
+
+      (data || []).forEach((row: any) => {
+        const companyId = row.insurance_company_id || '__SEM_SEGURADORA__';
+        const companyName = row.companies?.name || 'Sem Seguradora';
+        const amount = Number(row.total_amount) || 0;
+        const refDate = row.due_date || row.transaction_date;
+
+        if (!grouped.has(companyId)) {
+          grouped.set(companyId, {
+            seguradora: companyName,
+            insuranceCompanyId: row.insurance_company_id,
+            totalPendente: 0,
+            qtdTransacoes: 0,
+            proximaData: refDate,
+          });
+        }
+
+        const entry = grouped.get(companyId)!;
+        entry.totalPendente += amount;
+        entry.qtdTransacoes += 1;
+
+        // Manter a data mais próxima (menor)
+        if (refDate && entry.proximaData && refDate < entry.proximaData) {
+          entry.proximaData = refDate;
+        } else if (refDate && !entry.proximaData) {
+          entry.proximaData = refDate;
+        }
+      });
+
+      return Array.from(grouped.values())
+        .sort((a, b) => b.totalPendente - a.totalPendente);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
