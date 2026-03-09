@@ -68,8 +68,8 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
     defaultValues: {
       occurrence_date: format(new Date(), 'yyyy-MM-dd'),
       priority: 'Média',
-      claim_amount: '',
-      deductible_amount: '',
+      claim_amount: 0,
+      deductible_amount: 0,
     },
   });
 
