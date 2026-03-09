@@ -448,11 +448,10 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Valor do Prêmio</p>
                   <div className="flex items-center justify-center gap-1">
                     <span className="text-muted-foreground text-lg">R$</span>
-                    <Input
-                      {...register('premiumValue', { valueAsNumber: true })}
-                      type="number"
-                      step="0.01"
-                      min="0"
+                    <CurrencyInput
+                      value={watch('premiumValue')}
+                      onChange={(v) => setValue('premiumValue', v, { shouldValidate: true })}
+                      min={0}
                       className="text-center text-3xl font-bold border-0 bg-transparent shadow-none focus-visible:ring-0 w-full"
                       placeholder="0,00"
                     />
