@@ -89,8 +89,8 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
     try {
       const submitData = {
         ...data,
-        claim_amount: data.claim_amount ? parseFloat(data.claim_amount) : undefined,
-        deductible_amount: data.deductible_amount ? parseFloat(data.deductible_amount) : undefined,
+        claim_amount: data.claim_amount || undefined,
+        deductible_amount: data.deductible_amount || undefined,
       };
 
       await createSinistro.mutateAsync(submitData);
