@@ -464,12 +464,11 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
                 <div className="bg-card rounded-2xl p-5 text-center space-y-1">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Comissão</p>
                   <div className="flex items-center justify-center gap-1">
-                    <Input
-                      {...register('commissionRate', { valueAsNumber: true })}
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
+                    <CurrencyInput
+                      value={watch('commissionRate')}
+                      onChange={(v) => setValue('commissionRate', v, { shouldValidate: true })}
+                      min={0}
+                      max={100}
                       className="text-center text-3xl font-bold border-0 bg-transparent shadow-none focus-visible:ring-0 w-full"
                       placeholder="20"
                     />
