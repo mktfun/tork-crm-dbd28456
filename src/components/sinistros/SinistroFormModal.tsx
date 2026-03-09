@@ -11,11 +11,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Loader2, Plus, Calendar, AlertTriangle, MapPin, Search, User, FileText } from 'lucide-react';
 import { useCreateSinistro } from '@/hooks/useSinistros';
 import { useClients, usePolicies } from '@/hooks/useAppData';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { format } from 'date-fns';
 import { formatDate } from '@/utils/dateUtils';
 
 const sinistroSchema = z.object({
-  policy_id: z.string().optional(), // Agora opcional
+  policy_id: z.string().optional(),
   client_id: z.string().optional(),
   occurrence_date: z.string().min(1, 'Data da ocorrência é obrigatória'),
   claim_type: z.string().min(1, 'Tipo do sinistro é obrigatório'),
@@ -23,8 +24,8 @@ const sinistroSchema = z.object({
   location_occurrence: z.string().optional(),
   circumstances: z.string().optional(),
   police_report_number: z.string().optional(),
-  claim_amount: z.string().optional(),
-  deductible_amount: z.string().optional(),
+  claim_amount: z.number().optional(),
+  deductible_amount: z.number().optional(),
   priority: z.string().optional(),
 });
 
@@ -67,8 +68,8 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
     defaultValues: {
       occurrence_date: format(new Date(), 'yyyy-MM-dd'),
       priority: 'Média',
-      claim_amount: '',
-      deductible_amount: '',
+      claim_amount: 0,
+      deductible_amount: 0,
     },
   });
 
@@ -88,8 +89,8 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
     try {
       const submitData = {
         ...data,
-        claim_amount: data.claim_amount ? parseFloat(data.claim_amount) : undefined,
-        deductible_amount: data.deductible_amount ? parseFloat(data.deductible_amount) : undefined,
+        claim_amount: data.claim_amount || undefined,
+        deductible_amount: data.deductible_amount || undefined,
       };
 
       await createSinistro.mutateAsync(submitData);
@@ -98,8 +99,8 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
       form.reset({
         occurrence_date: new Date().toISOString().split('T')[0],
         priority: 'Média',
-        claim_amount: '',
-        deductible_amount: '',
+        claim_amount: 0,
+        deductible_amount: 0,
       });
       setOpen(false);
 
@@ -286,11 +287,10 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
                   <FormItem>
                     <FormLabel>Valor Estimado (R$)</FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
+                      <CurrencyInput
+                        value={field.value}
+                        onChange={field.onChange}
                         placeholder="0,00"
-                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -306,11 +306,10 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
                   <FormItem>
                     <FormLabel>Franquia (R$)</FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
+                      <CurrencyInput
+                        value={field.value}
+                        onChange={field.onChange}
                         placeholder="0,00"
-                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
