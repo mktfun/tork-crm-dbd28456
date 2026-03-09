@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Loader2, Plus, Calendar, AlertTriangle, MapPin, Search, User, FileText } from 'lucide-react';
 import { useCreateSinistro } from '@/hooks/useSinistros';
 import { useClients, usePolicies } from '@/hooks/useAppData';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { format } from 'date-fns';
 import { formatDate } from '@/utils/dateUtils';
 

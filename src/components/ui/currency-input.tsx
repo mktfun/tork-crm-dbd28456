@@ -13,10 +13,6 @@ interface CurrencyInputProps {
   decimals?: number;
 }
 
-/**
- * Formats a numeric value to BRL display format
- * e.g. 100000.00 → "100.000,00"
- */
 function formatBRL(value: number, decimals: number = 2): string {
   if (isNaN(value) || value === 0) return '';
   const parts = value.toFixed(decimals).split('.');
@@ -24,55 +20,32 @@ function formatBRL(value: number, decimals: number = 2): string {
   return `${intPart},${parts[1]}`;
 }
 
-/**
- * Parses a BRL-formatted string to a number
- * e.g. "100.000,00" → 100000.00
- */
-function parseBRL(raw: string): number {
-  if (!raw) return 0;
-  // Remove everything except digits, comma, dot, minus
-  let cleaned = raw.replace(/[^\d,.\-]/g, '');
-  // Remove thousand separators (dots) and convert decimal comma
-  cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-  const num = parseFloat(cleaned);
-  return isNaN(num) ? 0 : num;
-}
-
 export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
-  ({ value, onChange, className, placeholder = '0,00', min, max, prefix, suffix, decimals = 2 }, ref) => {
+  ({ value, onChange, className, placeholder = '0,00', min, max, decimals = 2 }, ref) => {
     const [displayValue, setDisplayValue] = useState(() =>
       value && value > 0 ? formatBRL(value, decimals) : ''
     );
     const [isFocused, setIsFocused] = useState(false);
 
+    const divisor = Math.pow(10, decimals);
+
     const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-      const raw = e.target.value;
-      // Allow typing freely — only digits, dots, commas
-      setDisplayValue(raw);
-    }, []);
-
-    const handleBlur = useCallback(() => {
-      setIsFocused(false);
-      let parsed = parseBRL(displayValue);
-
-      if (min !== undefined && parsed < min) parsed = min;
-      if (max !== undefined && parsed > max) parsed = max;
-
-      if (parsed > 0) {
-        setDisplayValue(formatBRL(parsed, decimals));
-      } else {
+      const digits = e.target.value.replace(/\D/g, '');
+      if (!digits) {
         setDisplayValue('');
+        onChange(0);
+        return;
       }
-      onChange(parsed);
-    }, [displayValue, onChange, min, max, decimals]);
+      let numericValue = parseInt(digits, 10) / divisor;
+      if (max !== undefined && numericValue > max) numericValue = max;
+      if (min !== undefined && numericValue < min) numericValue = min;
+      setDisplayValue(formatBRL(numericValue, decimals));
+      onChange(numericValue);
+    }, [onChange, min, max, decimals, divisor]);
 
-    const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
-      setIsFocused(true);
-      // Select all on focus for easy replacement
-      setTimeout(() => e.target.select(), 0);
-    }, []);
+    const handleFocus = useCallback(() => setIsFocused(true), []);
+    const handleBlur = useCallback(() => setIsFocused(false), []);
 
-    // Sync external value changes (e.g. form reset)
     React.useEffect(() => {
       if (!isFocused) {
         setDisplayValue(value && value > 0 ? formatBRL(value, decimals) : '');
@@ -83,11 +56,11 @@ export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputPro
       <input
         ref={ref}
         type="text"
-        inputMode="decimal"
+        inputMode="numeric"
         value={displayValue}
         onChange={handleChange}
-        onBlur={handleBlur}
         onFocus={handleFocus}
+        onBlur={handleBlur}
         placeholder={placeholder}
         className={cn(
           "flex h-10 w-full rounded-md border border-border bg-card/50 backdrop-blur-sm px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors",
