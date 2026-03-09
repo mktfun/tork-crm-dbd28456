@@ -287,11 +287,10 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
                   <FormItem>
                     <FormLabel>Valor Estimado (R$)</FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
+                      <CurrencyInput
+                        value={field.value}
+                        onChange={field.onChange}
                         placeholder="0,00"
-                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -307,11 +306,10 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
                   <FormItem>
                     <FormLabel>Franquia (R$)</FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
+                      <CurrencyInput
+                        value={field.value}
+                        onChange={field.onChange}
                         placeholder="0,00"
-                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
