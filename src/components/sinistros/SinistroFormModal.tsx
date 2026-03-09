@@ -99,8 +99,8 @@ export function SinistroFormModal({ children, onSuccess }: SinistroFormModalProp
       form.reset({
         occurrence_date: new Date().toISOString().split('T')[0],
         priority: 'Média',
-        claim_amount: '',
-        deductible_amount: '',
+        claim_amount: 0,
+        deductible_amount: 0,
       });
       setOpen(false);
 
