@@ -16,7 +16,7 @@ import { format } from 'date-fns';
 import { formatDate } from '@/utils/dateUtils';
 
 const sinistroSchema = z.object({
-  policy_id: z.string().optional(), // Agora opcional
+  policy_id: z.string().optional(),
   client_id: z.string().optional(),
   occurrence_date: z.string().min(1, 'Data da ocorrência é obrigatória'),
   claim_type: z.string().min(1, 'Tipo do sinistro é obrigatório'),
@@ -24,8 +24,8 @@ const sinistroSchema = z.object({
   location_occurrence: z.string().optional(),
   circumstances: z.string().optional(),
   police_report_number: z.string().optional(),
-  claim_amount: z.string().optional(),
-  deductible_amount: z.string().optional(),
+  claim_amount: z.number().optional(),
+  deductible_amount: z.number().optional(),
   priority: z.string().optional(),
 });
 
