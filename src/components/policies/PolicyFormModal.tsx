@@ -7,6 +7,7 @@ import { format, addYears } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Combobox } from '@/components/ui/combobox';
@@ -447,11 +448,10 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Valor do Prêmio</p>
                   <div className="flex items-center justify-center gap-1">
                     <span className="text-muted-foreground text-lg">R$</span>
-                    <Input
-                      {...register('premiumValue', { valueAsNumber: true })}
-                      type="number"
-                      step="0.01"
-                      min="0"
+                    <CurrencyInput
+                      value={watch('premiumValue')}
+                      onChange={(v) => setValue('premiumValue', v, { shouldValidate: true })}
+                      min={0}
                       className="text-center text-3xl font-bold border-0 bg-transparent shadow-none focus-visible:ring-0 w-full"
                       placeholder="0,00"
                     />
@@ -464,12 +464,11 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
                 <div className="bg-card rounded-2xl p-5 text-center space-y-1">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Comissão</p>
                   <div className="flex items-center justify-center gap-1">
-                    <Input
-                      {...register('commissionRate', { valueAsNumber: true })}
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
+                    <CurrencyInput
+                      value={watch('commissionRate')}
+                      onChange={(v) => setValue('commissionRate', v, { shouldValidate: true })}
+                      min={0}
+                      max={100}
                       className="text-center text-3xl font-bold border-0 bg-transparent shadow-none focus-visible:ring-0 w-full"
                       placeholder="20"
                     />
