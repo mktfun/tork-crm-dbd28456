@@ -314,6 +314,7 @@ export function ReconciliationPage() {
     // Import History
     const { data: importHistory = [], isLoading: isLoadingHistory } = useImportHistory(selectedBankAccountId);
     const { data: batchEntries = [], isLoading: isLoadingBatch } = useImportBatchEntries(selectedBatchId);
+    const { data: batchAuditLogs = [], isLoading: isLoadingAuditLogs } = useAuditLogByBatch(selectedBatchId);
 
     // Mutations
     const reconcileMutation = useReconcileTransactionDirectly();
