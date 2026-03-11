@@ -949,6 +949,37 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                 </div>
                             );
                         })()}
+
+                        {/* Bank selector */}
+                        <div>
+                            <label className="text-sm font-medium text-foreground mb-1.5 block">
+                                Banco de Destino
+                            </label>
+                            <Select value={createBankId} onValueChange={setCreateBankId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o banco..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {bankAccounts.map((account) => (
+                                        <SelectItem key={account.id} value={account.id}>
+                                            {account.bankName}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Operator name */}
+                        <div>
+                            <label className="text-sm font-medium text-foreground mb-1.5 block">
+                                Nome do Responsável *
+                            </label>
+                            <Input
+                                placeholder="Quem está processando..."
+                                value={operatorName}
+                                onChange={(e) => setOperatorName(e.target.value)}
+                            />
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowCreateModal(false)}>
@@ -956,7 +987,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                         </Button>
                         <Button
                             onClick={handleCreateTransaction}
-                            disabled={!createCategoryId || createFromStatement.isPending || !!bulkProgress || (() => { const sel = statementItems.filter(i => selectedStatementIds.includes(i.id)); return sel.some(e => e.amount >= 0) && sel.some(e => e.amount < 0); })()}
+                            disabled={!createCategoryId || !operatorName.trim() || createFromStatement.isPending || !!bulkProgress || (() => { const sel = statementItems.filter(i => selectedStatementIds.includes(i.id)); return sel.some(e => e.amount >= 0) && sel.some(e => e.amount < 0); })()}
                             className="gap-2"
                         >
                             {bulkProgress ? (
