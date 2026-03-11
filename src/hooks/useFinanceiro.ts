@@ -911,6 +911,7 @@ export function useReceivablesBySeguradora() {
         `)
         .eq('user_id', user.id)
         .eq('is_void', false)
+        .eq('archived', false)
         .in('type', ['revenue', 'income', 'Entrada'])
         .not('status', 'in', '("ignored","cancelled")')
         .or('reconciled.is.false,reconciled.is.null')
