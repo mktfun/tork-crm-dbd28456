@@ -1054,13 +1054,23 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                 ))}
                             </SelectContent>
                         </Select>
+                        <div>
+                            <label className="text-sm font-medium text-foreground mb-1.5 block">
+                                Nome do Responsável *
+                            </label>
+                            <Input
+                                placeholder="Quem está processando..."
+                                value={operatorName}
+                                onChange={(e) => setOperatorName(e.target.value)}
+                            />
+                        </div>
                     </div>
                     <DialogFooter className="gap-2">
                         <Button variant="outline" onClick={() => setShowBankModal(false)}>
                             Cancelar
                         </Button>
                         <Button
-                            disabled={!selectedBankForMatch || reconcilePartial.isPending}
+                            disabled={!selectedBankForMatch || !operatorName.trim() || reconcilePartial.isPending}
                             onClick={handleBankModalConfirm}
                         >
                             {reconcilePartial.isPending ? 'Conciliando...' : 'Vincular e Conciliar'}
