@@ -33,6 +33,7 @@ export function useSupabaseCompanies() {
         id: company.id,
         name: company.name,
         service_phone: company.service_phone || '',
+        assistance_phone: company.assistance_phone || '',
         createdAt: company.created_at,
         ramos_count: company.ramos_count || 0,
       })) || [];
