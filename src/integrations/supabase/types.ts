@@ -3043,10 +3043,12 @@ export type Database = {
       }
       companies_with_ramos_count: {
         Row: {
+          assistance_phone: string | null
           created_at: string | null
           id: string | null
           name: string | null
           ramos_count: number | null
+          service_phone: string | null
           updated_at: string | null
           user_id: string | null
         }
@@ -4076,10 +4078,12 @@ export type Database = {
       get_user_companies_with_ramos: {
         Args: never
         Returns: {
+          assistance_phone: string | null
           created_at: string | null
           id: string | null
           name: string | null
           ramos_count: number | null
+          service_phone: string | null
           updated_at: string | null
           user_id: string | null
         }[]
@@ -4309,6 +4313,7 @@ export type Database = {
           transaction_id: string
         }[]
       }
+      seed_user_defaults: { Args: { p_user_id: string }; Returns: undefined }
       settle_commission_transaction: {
         Args: {
           p_bank_account_id: string
