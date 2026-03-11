@@ -1,15 +1,23 @@
 
 
-# Fix: SQL Query for Corrupted Premium Values
+# Corrigir status padrão e atualizar orçamentos existentes
 
-The query I provided referenced a `description` column that doesn't exist in the `apolices` table. Here's the corrected query to run in the SQL Editor:
+## Problema
+O formulário de nova apólice vem com status "Orçamento" pré-selecionado (linha 135 de `PolicyFormModal.tsx`). O estagiário está criando apólices sem mudar o status, resultando em registros "Orçamento" que deveriam ser "Ativa".
 
+## Alterações
+
+### 1. Mudar default de "Orçamento" para "Ativa" no formulário
+**Arquivo:** `src/components/policies/PolicyFormModal.tsx` (linha 135)
+- Trocar `status: 'Orçamento'` para `status: 'Ativa'`
+
+### 2. Atualizar os 8 orçamentos existentes para "Ativa"
+Executar via SQL (insert tool) um UPDATE nos registros com status "Orçamento":
 ```sql
-SELECT id, policy_number, premium_value, commission_rate, status, created_at
-FROM apolices
-WHERE premium_value < 1000 AND premium_value > 0
-ORDER BY created_at DESC;
+UPDATE apolices 
+SET status = 'Ativa', updated_at = now()
+WHERE status = 'Orçamento';
 ```
-
-This will list policies with suspiciously low `premium_value` that may have been truncated by the comma/dot formatting issue. Share the results and I'll generate the corrective UPDATE statements.
+IDs afetados (da query anterior):
+- `5be5853f`, `665c6a43`, `c85d4e94`, `ff652cc0`, `b5626914`, `4112ca2e`, `d631c96c`, `99a016ca`
 
