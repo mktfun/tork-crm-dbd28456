@@ -3455,14 +3455,24 @@ export type Database = {
             }
             Returns: string
           }
-      create_transaction_from_statement: {
-        Args: {
-          p_category_account_id: string
-          p_description?: string
-          p_statement_entry_id: string
-        }
-        Returns: Json
-      }
+      create_transaction_from_statement:
+        | {
+            Args: {
+              p_category_account_id: string
+              p_description?: string
+              p_statement_entry_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_bank_account_id?: string
+              p_category_account_id: string
+              p_description?: string
+              p_statement_entry_id: string
+            }
+            Returns: Json
+          }
       delete_financial_account_safe: {
         Args: { p_migrate_to_account_id?: string; p_target_account_id: string }
         Returns: Json
