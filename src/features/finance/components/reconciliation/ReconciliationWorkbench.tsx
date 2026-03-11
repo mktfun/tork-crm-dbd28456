@@ -432,23 +432,40 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
 
     const handleCreateTransaction = async () => {
-        if (!createCategoryId || selectedStatementIds.length === 0) return;
+        if (!createCategoryId || selectedStatementIds.length === 0 || !operatorName.trim()) return;
         const total = selectedStatementIds.length;
         let successCount = 0;
         setBulkProgress({ current: 0, total });
         for (let i = 0; i < total; i++) {
             setBulkProgress({ current: i + 1, total });
             try {
-                await createFromStatement.mutateAsync({
+                const entry = statementItems.find(it => it.id === selectedStatementIds[i]);
+                const result = await createFromStatement.mutateAsync({
                     statementEntryId: selectedStatementIds[i],
                     categoryAccountId: createCategoryId,
+                    bankAccountId: createBankId || undefined,
                 });
                 successCount++;
+                // Insert audit log
+                try {
+                    await supabase.from('reconciliation_audit_log').insert({
+                        user_id: (await supabase.auth.getUser()).data.user?.id,
+                        action_type: 'create',
+                        statement_entry_id: selectedStatementIds[i],
+                        system_transaction_id: result.transaction_id || null,
+                        bank_account_id: createBankId || entry?.bank_account_id || null,
+                        amount: entry?.amount ? Math.abs(entry.amount) : 0,
+                        operator_name: operatorName.trim(),
+                        details: { category_id: createCategoryId },
+                    });
+                } catch { /* audit log is best-effort */ }
             } catch { /* skip */ }
         }
         setBulkProgress(null);
         setShowCreateModal(false);
         setCreateCategoryId('');
+        setCreateBankId('');
+        setOperatorName('');
         setSelectedStatementIds([]);
         toast.success(`${successCount} lançamento${successCount > 1 ? 's' : ''} criado${successCount > 1 ? 's' : ''} com sucesso!`);
     };
