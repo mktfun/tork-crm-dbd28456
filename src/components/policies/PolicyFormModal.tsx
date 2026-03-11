@@ -132,7 +132,7 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
       };
     }
     return {
-      status: 'Orçamento' as const,
+      status: 'Ativa' as const,
       commissionRate: 20,
       insuredAsset: '',
       automaticRenewal: true,
