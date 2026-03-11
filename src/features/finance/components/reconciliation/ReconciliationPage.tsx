@@ -76,6 +76,7 @@ import {
     type ImportHistoryItem,
     type BankStatementEntry,
 } from '@/features/finance/api/useReconciliation';
+import { useAuditLogByBatch } from '@/features/finance/api/useReconciliationAuditLog';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { StatementImporter } from './StatementImporter';
 import { ReconciliationWorkbench } from './ReconciliationWorkbench';
