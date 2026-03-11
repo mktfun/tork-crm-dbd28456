@@ -1,74 +1,89 @@
 
-# Auditoria dos KPIs da Tela de Conciliacao
 
-## Discrepancias Identificadas (com evidencia SQL)
+# Corrigir view de seguradoras + Seed automático para novas contas
 
-### BUG 1 (CRITICO): Contagem "Registros Encontrados" vs "Progresso" Divergentes
+## Problemas Identificados
 
-**Evidencia no screenshot**: O header da lista mostra **488 registros encontrados** mas o card de Progresso mostra **298 de 388 conciliados**. Sao duas fontes diferentes:
-- "488 registros" vem da RPC `get_bank_statement_paginated` (campo `total_count` via `COUNT(*) OVER()`)
-- "388 total / 298 conciliados" vem da RPC `get_reconciliation_kpis` (campo `total_count`)
+### Bug: View `companies_with_ramos_count` faltando `service_phone`
+A view atual seleciona apenas `id, name, user_id, created_at, updated_at, ramos_count` -- **não inclui `service_phone` nem `assistance_phone`**. O hook `useSupabaseCompanies` tenta ler `company.service_phone` da view e recebe `undefined`, por isso o telefone nunca aparece e edições parecem "não funcionar" (o dado salva na tabela `companies`, mas a view que alimenta a listagem não retorna o campo).
 
-Ambas as RPCs usam os mesmos filtros base (user_id, banco, datas, is_void). Porem a lista aplica `p_status` e `p_type` como filtros adicionais (mesmo quando "todas/todos" deveria ser identico). A divergencia de 100 itens (488 vs 388) indica que uma das RPCs tem um filtro extra ou diferente.
-
-**Causa provavel**: A RPC paginada faz LEFT JOIN com `bank_statement_entries` e `profiles` que pode gerar duplicatas via `string_agg` no ledger. Ou a KPI RPC nao filtra por `status IN ('confirmed','completed')` enquanto a lista nao filtra por isso tambem -- porem alguma diferenca sutil no WHERE causa a divergencia.
-
-**Correcao**: Unificar: a KPI RPC deve usar EXATAMENTE a mesma CTE/WHERE da lista paginada (sem os filtros de status/type). Alternativamente, adicionar um campo `kpi_total_count` na propria RPC paginada para garantir fonte unica.
+### Seed: Contas novas sem dados pré-cadastrados
+O trigger `handle_new_user()` só cria o perfil. Seguradoras, ramos e associações precisam ser populados automaticamente.
 
 ---
 
-### BUG 2 (ALTO): Periodo Anterior Removido -- Trends Sempre Nulos
+## Plano de Implementação
 
-**Diagnostico**: A versao mais recente de `get_reconciliation_kpis` (migration `20260219141008`) removeu completamente o calculo do periodo anterior. O JSON retornado so tem `current`, sem `previous`. No frontend (linhas 293-300), `calcTrend` sempre retorna `null` porque `previousKpis` esta vazio.
+### 1. Migration: Corrigir a view (adicionar `service_phone` e `assistance_phone`)
 
-**Impacto**: Os badges de tendencia ("+X% vs periodo anterior") nunca aparecem. A comparacao temporal esta desabilitada silenciosamente.
+```sql
+DROP VIEW IF EXISTS public.companies_with_ramos_count;
 
-**Correcao**: Restaurar o bloco de periodo anterior na RPC, calculando `v_prev_start` e `v_prev_end` da mesma forma que `get_financial_summary` faz (subtraindo a duracao do periodo).
-
----
-
-### BUG 3 (MEDIO): Modo Consolidado Infla KPIs com Transacoes Sem Banco
-
-**Evidencia SQL**: Existem **170 transacoes sem bank_account_id** no periodo Dec-Feb, sendo 105 delas marcadas como `reconciled = true`. Quando filtrado para "Consolidado (Todos)", tanto a KPI quanto a lista incluem essas 170 transacoes.
-
-```text
-Scope               | Total | Reconciled | Pending
-all_transactions     |  497  |    432     |   65
-with_bank_only       |  327  |    327     |    0
+CREATE VIEW public.companies_with_ramos_count AS
+SELECT 
+  c.id, c.name, c.user_id, c.created_at, c.updated_at,
+  c.service_phone, c.assistance_phone,
+  COUNT(cr.ramo_id) as ramos_count
+FROM public.companies c
+LEFT JOIN public.company_ramos cr ON c.id = cr.company_id AND cr.user_id = c.user_id
+WHERE c.user_id = auth.uid()
+GROUP BY c.id, c.name, c.user_id, c.created_at, c.updated_at, c.service_phone, c.assistance_phone;
 ```
 
-Todos os 65 pendentes sao transacoes SEM banco! Elas aparecem como "aguardando conciliacao" mas nao podem ser conciliadas porque nao estao vinculadas a nenhum banco. O progresso (77%) e artificialmente baixo.
+Isso resolve o bug de edição/inserção/exclusão -- os dados já salvam corretamente na tabela, mas a view que alimenta a UI não os retornava.
 
-**Correcao**: No modo consolidado, filtrar apenas transacoes COM `bank_account_id IS NOT NULL` na RPC de KPIs e na lista paginada. Alternativamente, separar os KPIs em "Com banco" vs "Sem banco" para dar visibilidade sem distorcer o progresso.
+### 2. Migration: Criar função `seed_user_defaults` + Atualizar trigger
+
+Criar uma função `SECURITY DEFINER` que insere seguradoras, ramos e associações padrão para um novo usuário. Será chamada automaticamente pelo trigger `handle_new_user()`.
+
+**Seguradoras com telefones de assistência 24h:**
+
+| Seguradora | Telefone Atendimento |
+|---|---|
+| Porto Seguro | 0800 727 0800 |
+| Bradesco Seguros | 0800 701 9090 |
+| SulAmérica | 0800 727 2020 |
+| Allianz | 0800 115 215 |
+| Tokio Marine | 0800 721 2583 |
+| HDI | 0800 771 2010 |
+| Mapfre | 0800 775 4545 |
+| Azul Seguros | 0800 703 1280 |
+| Mitsui Sumitomo | 0800 721 7878 |
+| Suhai | 0800 020 3040 |
+| Zurich | 0800 284 4848 |
+| Itaú Seguros | 0800 728 0079 |
+| Liberty | 0800 709 6464 |
+| Sompo | 0800 776 676 |
+
+**Ramos padrão:** Automóvel, Vida, Saúde, Residencial, Empresarial, Condomínio, Transporte, Responsabilidade Civil, Fiança Locatícia, Viagem, Equipamentos
+
+**Associações:** Cada seguradora será vinculada aos ramos que tipicamente oferece.
+
+### 3. Atualizar `handle_new_user()` para chamar o seed
+
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, nome_completo, email, role)
+  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data ->> 'nome_completo', 'Usuário'), NEW.email, 'corretor');
+  
+  PERFORM public.seed_user_defaults(NEW.id);
+  RETURN NEW;
+END;
+$$;
+```
+
+### 4. Sem mudanças no frontend
+A tela de `GestaoSeguradoras` já suporta editar, excluir e toggle de ramos. Uma vez que a view seja corrigida, tudo funcionará normalmente.
 
 ---
 
-### BUG 4 (MEDIO): Type Variants Inconsistentes Entre RPCs
+## Resumo
+- **1 migration SQL** com: fix da view + função de seed + trigger atualizado + dados das 14 seguradoras, 11 ramos e suas associações
+- **0 mudanças no frontend** -- o código já está correto, o problema é a view incompleta
 
-**Diagnostico**: A RPC `get_reconciliation_kpis` verifica `type = 'revenue'` e `type = 'expense'` (exato). Mas `get_financial_summary` e `get_bank_statement_paginated` verificam `type IN ('revenue', 'income', 'Entrada')` e `type IN ('expense', 'despesa', 'Saida')`.
-
-**Status atual**: Nao ha dados com tipos legados (validado por query). Mas e uma brecha: se qualquer fluxo criar transacao com tipo diferente, a KPI de conciliacao vai ignorar.
-
-**Correcao**: Alinhar o `get_reconciliation_kpis` para usar os mesmos IN-lists de tipo que as demais RPCs.
-
----
-
-## Plano de Execucao
-
-### Passo 1: Reescrever `get_reconciliation_kpis` (Migration SQL)
-- Adicionar filtro `bank_account_id IS NOT NULL` quando em modo consolidado
-- Restaurar calculo de periodo anterior (previous period)
-- Alinhar type checks para `IN ('revenue', 'income', 'Entrada')` / `IN ('expense', 'despesa', 'Saida')`
-- Manter assinatura identica (4 params)
-
-### Passo 2: Alinhar "registros encontrados" com KPI total
-- No `ReconciliationPage.tsx`, substituir `{totalCount} registros encontrados` por `{kpis.totalCount} registros encontrados` para usar a mesma fonte dos KPI cards
-- Ou melhor: manter `totalCount` da lista paginada para refletir filtros ativos (status/tipo), e exibir separadamente "X de Y" nos KPIs
-
-### Passo 3: Corrigir lista paginada para modo consolidado
-- Na RPC `get_bank_statement_paginated`, quando `v_bank_uuid IS NULL`, adicionar `AND t.bank_account_id IS NOT NULL` para excluir transacoes sem banco da tela de conciliacao bancaria
-
-### Passo 4: Validacao cruzada pos-correcao
-- Query SQL comparando `total_count` do KPI vs `COUNT(*)` da lista com mesmos filtros
-- Verificar que `reconciled_count + pending_count + ignored_count = total_count`
-- Confirmar que progresso 100% quando todos os itens com banco estao conciliados
