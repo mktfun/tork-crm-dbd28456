@@ -353,13 +353,28 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     };
 
     // Execute reconciliation with a given bankId
-    const executeReconcile = async (targetBankId: string) => {
+    const executeReconcile = async (targetBankId: string, opName?: string) => {
+        const finalOpName = opName || operatorName.trim();
         if (selectedStatementIds.length === 1 && selectedSystemIds.length === 1) {
             await reconcilePartial.mutateAsync({
                 statementEntryId: selectedStatementIds[0],
                 systemTransactionId: selectedSystemIds[0],
                 targetBankId,
             });
+            // Audit log
+            try {
+                const entry = statementItems.find(i => i.id === selectedStatementIds[0]);
+                await supabase.from('reconciliation_audit_log').insert({
+                    user_id: (await supabase.auth.getUser()).data.user?.id,
+                    action_type: 'reconcile',
+                    statement_entry_id: selectedStatementIds[0],
+                    system_transaction_id: selectedSystemIds[0],
+                    bank_account_id: targetBankId,
+                    amount: entry?.amount ? Math.abs(entry.amount) : 0,
+                    operator_name: finalOpName || 'Sistema',
+                    details: { method: 'manual_1to1' },
+                });
+            } catch { /* best-effort */ }
         } else {
             for (const stmtId of selectedStatementIds) {
                 for (const sysId of selectedSystemIds) {
@@ -369,12 +384,27 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                             systemTransactionId: sysId,
                             targetBankId,
                         });
+                        // Audit log
+                        try {
+                            const entry = statementItems.find(i => i.id === stmtId);
+                            await supabase.from('reconciliation_audit_log').insert({
+                                user_id: (await supabase.auth.getUser()).data.user?.id,
+                                action_type: 'reconcile',
+                                statement_entry_id: stmtId,
+                                system_transaction_id: sysId,
+                                bank_account_id: targetBankId,
+                                amount: entry?.amount ? Math.abs(entry.amount) : 0,
+                                operator_name: finalOpName || 'Sistema',
+                                details: { method: 'manual_NtoM' },
+                            });
+                        } catch { /* best-effort */ }
                     } catch { /* skip duplicates */ }
                 }
             }
         }
         setSelectedStatementIds([]);
         setSelectedSystemIds([]);
+        setOperatorName('');
     };
 
     // Reconcile handler (1:1 or N:M via multiple calls)
