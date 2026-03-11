@@ -1883,6 +1883,7 @@ export type Database = {
       }
       financial_transactions: {
         Row: {
+          archived: boolean | null
           attachments: string[] | null
           bank_account_id: string | null
           created_at: string
@@ -1916,6 +1917,7 @@ export type Database = {
           voided_by: string | null
         }
         Insert: {
+          archived?: boolean | null
           attachments?: string[] | null
           bank_account_id?: string | null
           created_at?: string
@@ -1949,6 +1951,7 @@ export type Database = {
           voided_by?: string | null
         }
         Update: {
+          archived?: boolean | null
           attachments?: string[] | null
           bank_account_id?: string | null
           created_at?: string
@@ -2371,6 +2374,74 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      reconciliation_audit_log: {
+        Row: {
+          action_type: string
+          amount: number | null
+          bank_account_id: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          operator_name: string | null
+          statement_entry_id: string | null
+          system_transaction_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          amount?: number | null
+          bank_account_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          operator_name?: string | null
+          statement_entry_id?: string | null
+          system_transaction_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          amount?: number | null
+          bank_account_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          operator_name?: string | null
+          statement_entry_id?: string | null
+          system_transaction_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_audit_log_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_audit_log_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliation_dashboard"
+            referencedColumns: ["bank_account_id"]
+          },
+          {
+            foreignKeyName: "reconciliation_audit_log_statement_entry_id_fkey"
+            columns: ["statement_entry_id"]
+            isOneToOne: false
+            referencedRelation: "bank_statement_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_audit_log_system_transaction_id_fkey"
+            columns: ["system_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "financial_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       security_audit_log: {
         Row: {
