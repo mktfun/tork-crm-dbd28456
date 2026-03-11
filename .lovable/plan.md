@@ -1,74 +1,49 @@
 
-# Auditoria dos KPIs da Tela de Conciliacao
 
-## Discrepancias Identificadas (com evidencia SQL)
+# Arquivar Legado Financeiro + Expandir Modais de Conciliação + Audit Log
 
-### BUG 1 (CRITICO): Contagem "Registros Encontrados" vs "Progresso" Divergentes
+## 1. Migration SQL: Arquivar transações legadas (apenas financeiro)
 
-**Evidencia no screenshot**: O header da lista mostra **488 registros encontrados** mas o card de Progresso mostra **298 de 388 conciliados**. Sao duas fontes diferentes:
-- "488 registros" vem da RPC `get_bank_statement_paginated` (campo `total_count` via `COUNT(*) OVER()`)
-- "388 total / 298 conciliados" vem da RPC `get_reconciliation_kpis` (campo `total_count`)
+Executar UPDATE para marcar `archived = true` apenas nas `financial_transactions` do usuário `65b85549-c928-4513-8d56-a3ef41512dc8` onde `related_entity_type = 'legacy_transaction'`. Apólices e dados de prêmio/comissão ficam intactos nos relatórios (filtrados por período).
 
-Ambas as RPCs usam os mesmos filtros base (user_id, banco, datas, is_void). Porem a lista aplica `p_status` e `p_type` como filtros adicionais (mesmo quando "todas/todos" deveria ser identico). A divergencia de 100 itens (488 vs 388) indica que uma das RPCs tem um filtro extra ou diferente.
+## 2. Expandir modal "Criar Lançamento" (`showCreateModal`)
 
-**Causa provavel**: A RPC paginada faz LEFT JOIN com `bank_statement_entries` e `profiles` que pode gerar duplicatas via `string_agg` no ledger. Ou a KPI RPC nao filtra por `status IN ('confirmed','completed')` enquanto a lista nao filtra por isso tambem -- porem alguma diferenca sutil no WHERE causa a divergencia.
+Adicionar dois campos ao modal existente (linhas 828-926 do Workbench):
+- **Banco de destino** — `Select` com `bankAccounts` (obrigatório)
+- **Nome do responsável** — `Input` text (obrigatório)
 
-**Correcao**: Unificar: a KPI RPC deve usar EXATAMENTE a mesma CTE/WHERE da lista paginada (sem os filtros de status/type). Alternativamente, adicionar um campo `kpi_total_count` na propria RPC paginada para garantir fonte unica.
+Estado: dois novos `useState` (`createBankId`, `operatorName`).
 
----
+Atualizar `handleCreateTransaction` para:
+1. Passar o `bankAccountId` selecionado para a RPC (atualizar `create_transaction_from_statement` para aceitar `p_bank_account_id uuid DEFAULT NULL` e usar esse valor ao invés de `v_entry.bank_account_id` quando fornecido)
+2. Após sucesso, inserir registro no `reconciliation_audit_log` com `action_type = 'create'`, `operator_name`, `bank_account_id`, `amount`, `statement_entry_id`
 
-### BUG 2 (ALTO): Periodo Anterior Removido -- Trends Sempre Nulos
+## 3. Expandir modal "Banco para Conciliar" (`showBankModal`)
 
-**Diagnostico**: A versao mais recente de `get_reconciliation_kpis` (migration `20260219141008`) removeu completamente o calculo do periodo anterior. O JSON retornado so tem `current`, sem `previous`. No frontend (linhas 293-300), `calcTrend` sempre retorna `null` porque `previousKpis` esta vazio.
+Adicionar ao modal existente (linhas 951-989):
+- **Nome do responsável** — `Input` text (obrigatório)
 
-**Impacto**: Os badges de tendencia ("+X% vs periodo anterior") nunca aparecem. A comparacao temporal esta desabilitada silenciosamente.
+Estado: reutilizar `operatorName`.
 
-**Correcao**: Restaurar o bloco de periodo anterior na RPC, calculando `v_prev_start` e `v_prev_end` da mesma forma que `get_financial_summary` faz (subtraindo a duracao do periodo).
+Atualizar `handleBankModalConfirm` e `executeReconcile` para, após sucesso, inserir audit log com `action_type = 'reconcile'`.
 
----
+## 4. Audit log em todas as ações de conciliação
 
-### BUG 3 (MEDIO): Modo Consolidado Infla KPIs com Transacoes Sem Banco
+Em `executeReconcile`, `handlePartialReconcile`, e `handleAggregateConfirm`: após cada operação bem-sucedida, inserir no `reconciliation_audit_log` via `supabase.from('reconciliation_audit_log').insert(...)`.
 
-**Evidencia SQL**: Existem **170 transacoes sem bank_account_id** no periodo Dec-Feb, sendo 105 delas marcadas como `reconciled = true`. Quando filtrado para "Consolidado (Todos)", tanto a KPI quanto a lista incluem essas 170 transacoes.
+Para fluxos que já têm banco (sem modal), o `operatorName` será solicitado via um prompt inline no action bar antes de executar.
 
-```text
-Scope               | Total | Reconciled | Pending
-all_transactions     |  497  |    432     |   65
-with_bank_only       |  327  |    327     |    0
-```
+## 5. Atualizar RPC `create_transaction_from_statement`
 
-Todos os 65 pendentes sao transacoes SEM banco! Elas aparecem como "aguardando conciliacao" mas nao podem ser conciliadas porque nao estao vinculadas a nenhum banco. O progresso (77%) e artificialmente baixo.
+Adicionar parâmetro opcional `p_bank_account_id uuid DEFAULT NULL`. Quando fornecido, usar esse valor no INSERT ao invés de `v_entry.bank_account_id`. Isso permite atribuir banco a entries importadas sem banco.
 
-**Correcao**: No modo consolidado, filtrar apenas transacoes COM `bank_account_id IS NOT NULL` na RPC de KPIs e na lista paginada. Alternativamente, separar os KPIs em "Com banco" vs "Sem banco" para dar visibilidade sem distorcer o progresso.
+## 6. Histórico detalhado na aba Histórico
 
----
+Criar hook `useAuditLogByBatch(batchId)` que busca registros do `reconciliation_audit_log` cujo `statement_entry_id` pertence ao batch. Exibir na seção de detalhes do batch no `ReconciliationPage` — quem conciliou, quando, valor, banco destino.
 
-### BUG 4 (MEDIO): Type Variants Inconsistentes Entre RPCs
+## Resumo de entregas
+- **1 migration**: UPDATE para arquivar legado + ALTER na RPC `create_transaction_from_statement`
+- **Frontend**: Expandir 2 modais com campos de banco + nome do responsável
+- **Frontend**: Inserir audit logs em todos os fluxos de conciliação
+- **Frontend**: Exibir audit log no histórico de importação
 
-**Diagnostico**: A RPC `get_reconciliation_kpis` verifica `type = 'revenue'` e `type = 'expense'` (exato). Mas `get_financial_summary` e `get_bank_statement_paginated` verificam `type IN ('revenue', 'income', 'Entrada')` e `type IN ('expense', 'despesa', 'Saida')`.
-
-**Status atual**: Nao ha dados com tipos legados (validado por query). Mas e uma brecha: se qualquer fluxo criar transacao com tipo diferente, a KPI de conciliacao vai ignorar.
-
-**Correcao**: Alinhar o `get_reconciliation_kpis` para usar os mesmos IN-lists de tipo que as demais RPCs.
-
----
-
-## Plano de Execucao
-
-### Passo 1: Reescrever `get_reconciliation_kpis` (Migration SQL)
-- Adicionar filtro `bank_account_id IS NOT NULL` quando em modo consolidado
-- Restaurar calculo de periodo anterior (previous period)
-- Alinhar type checks para `IN ('revenue', 'income', 'Entrada')` / `IN ('expense', 'despesa', 'Saida')`
-- Manter assinatura identica (4 params)
-
-### Passo 2: Alinhar "registros encontrados" com KPI total
-- No `ReconciliationPage.tsx`, substituir `{totalCount} registros encontrados` por `{kpis.totalCount} registros encontrados` para usar a mesma fonte dos KPI cards
-- Ou melhor: manter `totalCount` da lista paginada para refletir filtros ativos (status/tipo), e exibir separadamente "X de Y" nos KPIs
-
-### Passo 3: Corrigir lista paginada para modo consolidado
-- Na RPC `get_bank_statement_paginated`, quando `v_bank_uuid IS NULL`, adicionar `AND t.bank_account_id IS NOT NULL` para excluir transacoes sem banco da tela de conciliacao bancaria
-
-### Passo 4: Validacao cruzada pos-correcao
-- Query SQL comparando `total_count` do KPI vs `COUNT(*)` da lista com mesmos filtros
-- Verificar que `reconciled_count + pending_count + ignored_count = total_count`
-- Confirmar que progresso 100% quando todos os itens com banco estao conciliados
