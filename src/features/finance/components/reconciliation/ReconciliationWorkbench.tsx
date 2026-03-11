@@ -221,6 +221,8 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const [selectedSystemIds, setSelectedSystemIds] = useState<string[]>([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [createCategoryId, setCreateCategoryId] = useState('');
+    const [createBankId, setCreateBankId] = useState('');
+    const [operatorName, setOperatorName] = useState('');
     const [bankSearch, setBankSearch] = useState('');
     const [systemSearch, setSystemSearch] = useState('');
     const [showPartialModal, setShowPartialModal] = useState(false);
