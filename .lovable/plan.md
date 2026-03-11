@@ -1,54 +1,74 @@
 
+# Auditoria dos KPIs da Tela de Conciliacao
 
-# Limpar Financeiro + Corrigir "undefined" + Tesouraria independente de período
+## Discrepancias Identificadas (com evidencia SQL)
 
-## Diagnóstico
+### BUG 1 (CRITICO): Contagem "Registros Encontrados" vs "Progresso" Divergentes
 
-1. **249 transações sem banco vinculado**: São 246 `paid`+`confirmed`+`reconciled` (134 despesas + 112 receitas) + 3 `commission_settlement` + 1 `completed`. Todas já estão 100% processadas -- devem ser arquivadas para sumir do banner e do sistema.
+**Evidencia no screenshot**: O header da lista mostra **488 registros encontrados** mas o card de Progresso mostra **298 de 388 conciliados**. Sao duas fontes diferentes:
+- "488 registros" vem da RPC `get_bank_statement_paginated` (campo `total_count` via `COUNT(*) OVER()`)
+- "388 total / 298 conciliados" vem da RPC `get_reconciliation_kpis` (campo `total_count`)
 
-2. **"undefined" na tesouraria**: A RPC `get_payable_receivable_transactions` faz `COALESCE(... a.insurance_company::TEXT ...)` onde `a.insurance_company` é um UUID (FK para `companies`), não o nome. Resultado: mostra o UUID como fallback ou "undefined" quando o join com `transactions` legado também falha. Além disso, há 4 registros PENDENTES na tabela legada `transactions` (3 sem `client_id`) com descrição "Comissão da apólice undefined".
+Ambas as RPCs usam os mesmos filtros base (user_id, banco, datas, is_void). Porem a lista aplica `p_status` e `p_type` como filtros adicionais (mesmo quando "todas/todos" deveria ser identico). A divergencia de 100 itens (488 vs 388) indica que uma das RPCs tem um filtro extra ou diferente.
 
-3. **Tesouraria dependente de período**: Os KPIs de "Próx. Vencimentos" (`useUpcomingReceivables`) e "Aging Report" já são independentes de `dateRange` (não recebem esse parâmetro). Mas o `useReceivablesBySeguradora` consulta `financial_transactions` com filtro `is_confirmed = false AND reconciled = false`, que atualmente retorna 0 registros porque todas as txns desse usuário já estão confirmadas. O problema real é que as comissões pendentes vivem na tabela legada `transactions`, não em `financial_transactions`.
+**Causa provavel**: A RPC paginada faz LEFT JOIN com `bank_statement_entries` e `profiles` que pode gerar duplicatas via `string_agg` no ledger. Ou a KPI RPC nao filtra por `status IN ('confirmed','completed')` enquanto a lista nao filtra por isso tambem -- porem alguma diferenca sutil no WHERE causa a divergencia.
 
-## Plano de Implementação
+**Correcao**: Unificar: a KPI RPC deve usar EXATAMENTE a mesma CTE/WHERE da lista paginada (sem os filtros de status/type). Alternativamente, adicionar um campo `kpi_total_count` na propria RPC paginada para garantir fonte unica.
 
-### 1. Migration SQL: Arquivar os 249+1 unbanked e limpar legado
+---
 
-```sql
--- Arquivar transações sem banco que já estão 100% processadas
-UPDATE financial_transactions SET archived = true
-WHERE user_id = '65b85549-c928-4513-8d56-a3ef41512dc8'
-  AND bank_account_id IS NULL
-  AND COALESCE(archived, false) = false;
+### BUG 2 (ALTO): Periodo Anterior Removido -- Trends Sempre Nulos
 
--- Limpar as 4 transações legadas PENDENTES órfãs (duplicatas + "undefined")
-DELETE FROM transactions
-WHERE user_id = '65b85549-c928-4513-8d56-a3ef41512dc8'
-  AND status = 'PENDENTE'
-  AND nature = 'RECEITA'
-  AND (description ILIKE '%undefined%' OR client_id IS NULL);
+**Diagnostico**: A versao mais recente de `get_reconciliation_kpis` (migration `20260219141008`) removeu completamente o calculo do periodo anterior. O JSON retornado so tem `current`, sem `previous`. No frontend (linhas 293-300), `calcTrend` sempre retorna `null` porque `previousKpis` esta vazio.
+
+**Impacto**: Os badges de tendencia ("+X% vs periodo anterior") nunca aparecem. A comparacao temporal esta desabilitada silenciosamente.
+
+**Correcao**: Restaurar o bloco de periodo anterior na RPC, calculando `v_prev_start` e `v_prev_end` da mesma forma que `get_financial_summary` faz (subtraindo a duracao do periodo).
+
+---
+
+### BUG 3 (MEDIO): Modo Consolidado Infla KPIs com Transacoes Sem Banco
+
+**Evidencia SQL**: Existem **170 transacoes sem bank_account_id** no periodo Dec-Feb, sendo 105 delas marcadas como `reconciled = true`. Quando filtrado para "Consolidado (Todos)", tanto a KPI quanto a lista incluem essas 170 transacoes.
+
+```text
+Scope               | Total | Reconciled | Pending
+all_transactions     |  497  |    432     |   65
+with_bank_only       |  327  |    327     |    0
 ```
 
-### 2. Migration SQL: Corrigir RPC `get_payable_receivable_transactions`
+Todos os 65 pendentes sao transacoes SEM banco! Elas aparecem como "aguardando conciliacao" mas nao podem ser conciliadas porque nao estao vinculadas a nenhum banco. O progresso (77%) e artificialmente baixo.
 
-Substituir `a.insurance_company::TEXT` por um JOIN correto com `companies` para pegar o nome:
-```sql
-LEFT JOIN companies comp ON comp.id = a.insurance_company
--- No COALESCE:
-COALESCE(c_trans.name, c_apolice.name, comp.name, fa.name, 'Não especificado')
-```
+**Correcao**: No modo consolidado, filtrar apenas transacoes COM `bank_account_id IS NOT NULL` na RPC de KPIs e na lista paginada. Alternativamente, separar os KPIs em "Com banco" vs "Sem banco" para dar visibilidade sem distorcer o progresso.
 
-Também adicionar filtro `AND COALESCE(ft.archived, false) = false` que está faltando nessa RPC.
+---
 
-### 3. Migration SQL: Corrigir RPC `get_upcoming_receivables`
+### BUG 4 (MEDIO): Type Variants Inconsistentes Entre RPCs
 
-Mesmo problema: falta `archived` filter e o entity_name pode retornar "undefined" pelo mesmo motivo. Adicionar filtro `AND COALESCE(ft.archived, false) = false` e corrigir o JOIN para resolver o nome via `companies`.
+**Diagnostico**: A RPC `get_reconciliation_kpis` verifica `type = 'revenue'` e `type = 'expense'` (exato). Mas `get_financial_summary` e `get_bank_statement_paginated` verificam `type IN ('revenue', 'income', 'Entrada')` e `type IN ('expense', 'despesa', 'Saida')`.
 
-### 4. Frontend: Sem mudanças
+**Status atual**: Nao ha dados com tipos legados (validado por query). Mas e uma brecha: se qualquer fluxo criar transacao com tipo diferente, a KPI de conciliacao vai ignorar.
 
-Todos os componentes (`UpcomingTransactionsList`, `ReceivablesBySeguradora`, `AccountsPayableReceivableTable`, `ReconciliationPage`) já consomem os dados corretos. Após as correções nas RPCs + limpeza de dados, tudo ficará limpo.
+**Correcao**: Alinhar o `get_reconciliation_kpis` para usar os mesmos IN-lists de tipo que as demais RPCs.
 
-## Resumo
-- **1 migration**: Arquivar 250 unbanked txns + deletar 4 legadas órfãs + fix 2 RPCs (entity_name + archived filter)
-- **0 mudanças frontend**
+---
 
+## Plano de Execucao
+
+### Passo 1: Reescrever `get_reconciliation_kpis` (Migration SQL)
+- Adicionar filtro `bank_account_id IS NOT NULL` quando em modo consolidado
+- Restaurar calculo de periodo anterior (previous period)
+- Alinhar type checks para `IN ('revenue', 'income', 'Entrada')` / `IN ('expense', 'despesa', 'Saida')`
+- Manter assinatura identica (4 params)
+
+### Passo 2: Alinhar "registros encontrados" com KPI total
+- No `ReconciliationPage.tsx`, substituir `{totalCount} registros encontrados` por `{kpis.totalCount} registros encontrados` para usar a mesma fonte dos KPI cards
+- Ou melhor: manter `totalCount` da lista paginada para refletir filtros ativos (status/tipo), e exibir separadamente "X de Y" nos KPIs
+
+### Passo 3: Corrigir lista paginada para modo consolidado
+- Na RPC `get_bank_statement_paginated`, quando `v_bank_uuid IS NULL`, adicionar `AND t.bank_account_id IS NOT NULL` para excluir transacoes sem banco da tela de conciliacao bancaria
+
+### Passo 4: Validacao cruzada pos-correcao
+- Query SQL comparando `total_count` do KPI vs `COUNT(*)` da lista com mesmos filtros
+- Verificar que `reconciled_count + pending_count + ignored_count = total_count`
+- Confirmar que progresso 100% quando todos os itens com banco estao conciliados
