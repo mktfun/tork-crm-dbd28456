@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
@@ -221,6 +222,8 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const [selectedSystemIds, setSelectedSystemIds] = useState<string[]>([]);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [createCategoryId, setCreateCategoryId] = useState('');
+    const [createBankId, setCreateBankId] = useState('');
+    const [operatorName, setOperatorName] = useState('');
     const [bankSearch, setBankSearch] = useState('');
     const [systemSearch, setSystemSearch] = useState('');
     const [showPartialModal, setShowPartialModal] = useState(false);
@@ -351,13 +354,28 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     };
 
     // Execute reconciliation with a given bankId
-    const executeReconcile = async (targetBankId: string) => {
+    const executeReconcile = async (targetBankId: string, opName?: string) => {
+        const finalOpName = opName || operatorName.trim();
         if (selectedStatementIds.length === 1 && selectedSystemIds.length === 1) {
             await reconcilePartial.mutateAsync({
                 statementEntryId: selectedStatementIds[0],
                 systemTransactionId: selectedSystemIds[0],
                 targetBankId,
             });
+            // Audit log
+            try {
+                const entry = statementItems.find(i => i.id === selectedStatementIds[0]);
+                await supabase.from('reconciliation_audit_log').insert({
+                    user_id: (await supabase.auth.getUser()).data.user?.id,
+                    action_type: 'reconcile',
+                    statement_entry_id: selectedStatementIds[0],
+                    system_transaction_id: selectedSystemIds[0],
+                    bank_account_id: targetBankId,
+                    amount: entry?.amount ? Math.abs(entry.amount) : 0,
+                    operator_name: finalOpName || 'Sistema',
+                    details: { method: 'manual_1to1' },
+                });
+            } catch { /* best-effort */ }
         } else {
             for (const stmtId of selectedStatementIds) {
                 for (const sysId of selectedSystemIds) {
@@ -367,12 +385,27 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                             systemTransactionId: sysId,
                             targetBankId,
                         });
+                        // Audit log
+                        try {
+                            const entry = statementItems.find(i => i.id === stmtId);
+                            await supabase.from('reconciliation_audit_log').insert({
+                                user_id: (await supabase.auth.getUser()).data.user?.id,
+                                action_type: 'reconcile',
+                                statement_entry_id: stmtId,
+                                system_transaction_id: sysId,
+                                bank_account_id: targetBankId,
+                                amount: entry?.amount ? Math.abs(entry.amount) : 0,
+                                operator_name: finalOpName || 'Sistema',
+                                details: { method: 'manual_NtoM' },
+                            });
+                        } catch { /* best-effort */ }
                     } catch { /* skip duplicates */ }
                 }
             }
         }
         setSelectedStatementIds([]);
         setSelectedSystemIds([]);
+        setOperatorName('');
     };
 
     // Reconcile handler (1:1 or N:M via multiple calls)
@@ -430,23 +463,40 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
 
     const handleCreateTransaction = async () => {
-        if (!createCategoryId || selectedStatementIds.length === 0) return;
+        if (!createCategoryId || selectedStatementIds.length === 0 || !operatorName.trim()) return;
         const total = selectedStatementIds.length;
         let successCount = 0;
         setBulkProgress({ current: 0, total });
         for (let i = 0; i < total; i++) {
             setBulkProgress({ current: i + 1, total });
             try {
-                await createFromStatement.mutateAsync({
+                const entry = statementItems.find(it => it.id === selectedStatementIds[i]);
+                const result = await createFromStatement.mutateAsync({
                     statementEntryId: selectedStatementIds[i],
                     categoryAccountId: createCategoryId,
+                    bankAccountId: createBankId || undefined,
                 });
                 successCount++;
+                // Insert audit log
+                try {
+                    await supabase.from('reconciliation_audit_log').insert({
+                        user_id: (await supabase.auth.getUser()).data.user?.id,
+                        action_type: 'create',
+                        statement_entry_id: selectedStatementIds[i],
+                        system_transaction_id: result.transaction_id || null,
+                        bank_account_id: createBankId || entry?.bank_account_id || null,
+                        amount: entry?.amount ? Math.abs(entry.amount) : 0,
+                        operator_name: operatorName.trim(),
+                        details: { category_id: createCategoryId },
+                    });
+                } catch { /* audit log is best-effort */ }
             } catch { /* skip */ }
         }
         setBulkProgress(null);
         setShowCreateModal(false);
         setCreateCategoryId('');
+        setCreateBankId('');
+        setOperatorName('');
         setSelectedStatementIds([]);
         toast.success(`${successCount} lançamento${successCount > 1 ? 's' : ''} criado${successCount > 1 ? 's' : ''} com sucesso!`);
     };
@@ -467,10 +517,23 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
         if (selectedStatementIds.length < 1 || !selectedAggregateId) return;
         for (const stmtId of selectedStatementIds) {
             try {
+                const entry = statementItems.find(i => i.id === stmtId);
                 await reconcileAggregate.mutateAsync({
                     statementEntryId: stmtId,
                     insuranceCompanyId: selectedAggregateId,
                 });
+                // Audit log for aggregate FIFO
+                try {
+                    await supabase.from('reconciliation_audit_log').insert({
+                        user_id: (await supabase.auth.getUser()).data.user?.id,
+                        action_type: 'fifo',
+                        statement_entry_id: stmtId,
+                        bank_account_id: entry?.bank_account_id || null,
+                        amount: entry?.amount ? Math.abs(entry.amount) : 0,
+                        operator_name: operatorName.trim() || 'Sistema',
+                        details: { insurance_company_id: selectedAggregateId, method: 'aggregate_fifo' },
+                    });
+                } catch { /* best-effort */ }
             } catch { /* skip if already reconciled */ }
         }
         setShowAggregateModal(false);
@@ -899,6 +962,37 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                 </div>
                             );
                         })()}
+
+                        {/* Bank selector */}
+                        <div>
+                            <label className="text-sm font-medium text-foreground mb-1.5 block">
+                                Banco de Destino
+                            </label>
+                            <Select value={createBankId} onValueChange={setCreateBankId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o banco..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {bankAccounts.map((account) => (
+                                        <SelectItem key={account.id} value={account.id}>
+                                            {account.bankName}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Operator name */}
+                        <div>
+                            <label className="text-sm font-medium text-foreground mb-1.5 block">
+                                Nome do Responsável *
+                            </label>
+                            <Input
+                                placeholder="Quem está processando..."
+                                value={operatorName}
+                                onChange={(e) => setOperatorName(e.target.value)}
+                            />
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowCreateModal(false)}>
@@ -906,7 +1000,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                         </Button>
                         <Button
                             onClick={handleCreateTransaction}
-                            disabled={!createCategoryId || createFromStatement.isPending || !!bulkProgress || (() => { const sel = statementItems.filter(i => selectedStatementIds.includes(i.id)); return sel.some(e => e.amount >= 0) && sel.some(e => e.amount < 0); })()}
+                            disabled={!createCategoryId || !operatorName.trim() || createFromStatement.isPending || !!bulkProgress || (() => { const sel = statementItems.filter(i => selectedStatementIds.includes(i.id)); return sel.some(e => e.amount >= 0) && sel.some(e => e.amount < 0); })()}
                             className="gap-2"
                         >
                             {bulkProgress ? (
@@ -973,13 +1067,23 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                 ))}
                             </SelectContent>
                         </Select>
+                        <div>
+                            <label className="text-sm font-medium text-foreground mb-1.5 block">
+                                Nome do Responsável *
+                            </label>
+                            <Input
+                                placeholder="Quem está processando..."
+                                value={operatorName}
+                                onChange={(e) => setOperatorName(e.target.value)}
+                            />
+                        </div>
                     </div>
                     <DialogFooter className="gap-2">
                         <Button variant="outline" onClick={() => setShowBankModal(false)}>
                             Cancelar
                         </Button>
                         <Button
-                            disabled={!selectedBankForMatch || reconcilePartial.isPending}
+                            disabled={!selectedBankForMatch || !operatorName.trim() || reconcilePartial.isPending}
                             onClick={handleBankModalConfirm}
                         >
                             {reconcilePartial.isPending ? 'Conciliando...' : 'Vincular e Conciliar'}

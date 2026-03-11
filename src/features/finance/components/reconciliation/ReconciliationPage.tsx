@@ -76,6 +76,7 @@ import {
     type ImportHistoryItem,
     type BankStatementEntry,
 } from '@/features/finance/api/useReconciliation';
+import { useAuditLogByBatch } from '@/features/finance/api/useReconciliationAuditLog';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { StatementImporter } from './StatementImporter';
 import { ReconciliationWorkbench } from './ReconciliationWorkbench';
@@ -314,6 +315,7 @@ export function ReconciliationPage() {
     // Import History
     const { data: importHistory = [], isLoading: isLoadingHistory } = useImportHistory(selectedBankAccountId);
     const { data: batchEntries = [], isLoading: isLoadingBatch } = useImportBatchEntries(selectedBatchId);
+    const { data: batchAuditLogs = [], isLoading: isLoadingAuditLogs } = useAuditLogByBatch(selectedBatchId);
 
     // Mutations
     const reconcileMutation = useReconcileTransactionDirectly();
@@ -1160,6 +1162,39 @@ export function ReconciliationPage() {
                                     </span>
                                 </div>
                             </>
+                        )}
+
+                        {/* Audit Log Section */}
+                        {batchAuditLogs.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-border">
+                                <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                                    <UserCheck className="w-4 h-4 text-primary" />
+                                    Histórico de Conciliação ({batchAuditLogs.length})
+                                </p>
+                                <div className="max-h-40 overflow-auto space-y-1.5">
+                                    {batchAuditLogs.map((log) => (
+                                        <div key={log.id} className="flex items-center justify-between p-2 bg-muted/30 rounded border border-border/30 text-xs">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-medium text-foreground">
+                                                    {log.operator_name}
+                                                    <span className="text-muted-foreground ml-1.5">
+                                                        ({log.action_type === 'create' ? 'Criou' : log.action_type === 'reconcile' ? 'Conciliou' : log.action_type === 'fifo' ? 'FIFO' : log.action_type})
+                                                    </span>
+                                                </p>
+                                                <p className="text-muted-foreground">
+                                                    {new Date(log.created_at).toLocaleString('pt-BR')}
+                                                </p>
+                                            </div>
+                                            <p className="font-semibold text-foreground shrink-0 ml-2">
+                                                {formatCurrency(log.amount)}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {isLoadingAuditLogs && (
+                            <div className="text-xs text-muted-foreground text-center py-2">Carregando histórico...</div>
                         )}
                     </div>
                     <DialogFooter>

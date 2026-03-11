@@ -600,15 +600,18 @@ export function useCreateFromStatement() {
             statementEntryId,
             categoryAccountId,
             description,
+            bankAccountId,
         }: {
             statementEntryId: string;
             categoryAccountId: string;
             description?: string;
+            bankAccountId?: string;
         }) => {
             const { data, error } = await (supabase.rpc as any)('create_transaction_from_statement', {
                 p_statement_entry_id: statementEntryId,
                 p_category_account_id: categoryAccountId,
                 p_description: description || null,
+                p_bank_account_id: bankAccountId || null,
             });
 
             if (error) throw error;
