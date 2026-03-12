@@ -274,7 +274,9 @@ serve(async (req) => {
           console.error('Connection validation failed:', error);
           
           let message = 'Erro desconhecido';
-          if (error.message?.includes('401')) {
+          if (error.message?.includes('dns') || error.message?.includes('lookup')) {
+            message = 'Domínio do Chatwoot não encontrado. Verifique se a URL está correta e acessível publicamente.';
+          } else if (error.message?.includes('401')) {
             message = 'Token de API inválido';
           } else if (error.message?.includes('404')) {
             message = 'URL ou Account ID incorretos';
