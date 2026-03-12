@@ -10,6 +10,30 @@ const N8N_WEBHOOK_URL = Deno.env.get('N8N_WEBHOOK_URL')
 // Initialize Supabase Client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+// Helper function to resolve brokerage and user role
+async function resolveBrokerageAndRole(assigneeEmail: string | null, conversation: any) {
+    if (!assigneeEmail) return { userId: null, brokerageId: null, isCorretor: false };
+
+    const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, brokerage_id')
+        .eq('email', assigneeEmail)
+        .maybeSingle();
+
+    if (profileError || !profile) {
+        console.warn(`Could not resolve profile for email: ${assigneeEmail}`);
+        return { userId: null, brokerageId: null, isCorretor: false };
+    }
+
+    const isCorretor = conversation?.labels?.includes('Corretor') || conversation?.labels?.includes('Admin');
+
+    return {
+        userId: profile.id,
+        brokerageId: profile.brokerage_id,
+        isCorretor: !!isCorretor
+    };
+}
+
 Deno.serve(async (req) => {
     try {
         const body = await req.json()
@@ -22,24 +46,107 @@ Deno.serve(async (req) => {
             })
         }
 
-        const { conversation, sender } = body
-        const assigneeEmail = conversation?.meta?.assignee?.email
-        const inboxId = conversation?.inbox_id
+        const { conversation, sender, content } = body;
+        const assigneeEmail = conversation?.meta?.assignee?.email;
+        const inboxId = conversation?.inbox_id;
 
-        console.log(`🕵️ Resolving User for: ${assigneeEmail || 'No Assignee'} (Inbox: ${inboxId})`)
+        // Resolve user and role
+        const { userId, brokerageId, isCorretor } = await resolveBrokerageAndRole(assigneeEmail, conversation);
 
-        // 2. Resolve CRM User (The Agent)
-        let userId = null
+        // --- Start of Analysis Session Logic ---
+        if (isCorretor && userId && brokerageId) {
+            console.log(`👨‍💼 Corrector detected: ${userId}`);
+            const messageContent = (content || '').toLowerCase().trim();
+            const triggerKeyword = 'analisar';
+            const finalizeKeyword = 'processar';
 
-        if (assigneeEmail) {
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('id')
-                .eq('email', assigneeEmail)
-                .maybeSingle()
+            // Check for active session for this user
+            const { data: activeSession, error: sessionError } = await supabase
+                .from('ai_analysis_sessions')
+                .select('id, collected_data')
+                .eq('user_id', userId)
+                .eq('status', 'compiling')
+                .maybeSingle();
 
-            if (profile) userId = profile.id
+            if (sessionError) {
+                console.error("Error fetching session:", sessionError.message);
+                // Continue to default logic even if session check fails
+            } else if (activeSession) {
+                // --- Active session found, append data or finalize ---
+                const collectedData = activeSession.collected_data || [];
+                collectedData.push(body); // Add the whole message body for context
+
+                if (messageContent.includes(finalizeKeyword)) {
+                    // Finalize session
+                    console.log(`✅ Finalizing session ${activeSession.id}`);
+                    const { error: updateError } = await supabase
+                        .from('ai_analysis_sessions')
+                        .update({ status: 'ready_for_processing', collected_data: collectedData })
+                        .eq('id', activeSession.id);
+
+                    if (updateError) {
+                      console.error("Error finalizing session:", updateError.message);
+                    } else {
+                       // Asynchronously trigger the processing function without blocking the response
+                       supabase.functions.invoke('process-analysis-session', { body: { session_id: activeSession.id } }).catch(console.error);
+                    }
+                    
+                    return new Response(JSON.stringify({ message: "Análise iniciada. Você será notificado quando terminar." }), {
+                        headers: { "Content-Type": "application/json" },
+                    });
+                } else {
+                    // Append to session
+                    console.log(`📥 Appending data to session ${activeSession.id}`);
+                    const { error: updateError } = await supabase
+                        .from('ai_analysis_sessions')
+                        .update({ collected_data: collectedData, expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() })
+                        .eq('id', activeSession.id);
+                    
+                    if (updateError) console.error("Error updating session:", updateError.message);
+
+                    return new Response(JSON.stringify({ message: "Dados recebidos. Envie 'processar' quando terminar." }), {
+                        headers: { "Content-Type": "application/json" },
+                    });
+                }
+            } else if (messageContent.includes(triggerKeyword)) {
+                // --- No active session, create a new one ---
+                console.log(`🚀 Creating new analysis session for user ${userId}`);
+                const { error: createError } = await supabase
+                    .from('ai_analysis_sessions')
+                    .insert({
+                        user_id: userId,
+                        brokerage_id: brokerageId,
+                        chatwoot_conversation_id: conversation.id,
+                        status: 'compiling',
+                        collected_data: [body],
+                    });
+
+                if (createError) console.error("Error creating session:", createError.message);
+                
+                return new Response(JSON.stringify({ message: "Modo de análise iniciado. Envie todos os arquivos e áudios. Digite 'processar' para finalizar." }), {
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
         }
+        // --- End of Analysis Session Logic. Fallback to original logic below ---
+        
+        console.log(`🕵️ Resolving User for: ${assigneeEmail || 'No Assignee'} (Inbox: ${inboxId})`)
+        
+        // 2. Resolve CRM User (The Agent) - This part of the original code is now redundant if the above runs.
+        // We'll keep the variable for the old flow.
+        let resolvedUserId = userId;
+        if (!resolvedUserId) {
+             if (assigneeEmail) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('email', assigneeEmail)
+                    .maybeSingle()
+
+                if (profile) resolvedUserId = profile.id;
+            }
+        }
+
 
         // 3. Resolve Deal & Stage Context
         let currentDeal = null

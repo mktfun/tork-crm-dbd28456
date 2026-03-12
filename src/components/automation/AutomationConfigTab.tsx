@@ -50,8 +50,8 @@ export function AutomationConfigTab() {
   const fetchSettings = async () => {
     try {
       const { data, error } = await supabase
-        .from('crm_settings')
-        .select('*')
+        .from('brokerages')
+        .select('id, user_id, chatwoot_url, chatwoot_token, chatwoot_account_id, n8n_webhook_url, chatwoot_webhook_secret')
         .eq('user_id', user?.id)
         .maybeSingle();
 
@@ -61,7 +61,7 @@ export function AutomationConfigTab() {
         setSettings({
           id: data.id,
           chatwoot_url: data.chatwoot_url || '',
-          chatwoot_api_key: data.chatwoot_api_key || '',
+          chatwoot_api_key: data.chatwoot_token || '',
           chatwoot_account_id: data.chatwoot_account_id || '',
           chatwoot_webhook_secret: data.chatwoot_webhook_secret || '',
           n8n_webhook_url: data.n8n_webhook_url || ''
@@ -82,24 +82,18 @@ export function AutomationConfigTab() {
       const payload = {
         user_id: user.id,
         chatwoot_url: settings.chatwoot_url || null,
-        chatwoot_api_key: settings.chatwoot_api_key || null,
+        chatwoot_token: settings.chatwoot_api_key || null,
         chatwoot_account_id: settings.chatwoot_account_id || null,
         chatwoot_webhook_secret: settings.chatwoot_webhook_secret || null,
         n8n_webhook_url: settings.n8n_webhook_url || null
       };
 
-      if (settings.id) {
-        const { error } = await supabase
-          .from('crm_settings')
-          .update(payload)
-          .eq('id', settings.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('crm_settings')
-          .insert(payload);
-        if (error) throw error;
-      }
+      const { error } = await supabase
+        .from('brokerages')
+        .update(payload)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
 
       toast.success('Configurações salvas com sucesso!');
       fetchSettings();
