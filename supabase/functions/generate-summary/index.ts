@@ -22,11 +22,11 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const geminiKey = Deno.env.get("GOOGLE_AI_API_KEY");
+    const apiKey = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!geminiKey) {
+    if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: "GOOGLE_AI_API_KEY not configured" }),
+        JSON.stringify({ error: "LOVABLE_API_KEY not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -71,8 +71,8 @@ Deno.serve(async (req) => {
     console.log(`[SUMMARY] Gathering data for user ${user.id}, scope=${scope}, focus=${focus}`);
     const context = await gatherContext(supabase, user.id, scope, focus);
 
-    // Call Gemini
-    const summary = await callGemini(geminiKey, context, scope, focus);
+    // Call AI
+    const summary = await callAI(apiKey, context, scope, focus);
 
     // Save to cache (upsert)
     await supabase.from("ai_summaries").upsert(
@@ -219,7 +219,7 @@ async function gatherContext(
   return parts.join("\n\n") || "Sem dados disponíveis para análise.";
 }
 
-async function callGemini(apiKey: string, context: string, scope: string, focus: string): Promise<string> {
+async function callAI(apiKey: string, context: string, scope: string, focus: string): Promise<string> {
   const scopeLabel = scope === "day" ? "do dia" : scope === "week" ? "da semana" : "do mês";
   const focusLabel =
     focus === "finance" ? "financeiro" : focus === "crm" ? "de vendas e CRM" : "geral da operação";
@@ -237,25 +237,29 @@ REGRAS ABSOLUTAS:
 
   const userPrompt = `Analise os dados ${scopeLabel} com foco ${focusLabel} e gere um resumo executivo:\n\n${context}`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        generationConfig: { temperature: 0.3, maxOutputTokens: 300 },
-      }),
-    }
-  );
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 300,
+      temperature: 0.3,
+    }),
+  });
 
   if (!response.ok) {
     const errText = await response.text();
-    console.error("[SUMMARY] Gemini error:", errText);
+    console.error("[SUMMARY] AI Gateway error:", response.status, errText);
     throw new Error("Falha ao gerar resumo com IA");
   }
 
   const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resumo disponível.";
+  return data.choices?.[0]?.message?.content || "Sem resumo disponível.";
 }
