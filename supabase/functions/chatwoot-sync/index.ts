@@ -205,8 +205,8 @@ serve(async (req) => {
 
     console.log('CRM Sync action:', action, 'for user:', user.id);
 
-    // Get Chatwoot config
-    const config = await getChatwootConfig(supabase, user.id);
+    // Get Chatwoot config (prefer config_override from request body)
+    const config = await getChatwootConfig(supabase, user.id, body.config_override);
     
     if (!config) {
       return new Response(
