@@ -49,25 +49,57 @@ function formatPhoneToE164(phone: string | null): string | undefined {
   return undefined;
 }
 
-async function getChatwootConfig(supabase: any, userId: string): Promise<ChatwootConfig | null> {
-  // First try brokerages table (new approach - multi-tenant)
-  const { data: brokerage, error: brokerageError } = await supabase
-    .from('brokerages')
-    .select('chatwoot_url, chatwoot_token, chatwoot_account_id')
-    .eq('user_id', userId)
-    .maybeSingle();
+/** Normalize a Chatwoot base URL: trim, strip /api/v1, strip trailing slashes */
+function normalizeBaseUrl(url: string): string {
+  return url.trim().replace(/\/api\/v1\/?$/i, '').replace(/\/+$/, '');
+}
 
-  if (brokerage?.chatwoot_url && brokerage?.chatwoot_token && brokerage?.chatwoot_account_id) {
-    console.log('Using Chat Tork config from brokerages table');
+async function getChatwootConfig(supabase: any, userId: string, configOverride?: any): Promise<ChatwootConfig | null> {
+  // 1) If caller sent config_override with all 3 fields, use it directly (test/sync from UI)
+  if (configOverride?.chatwoot_url && configOverride?.chatwoot_api_key && configOverride?.chatwoot_account_id) {
+    console.log('Using config_override from request body');
     return {
-      chatwoot_url: brokerage.chatwoot_url,
-      chatwoot_api_key: brokerage.chatwoot_token,
-      chatwoot_account_id: brokerage.chatwoot_account_id
+      chatwoot_url: normalizeBaseUrl(configOverride.chatwoot_url),
+      chatwoot_api_key: configOverride.chatwoot_api_key,
+      chatwoot_account_id: configOverride.chatwoot_account_id,
     };
   }
 
-  // If we reach here, the config is incomplete or missing.
-  console.log('No complete Chat Tork config found for user in brokerages table:', userId);
+  // 2) Fetch both sources in parallel
+  const [brokRes, crmRes] = await Promise.all([
+    supabase.from('brokerages').select('chatwoot_url, chatwoot_token, chatwoot_account_id, updated_at').eq('user_id', userId).maybeSingle(),
+    supabase.from('crm_settings').select('chatwoot_url, chatwoot_api_key, chatwoot_account_id, updated_at').eq('user_id', userId).maybeSingle(),
+  ]);
+
+  const brok = brokRes.data;
+  const crm = crmRes.data;
+
+  const brokComplete = brok?.chatwoot_url && brok?.chatwoot_token && brok?.chatwoot_account_id;
+  const crmComplete = crm?.chatwoot_url && crm?.chatwoot_api_key && crm?.chatwoot_account_id;
+
+  // Pick the most recently updated complete config
+  if (brokComplete && crmComplete) {
+    const brokTime = new Date(brok.updated_at || 0).getTime();
+    const crmTime = new Date(crm.updated_at || 0).getTime();
+    if (crmTime >= brokTime) {
+      console.log('Using Chat Tork config from crm_settings (newer)');
+      return { chatwoot_url: normalizeBaseUrl(crm.chatwoot_url), chatwoot_api_key: crm.chatwoot_api_key, chatwoot_account_id: crm.chatwoot_account_id };
+    }
+    console.log('Using Chat Tork config from brokerages (newer)');
+    return { chatwoot_url: normalizeBaseUrl(brok.chatwoot_url), chatwoot_api_key: brok.chatwoot_token, chatwoot_account_id: brok.chatwoot_account_id };
+  }
+
+  if (crmComplete) {
+    console.log('Using Chat Tork config from crm_settings');
+    return { chatwoot_url: normalizeBaseUrl(crm.chatwoot_url), chatwoot_api_key: crm.chatwoot_api_key, chatwoot_account_id: crm.chatwoot_account_id };
+  }
+
+  if (brokComplete) {
+    console.log('Using Chat Tork config from brokerages');
+    return { chatwoot_url: normalizeBaseUrl(brok.chatwoot_url), chatwoot_api_key: brok.chatwoot_token, chatwoot_account_id: brok.chatwoot_account_id };
+  }
+
+  console.log('No complete Chat Tork config found for user:', userId);
   return null;
 }
 
