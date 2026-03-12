@@ -71,8 +71,8 @@ Deno.serve(async (req) => {
     console.log(`[SUMMARY] Gathering data for user ${user.id}, scope=${scope}, focus=${focus}`);
     const context = await gatherContext(supabase, user.id, scope, focus);
 
-    // Call Gemini
-    const summary = await callGemini(geminiKey, context, scope, focus);
+    // Call AI
+    const summary = await callAI(apiKey, context, scope, focus);
 
     // Save to cache (upsert)
     await supabase.from("ai_summaries").upsert(
