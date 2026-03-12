@@ -10,12 +10,18 @@ import { Save, MessageCircle, ExternalLink, Eye, EyeOff, Loader2, RefreshCw, Wif
 import { InboxAgentMapping } from '@/components/settings/InboxAgentMapping';
 
 interface AutomationSettings {
-  id?: string;
+  brokerageId?: number;
+  crmSettingsId?: string;
   chatwoot_url: string;
   chatwoot_api_key: string;
   chatwoot_account_id: string;
   chatwoot_webhook_secret: string;
   n8n_webhook_url: string;
+}
+
+/** Remove trailing slashes and /api/v1 suffix */
+function sanitizeUrl(url: string): string {
+  return url.trim().replace(/\/api\/v1\/?$/i, '').replace(/\/+$/, '');
 }
 
 export function AutomationConfigTab() {
@@ -49,26 +55,40 @@ export function AutomationConfigTab() {
 
   const fetchSettings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('brokerages')
-        .select('id, user_id, chatwoot_url, chatwoot_token, chatwoot_account_id, n8n_webhook_url, chatwoot_webhook_secret')
-        .eq('user_id', user?.id)
-        .maybeSingle();
+      // Fetch from both sources in parallel
+      const [brokerageRes, crmRes] = await Promise.all([
+        supabase
+          .from('brokerages')
+          .select('id, chatwoot_url, chatwoot_token, chatwoot_account_id, updated_at')
+          .eq('user_id', user?.id ?? '')
+          .maybeSingle(),
+        supabase
+          .from('crm_settings')
+          .select('id, chatwoot_url, chatwoot_api_key, chatwoot_account_id, chatwoot_webhook_secret, n8n_webhook_url, updated_at')
+          .eq('user_id', user?.id ?? '')
+          .maybeSingle()
+      ]);
 
-      if (error) throw error;
+      const brok = brokerageRes.data;
+      const crm = crmRes.data;
 
-      if (data) {
-        setSettings({
-          id: data.id,
-          chatwoot_url: data.chatwoot_url || '',
-          chatwoot_api_key: data.chatwoot_token || '',
-          chatwoot_account_id: data.chatwoot_account_id || '',
-          chatwoot_webhook_secret: data.chatwoot_webhook_secret || '',
-          n8n_webhook_url: data.n8n_webhook_url || ''
-        });
-      }
+      // Merge: crm_settings takes priority for webhook_secret and n8n; for chatwoot creds use most recent
+      const brokDate = brok?.updated_at ? new Date(brok.updated_at).getTime() : 0;
+      const crmDate = crm?.updated_at ? new Date(crm.updated_at).getTime() : 0;
+      const useCrmCreds = crmDate >= brokDate && crm?.chatwoot_url;
+
+      setSettings({
+        brokerageId: brok?.id ?? undefined,
+        crmSettingsId: crm?.id ?? undefined,
+        chatwoot_url: (useCrmCreds ? crm?.chatwoot_url : brok?.chatwoot_url) || '',
+        chatwoot_api_key: (useCrmCreds ? crm?.chatwoot_api_key : brok?.chatwoot_token) || '',
+        chatwoot_account_id: (useCrmCreds ? crm?.chatwoot_account_id : brok?.chatwoot_account_id) || '',
+        chatwoot_webhook_secret: crm?.chatwoot_webhook_secret || '',
+        n8n_webhook_url: crm?.n8n_webhook_url || ''
+      });
     } catch (error) {
       console.error('Error fetching settings:', error);
+      toast.error('Erro ao carregar configurações');
     } finally {
       setLoading(false);
     }
@@ -78,32 +98,62 @@ export function AutomationConfigTab() {
     if (!user) return;
     setSaving(true);
 
+    const cleanUrl = sanitizeUrl(settings.chatwoot_url);
+
     try {
-      const payload = {
+      // 1) Update brokerages (only columns that exist there)
+      if (settings.brokerageId) {
+        const { error: brokErr } = await supabase
+          .from('brokerages')
+          .update({
+            chatwoot_url: cleanUrl || null,
+            chatwoot_token: settings.chatwoot_api_key || null,
+            chatwoot_account_id: settings.chatwoot_account_id || null,
+          })
+          .eq('id', settings.brokerageId)
+          .eq('user_id', user.id);
+        if (brokErr) throw brokErr;
+      }
+
+      // 2) Upsert crm_settings (webhook_secret + n8n + mirror of creds)
+      const crmPayload = {
         user_id: user.id,
-        chatwoot_url: settings.chatwoot_url || null,
-        chatwoot_token: settings.chatwoot_api_key || null,
+        chatwoot_url: cleanUrl || null,
+        chatwoot_api_key: settings.chatwoot_api_key || null,
         chatwoot_account_id: settings.chatwoot_account_id || null,
         chatwoot_webhook_secret: settings.chatwoot_webhook_secret || null,
-        n8n_webhook_url: settings.n8n_webhook_url || null
+        n8n_webhook_url: settings.n8n_webhook_url || null,
       };
 
-      const { error } = await supabase
-        .from('brokerages')
-        .update(payload)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
+      if (settings.crmSettingsId) {
+        const { error: crmErr } = await supabase
+          .from('crm_settings')
+          .update(crmPayload)
+          .eq('id', settings.crmSettingsId);
+        if (crmErr) throw crmErr;
+      } else {
+        const { error: crmErr } = await supabase
+          .from('crm_settings')
+          .insert(crmPayload);
+        if (crmErr) throw crmErr;
+      }
 
       toast.success('Configurações salvas com sucesso!');
       fetchSettings();
     } catch (error: any) {
       console.error('Error saving settings:', error);
-      toast.error('Erro ao salvar configurações');
+      toast.error('Erro ao salvar: ' + (error.message || 'Verifique os dados'));
     } finally {
       setSaving(false);
     }
   };
+
+  /** Send config_override so test uses what's on screen, not stale DB */
+  const buildConfigOverride = () => ({
+    chatwoot_url: sanitizeUrl(settings.chatwoot_url),
+    chatwoot_api_key: settings.chatwoot_api_key,
+    chatwoot_account_id: settings.chatwoot_account_id,
+  });
 
   const handleTestChatwoot = async () => {
     if (!settings.chatwoot_url || !settings.chatwoot_api_key || !settings.chatwoot_account_id) {
@@ -116,7 +166,7 @@ export function AutomationConfigTab() {
     
     try {
       const { data, error } = await supabase.functions.invoke('chatwoot-sync', {
-        body: { action: 'validate' }
+        body: { action: 'validate', config_override: buildConfigOverride() }
       });
 
       toast.dismiss(toastId);
@@ -147,7 +197,7 @@ export function AutomationConfigTab() {
     
     try {
       const { data, error } = await supabase.functions.invoke('chatwoot-sync', {
-        body: { action: 'sync_stages' }
+        body: { action: 'sync_stages', config_override: buildConfigOverride() }
       });
 
       toast.dismiss(toastId);

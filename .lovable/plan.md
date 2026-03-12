@@ -1,80 +1,74 @@
 
-Do I know what the issue is? Sim.
+# Auditoria dos KPIs da Tela de Conciliacao
 
-## Diagnóstico confirmado (com evidência)
+## Discrepancias Identificadas (com evidencia SQL)
 
-1. A aba está quebrando porque `AutomationConfigTab` consulta/atualiza colunas que **não existem** em `brokerages`:
-   - `n8n_webhook_url`
-   - `chatwoot_webhook_secret`
-   Isso gera 400 (`column brokerages.n8n_webhook_url does not exist`) e quebra save/load.
+### BUG 1 (CRITICO): Contagem "Registros Encontrados" vs "Progresso" Divergentes
 
-2. O teste usa config antiga porque `chatwoot-sync` lê somente `brokerages`, e lá está salvo:
-   - `https://chat.davicode.me/`
-   enquanto em `crm_settings` já existe URL nova.
-   Resultado: teste chama domínio antigo e falha com DNS.
+**Evidencia no screenshot**: O header da lista mostra **488 registros encontrados** mas o card de Progresso mostra **298 de 388 conciliados**. Sao duas fontes diferentes:
+- "488 registros" vem da RPC `get_bank_statement_paginated` (campo `total_count` via `COUNT(*) OVER()`)
+- "388 total / 298 conciliados" vem da RPC `get_reconciliation_kpis` (campo `total_count`)
 
-3. Há bug de normalização de URL (`...me//api/v1...`) por concatenação com barra final.
+Ambas as RPCs usam os mesmos filtros base (user_id, banco, datas, is_void). Porem a lista aplica `p_status` e `p_type` como filtros adicionais (mesmo quando "todas/todos" deveria ser identico). A divergencia de 100 itens (488 vs 388) indica que uma das RPCs tem um filtro extra ou diferente.
 
-## Plano de correção (passo a passo)
+**Causa provavel**: A RPC paginada faz LEFT JOIN com `bank_statement_entries` e `profiles` que pode gerar duplicatas via `string_agg` no ledger. Ou a KPI RPC nao filtra por `status IN ('confirmed','completed')` enquanto a lista nao filtra por isso tambem -- porem alguma diferenca sutil no WHERE causa a divergencia.
 
-### 1) Consertar a aba “Configurações” (fonte de dados correta)
-**Arquivo:** `src/components/automation/AutomationConfigTab.tsx`
+**Correcao**: Unificar: a KPI RPC deve usar EXATAMENTE a mesma CTE/WHERE da lista paginada (sem os filtros de status/type). Alternativamente, adicionar um campo `kpi_total_count` na propria RPC paginada para garantir fonte unica.
 
-- Separar leitura em 2 queries:
-  - `brokerages`: `id, user_id, chatwoot_url, chatwoot_token, chatwoot_account_id, updated_at`
-  - `crm_settings`: `id, chatwoot_url, chatwoot_api_key, chatwoot_account_id, chatwoot_webhook_secret, n8n_webhook_url, updated_at`
-- Remover `n8n_webhook_url` e `chatwoot_webhook_secret` de qualquer select/update em `brokerages`.
-- Save em duas partes:
-  - Atualiza `brokerages` com credenciais Chatwoot (url/token/account_id).
-  - Atualiza/insere `crm_settings` com webhook secret + n8n + espelho das credenciais.
-- Exibir erro real no toast (não genérico), para troubleshooting imediato.
-- Sanitizar URL antes de salvar (trim, remover `/api/v1`, remover barras finais).
+---
 
-### 2) Fazer o teste usar o valor atual da tela (não ficar preso no antigo)
-**Arquivos:**  
-- `src/components/automation/AutomationConfigTab.tsx`
-- `supabase/functions/chatwoot-sync/index.ts`
+### BUG 2 (ALTO): Periodo Anterior Removido -- Trends Sempre Nulos
 
-- Em `handleTestChatwoot` e `handleSyncLabels`, enviar `config_override` no body (`chatwoot_url`, `chatwoot_api_key`, `chatwoot_account_id`).
-- No `chatwoot-sync`, priorizar `config_override` quando vier completo.
-- Se não vier override, buscar brokerages + crm_settings e escolher config válida mais recente (`updated_at`), com fallback de compatibilidade.
+**Diagnostico**: A versao mais recente de `get_reconciliation_kpis` (migration `20260219141008`) removeu completamente o calculo do periodo anterior. O JSON retornado so tem `current`, sem `previous`. No frontend (linhas 293-300), `calcTrend` sempre retorna `null` porque `previousKpis` esta vazio.
 
-### 3) Auto-correção de dados para remover config velha
-**Arquivo novo:** `supabase/migrations/<timestamp>_sync_chatwoot_config.sql`
+**Impacto**: Os badges de tendencia ("+X% vs periodo anterior") nunca aparecem. A comparacao temporal esta desabilitada silenciosamente.
 
-- Rodar update de sincronização:
-  - quando `crm_settings` estiver mais novo/diferente, copiar para `brokerages`.
-- Isso corrige imediatamente o caso atual (URL velha em brokerages) e evita reincidência após deploy.
+**Correcao**: Restaurar o bloco de periodo anterior na RPC, calculando `v_prev_start` e `v_prev_end` da mesma forma que `get_financial_summary` faz (subtraindo a duracao do periodo).
 
-### 4) Hardening da edge function para erro de DNS e URL
-**Arquivo:** `supabase/functions/chatwoot-sync/index.ts`
+---
 
-- Normalizar URL internamente antes de montar endpoint.
-- Padronizar concatenação para nunca gerar `//api/v1`.
-- Melhorar mensagem de erro para DNS/host inválido:
-  - “Domínio do Chatwoot não resolvido. Verifique se a URL está correta e pública.”
+### BUG 3 (MEDIO): Modo Consolidado Infla KPIs com Transacoes Sem Banco
 
-### 5) Validação pós-fix (fim-a-fim)
-- Abrir aba de Configurações e confirmar que não há mais 400 no GET.
-- Salvar credenciais e confirmar 200 nos updates.
-- Clicar “Testar Conexão” e garantir que a chamada não usa mais `chat.davicode.me`.
-- Clicar “Sincronizar Etiquetas” com mesma origem de config.
-- Confirmar no banco que `brokerages.chatwoot_*` e `crm_settings.chatwoot_*` ficaram alinhados.
+**Evidencia SQL**: Existem **170 transacoes sem bank_account_id** no periodo Dec-Feb, sendo 105 delas marcadas como `reconciled = true`. Quando filtrado para "Consolidado (Todos)", tanto a KPI quanto a lista incluem essas 170 transacoes.
 
-## Detalhes técnicos (resumo de implementação)
+```text
+Scope               | Total | Reconciled | Pending
+all_transactions     |  497  |    432     |   65
+with_bank_only       |  327  |    327     |    0
+```
 
-- **Sem alterar schema de `brokerages`** para n8n/webhook secret (não existe hoje e causou o erro).
-- **Compatibilidade mantida** com `crm_settings` (já usado por outras telas).
-- **Fonte operacional para chatwoot-sync** continua suportando multi-tenant via `brokerages`, mas com fallback inteligente e override no teste.
-- **Arquivos impactados:**
-  - `src/components/automation/AutomationConfigTab.tsx`
-  - `supabase/functions/chatwoot-sync/index.ts`
-  - `supabase/migrations/<timestamp>_sync_chatwoot_config.sql`
+Todos os 65 pendentes sao transacoes SEM banco! Elas aparecem como "aguardando conciliacao" mas nao podem ser conciliadas porque nao estao vinculadas a nenhum banco. O progresso (77%) e artificialmente baixo.
 
-## Resultado esperado
+**Correcao**: No modo consolidado, filtrar apenas transacoes COM `bank_account_id IS NOT NULL` na RPC de KPIs e na lista paginada. Alternativamente, separar os KPIs em "Com banco" vs "Sem banco" para dar visibilidade sem distorcer o progresso.
 
-- Aba deixa de quebrar.
-- Save volta a funcionar.
-- Teste/sync param de usar config antiga.
-- Erro DNS antigo desaparece (desde que URL digitada esteja correta).
-- Fluxo de automação fica estável e previsível.
+---
+
+### BUG 4 (MEDIO): Type Variants Inconsistentes Entre RPCs
+
+**Diagnostico**: A RPC `get_reconciliation_kpis` verifica `type = 'revenue'` e `type = 'expense'` (exato). Mas `get_financial_summary` e `get_bank_statement_paginated` verificam `type IN ('revenue', 'income', 'Entrada')` e `type IN ('expense', 'despesa', 'Saida')`.
+
+**Status atual**: Nao ha dados com tipos legados (validado por query). Mas e uma brecha: se qualquer fluxo criar transacao com tipo diferente, a KPI de conciliacao vai ignorar.
+
+**Correcao**: Alinhar o `get_reconciliation_kpis` para usar os mesmos IN-lists de tipo que as demais RPCs.
+
+---
+
+## Plano de Execucao
+
+### Passo 1: Reescrever `get_reconciliation_kpis` (Migration SQL)
+- Adicionar filtro `bank_account_id IS NOT NULL` quando em modo consolidado
+- Restaurar calculo de periodo anterior (previous period)
+- Alinhar type checks para `IN ('revenue', 'income', 'Entrada')` / `IN ('expense', 'despesa', 'Saida')`
+- Manter assinatura identica (4 params)
+
+### Passo 2: Alinhar "registros encontrados" com KPI total
+- No `ReconciliationPage.tsx`, substituir `{totalCount} registros encontrados` por `{kpis.totalCount} registros encontrados` para usar a mesma fonte dos KPI cards
+- Ou melhor: manter `totalCount` da lista paginada para refletir filtros ativos (status/tipo), e exibir separadamente "X de Y" nos KPIs
+
+### Passo 3: Corrigir lista paginada para modo consolidado
+- Na RPC `get_bank_statement_paginated`, quando `v_bank_uuid IS NULL`, adicionar `AND t.bank_account_id IS NOT NULL` para excluir transacoes sem banco da tela de conciliacao bancaria
+
+### Passo 4: Validacao cruzada pos-correcao
+- Query SQL comparando `total_count` do KPI vs `COUNT(*)` da lista com mesmos filtros
+- Verificar que `reconciled_count + pending_count + ignored_count = total_count`
+- Confirmar que progresso 100% quando todos os itens com banco estao conciliados

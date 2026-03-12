@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_analysis_sessions: {
+        Row: {
+          brokerage_id: number
+          chatwoot_conversation_id: number
+          collected_data: Json | null
+          created_at: string
+          expires_at: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brokerage_id: number
+          chatwoot_conversation_id: number
+          collected_data?: Json | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brokerage_id?: number
+          chatwoot_conversation_id?: number
+          collected_data?: Json | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_analysis_sessions_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_conversations: {
         Row: {
           created_at: string | null
