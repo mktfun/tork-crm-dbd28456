@@ -22,11 +22,11 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const geminiKey = Deno.env.get("GOOGLE_AI_API_KEY");
+    const apiKey = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!geminiKey) {
+    if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: "GOOGLE_AI_API_KEY not configured" }),
+        JSON.stringify({ error: "LOVABLE_API_KEY not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
