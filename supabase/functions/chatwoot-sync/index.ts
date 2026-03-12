@@ -66,24 +66,9 @@ async function getChatwootConfig(supabase: any, userId: string): Promise<Chatwoo
     };
   }
 
-  // Fallback to crm_settings for backwards compatibility
-  const { data, error } = await supabase
-    .from('crm_settings')
-    .select('chatwoot_url, chatwoot_api_key, chatwoot_account_id')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (error || !data) {
-    console.log('No Chat Tork config found for user:', userId);
-    return null;
-  }
-
-  if (!data.chatwoot_url || !data.chatwoot_api_key || !data.chatwoot_account_id) {
-    console.log('Incomplete Chat Tork config for user:', userId);
-    return null;
-  }
-
-  return data as ChatwootConfig;
+  // If we reach here, the config is incomplete or missing.
+  console.log('No complete Chat Tork config found for user in brokerages table:', userId);
+  return null;
 }
 
 async function chatwootRequest(
