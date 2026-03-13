@@ -220,6 +220,10 @@ async function gatherContext(
 }
 
 async function callAI(apiKey: string, context: string, scope: string, focus: string): Promise<string> {
+  if (!apiKey.startsWith("sk_")) {
+    throw new Error("LOVABLE_API_KEY inválida. Atualize o segredo com uma chave Lovable AI válida (prefixo sk_).");
+  }
+
   const scopeLabel = scope === "day" ? "do dia" : scope === "week" ? "da semana" : "do mês";
   const focusLabel =
     focus === "finance" ? "financeiro" : focus === "crm" ? "de vendas e CRM" : "geral da operação";
@@ -257,6 +261,19 @@ REGRAS ABSOLUTAS:
   if (!response.ok) {
     const errText = await response.text();
     console.error("[SUMMARY] AI Gateway error:", response.status, errText);
+
+    if (response.status === 401) {
+      throw new Error("LOVABLE_API_KEY inválida ou expirada. Atualize o segredo nas Edge Function secrets.");
+    }
+
+    if (response.status === 402) {
+      throw new Error("Lovable AI sem créditos (402). Adicione créditos no workspace.");
+    }
+
+    if (response.status === 429) {
+      throw new Error("Limite de requisições do Lovable AI atingido (429). Tente novamente em instantes.");
+    }
+
     throw new Error("Falha ao gerar resumo com IA");
   }
 
