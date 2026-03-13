@@ -249,7 +249,23 @@ Deno.serve(async (req) => {
         }
 
         // 6. Send to n8n
-        if (N8N_WEBHOOK_URL) {
+        let finalN8nUrl = N8N_WEBHOOK_URL;
+        
+        // Fetch user-specific N8n configuration if available
+        if (userId) {
+            const { data: crmSettings } = await supabase
+                .from('crm_settings')
+                .select('n8n_webhook_url')
+                .eq('user_id', userId)
+                .maybeSingle();
+                
+            if (crmSettings?.n8n_webhook_url) {
+                finalN8nUrl = crmSettings.n8n_webhook_url;
+                console.log(`✅ Using custom N8N Webhook URL for user ${userId}`);
+            }
+        }
+
+        if (finalN8nUrl) {
             const payload = {
                 ...body,
                 derived_data: {
@@ -264,7 +280,7 @@ Deno.serve(async (req) => {
 
             console.log("🚀 Forwarding payload to n8n...")
 
-            const n8nResponse = await fetch(N8N_WEBHOOK_URL, {
+            const n8nResponse = await fetch(finalN8nUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -272,7 +288,7 @@ Deno.serve(async (req) => {
 
             console.log(`n8n Response Status: ${n8nResponse.status}`)
         } else {
-            console.warn("⚠️ N8N_WEBHOOK_URL environment variable is not set.")
+            console.warn("⚠️ No N8N_WEBHOOK_URL configured globally or for this user.")
         }
 
         return new Response(JSON.stringify({ success: true }), {

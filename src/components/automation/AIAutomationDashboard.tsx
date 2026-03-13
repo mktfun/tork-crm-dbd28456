@@ -1,54 +1,68 @@
-
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Bot, Loader2 } from 'lucide-react';
-import { useCRMPipelines } from '@/hooks/useCRMPipelines';
-import { useCRMStages } from '@/hooks/useCRMDeals';
-import { useCrmAiSettings } from '@/hooks/useCrmAiSettings';
-import { useGlobalAiConfig } from '@/hooks/useGlobalAiConfig';
-import { usePipelineAiDefaults } from '@/hooks/usePipelineAiDefaults';
-import { SalesFlowTimeline } from './SalesFlowTimeline';
-import { AISandbox } from './AISandbox';
-import { SandboxFloatingCard } from './SandboxFloatingCard';
-import { PipelineAiDefaultsModal } from './PipelineAiDefaultsModal';
-import { NewPipelineModal } from '@/components/crm/NewPipelineModal';
-import { NewStageModal } from '@/components/crm/NewStageModal';
-import { StageEditModal } from '@/components/crm/StageEditModal';
-import { PipelineEditModal } from '@/components/crm/PipelineEditModal';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AutomationConfigTab } from './AutomationConfigTab';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { Bot, Loader2 } from "lucide-react";
+import { useCRMPipelines } from "@/hooks/useCRMPipelines";
+import { useCRMStages } from "@/hooks/useCRMDeals";
+import { useCrmAiSettings } from "@/hooks/useCrmAiSettings";
+import { useGlobalAiConfig } from "@/hooks/useGlobalAiConfig";
+import { usePipelineAiDefaults } from "@/hooks/usePipelineAiDefaults";
+import { SalesFlowTimeline } from "./SalesFlowTimeline";
+import { AISandbox } from "./AISandbox";
+import { SandboxFloatingCard } from "./SandboxFloatingCard";
+import { PipelineAiDefaultsModal } from "./PipelineAiDefaultsModal";
+import { NewPipelineModal } from "@/components/crm/NewPipelineModal";
+import { NewStageModal } from "@/components/crm/NewStageModal";
+import { StageEditModal } from "@/components/crm/StageEditModal";
+import { PipelineEditModal } from "@/components/crm/PipelineEditModal";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AutomationConfigTab } from "./AutomationConfigTab";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 export function AIAutomationDashboard() {
   const { pipelines, isLoading: pipelinesLoading } = useCRMPipelines();
   const { config: globalConfig } = useGlobalAiConfig();
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Pipeline selection
 
   // Pipeline selection
-  const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
-  const selectedPipeline = pipelines.find(p => p.id === selectedPipelineId) || pipelines[0];
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(
+    null,
+  );
+  const selectedPipeline =
+    pipelines.find((p) => p.id === selectedPipelineId) || pipelines[0];
 
   // Get stages for selected pipeline
-  const { stages, isLoading: stagesLoading } = useCRMStages(selectedPipeline?.id);
+  const { stages, isLoading: stagesLoading } = useCRMStages(
+    selectedPipeline?.id,
+  );
 
   // Get AI settings for selected pipeline
-  const { aiSettings, upsertSetting, isLoading: aiSettingsLoading } = useCrmAiSettings(selectedPipeline?.id);
+  const {
+    aiSettings,
+    upsertSetting,
+    isLoading: aiSettingsLoading,
+  } = useCrmAiSettings(selectedPipeline?.id);
 
   // Get pipeline AI defaults
-  const { pipelineDefault, resetStageToDefault, isLoading: pipelineDefaultLoading } = usePipelineAiDefaults(selectedPipeline?.id || null);
+  const {
+    pipelineDefault,
+    resetStageToDefault,
+    isLoading: pipelineDefaultLoading,
+  } = usePipelineAiDefaults(selectedPipeline?.id || null);
 
   // Selected stage for editing
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
-  const selectedStage = stages.find(s => s.id === selectedStageId) || null;
+  const selectedStage = stages.find((s) => s.id === selectedStageId) || null;
   const sortedStagesForNext = useMemo(
     () => [...stages].sort((a, b) => a.position - b.position),
-    [stages]
+    [stages],
   );
   const nextStage = selectedStage
-    ? sortedStagesForNext.find(s => s.position > selectedStage.position) ?? null
+    ? (sortedStagesForNext.find((s) => s.position > selectedStage.position) ??
+      null)
     : null;
-  const selectedAiSetting = aiSettings.find(s => s.stage_id === selectedStageId) || null;
+  const selectedAiSetting =
+    aiSettings.find((s) => s.stage_id === selectedStageId) || null;
 
   // Modals
   const [showNewPipeline, setShowNewPipeline] = useState(false);
@@ -59,7 +73,8 @@ export function AIAutomationDashboard() {
   // Auto-select first pipeline
   useEffect(() => {
     if (pipelines.length > 0 && !selectedPipelineId) {
-      const defaultPipeline = pipelines.find(p => p.is_default) || pipelines[0];
+      const defaultPipeline =
+        pipelines.find((p) => p.is_default) || pipelines[0];
       setSelectedPipelineId(defaultPipeline.id);
     }
   }, [pipelines, selectedPipelineId]);
@@ -80,10 +95,10 @@ export function AIAutomationDashboard() {
         stage_id: stageId,
         is_active: isActive,
       });
-      toast.success(isActive ? 'IA ativada!' : 'IA desativada');
+      toast.success(isActive ? "IA ativada!" : "IA desativada");
     } catch (error) {
-      console.error('Error toggling AI:', error);
-      toast.error('Erro ao alterar status da IA');
+      console.error("Error toggling AI:", error);
+      toast.error("Erro ao alterar status da IA");
     }
   };
 
@@ -91,28 +106,32 @@ export function AIAutomationDashboard() {
     try {
       await upsertSetting.mutateAsync(data);
     } catch (error) {
-      console.error('Error saving AI config:', error);
-      toast.error('Erro ao salvar configuração');
+      console.error("Error saving AI config:", error);
+      toast.error("Erro ao salvar configuração");
     }
   };
 
   const handleResetStageToDefault = async (stageId: string) => {
     try {
       await resetStageToDefault.mutateAsync(stageId);
-      toast.success('Configuração resetada para o padrão');
+      toast.success("Configuração resetada para o padrão");
     } catch (error) {
-      console.error('Error resetting stage:', error);
-      toast.error('Erro ao resetar configuração');
+      console.error("Error resetting stage:", error);
+      toast.error("Erro ao resetar configuração");
     }
   };
 
   // Build stage config map for badges
   const stageConfigMap = new Map<string, boolean>();
-  aiSettings.forEach(setting => {
+  aiSettings.forEach((setting) => {
     stageConfigMap.set(setting.stage_id, !!setting.id);
   });
 
-  const isLoading = pipelinesLoading || stagesLoading || aiSettingsLoading || pipelineDefaultLoading;
+  const isLoading =
+    pipelinesLoading ||
+    stagesLoading ||
+    aiSettingsLoading ||
+    pipelineDefaultLoading;
 
   if (isLoading && pipelines.length === 0) {
     return (
@@ -132,9 +151,13 @@ export function AIAutomationDashboard() {
           Nenhum Funil Configurado
         </h2>
         <p className="text-muted-foreground mb-6 max-w-md">
-          Crie seu primeiro funil de vendas para começar a configurar a automação de IA.
+          Crie seu primeiro funil de vendas para começar a configurar a
+          automação de IA.
         </p>
-        <NewPipelineModal open={showNewPipeline} onOpenChange={setShowNewPipeline} />
+        <NewPipelineModal
+          open={showNewPipeline}
+          onOpenChange={setShowNewPipeline}
+        />
       </div>
     );
   }
@@ -168,7 +191,10 @@ export function AIAutomationDashboard() {
           </TabsList>
         </div>
 
-        <TabsContent value="etapas" className="flex-1 m-0 overflow-y-auto scroll-smooth relative" ref={scrollContainerRef as any}>
+        <TabsContent
+          value="etapas"
+          className="flex-1 m-0 overflow-y-auto relative"
+        >
           <div className="grid grid-cols-1 lg:grid-cols-5 items-start">
             {/* Left column — flows naturally, scrolls with the page */}
             <div className="lg:col-span-3 p-4">
@@ -194,7 +220,7 @@ export function AIAutomationDashboard() {
             </div>
 
             {/* Right column — floating card pinned to viewport */}
-            <SandboxFloatingCard scrollContainerRef={scrollContainerRef}>
+            <SandboxFloatingCard>
               <AISandbox
                 selectedStage={selectedStage}
                 selectedPipeline={selectedPipeline}
@@ -202,14 +228,19 @@ export function AIAutomationDashboard() {
                 pipelineDefault={pipelineDefault}
                 nextStageName={nextStage?.name}
                 companyName={globalConfig?.company_name ?? undefined}
-                globalBaseInstructions={globalConfig?.base_instructions ?? undefined}
+                globalBaseInstructions={
+                  globalConfig?.base_instructions ?? undefined
+                }
                 globalAgentName={globalConfig?.agent_name ?? undefined}
               />
             </SandboxFloatingCard>
           </div>
         </TabsContent>
 
-        <TabsContent value="configuracoes" className="flex-1 m-0 overflow-y-auto">
+        <TabsContent
+          value="configuracoes"
+          className="flex-1 m-0 overflow-y-auto"
+        >
           <div className="max-w-5xl mx-auto p-6">
             <AutomationConfigTab />
           </div>
@@ -217,8 +248,15 @@ export function AIAutomationDashboard() {
       </Tabs>
 
       {/* Modals */}
-      <NewPipelineModal open={showNewPipeline} onOpenChange={setShowNewPipeline} />
-      <NewStageModal open={showNewStage} onOpenChange={setShowNewStage} pipelineId={selectedPipeline?.id} />
+      <NewPipelineModal
+        open={showNewPipeline}
+        onOpenChange={setShowNewPipeline}
+      />
+      <NewStageModal
+        open={showNewStage}
+        onOpenChange={setShowNewStage}
+        pipelineId={selectedPipeline?.id}
+      />
 
       {selectedPipeline && (
         <PipelineAiDefaultsModal
