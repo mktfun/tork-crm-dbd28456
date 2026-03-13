@@ -652,8 +652,10 @@ serve(async (req) => {
           if (labelColor === '000000') {
             labelColor = '3B82F6';
           }
+          // Chatwoot API expects #RRGGBB format
+          const labelColorHex = `#${labelColor}`;
           
-          console.log('Processing label:', labelTitle, 'color:', labelColor, '(original:', rawColor, ')');
+          console.log('Processing label:', labelTitle, 'color:', labelColorHex, '(original:', rawColor, ')');
           
           // Verificar se a etiqueta já existe
           const existingLabel = existingLabels.find(
