@@ -652,8 +652,10 @@ serve(async (req) => {
           if (labelColor === '000000') {
             labelColor = '3B82F6';
           }
+          // Chatwoot API expects #RRGGBB format
+          const labelColorHex = `#${labelColor}`;
           
-          console.log('Processing label:', labelTitle, 'color:', labelColor, '(original:', rawColor, ')');
+          console.log('Processing label:', labelTitle, 'color:', labelColorHex, '(original:', rawColor, ')');
           
           // Verificar se a etiqueta já existe
           const existingLabel = existingLabels.find(
@@ -664,7 +666,7 @@ serve(async (req) => {
             // ATUALIZAR a cor da etiqueta existente via PATCH
             try {
               await chatwootRequest(config, `/labels/${existingLabel.id}`, 'PATCH', {
-                color: labelColor,
+                color: labelColorHex,
                 description: `Etapa CRM: ${stage.name}`
               });
               updated++;
@@ -682,8 +684,8 @@ serve(async (req) => {
                 'POST',
                 {
                   title: labelTitle,
-                  description: `Etapa CRM: ${stage.name}`,
-                  color: labelColor
+                    description: `Etapa CRM: ${stage.name}`,
+                    color: labelColorHex
                 }
               );
               synced++;
@@ -699,7 +701,7 @@ serve(async (req) => {
                   );
                   if (foundLabel) {
                     await chatwootRequest(config, `/labels/${foundLabel.id}`, 'PATCH', {
-                      color: labelColor,
+                      color: labelColorHex,
                       description: `Etapa CRM: ${stage.name}`
                     });
                     updated++;
