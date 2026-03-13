@@ -701,7 +701,7 @@ serve(async (req) => {
                   );
                   if (foundLabel) {
                     await chatwootRequest(config, `/labels/${foundLabel.id}`, 'PATCH', {
-                      color: labelColor,
+                      color: labelColorHex,
                       description: `Etapa CRM: ${stage.name}`
                     });
                     updated++;
