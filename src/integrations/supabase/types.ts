@@ -937,6 +937,62 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_posts: {
+        Row: {
+          campaign_id: string | null
+          caption: string | null
+          created_at: string | null
+          hook: string | null
+          id: string
+          image_urls: string[] | null
+          scheduled_date: string | null
+          slide_data: Json | null
+          status: string | null
+          text_briefing: Json | null
+          theme: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          caption?: string | null
+          created_at?: string | null
+          hook?: string | null
+          id?: string
+          image_urls?: string[] | null
+          scheduled_date?: string | null
+          slide_data?: Json | null
+          status?: string | null
+          text_briefing?: Json | null
+          theme?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          caption?: string | null
+          created_at?: string | null
+          hook?: string | null
+          id?: string
+          image_urls?: string[] | null
+          scheduled_date?: string | null
+          slide_data?: Json | null
+          status?: string | null
+          text_briefing?: Json | null
+          theme?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_posts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       changelogs: {
         Row: {
           category: string
@@ -3135,6 +3191,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      weekly_campaigns: {
+        Row: {
+          created_at: string | null
+          id: string
+          n8n_metrics: Json | null
+          start_date: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          n8n_metrics?: Json | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          n8n_metrics?: Json | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
