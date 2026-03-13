@@ -684,8 +684,8 @@ serve(async (req) => {
                 'POST',
                 {
                   title: labelTitle,
-                  description: `Etapa CRM: ${stage.name}`,
-                  color: labelColor
+                    description: `Etapa CRM: ${stage.name}`,
+                    color: labelColorHex
                 }
               );
               synced++;
