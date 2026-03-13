@@ -264,18 +264,20 @@ Deno.serve(async (req) => {
         let finalN8nUrl = N8N_WEBHOOK_URL;
         
         // Fetch user-specific N8n configuration if available
-        if (userId) {
+        if (resolvedUserId) {
             const { data: crmSettings } = await supabase
                 .from('crm_settings')
                 .select('n8n_webhook_url')
-                .eq('user_id', userId)
+                .eq('user_id', resolvedUserId)
                 .maybeSingle();
                 
             if (crmSettings?.n8n_webhook_url && crmSettings.n8n_webhook_url.trim().length > 0) {
                 finalN8nUrl = crmSettings.n8n_webhook_url.trim();
-                console.log(`✅ Using custom N8N Webhook URL for user ${userId}`);
+                console.log(`✅ Using custom N8N Webhook URL for user ${resolvedUserId}`);
             }
         }
+        
+        console.log(`🔗 Final N8N URL: ${finalN8nUrl?.substring(0, 50)}...`);
 
         if (finalN8nUrl && finalN8nUrl.trim().length > 0) {
             finalN8nUrl = finalN8nUrl.trim();
