@@ -130,13 +130,10 @@ Deno.serve(async (req) => {
         }
         // --- End of Analysis Session Logic. Fallback to original logic below ---
         
-        console.log(`🕵️ Resolving User for: ${assigneeEmail || 'No Assignee'} (Inbox: ${inboxId})`)
-        
-        // 2. Resolve CRM User (The Agent) - This part of the original code is now redundant if the above runs.
-        // We'll keep the variable for the old flow.
+        // 2. Resolve CRM User (The Agent) - Essential for fetching AI presets and N8n Webhook
         let resolvedUserId = userId;
         if (!resolvedUserId) {
-             if (assigneeEmail) {
+            if (assigneeEmail) {
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('id')
@@ -144,6 +141,21 @@ Deno.serve(async (req) => {
                     .maybeSingle()
 
                 if (profile) resolvedUserId = profile.id;
+            }
+            
+            // If still no user (e.g., unassigned chat), try to find an inbox mapping route
+            if (!resolvedUserId && inboxId) {
+                const { data: inboxMapping } = await supabase
+                    .from('chatwoot_inbox_agents')
+                    .select('user_id')
+                    .eq('inbox_id', inboxId)
+                    .limit(1)
+                    .maybeSingle();
+
+                if (inboxMapping?.user_id) {
+                    resolvedUserId = inboxMapping.user_id;
+                    console.log(`🕵️ Resolved User Fallback via Inbox Route: ${resolvedUserId}`);
+                }
             }
         }
 
@@ -259,13 +271,14 @@ Deno.serve(async (req) => {
                 .eq('user_id', userId)
                 .maybeSingle();
                 
-            if (crmSettings?.n8n_webhook_url) {
-                finalN8nUrl = crmSettings.n8n_webhook_url;
+            if (crmSettings?.n8n_webhook_url && crmSettings.n8n_webhook_url.trim().length > 0) {
+                finalN8nUrl = crmSettings.n8n_webhook_url.trim();
                 console.log(`✅ Using custom N8N Webhook URL for user ${userId}`);
             }
         }
 
-        if (finalN8nUrl) {
+        if (finalN8nUrl && finalN8nUrl.trim().length > 0) {
+            finalN8nUrl = finalN8nUrl.trim();
             const payload = {
                 ...body,
                 derived_data: {
@@ -288,7 +301,7 @@ Deno.serve(async (req) => {
 
             console.log(`n8n Response Status: ${n8nResponse.status}`)
         } else {
-            console.warn("⚠️ No N8N_WEBHOOK_URL configured globally or for this user.")
+            console.warn("⚠️ No valid N8N_WEBHOOK_URL configured globally or for this user.")
         }
 
         return new Response(JSON.stringify({ success: true }), {
