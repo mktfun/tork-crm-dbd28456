@@ -153,7 +153,8 @@ export function usePendingReconciliation(
                     .or(`bank_account_id.eq.${bankAccountId},bank_account_id.is.null`);
             }
 
-            if (startDate && endDate) {
+            // No modo consolidado, não filtrar por data para mostrar todos os pendentes
+            if (startDate && endDate && !isConsolidated) {
                 statementQuery = statementQuery
                     .gte('transaction_date', startDate)
                     .lte('transaction_date', endDate);
