@@ -1141,17 +1141,17 @@ export function ReconciliationPage() {
                                 </p>
                                 <div className="max-h-64 overflow-auto space-y-1.5">
                                     {batchEntries.map((entry) => (
-                                        <div key={entry.id} className="flex items-center justify-between p-2.5 bg-muted/50 rounded border border-border/50">
+                                        <div key={entry.id} className="flex items-start justify-between gap-3 p-3 bg-muted/50 rounded border border-border/50">
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-sm font-medium truncate">{entry.description}</p>
-                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                <p className="text-sm font-medium line-clamp-2">{entry.description}</p>
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                                                     <span>{entry.transaction_date}</span>
                                                     <Badge variant={entry.reconciliation_status === 'matched' ? 'secondary' : 'outline'} className="text-[10px]">
                                                         {entry.reconciliation_status === 'matched' ? 'Conciliado' : 'Pendente'}
                                                     </Badge>
                                                 </div>
                                             </div>
-                                            <p className={cn('font-semibold text-sm shrink-0 ml-3', entry.amount >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                                            <p className={cn('font-semibold text-sm shrink-0 whitespace-nowrap min-w-[90px] text-right', entry.amount >= 0 ? 'text-emerald-400' : 'text-red-400')}>
                                                 {formatCurrency(entry.amount)}
                                             </p>
                                         </div>
