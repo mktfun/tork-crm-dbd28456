@@ -637,20 +637,25 @@ export function ReconciliationPage() {
                                                 )}
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="text-sm font-medium text-foreground">
-                                                        {item.imported_at ? format(new Date(item.imported_at), 'dd/MM/yyyy HH:mm') : '—'}
-                                                    </span>
-                                                    {bankAccount && (
-                                                        <Badge variant="secondary" className="text-[10px]">
-                                                            {bankAccount.bankName}
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-sm font-medium text-foreground">
+                                                            {item.imported_at ? format(new Date(item.imported_at), 'dd/MM/yyyy HH:mm') : '—'}
+                                                        </span>
+                                                        {bankAccount && (
+                                                            <Badge variant="secondary" className="text-[10px]">
+                                                                {bankAccount.bankName}
+                                                            </Badge>
+                                                        )}
+                                                        <Badge variant={item.status === 'completed' ? 'secondary' : 'destructive'} className="text-[10px]">
+                                                            {item.status === 'completed' ? 'Concluído' : 'Erro'}
                                                         </Badge>
-                                                    )}
-                                                    <Badge variant={item.status === 'completed' ? 'secondary' : 'destructive'} className="text-[10px]">
-                                                        {item.status === 'completed' ? 'Concluído' : 'Erro'}
-                                                    </Badge>
+                                                    </div>
+                                                    <span className="text-sm font-semibold text-foreground whitespace-nowrap">
+                                                        {formatCurrency(Number(item.total_amount) || 0)}
+                                                    </span>
                                                 </div>
-                                                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                                <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                                                     {item.file_name && (
                                                         <span className="flex items-center gap-1">
                                                             <FileText className="w-3 h-3" />
@@ -664,9 +669,6 @@ export function ReconciliationPage() {
                                                         </span>
                                                     )}
                                                     <span>{item.total_transactions || 0} transações</span>
-                                                    <span className="font-medium text-foreground">
-                                                        {formatCurrency(Number(item.total_amount) || 0)}
-                                                    </span>
                                                 </div>
                                                 {item.error_message && (
                                                     <p className="text-xs text-red-400 mt-1">{item.error_message}</p>
