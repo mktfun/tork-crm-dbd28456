@@ -164,52 +164,52 @@ Deno.serve(async (req) => {
         let currentDeal = null
         let currentStage = null
         let stageAiSettings = null
+        let clientId = null
 
-        // Find contact by phone or email provided by Chatwoot
-        // Note: We search in crm_deals directly assuming some denormalization or direct link logic exists/will exist
-        // Or we could search crm_clients first. For MVP, we search deals by contact info.
-        const contactIdentifier = sender?.phone_number || sender?.email;
+        const contactPhone = sender?.phone_number;
+        const contactEmail = sender?.email;
 
-        if (contactIdentifier) {
-            // Try to find an open deal for this contact
-            // We use .or() to match either phone or email if columns exist
-            // Note: Adjust column names if your schema uses 'client_id' relationship instead
-            const { data: deals } = await supabase
-                .from('crm_deals')
-                .select(`
-                id, 
-                title, 
-                stage_id,
-                crm_stages (
-                    id, 
-                    name, 
-                    pipeline_id
-                )
-            `)
-                // Simple approach: assuming deals table has contact info or linked client info. 
-                // If deals are linked to clients, we'd need a deeper join, but let's assume simplified view for now.
-                // If this fails, we might need a stored procedure or View.
-                // For now, let's assume we can match. If not, this part yields null and we fallback.
-                .limit(1)
-                .order('created_at', { ascending: false });
+        if (contactPhone || contactEmail) {
+            // Primeiro, encontrar o cliente
+            let clientQuery = supabase.from('clientes').select('id');
+            if (contactPhone) clientQuery = clientQuery.ilike('phone', `%${contactPhone.replace(/\D/g, '')}%`);
+            else if (contactEmail) clientQuery = clientQuery.eq('email', contactEmail);
+            
+            const { data: clientData } = await clientQuery.maybeSingle();
+            clientId = clientData?.id;
 
-            // Since we can't easily join-filter in one step without knowing exact schema, 
-            // let's assume valid deals are returned or we use a more generic approach in n8n if this fails.
-            if (deals && deals.length > 0) {
-                currentDeal = deals[0]
-                currentStage = currentDeal.crm_stages
+            if (clientId) {
+                // Buscar negócio aberto para este cliente
+                const { data: deals } = await supabase
+                    .from('crm_deals')
+                    .select(`
+                        id, 
+                        title, 
+                        stage_id,
+                        crm_stages (
+                            id, 
+                            name, 
+                            pipeline_id
+                        )
+                    `)
+                    .eq('client_id', clientId)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
 
-                console.log(`✅ Found Deal: ${currentDeal.title} in Stage: ${currentStage?.name}`)
+                if (deals && deals.length > 0) {
+                    currentDeal = deals[0];
+                    currentStage = currentDeal.crm_stages;
+                    console.log(`✅ Found Deal: ${currentDeal.title} in Stage: ${currentStage?.name}`);
 
-                // 4. Fetch AI Settings for this Stage
-                if (currentStage?.id) {
-                    const { data: settings } = await supabase
-                        .from('crm_ai_settings')
-                        .select('*')
-                        .eq('stage_id', currentStage.id)
-                        .maybeSingle()
-
-                    stageAiSettings = settings
+                    // 4. Fetch AI Settings for this Stage
+                    if (currentStage?.id) {
+                        const { data: settings } = await supabase
+                            .from('crm_ai_settings')
+                            .select('*')
+                            .eq('stage_id', currentStage.id)
+                            .maybeSingle();
+                        stageAiSettings = settings;
+                    }
                 }
             }
         }
@@ -228,68 +228,60 @@ Deno.serve(async (req) => {
             globalConfig = data;
         }
 
-        // Base Persona Priority: Stage > Pipeline Default (not fetched here) > Global > Default
+        // Base Persona
         const basePersona = stageAiSettings?.ai_persona || globalConfig?.base_instructions || "Você é um assistente de vendas útil e amigável da Tork CRM."
-
         systemPrompt += `<character>\n${basePersona}\n</character>\n\n`
+
+        // MANUAL DE TOOLS (Obrigatório para a IA saber usar o Supabase)
+        systemPrompt += `<tools_manual>\n`
+        systemPrompt += `1. search_contact: SEMPRE use antes de criar um contato para evitar duplicados.\n`
+        systemPrompt += `2. create_contact: Use se search_contact não retornar nada. Peça nome e telefone.\n`
+        systemPrompt += `3. list_pipelines_and_stages: Use para conhecer os funis antes de criar um negócio.\n`
+        systemPrompt += `4. create_deal: Use para abrir uma oportunidade. Requer client_id e stage_id.\n`
+        systemPrompt += `5. update_deal_stage: Use para mover o cliente no funil assim que o objetivo for atingido.\n`
+        systemPrompt += `</tools_manual>\n\n`
 
         // Stage Specific Objective
         if (currentStage && stageAiSettings?.ai_objective) {
             systemPrompt += `<current_context>\n`
-            systemPrompt += `CONTEXTO: O cliente está na etapa do funil: "${currentStage.name}".\n`
-            systemPrompt += `SEU OBJETIVO EXCLUSIVO NESTE MOMENTO: ${stageAiSettings.ai_objective}\n`
+            systemPrompt += `NEGÓCIO ATUAL: "${currentDeal?.title}"\n`
+            systemPrompt += `ETAPA ATUAL: "${currentStage.name}"\n`
+            systemPrompt += `OBJETIVO: ${stageAiSettings.ai_objective}\n`
             systemPrompt += `</current_context>\n\n`
 
-            // Completion Action Instruction
-            // If we have a structured completion action, we instruct the AI on how to proceed
             if (stageAiSettings.ai_completion_action) {
                 const action = typeof stageAiSettings.ai_completion_action === 'string'
                     ? JSON.parse(stageAiSettings.ai_completion_action)
                     : stageAiSettings.ai_completion_action
 
                 if (action.type === 'move_stage' && action.target_stage_id) {
-                    systemPrompt += `<success_rule>\n`
-                    systemPrompt += `IMPORTANTE: Assim que você confirmar que o objetivo "${stageAiSettings.ai_objective}" foi atingido, você DEVE executar a ferramenta "update_deal_stage" para mover o negócio.\n`
-                    systemPrompt += `Parâmetros da ferramenta: { "deal_id": "${currentDeal.id}", "stage_id": "${action.target_stage_id}" }\n`
-                    systemPrompt += `Não peça permissão, apenas mova o card se o objetivo for cumprido.\n`
-                    systemPrompt += `</success_rule>\n\n`
+                    systemPrompt += `<automation_rule>\n`
+                    systemPrompt += `Ao atingir o objetivo, use update_deal_stage({ "deal_id": "${currentDeal.id}", "new_stage_id": "${action.target_stage_id}" }).\n`
+                    systemPrompt += `</automation_rule>\n\n`
                 }
             }
-        } else {
-            // Fallback for Unknown Stage or No Objective
-            systemPrompt += `Instrução Geral: Atue como um assistente de triagem. Identifique as necessidades do cliente e registre notas.\n`
         }
 
         // 6. Send to n8n
         let finalN8nUrl = N8N_WEBHOOK_URL;
-        
-        // Fetch user-specific N8n configuration if available
         if (resolvedUserId) {
-            const { data: crmSettings } = await supabase
-                .from('crm_settings')
-                .select('n8n_webhook_url')
-                .eq('user_id', resolvedUserId)
-                .maybeSingle();
-                
-            if (crmSettings?.n8n_webhook_url && crmSettings.n8n_webhook_url.trim().length > 0) {
-                finalN8nUrl = crmSettings.n8n_webhook_url.trim();
-                console.log(`✅ Using custom N8N Webhook URL for user ${resolvedUserId}`);
-            }
+            const { data: crmSettings } = await supabase.from('crm_settings').select('n8n_webhook_url').eq('user_id', resolvedUserId).maybeSingle();
+            if (crmSettings?.n8n_webhook_url) finalN8nUrl = crmSettings.n8n_webhook_url.trim();
         }
         
-        console.log(`🔗 Final N8N URL: ${finalN8nUrl?.substring(0, 50)}...`);
-
-        if (finalN8nUrl && finalN8nUrl.trim().length > 0) {
-            finalN8nUrl = finalN8nUrl.trim();
+        if (finalN8nUrl) {
             const payload = {
                 ...body,
                 derived_data: {
                     crm_user_id: userId,
+                    client_id: clientId,
                     deal_id: currentDeal?.id,
+                    deal_title: currentDeal?.title,
+                    pipeline_id: currentStage?.pipeline_id,
+                    stage_id: currentStage?.id,
                     current_stage_name: currentStage?.name,
                     ai_system_prompt: systemPrompt,
-                    // Allowed tools could also be dynamic based on stage
-                    allowed_tools: ['update_deal_stage', 'create_note', 'search_knowledge_base']
+                    allowed_tools: ['create_contact', 'search_contact', 'create_deal', 'update_deal_stage', 'list_pipelines_and_stages']
                 }
             }
 
