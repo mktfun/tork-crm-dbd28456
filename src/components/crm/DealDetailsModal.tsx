@@ -352,7 +352,8 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
       toast.success('Negócio marcado como Perdido.');
       onOpenChange(false);
     } catch (error) {
-      console.error(error);
+      console.error('Error marking deal as lost:', error);
+      toast.error('Erro ao marcar como Perdido');
     }
   };
 
