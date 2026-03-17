@@ -424,22 +424,33 @@ export function AutomationConfigTab() {
 
             <div className="space-y-2 md:col-span-2">
               <Label>API Key</Label>
-              <div className="relative">
-                <Input
-                  type={showAiApiKey ? "text" : "password"}
-                  placeholder="Insira a chave do provedor"
-                  value={aiApiKey}
-                  onChange={(e) => setAiApiKey(e.target.value)}
-                  className="pr-10"
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showAiApiKey ? "text" : "password"}
+                    placeholder="Insira a chave do provedor"
+                    value={aiApiKey}
+                    onChange={(e) => setAiApiKey(e.target.value)}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowAiApiKey(!showAiApiKey)}
+                  >
+                    {showAiApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
                 <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowAiApiKey(!showAiApiKey)}
+                  variant="outline"
+                  size="icon"
+                  title="Testar conexão com o provedor"
+                  disabled={!aiApiKey}
+                  className="shrink-0 h-10 w-10"
                 >
-                  {showAiApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  <Wifi className="h-4 w-4" />
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
