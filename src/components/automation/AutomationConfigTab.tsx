@@ -389,7 +389,7 @@ export function AutomationConfigTab() {
             <div>
               <CardTitle>Motor de Inteligência</CardTitle>
               <CardDescription>
-                Provedor, modelo e chave de acesso da IA
+                Provedor, modelo e chave de acesso da IA — usado pelo Assistente Tork e Relatórios Estratégicos
               </CardDescription>
             </div>
           </div>

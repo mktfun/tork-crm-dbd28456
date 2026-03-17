@@ -181,16 +181,3 @@ export interface BulkOCRExtractedPolicy {
   validade_cartao: string | null;
 }
 
-// Resposta da Edge Function ocr-bulk-analyze
-export interface BulkOCRResponse {
-  success: boolean;
-  data?: BulkOCRExtractedPolicy[];
-  processedFiles?: string[];
-  errors?: Array<{ fileName: string; error: string }>;
-  stats?: {
-    total: number;
-    success: number;
-    failed: number;
-  };
-  error?: string;
-}
