@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Bot, Zap, Sparkles, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { VibeSelector, VibeId, getVibePreset, VIBE_CONFIG } from './VibeSelector';
+import { AI_PERSONA_PRESETS } from './aiPresets';
 import { ConfigSourceBadge } from './ConfigSourceBadge';
 import { useDebounce } from '@/hooks/useDebounce';
 
