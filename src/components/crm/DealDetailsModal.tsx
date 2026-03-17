@@ -225,6 +225,40 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
   };
 
   const currentStage = stages.find(s => s.id === deal?.stage_id);
+  const wonStage = stages.find(s => s.chatwoot_label?.toLowerCase().includes('ganho'));
+  const lostStage = stages.find(s => s.chatwoot_label?.toLowerCase().includes('perdido'));
+
+  const handleMarkWon = async () => {
+    if (!deal || !wonStage) return;
+    try {
+      await updateDeal.mutateAsync({ id: deal.id, stage_id: wonStage.id });
+      toast.success('Negócio marcado como Ganho!');
+      onOpenChange(false);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleMarkLost = async () => {
+    if (!deal || !lostStage) return;
+    try {
+      await updateDeal.mutateAsync({ id: deal.id, stage_id: lostStage.id });
+      toast.success('Negócio marcado como Perdido.');
+      onOpenChange(false);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleInlineStageChange = async (newStageId: string) => {
+    if (!deal || newStageId === deal.stage_id) return;
+    try {
+      await updateDeal.mutateAsync({ id: deal.id, stage_id: newStageId });
+      toast.success('Etapa atualizada!');
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   if (!deal) return null;
 
@@ -241,6 +275,32 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
             )}
             <span className="truncate">{isEditing ? 'Editar Negócio' : deal.title}</span>
           </SheetTitle>
+          {/* Quick actions: Won / Lost */}
+          {(wonStage || lostStage) && !isEditing && (
+            <div className="flex gap-2 pt-1">
+              {wonStage && deal.stage_id !== wonStage.id && (
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
+                  onClick={handleMarkWon}
+                >
+                  <Trophy className="h-3.5 w-3.5" />
+                  Ganho
+                </Button>
+              )}
+              {lostStage && deal.stage_id !== lostStage.id && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="gap-1.5"
+                  onClick={handleMarkLost}
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                  Perdido
+                </Button>
+              )}
+            </div>
+          )}
         </SheetHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
