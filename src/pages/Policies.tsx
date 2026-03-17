@@ -662,6 +662,13 @@ export default function Policies() {
 
       {/* Modais */}
 
+      {/* Filtros Avançados de Data */}
+      <PolicyDateFilterBar
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        periodType={periodType}
+        onPeriodTypeChange={setPeriodType}
+      />
 
       {/* Modal Nova Apólice */}
       {isNewPolicyModalOpen && (
