@@ -31,6 +31,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, Drawer
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
 import { AppCard } from '@/components/ui/app-card';
+import { PolicyDateFilterBar, PeriodType } from '@/components/policies/PolicyDateFilterBar';
 
 export default function Policies() {
   const { clients } = useClients();
