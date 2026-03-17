@@ -31,7 +31,6 @@ import {
   ExtractedPolicyData,
   PolicyImportItem,
   BulkOCRExtractedPolicy,
-  BulkOCRResponse,
   DocumentType,
   ImportError
 } from '@/types/policyImport';
