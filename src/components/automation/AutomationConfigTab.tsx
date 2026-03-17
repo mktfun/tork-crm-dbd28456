@@ -377,7 +377,7 @@ export function AutomationConfigTab() {
       </div>
 
       {/* AI Engine Config */}
-      <Card>
+      <Card className="bg-background/50 backdrop-blur-md border border-white/10 shadow-lg">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
