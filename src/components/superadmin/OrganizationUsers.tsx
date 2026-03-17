@@ -12,7 +12,7 @@ interface User {
   email: string;
   role: string;
   ativo: boolean;
-  ai_enabled: boolean;
+  ai_enabled?: boolean;
   created_at: string;
 }
 
