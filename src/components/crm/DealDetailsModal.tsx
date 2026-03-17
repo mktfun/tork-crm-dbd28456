@@ -200,7 +200,7 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
     if (!deal || !newNote.trim() || !user) return;
     setAddingNote(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('crm_deal_notes')
         .insert({
           deal_id: deal.id,
