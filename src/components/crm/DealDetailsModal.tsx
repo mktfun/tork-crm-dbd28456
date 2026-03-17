@@ -283,13 +283,17 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
 
   const handleDelete = async () => {
     if (!deal) return;
-    if (confirm('Tem certeza que deseja excluir este negócio?')) {
+    if (!confirm('Tem certeza que deseja excluir este negócio?')) return;
+    try {
       await deleteDeal.mutateAsync({
         id: deal.id,
         title: deal.title,
         client_id: deal.client_id
       });
       onOpenChange(false);
+    } catch (error) {
+      console.error('Error deleting deal:', error);
+      toast.error('Erro ao excluir negócio');
     }
   };
 
