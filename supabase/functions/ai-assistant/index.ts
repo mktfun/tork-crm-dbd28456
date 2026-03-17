@@ -8,6 +8,7 @@ import * as CRUD from "./tools-crud.ts";
 import * as CRM from "./tools-crm.ts";
 import * as INSPECTOR from "./tools-inspector.ts";
 import * as ANALYTICS from "./tools-analytics.ts";
+import { resolveUserModel } from "../_shared/model-resolver.ts";
 
 // --- Configuração do Rate Limiter ---
 const redis = new Redis({
