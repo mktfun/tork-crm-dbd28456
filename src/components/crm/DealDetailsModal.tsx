@@ -127,8 +127,11 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
         }
       }
 
-      setNotes((data || []).map(n => ({
-        ...n,
+      setNotes((data || []).map((n: any) => ({
+        id: n.id,
+        content: n.content,
+        created_by: n.created_by,
+        created_at: n.created_at,
         author_name: authorMap[n.created_by] || 'Usuário'
       })));
     } catch (error) {
