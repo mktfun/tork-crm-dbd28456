@@ -1417,6 +1417,54 @@ export type Database = {
           },
         ]
       }
+      crm_deal_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          event_type: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          event_type: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          event_type?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_deal_events_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deal_events_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "v_n8n_agent_config"
+            referencedColumns: ["deal_id"]
+          },
+        ]
+      }
       crm_deal_notes: {
         Row: {
           content: string
