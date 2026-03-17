@@ -1,6 +1,7 @@
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
 import { logger } from '../_shared/logger.ts';
+import { resolveUserModel } from '../_shared/model-resolver.ts';
 
 // Configuração da API Lovable/Gemini
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_AI_API_KEY');
@@ -80,6 +81,7 @@ export async function inspect_document(
 
         // 4. Chamada Direta ao Gemini via Gateway (Bypassing main loop for specialized analysis)
         // Isso evita "poluir" o contexto principal com o binário gigante e garante foco.
+        const inspectorModel = await resolveUserModel(supabase, userId);
         const response = await fetch(GATEWAY_URL, {
             method: 'POST',
             headers: {
@@ -87,7 +89,7 @@ export async function inspect_document(
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'google/gemini-2.5-flash', // Modelo Multimodal Rápido
+                model: inspectorModel, // Modelo dinâmico via config global
                 messages: [
                     { role: 'system', content: auditorSystemPrompt },
                     {

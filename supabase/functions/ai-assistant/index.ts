@@ -8,6 +8,7 @@ import * as CRUD from "./tools-crud.ts";
 import * as CRM from "./tools-crm.ts";
 import * as INSPECTOR from "./tools-inspector.ts";
 import * as ANALYTICS from "./tools-analytics.ts";
+import { resolveUserModel } from "../_shared/model-resolver.ts";
 
 // --- Configuração do Rate Limiter ---
 const redis = new Redis({
@@ -2077,6 +2078,10 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Resolve dynamic model from user's global config
+    const userModel = await resolveUserModel(supabase, userId);
+    console.log(`[MODEL] Using model: ${userModel} for user ${userId}`);
+
     // Process attachments in user messages
     const processedMessages = messages.map((msg: any) => {
       if (msg.role === 'user' && typeof msg.content === 'string') {
@@ -2152,7 +2157,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
+          model: userModel,
           messages: currentMessages,
           tools: TOOLS,
           tool_choice: 'auto',
@@ -2208,7 +2213,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
+            model: userModel,
             messages: currentMessages,
             tools: TOOLS,
             tool_choice: 'auto',
@@ -2234,7 +2239,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
+          model: userModel,
           messages: currentMessages,
           stream: true,
           max_tokens: 8192, // FASE P5: Expansão para respostas técnicas longas
@@ -2326,7 +2331,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: userModel,
         messages: aiMessages,
         tools: TOOLS,
         tool_choice: 'auto',
@@ -2384,7 +2389,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
+          model: userModel,
           messages: currentMessages,
           tools: TOOLS,
           tool_choice: 'auto',

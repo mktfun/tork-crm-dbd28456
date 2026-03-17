@@ -48,34 +48,25 @@ interface AutomationSettings {
 
 const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
   gemini: [
-    { value: "gemini-3.1-pro", label: "Gemini 3.1 Pro" },
-    { value: "gemini-1.5-pro-002", label: "Gemini 1.5 Pro 002" },
-    { value: "gemini-1.5-flash-002", label: "Gemini 1.5 Flash 002" },
-    { value: "veo-3.1", label: "Veo 3.1" },
+    { value: "gemini-3.1-pro", label: "Gemini 3.1 Pro (Alta Inteligência)" },
+    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Alta Velocidade)" },
   ],
   openai: [
-    { value: "gpt-5-pro", label: "GPT-5 Pro" },
-    { value: "gpt-5-mini", label: "GPT-5 Mini" },
-    { value: "gpt-4.1", label: "GPT-4.1" },
-    { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+    { value: "gpt-4.1", label: "GPT-4.1 (Alta Inteligência)" },
+    { value: "o3", label: "o3 (Raciocínio)" },
+    { value: "gpt-4.1-mini", label: "GPT-4.1 Mini (Alta Velocidade)" },
   ],
   grok: [
-    { value: "grok-4.20-beta-2", label: "Grok 4.20 Beta 2" },
-    { value: "grok-4.20-beta-1", label: "Grok 4.20 Beta 1" },
-    { value: "grok-4", label: "Grok 4" },
-    { value: "grok-3.5", label: "Grok 3.5" },
+    { value: "grok-4.20", label: "Grok 4.20 (Alta Inteligência)" },
+    { value: "grok-3-mini", label: "Grok 3 Mini (Alta Velocidade)" },
   ],
   anthropic: [
-    { value: "claude-opus-4.6", label: "Claude Opus 4.6" },
-    { value: "claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
-    { value: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
-    { value: "claude-3.5-haiku", label: "Claude 3.5 Haiku" },
+    { value: "claude-sonnet-4.6", label: "Claude Sonnet 4.6 (Alta Inteligência)" },
+    { value: "claude-3.5-haiku", label: "Claude 3.5 Haiku (Alta Velocidade)" },
   ],
   deepseek: [
-    { value: "deepseek-r1", label: "DeepSeek R1" },
-    { value: "deepseek-v3-0324", label: "DeepSeek V3-0324" },
-    { value: "deepseek-v3-1226", label: "DeepSeek V3-1226" },
-    { value: "deepseek-vl2", label: "DeepSeek VL2" },
+    { value: "deepseek-r1", label: "DeepSeek R1 (Alta Inteligência)" },
+    { value: "deepseek-vl2", label: "DeepSeek VL2 (Alta Velocidade)" },
   ],
 };
 
@@ -398,7 +389,7 @@ export function AutomationConfigTab() {
             <div>
               <CardTitle>Motor de Inteligência</CardTitle>
               <CardDescription>
-                Provedor, modelo e chave de acesso da IA
+                Provedor, modelo e chave de acesso da IA — usado pelo Assistente Tork e Relatórios Estratégicos
               </CardDescription>
             </div>
           </div>

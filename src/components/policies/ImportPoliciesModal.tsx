@@ -31,7 +31,6 @@ import {
   ExtractedPolicyData,
   PolicyImportItem,
   BulkOCRExtractedPolicy,
-  BulkOCRResponse,
   DocumentType,
   ImportError
 } from '@/types/policyImport';
@@ -75,7 +74,13 @@ interface ProcessingMetrics {
   policiesExtracted: number;
 }
 
-interface ExtendedBulkOCRResponse extends BulkOCRResponse {
+interface ExtendedBulkOCRResponse {
+  success: boolean;
+  data?: BulkOCRExtractedPolicy[];
+  processedFiles?: string[];
+  errors?: Array<{ fileName: string; error: string }>;
+  stats?: { total: number; success: number; failed: number };
+  error?: string;
   metrics?: ProcessingMetrics;
 }
 

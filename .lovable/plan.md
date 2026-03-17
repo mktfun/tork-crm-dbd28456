@@ -1,89 +1,74 @@
 
+# Auditoria dos KPIs da Tela de Conciliacao
 
-# Plano: Modelos Corretos + Vincular Config + Limpar OCR Morto
+## Discrepancias Identificadas (com evidencia SQL)
 
-## 1. Atualizar MODEL_OPTIONS com versoes corretas
+### BUG 1 (CRITICO): Contagem "Registros Encontrados" vs "Progresso" Divergentes
 
-Em `AutomationConfigTab.tsx` (linhas 49-80), substituir por:
+**Evidencia no screenshot**: O header da lista mostra **488 registros encontrados** mas o card de Progresso mostra **298 de 388 conciliados**. Sao duas fontes diferentes:
+- "488 registros" vem da RPC `get_bank_statement_paginated` (campo `total_count` via `COUNT(*) OVER()`)
+- "388 total / 298 conciliados" vem da RPC `get_reconciliation_kpis` (campo `total_count`)
 
-```ts
-const MODEL_OPTIONS = {
-  gemini: [
-    { value: "gemini-3.1-pro", label: "Gemini 3.1 Pro (Alta Inteligência)" },
-    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Alta Velocidade)" },
-  ],
-  openai: [
-    { value: "gpt-4.1", label: "GPT-4.1 (Alta Inteligência)" },
-    { value: "o3", label: "o3 (Raciocínio)" },
-    { value: "gpt-4.1-mini", label: "GPT-4.1 Mini (Alta Velocidade)" },
-  ],
-  grok: [
-    { value: "grok-4.20", label: "Grok 4.20 (Alta Inteligência)" },
-    { value: "grok-3-mini", label: "Grok 3 Mini (Alta Velocidade)" },
-  ],
-  anthropic: [
-    { value: "claude-sonnet-4.6", label: "Claude Sonnet 4.6 (Alta Inteligência)" },
-    { value: "claude-3.5-haiku", label: "Claude 3.5 Haiku (Alta Velocidade)" },
-  ],
-  deepseek: [
-    { value: "deepseek-r1", label: "DeepSeek R1 (Alta Inteligência)" },
-    { value: "deepseek-vl2", label: "DeepSeek VL2 (Alta Velocidade)" },
-  ],
-};
+Ambas as RPCs usam os mesmos filtros base (user_id, banco, datas, is_void). Porem a lista aplica `p_status` e `p_type` como filtros adicionais (mesmo quando "todas/todos" deveria ser identico). A divergencia de 100 itens (488 vs 388) indica que uma das RPCs tem um filtro extra ou diferente.
+
+**Causa provavel**: A RPC paginada faz LEFT JOIN com `bank_statement_entries` e `profiles` que pode gerar duplicatas via `string_agg` no ledger. Ou a KPI RPC nao filtra por `status IN ('confirmed','completed')` enquanto a lista nao filtra por isso tambem -- porem alguma diferenca sutil no WHERE causa a divergencia.
+
+**Correcao**: Unificar: a KPI RPC deve usar EXATAMENTE a mesma CTE/WHERE da lista paginada (sem os filtros de status/type). Alternativamente, adicionar um campo `kpi_total_count` na propria RPC paginada para garantir fonte unica.
+
+---
+
+### BUG 2 (ALTO): Periodo Anterior Removido -- Trends Sempre Nulos
+
+**Diagnostico**: A versao mais recente de `get_reconciliation_kpis` (migration `20260219141008`) removeu completamente o calculo do periodo anterior. O JSON retornado so tem `current`, sem `previous`. No frontend (linhas 293-300), `calcTrend` sempre retorna `null` porque `previousKpis` esta vazio.
+
+**Impacto**: Os badges de tendencia ("+X% vs periodo anterior") nunca aparecem. A comparacao temporal esta desabilitada silenciosamente.
+
+**Correcao**: Restaurar o bloco de periodo anterior na RPC, calculando `v_prev_start` e `v_prev_end` da mesma forma que `get_financial_summary` faz (subtraindo a duracao do periodo).
+
+---
+
+### BUG 3 (MEDIO): Modo Consolidado Infla KPIs com Transacoes Sem Banco
+
+**Evidencia SQL**: Existem **170 transacoes sem bank_account_id** no periodo Dec-Feb, sendo 105 delas marcadas como `reconciled = true`. Quando filtrado para "Consolidado (Todos)", tanto a KPI quanto a lista incluem essas 170 transacoes.
+
+```text
+Scope               | Total | Reconciled | Pending
+all_transactions     |  497  |    432     |   65
+with_bank_only       |  327  |    327     |    0
 ```
 
-## 2. Vincular config global ao `ai-assistant` e `generate-summary`
+Todos os 65 pendentes sao transacoes SEM banco! Elas aparecem como "aguardando conciliacao" mas nao podem ser conciliadas porque nao estao vinculadas a nenhum banco. O progresso (77%) e artificialmente baixo.
 
-Ambas as edge functions usam modelos hardcoded. Vou fazer cada uma buscar `ai_model` e `ai_provider` do `crm_ai_global_config` do usuario autenticado.
+**Correcao**: No modo consolidado, filtrar apenas transacoes COM `bank_account_id IS NOT NULL` na RPC de KPIs e na lista paginada. Alternativamente, separar os KPIs em "Com banco" vs "Sem banco" para dar visibilidade sem distorcer o progresso.
 
-**Mapeamento UI → Gateway** (o Lovable AI Gateway aceita `google/*` e `openai/*`):
+---
 
-| UI value | Gateway model |
-|---|---|
-| `gemini-3.1-pro` | `google/gemini-3.1-pro` |
-| `gemini-2.5-flash` | `google/gemini-2.5-flash` |
-| `gpt-4.1` | `openai/gpt-4.1` |
-| `gpt-4.1-mini` | `openai/gpt-4.1-mini` |
-| `o3` | `openai/o3` |
-| Outros (grok, anthropic, deepseek) | Fallback → `google/gemini-2.5-flash` (gateway nao suporta ainda) |
+### BUG 4 (MEDIO): Type Variants Inconsistentes Entre RPCs
 
-### `ai-assistant/index.ts`
-- Adicionar funcao helper `getUserModel(userId, supabase)` que consulta `crm_ai_global_config` e retorna o modelo no formato gateway
-- Substituir as 5 ocorrencias de `'google/gemini-2.5-flash'` (linhas 2155, 2211, 2237, 2329, 2387) pelo modelo dinamico
-- Substituir tambem em `tools-inspector.ts` (linha 90)
+**Diagnostico**: A RPC `get_reconciliation_kpis` verifica `type = 'revenue'` e `type = 'expense'` (exato). Mas `get_financial_summary` e `get_bank_statement_paginated` verificam `type IN ('revenue', 'income', 'Entrada')` e `type IN ('expense', 'despesa', 'Saida')`.
 
-### `generate-summary/index.ts`
-- Buscar config do usuario autenticado (ja temos `user.id`)
-- Substituir `'google/gemini-3-flash-preview'` (linha 251) pelo modelo dinamico
-- Fallback: `google/gemini-2.5-flash`
+**Status atual**: Nao ha dados com tipos legados (validado por query). Mas e uma brecha: se qualquer fluxo criar transacao com tipo diferente, a KPI de conciliacao vai ignorar.
 
-### O que NAO muda
-- `analyze-policy-mistral` — usa Mistral OCR dedicado, nao se vincula a config global
-- OCR permanece independente com seu proprio modelo (Mistral Large)
+**Correcao**: Alinhar o `get_reconciliation_kpis` para usar os mesmos IN-lists de tipo que as demais RPCs.
 
-## 3. Deletar Edge Functions OCR mortas
+---
 
-O frontend so usa `analyze-policy-mistral`. As seguintes functions sao codigo morto (nenhuma referencia no `src/`):
+## Plano de Execucao
 
-| Function | Status |
-|---|---|
-| `ocr-agent-1-extractor/` | Morta — so chamada pelo orchestrator |
-| `ocr-agent-2-classifier/` | Morta — so chamada pelo orchestrator |
-| `ocr-agent-3-validator/` | Morta — so chamada pelo orchestrator |
-| `ocr-orchestrator/` | Morta — nunca chamada pelo frontend |
-| `ocr-bulk-analyze/` | Morta — nunca chamada (so tipo referenciado) |
-| `analyze-policy/` | Morta — substituida por `analyze-policy-mistral` |
+### Passo 1: Reescrever `get_reconciliation_kpis` (Migration SQL)
+- Adicionar filtro `bank_account_id IS NOT NULL` quando em modo consolidado
+- Restaurar calculo de periodo anterior (previous period)
+- Alinhar type checks para `IN ('revenue', 'income', 'Entrada')` / `IN ('expense', 'despesa', 'Saida')`
+- Manter assinatura identica (4 params)
 
-Deletar todas as 6. Limpar o tipo `BulkOCRResponse` de `src/types/policyImport.ts` (referencia orfã).
+### Passo 2: Alinhar "registros encontrados" com KPI total
+- No `ReconciliationPage.tsx`, substituir `{totalCount} registros encontrados` por `{kpis.totalCount} registros encontrados` para usar a mesma fonte dos KPI cards
+- Ou melhor: manter `totalCount` da lista paginada para refletir filtros ativos (status/tipo), e exibir separadamente "X de Y" nos KPIs
 
-## Arquivos Afetados
+### Passo 3: Corrigir lista paginada para modo consolidado
+- Na RPC `get_bank_statement_paginated`, quando `v_bank_uuid IS NULL`, adicionar `AND t.bank_account_id IS NOT NULL` para excluir transacoes sem banco da tela de conciliacao bancaria
 
-| Arquivo | Mudanca |
-|---|---|
-| `AutomationConfigTab.tsx` | Atualizar MODEL_OPTIONS com versoes corretas |
-| `ai-assistant/index.ts` | Ler config global, usar modelo dinamico |
-| `ai-assistant/tools-inspector.ts` | Usar modelo dinamico |
-| `generate-summary/index.ts` | Ler config global, usar modelo dinamico |
-| `src/types/policyImport.ts` | Remover `BulkOCRResponse` orfao |
-| 6 pastas de functions OCR | Deletar |
-
+### Passo 4: Validacao cruzada pos-correcao
+- Query SQL comparando `total_count` do KPI vs `COUNT(*)` da lista com mesmos filtros
+- Verificar que `reconciled_count + pending_count + ignored_count = total_count`
+- Confirmar que progresso 100% quando todos os itens com banco estao conciliados
