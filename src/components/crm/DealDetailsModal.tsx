@@ -37,7 +37,9 @@ import {
   Trash2,
   Clock,
   Plus,
-  FileText
+  FileText,
+  Trophy,
+  XCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
