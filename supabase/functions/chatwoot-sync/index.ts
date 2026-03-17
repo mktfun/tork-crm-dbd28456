@@ -493,6 +493,21 @@ serve(async (req) => {
             console.warn('⚠️ Algumas etiquetas antigas ainda estão presentes:', stillHasOldLabels);
           }
 
+          // Emit audit event for AI-driven stage changes
+          const oldStage = allStages?.find(s => {
+            const label = s.chatwoot_label || s.name.toLowerCase().replace(/\s+/g, '_');
+            return labelsToRemove.some(r => normalizeLabel(r) === normalizeLabel(label));
+          });
+          
+          await supabase.from('crm_deal_events').insert({
+            deal_id: deal_id,
+            event_type: 'stage_change',
+            old_value: oldStage?.name || labelsToRemove[0] || null,
+            new_value: newStage?.name || newLabel,
+            source: 'ai_automation',
+            created_by: null
+          });
+
           return new Response(
             JSON.stringify({ 
               success: true, 
