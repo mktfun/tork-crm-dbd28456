@@ -340,11 +340,40 @@ Deno.serve(async (req) => {
     const inboxId = conversation?.inbox_id
 
     // 2. Resolve user
-    const { userId, brokerageId, role, aiEnabled } = await resolveUser(assigneeEmail, inboxId)
+    let { userId, brokerageId, role, aiEnabled } = await resolveUser(assigneeEmail, inboxId)
 
     if (!aiEnabled) {
       console.log('🚫 AI disabled for user:', userId)
       return new Response(JSON.stringify({ message: 'AI disabled for this user' }), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // 2.5 — Auto-detect producer or brokerage owner as admin by phone
+    const senderPhone = sender?.phone_number?.replace(/\D/g, '')
+    if (senderPhone && role !== 'admin') {
+      const { data: producer } = await supabase
+        .from('producers')
+        .select('id, brokerage_id')
+        .ilike('phone', `%${senderPhone}%`)
+        .maybeSingle()
+
+      if (producer) {
+        role = 'admin'
+        if (!brokerageId) brokerageId = producer.brokerage_id
+        console.log('👑 Sender is a producer → admin mode')
+      } else {
+        const { data: brokerage } = await supabase
+          .from('brokerages')
+          .select('id, user_id')
+          .ilike('phone', `%${senderPhone}%`)
+          .maybeSingle()
+
+        if (brokerage) {
+          role = 'admin'
+          if (!brokerageId) brokerageId = brokerage.id
+          if (!userId) userId = brokerage.user_id
+          console.log('👑 Sender is a brokerage owner → admin mode')
+        }
+      }
     }
 
     // 3. Analysis session logic (batch mode — kept from v1)
