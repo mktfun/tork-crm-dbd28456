@@ -1,74 +1,118 @@
 
-# Auditoria dos KPIs da Tela de Conciliacao
 
-## Discrepancias Identificadas (com evidencia SQL)
+# Plano: Refatoração UI/UX do Módulo de Automação
 
-### BUG 1 (CRITICO): Contagem "Registros Encontrados" vs "Progresso" Divergentes
+## Diagnóstico
 
-**Evidencia no screenshot**: O header da lista mostra **488 registros encontrados** mas o card de Progresso mostra **298 de 388 conciliados**. Sao duas fontes diferentes:
-- "488 registros" vem da RPC `get_bank_statement_paginated` (campo `total_count` via `COUNT(*) OVER()`)
-- "388 total / 298 conciliados" vem da RPC `get_reconciliation_kpis` (campo `total_count`)
+Após inspeção completa:
 
-Ambas as RPCs usam os mesmos filtros base (user_id, banco, datas, is_void). Porem a lista aplica `p_status` e `p_type` como filtros adicionais (mesmo quando "todas/todos" deveria ser identico). A divergencia de 100 itens (488 vs 388) indica que uma das RPCs tem um filtro extra ou diferente.
+1. **ChatHistorySidebar**: Usa `absolute` positioning dentro do `AmorimAIFloating` (widget flutuante de chat). Não faz parte do `AIAutomationDashboard`. O layout do dashboard em si usa `grid-cols-5` com `SandboxFloatingCard` sticky -- funciona corretamente. A sidebar do chat flutuante é um overlay intencional dentro do widget. Nenhuma mudança estrutural necessária no dashboard grid.
 
-**Causa provavel**: A RPC paginada faz LEFT JOIN com `bank_statement_entries` e `profiles` que pode gerar duplicatas via `string_agg` no ledger. Ou a KPI RPC nao filtra por `status IN ('confirmed','completed')` enquanto a lista nao filtra por isso tambem -- porem alguma diferenca sutil no WHERE causa a divergencia.
+2. **AutomationConfigTab**: Cards usam `<Card>` padrão sem glassmorphism. Falta botão "Testar Conexão" na seção AI API Key. Modelos desatualizados.
 
-**Correcao**: Unificar: a KPI RPC deve usar EXATAMENTE a mesma CTE/WHERE da lista paginada (sem os filtros de status/type). Alternativamente, adicionar um campo `kpi_total_count` na propria RPC paginada para garantir fonte unica.
+3. **VibeSelector**: Já é 100% controlado via props (`value`/`onChange`). A concorrência de estado está no `StageFlowCard` (useEffect na linha 97-99 re-sincroniza o vibe do servidor, causando flicker). O componente visual em si pode ser melhorado com melhor hierarquia.
 
 ---
 
-### BUG 2 (ALTO): Periodo Anterior Removido -- Trends Sempre Nulos
+## Mudanças Propostas
 
-**Diagnostico**: A versao mais recente de `get_reconciliation_kpis` (migration `20260219141008`) removeu completamente o calculo do periodo anterior. O JSON retornado so tem `current`, sem `previous`. No frontend (linhas 293-300), `calcTrend` sempre retorna `null` porque `previousKpis` esta vazio.
+### 1. `AutomationConfigTab.tsx` -- Glassmorphism + Modelos Atualizados + Botão Testar IA
 
-**Impacto**: Os badges de tendencia ("+X% vs periodo anterior") nunca aparecem. A comparacao temporal esta desabilitada silenciosamente.
-
-**Correcao**: Restaurar o bloco de periodo anterior na RPC, calculando `v_prev_start` e `v_prev_end` da mesma forma que `get_financial_summary` faz (subtraindo a duracao do periodo).
-
----
-
-### BUG 3 (MEDIO): Modo Consolidado Infla KPIs com Transacoes Sem Banco
-
-**Evidencia SQL**: Existem **170 transacoes sem bank_account_id** no periodo Dec-Feb, sendo 105 delas marcadas como `reconciled = true`. Quando filtrado para "Consolidado (Todos)", tanto a KPI quanto a lista incluem essas 170 transacoes.
-
-```text
-Scope               | Total | Reconciled | Pending
-all_transactions     |  497  |    432     |   65
-with_bank_only       |  327  |    327     |    0
+**A. Atualizar MODEL_OPTIONS (linhas 49-59):**
+```ts
+const MODEL_OPTIONS = {
+  gemini: [
+    { value: "gemini-2.5-pro-preview-05-06", label: "Gemini 2.5 Pro (Preview)" },
+    { value: "gemini-2.5-flash-preview-04-17", label: "Gemini 2.5 Flash (Preview)" },
+    { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+    { value: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash Lite" },
+    { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+    { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
+  ],
+  openai: [
+    { value: "gpt-4.1", label: "GPT-4.1" },
+    { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+    { value: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
+    { value: "gpt-4o", label: "GPT-4o" },
+    { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+    { value: "o3", label: "o3" },
+    { value: "o3-mini", label: "o3-mini" },
+    { value: "o4-mini", label: "o4-mini (Preview)" },
+  ],
+};
 ```
 
-Todos os 65 pendentes sao transacoes SEM banco! Elas aparecem como "aguardando conciliacao" mas nao podem ser conciliadas porque nao estao vinculadas a nenhum banco. O progresso (77%) e artificialmente baixo.
+**B. Glassmorphism em todos os Cards:**
+Substituir `<Card>` por `<Card className="bg-background/50 backdrop-blur-md border border-white/10 shadow-lg">` nos 4 cards (Motor de Inteligência, Chatwoot, Webhook, n8n).
 
-**Correcao**: No modo consolidado, filtrar apenas transacoes COM `bank_account_id IS NOT NULL` na RPC de KPIs e na lista paginada. Alternativamente, separar os KPIs em "Com banco" vs "Sem banco" para dar visibilidade sem distorcer o progresso.
+**C. Botão "Testar Conexão IA" ao lado do campo API Key (linha 416-439):**
+Alterar o layout do campo API Key para usar flex com gap, adicionando um botão visual com ícone `Wifi`:
+```tsx
+<div className="flex gap-2">
+  <div className="relative flex-1">
+    <Input type={...} ... />
+    <Button ...eye toggle... />
+  </div>
+  <Button variant="outline" size="icon" title="Testar conexão com o provedor">
+    <Wifi className="h-4 w-4" />
+  </Button>
+</div>
+```
+O botão será puramente visual (sem lógica), pronto para receber `onTestConnection` futuramente.
+
+### 2. `VibeSelector.tsx` -- Redesign Visual
+
+Melhorar o design dos cards com:
+- Mostrar o `description` (atualmente oculto, só mostra `style`)
+- Usar `backdrop-blur-sm` no card ativo para efeito glass
+- Substituir `hover:scale-[1.02]` por `hover:translate-y-[-2px]` (padrão Tork)
+- Aumentar padding para melhor legibilidade
+- Ring visual no card ativo em vez de apenas border color
+
+```tsx
+<button className={cn(
+  'relative flex flex-col items-center gap-2.5 p-4 rounded-xl border transition-all duration-200',
+  'hover:translate-y-[-2px] active:scale-[0.98]',
+  disabled && 'opacity-50 cursor-not-allowed',
+  isActive
+    ? cn(vibe.activeStyle, 'ring-1 ring-offset-1 ring-offset-background backdrop-blur-sm shadow-md')
+    : 'border-border bg-secondary/30 hover:border-muted-foreground/30 hover:shadow-sm'
+)}>
+```
+
+Exibir `description` abaixo do nome:
+```tsx
+<p className="text-sm font-medium">{vibe.shortName}</p>
+<p className="text-[10px] text-muted-foreground leading-tight">{vibe.description}</p>
+```
+
+### 3. `StageFlowCard.tsx` -- Fix Concorrência de Estado do Vibe
+
+O `useEffect` na linha 97-99 re-executa `inferVibeFromPersona` toda vez que `currentPersona` muda (incluindo após o próprio save do vibe). Isso causa um ciclo: user seleciona vibe → save → server retorna persona → useEffect re-infere → pode dar flicker.
+
+**Fix**: Adicionar guard para não re-setar se o vibe inferido é o mesmo:
+```tsx
+useEffect(() => {
+  const inferred = inferVibeFromPersona(currentPersona);
+  setSelectedVibe(prev => prev === inferred ? prev : inferred);
+}, [currentPersona]);
+```
+
+### 4. `ChatHistorySidebar.tsx` -- Glassmorphism Consistency
+
+Aplicar classes glass no painel lateral:
+- Container: `bg-background/80 backdrop-blur-xl border-r border-white/10` (já tem `bg-background/95 backdrop-blur-xl border-r border-white/10` -- ajuste mínimo para `bg-background/80`)
 
 ---
 
-### BUG 4 (MEDIO): Type Variants Inconsistentes Entre RPCs
+## Arquivos Afetados
 
-**Diagnostico**: A RPC `get_reconciliation_kpis` verifica `type = 'revenue'` e `type = 'expense'` (exato). Mas `get_financial_summary` e `get_bank_statement_paginated` verificam `type IN ('revenue', 'income', 'Entrada')` e `type IN ('expense', 'despesa', 'Saida')`.
+| Arquivo | Mudanças |
+|---------|----------|
+| `AutomationConfigTab.tsx` | Glass cards, modelos atualizados, botão testar IA |
+| `VibeSelector.tsx` | Redesign visual com glass + description |
+| `StageFlowCard.tsx` | Fix guard no useEffect do vibe |
+| `ChatHistorySidebar.tsx` | Ajuste opacity glass (minor) |
 
-**Status atual**: Nao ha dados com tipos legados (validado por query). Mas e uma brecha: se qualquer fluxo criar transacao com tipo diferente, a KPI de conciliacao vai ignorar.
+Nenhuma API alterada. Nenhum hook modificado. Apenas UI pura.
 
-**Correcao**: Alinhar o `get_reconciliation_kpis` para usar os mesmos IN-lists de tipo que as demais RPCs.
-
----
-
-## Plano de Execucao
-
-### Passo 1: Reescrever `get_reconciliation_kpis` (Migration SQL)
-- Adicionar filtro `bank_account_id IS NOT NULL` quando em modo consolidado
-- Restaurar calculo de periodo anterior (previous period)
-- Alinhar type checks para `IN ('revenue', 'income', 'Entrada')` / `IN ('expense', 'despesa', 'Saida')`
-- Manter assinatura identica (4 params)
-
-### Passo 2: Alinhar "registros encontrados" com KPI total
-- No `ReconciliationPage.tsx`, substituir `{totalCount} registros encontrados` por `{kpis.totalCount} registros encontrados` para usar a mesma fonte dos KPI cards
-- Ou melhor: manter `totalCount` da lista paginada para refletir filtros ativos (status/tipo), e exibir separadamente "X de Y" nos KPIs
-
-### Passo 3: Corrigir lista paginada para modo consolidado
-- Na RPC `get_bank_statement_paginated`, quando `v_bank_uuid IS NULL`, adicionar `AND t.bank_account_id IS NOT NULL` para excluir transacoes sem banco da tela de conciliacao bancaria
-
-### Passo 4: Validacao cruzada pos-correcao
-- Query SQL comparando `total_count` do KPI vs `COUNT(*)` da lista com mesmos filtros
-- Verificar que `reconciled_count + pending_count + ignored_count = total_count`
-- Confirmar que progresso 100% quando todos os itens com banco estao conciliados
