@@ -271,9 +271,11 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
         await emitDealEvent('stage_change', oldStageName, newStageName);
       }
 
+      toast.success('Negócio atualizado!');
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating deal:', error);
+      toast.error('Erro ao atualizar negócio');
     } finally {
       setSaving(false);
     }
