@@ -220,9 +220,16 @@ async function gatherContext(
   return parts.join("\n\n") || "Sem dados disponíveis para análise.";
 }
 
-async function callAI(apiKey: string, context: string, scope: string, focus: string): Promise<string> {
+async function callAI(apiKey: string, context: string, scope: string, focus: string, supabase?: any, userId?: string): Promise<string> {
   if (!apiKey.startsWith("sk_")) {
     throw new Error("LOVABLE_API_KEY inválida. Atualize o segredo com uma chave Lovable AI válida (prefixo sk_).");
+  }
+
+  // Resolve dynamic model from user's global config
+  let model = "google/gemini-2.5-flash";
+  if (supabase && userId) {
+    model = await resolveUserModel(supabase, userId);
+    console.log(`[SUMMARY] Using model: ${model} for user ${userId}`);
   }
 
   const scopeLabel = scope === "day" ? "do dia" : scope === "week" ? "da semana" : "do mês";
@@ -249,7 +256,7 @@ REGRAS ABSOLUTAS:
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
+      model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
