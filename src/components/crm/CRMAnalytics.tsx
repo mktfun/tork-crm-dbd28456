@@ -27,8 +27,6 @@ export function CRMAnalytics({ pipelineId }: CRMAnalyticsProps) {
 
   const isLoading = dealsLoading || stagesLoading;
 
-  const wonLabel = 'fechado_ganho';
-  const lostLabel = 'perdido';
 
   const analytics = useMemo(() => {
     if (!deals.length || !stages.length) return null;

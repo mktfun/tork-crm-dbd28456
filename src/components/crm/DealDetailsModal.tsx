@@ -87,7 +87,7 @@ interface TimelineItem {
 export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalProps) {
   const { user } = useAuth();
   const { updateDeal, deleteDeal } = useCRMDeals();
-  const { stages } = useCRMStages();
+  const { stages: allStages } = useCRMStages();
   const [chatTorkConfig, setChatTorkConfig] = useState<ChatTorkConfig | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -271,9 +271,11 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
         await emitDealEvent('stage_change', oldStageName, newStageName);
       }
 
+      toast.success('Negócio atualizado!');
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating deal:', error);
+      toast.error('Erro ao atualizar negócio');
     } finally {
       setSaving(false);
     }
@@ -281,13 +283,17 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
 
   const handleDelete = async () => {
     if (!deal) return;
-    if (confirm('Tem certeza que deseja excluir este negócio?')) {
+    if (!confirm('Tem certeza que deseja excluir este negócio?')) return;
+    try {
       await deleteDeal.mutateAsync({
         id: deal.id,
         title: deal.title,
         client_id: deal.client_id
       });
       onOpenChange(false);
+    } catch (error) {
+      console.error('Error deleting deal:', error);
+      toast.error('Erro ao excluir negócio');
     }
   };
 
@@ -314,7 +320,14 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
     }
   };
 
-  const currentStage = stages.find(s => s.id === deal?.stage_id);
+  // Filter stages to same pipeline as current deal's stage
+  const currentStageFromAll = allStages.find(s => s.id === deal?.stage_id);
+  const currentPipelineId = currentStageFromAll?.pipeline_id || null;
+  const stages = currentPipelineId 
+    ? allStages.filter(s => s.pipeline_id === currentPipelineId) 
+    : allStages;
+  
+  const currentStage = currentStageFromAll;
   const wonStage = stages.find(s => s.chatwoot_label?.toLowerCase().includes('ganho'));
   const lostStage = stages.find(s => s.chatwoot_label?.toLowerCase().includes('perdido'));
 
@@ -326,7 +339,8 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
       toast.success('Negócio marcado como Ganho!');
       onOpenChange(false);
     } catch (error) {
-      console.error(error);
+      console.error('Error marking deal as won:', error);
+      toast.error('Erro ao marcar como Ganho');
     }
   };
 
@@ -338,7 +352,8 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
       toast.success('Negócio marcado como Perdido.');
       onOpenChange(false);
     } catch (error) {
-      console.error(error);
+      console.error('Error marking deal as lost:', error);
+      toast.error('Erro ao marcar como Perdido');
     }
   };
 
@@ -351,7 +366,8 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
       await emitDealEvent('stage_change', oldStageName, newStageName);
       toast.success('Etapa atualizada!');
     } catch (error) {
-      console.error(error);
+      console.error('Error changing stage:', error);
+      toast.error('Erro ao alterar etapa');
     }
   };
 

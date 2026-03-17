@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import {
   DndContext,
   DragEndEvent,
@@ -217,6 +218,18 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
 
       try {
         await moveDeal.mutateAsync({ dealId, newStageId: targetStageId, newPosition });
+        
+        // Emit audit event for drag & drop stage change
+        const oldStage = stages.find(s => s.id === deal.stage_id);
+        const newStage = stages.find(s => s.id === targetStageId);
+        await (supabase as any).from('crm_deal_events').insert({
+          deal_id: dealId,
+          event_type: 'stage_change',
+          old_value: oldStage?.name || null,
+          new_value: newStage?.name || null,
+          source: 'manual',
+          created_by: user?.id
+        });
       } catch (error) {
         // Rollback
         if (previousDeals) {
