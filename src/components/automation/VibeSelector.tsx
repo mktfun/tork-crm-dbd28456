@@ -1,9 +1,9 @@
 import React from 'react';
-import { Rocket, Shield, Heart, Check } from 'lucide-react';
+import { Rocket, Shield, Heart, Check, Blend } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AI_PERSONA_PRESETS } from './aiPresets';
 
-export type VibeId = 'proactive' | 'technical' | 'supportive';
+export type VibeId = 'proactive' | 'technical' | 'supportive_sales' | 'supportive';
 
 interface VibeSelectorProps {
   value: VibeId | null;
@@ -41,8 +41,8 @@ const VIBE_CONFIG: Record<VibeId, {
     activeStyle: 'border-blue-500/50 bg-blue-500/10',
     ringColor: 'ring-blue-500/40',
   },
-  supportive: {
-    id: 'supportive',
+  supportive_sales: {
+    id: 'supportive_sales',
     name: 'O Amigo',
     shortName: 'Amigo',
     icon: <Heart className="h-5 w-5" />,
@@ -50,6 +50,16 @@ const VIBE_CONFIG: Record<VibeId, {
     style: 'Suporte VIP, sem burocracia',
     activeStyle: 'border-amber-500/50 bg-amber-500/10',
     ringColor: 'ring-amber-500/40',
+  },
+  supportive: {
+    id: 'supportive',
+    name: 'O Geral',
+    shortName: 'Geral',
+    icon: <Blend className="h-5 w-5" />,
+    description: 'Híbrido, descontraído e astuto',
+    style: 'Amigo + Técnico + Vendedor',
+    activeStyle: 'border-violet-500/50 bg-violet-500/10',
+    ringColor: 'ring-violet-500/40',
   },
 };
 
@@ -61,7 +71,7 @@ export function VibeSelector({ value, onChange, disabled }: VibeSelectorProps) {
   const vibes = Object.values(VIBE_CONFIG);
 
   return (
-    <div className="grid grid-cols-3 gap-2.5">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
       {vibes.map((vibe) => {
         const isActive = value === vibe.id;
         

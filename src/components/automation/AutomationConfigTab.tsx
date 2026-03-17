@@ -414,6 +414,7 @@ export function AutomationConfigTab() {
                 <SelectContent>
                   <SelectItem value="gemini">Google Gemini</SelectItem>
                   <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="grok">Grok (xAI)</SelectItem>
                   <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
                   <SelectItem value="deepseek">DeepSeek</SelectItem>
                 </SelectContent>
