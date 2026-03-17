@@ -316,7 +316,7 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
           </TabsList>
 
           {/* DETAILS TAB */}
-          <TabsContent value="details" className="flex-1 overflow-auto px-6 pb-6 mt-0">
+          <TabsContent value="details" className="flex-1 overflow-auto px-6 pb-6 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
             <div className="space-y-4">
               {/* Client Info */}
               {deal.client && (
