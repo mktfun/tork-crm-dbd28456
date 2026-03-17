@@ -93,9 +93,10 @@ export function StageFlowCard({
     setMission(currentObjective || '');
   }, [currentObjective]);
   
-  // Sync vibe with external data
+  // Sync vibe with external data (guard to prevent flicker)
   useEffect(() => {
-    setSelectedVibe(inferVibeFromPersona(currentPersona));
+    const inferred = inferVibeFromPersona(currentPersona);
+    setSelectedVibe(prev => prev === inferred ? prev : inferred);
   }, [currentPersona]);
   
   // Auto-save mission on debounce
