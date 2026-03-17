@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
     const context = await gatherContext(supabase, user.id, scope, focus);
 
     // Call AI
-    const summary = await callAI(apiKey, context, scope, focus);
+    const summary = await callAI(apiKey, context, scope, focus, supabase, user.id);
 
     // Save to cache (upsert)
     await supabase.from("ai_summaries").upsert(
