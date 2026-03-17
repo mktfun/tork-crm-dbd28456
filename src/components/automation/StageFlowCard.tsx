@@ -129,12 +129,12 @@ export function StageFlowCard({
     <div
       className={cn(
         'relative rounded-xl border transition-all duration-200',
-        'bg-card/50 backdrop-blur-sm',
+        'bg-card border-border',
         isSelected 
           ? 'border-primary/40 ring-1 ring-primary/20' 
-          : 'border-border hover:border-muted-foreground/30',
+          : 'hover:border-muted-foreground/30',
         isActive 
-          ? 'shadow-[0_0_20px_rgba(16,185,129,0.1)]' 
+          ? 'shadow-sm' 
           : ''
       )}
     >
