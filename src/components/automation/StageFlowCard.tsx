@@ -46,20 +46,11 @@ interface StageFlowCardProps {
   isSaving?: boolean;
 }
 
-// Infer vibe from persona XML
+// Deterministic vibe inference via exact xmlPrompt match
 function inferVibeFromPersona(persona: string | null | undefined): VibeId | null {
   if (!persona) return null;
-  
-  if (persona.includes('SDR') || persona.includes('CNPJ') || persona.includes('ping-pong') || persona.includes('fechar')) {
-    return 'proactive';
-  }
-  if (persona.includes('técnico') || persona.includes('especialista') || persona.includes('diagnóstico')) {
-    return 'technical';
-  }
-  if (persona.includes('resolvedor') || persona.includes('acolhimento') || persona.includes('suporte')) {
-    return 'supportive';
-  }
-  
+  const match = AI_PERSONA_PRESETS.find(p => p.xmlPrompt === persona);
+  if (match && match.id in VIBE_CONFIG) return match.id as VibeId;
   return null;
 }
 
