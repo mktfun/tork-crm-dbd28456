@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCompanyNames } from '@/hooks/useCompanyNames';
