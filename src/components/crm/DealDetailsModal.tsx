@@ -115,7 +115,7 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
       if (error) throw error;
 
       // Fetch author names
-      const authorIds = [...new Set((data || []).map(n => n.created_by))];
+      const authorIds = [...new Set((data || []).map((n: any) => n.created_by as string))];
       let authorMap: Record<string, string> = {};
       if (authorIds.length > 0) {
         const { data: profiles } = await supabase
