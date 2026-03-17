@@ -45,6 +45,8 @@ export default function Policies() {
   const [isAIImportModalOpen, setIsAIImportModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [periodType, setPeriodType] = useState<PeriodType>('expiration_date');
 
   // Estado de paginação e filtros
   const [page, setPage] = useState(1);
