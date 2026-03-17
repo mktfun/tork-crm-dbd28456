@@ -880,6 +880,7 @@ export type Database = {
           id: number
           logo_url: string | null
           name: string
+          phone: string | null
           portal_allow_card_download: boolean | null
           portal_allow_policy_download: boolean | null
           portal_allow_profile_edit: boolean | null
@@ -902,6 +903,7 @@ export type Database = {
           id?: never
           logo_url?: string | null
           name: string
+          phone?: string | null
           portal_allow_card_download?: boolean | null
           portal_allow_policy_download?: boolean | null
           portal_allow_profile_edit?: boolean | null
@@ -924,6 +926,7 @@ export type Database = {
           id?: never
           logo_url?: string | null
           name?: string
+          phone?: string | null
           portal_allow_card_download?: boolean | null
           portal_allow_policy_download?: boolean | null
           portal_allow_profile_edit?: boolean | null
@@ -1080,6 +1083,7 @@ export type Database = {
       clientes: {
         Row: {
           address: string | null
+          ai_enabled: boolean
           birth_date: string | null
           cep: string | null
           chatwoot_contact_id: number | null
@@ -1106,6 +1110,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          ai_enabled?: boolean
           birth_date?: string | null
           cep?: string | null
           chatwoot_contact_id?: number | null
@@ -1132,6 +1137,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          ai_enabled?: boolean
           birth_date?: string | null
           cep?: string | null
           chatwoot_contact_id?: number | null
@@ -3824,6 +3830,7 @@ export type Database = {
         }
         Returns: {
           address: string | null
+          ai_enabled: boolean
           birth_date: string | null
           cep: string | null
           chatwoot_contact_id: number | null
