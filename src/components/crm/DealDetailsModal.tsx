@@ -320,7 +320,14 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
     }
   };
 
-  const currentStage = stages.find(s => s.id === deal?.stage_id);
+  // Filter stages to same pipeline as current deal's stage
+  const currentStageFromAll = allStages.find(s => s.id === deal?.stage_id);
+  const currentPipelineId = currentStageFromAll?.pipeline_id || null;
+  const stages = currentPipelineId 
+    ? allStages.filter(s => s.pipeline_id === currentPipelineId) 
+    : allStages;
+  
+  const currentStage = currentStageFromAll;
   const wonStage = stages.find(s => s.chatwoot_label?.toLowerCase().includes('ganho'));
   const lostStage = stages.find(s => s.chatwoot_label?.toLowerCase().includes('perdido'));
 
