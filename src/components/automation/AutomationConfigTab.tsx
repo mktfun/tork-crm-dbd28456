@@ -607,7 +607,7 @@ export function AutomationConfigTab() {
       </Card>
 
       {/* n8n Config */}
-      <Card>
+      <Card className="bg-background/50 backdrop-blur-md border border-white/10 shadow-lg">
         <CardHeader>
           <CardTitle>n8n (Automação Avançada)</CardTitle>
           <CardDescription>
