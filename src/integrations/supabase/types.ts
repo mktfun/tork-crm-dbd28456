@@ -1408,6 +1408,45 @@ export type Database = {
           },
         ]
       }
+      crm_deal_notes: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string
+          deal_id: string
+          id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by: string
+          deal_id: string
+          id?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string
+          deal_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_deal_notes_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deal_notes_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "v_n8n_agent_config"
+            referencedColumns: ["deal_id"]
+          },
+        ]
+      }
       crm_deals: {
         Row: {
           chatwoot_conversation_id: number | null
