@@ -121,7 +121,7 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, nome_completo')
-          .in('id', authorIds);
+          .in('id', authorIds as string[]);
         if (profiles) {
           authorMap = Object.fromEntries(profiles.map(p => [p.id, p.nome_completo]));
         }
