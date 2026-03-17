@@ -427,17 +427,33 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
                     )}
                   </div>
 
-                  {currentStage && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">Etapa:</span>
-                      <div 
-                        className="px-2 py-1 rounded-full text-xs font-medium text-white"
-                        style={{ backgroundColor: currentStage.color }}
-                      >
-                        {currentStage.name}
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Etapa:</span>
+                    <Select value={deal.stage_id} onValueChange={handleInlineStageChange}>
+                      <SelectTrigger className="w-auto h-7 text-xs gap-1.5 px-2">
+                        {currentStage && (
+                          <div 
+                            className="h-2 w-2 rounded-full shrink-0"
+                            style={{ backgroundColor: currentStage.color }}
+                          />
+                        )}
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stages.map((stage) => (
+                          <SelectItem key={stage.id} value={stage.id}>
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="h-2.5 w-2.5 rounded-full"
+                                style={{ backgroundColor: stage.color }}
+                              />
+                              {stage.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   {deal.notes && (
                     <div className="p-3 rounded-lg bg-secondary/20">
