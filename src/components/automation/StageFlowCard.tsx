@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Bot, Zap, Sparkles, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { VibeSelector, VibeId, getVibePreset, VIBE_CONFIG } from './VibeSelector';
+import { AI_PERSONA_PRESETS } from './aiPresets';
 import { ConfigSourceBadge } from './ConfigSourceBadge';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -45,20 +46,11 @@ interface StageFlowCardProps {
   isSaving?: boolean;
 }
 
-// Infer vibe from persona XML
+// Deterministic vibe inference via exact xmlPrompt match
 function inferVibeFromPersona(persona: string | null | undefined): VibeId | null {
   if (!persona) return null;
-  
-  if (persona.includes('SDR') || persona.includes('CNPJ') || persona.includes('ping-pong') || persona.includes('fechar')) {
-    return 'proactive';
-  }
-  if (persona.includes('técnico') || persona.includes('especialista') || persona.includes('diagnóstico')) {
-    return 'technical';
-  }
-  if (persona.includes('resolvedor') || persona.includes('acolhimento') || persona.includes('suporte')) {
-    return 'supportive';
-  }
-  
+  const match = AI_PERSONA_PRESETS.find(p => p.xmlPrompt === persona);
+  if (match && match.id in VIBE_CONFIG) return match.id as VibeId;
   return null;
 }
 
@@ -82,6 +74,7 @@ export function StageFlowCard({
   const [selectedVibe, setSelectedVibe] = useState<VibeId | null>(inferVibeFromPersona(currentPersona));
   const [mission, setMission] = useState(currentObjective || '');
   const debouncedMission = useDebounce(mission, 1500);
+  const userSelectedRef = useRef(false);
   
   // Sync expanded state with selection
   useEffect(() => {
@@ -93,8 +86,12 @@ export function StageFlowCard({
     setMission(currentObjective || '');
   }, [currentObjective]);
   
-  // Sync vibe with external data (guard to prevent flicker)
+  // Sync vibe with external data — skip when change came from user click
   useEffect(() => {
+    if (userSelectedRef.current) {
+      userSelectedRef.current = false;
+      return;
+    }
     const inferred = inferVibeFromPersona(currentPersona);
     setSelectedVibe(prev => prev === inferred ? prev : inferred);
   }, [currentPersona]);
@@ -110,6 +107,7 @@ export function StageFlowCard({
   }, [debouncedMission]);
   
   const handleVibeChange = useCallback((vibeId: VibeId) => {
+    userSelectedRef.current = true;
     setSelectedVibe(vibeId);
     const preset = getVibePreset(vibeId);
     if (preset) {
@@ -131,12 +129,12 @@ export function StageFlowCard({
     <div
       className={cn(
         'relative rounded-xl border transition-all duration-200',
-        'bg-card/50 backdrop-blur-sm',
+        'bg-card border-border',
         isSelected 
           ? 'border-primary/40 ring-1 ring-primary/20' 
-          : 'border-border hover:border-muted-foreground/30',
+          : 'hover:border-muted-foreground/30',
         isActive 
-          ? 'shadow-[0_0_20px_rgba(16,185,129,0.1)]' 
+          ? 'shadow-sm' 
           : ''
       )}
     >

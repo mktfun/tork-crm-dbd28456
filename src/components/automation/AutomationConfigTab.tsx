@@ -48,22 +48,24 @@ interface AutomationSettings {
 
 const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
   gemini: [
-    { value: "gemini-2.5-pro-preview-05-06", label: "Gemini 2.5 Pro (Preview)" },
-    { value: "gemini-2.5-flash-preview-04-17", label: "Gemini 2.5 Flash (Preview)" },
+    { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
     { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
-    { value: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash Lite" },
-    { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
-    { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
   ],
   openai: [
     { value: "gpt-4.1", label: "GPT-4.1" },
     { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
-    { value: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
-    { value: "gpt-4o", label: "GPT-4o" },
-    { value: "gpt-4o-mini", label: "GPT-4o Mini" },
     { value: "o3", label: "o3" },
-    { value: "o3-mini", label: "o3-mini" },
-    { value: "o4-mini", label: "o4-mini (Preview)" },
+    { value: "o4-mini", label: "o4-mini" },
+  ],
+  anthropic: [
+    { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+    { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
+    { value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku" },
+  ],
+  deepseek: [
+    { value: "deepseek-chat", label: "DeepSeek V3" },
+    { value: "deepseek-reasoner", label: "DeepSeek R1" },
   ],
 };
 
@@ -402,6 +404,8 @@ export function AutomationConfigTab() {
                 <SelectContent>
                   <SelectItem value="gemini">Google Gemini</SelectItem>
                   <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
+                  <SelectItem value="deepseek">DeepSeek</SelectItem>
                 </SelectContent>
               </Select>
             </div>

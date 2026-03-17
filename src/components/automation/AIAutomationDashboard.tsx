@@ -196,34 +196,6 @@ export function AIAutomationDashboard() {
           value="etapas"
           className="flex-1 m-0 overflow-y-auto relative"
         >
-          {/* KPI Metrics */}
-          {(() => {
-            const activeCount = aiSettings.filter((s) => s.is_active).length;
-            const totalStages = stages.length;
-            const automationRate = totalStages > 0 ? Math.round((activeCount / totalStages) * 100) : 0;
-            return (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-4 pt-4">
-                <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-                  <CardContent className="pt-6 pb-4">
-                    <div className="text-2xl font-bold text-foreground">—</div>
-                    <p className="text-xs text-muted-foreground mt-1">Total de Conversas</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-                  <CardContent className="pt-6 pb-4">
-                    <div className="text-2xl font-bold text-foreground">{activeCount}</div>
-                    <p className="text-xs text-muted-foreground mt-1">Etapas Ativas</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-                  <CardContent className="pt-6 pb-4">
-                    <div className="text-2xl font-bold text-foreground">{automationRate}%</div>
-                    <p className="text-xs text-muted-foreground mt-1">Taxa de Automação</p>
-                  </CardContent>
-                </Card>
-              </div>
-            );
-          })()}
           <div className="grid grid-cols-1 lg:grid-cols-5 items-start">
             {/* Left column — flows naturally, scrolls with the page */}
             <div className="lg:col-span-3 p-4">

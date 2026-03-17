@@ -1,114 +1,74 @@
 
+# Auditoria dos KPIs da Tela de Conciliacao
 
-# Plano: Fix do Bug de Persona + Cleanup Visual + Modelos Atualizados
+## Discrepancias Identificadas (com evidencia SQL)
 
-## 3 Problemas a Resolver
+### BUG 1 (CRITICO): Contagem "Registros Encontrados" vs "Progresso" Divergentes
 
-### 1. Bug critico: Persona volta ao anterior ao clicar
+**Evidencia no screenshot**: O header da lista mostra **488 registros encontrados** mas o card de Progresso mostra **298 de 388 conciliados**. Sao duas fontes diferentes:
+- "488 registros" vem da RPC `get_bank_statement_paginated` (campo `total_count` via `COUNT(*) OVER()`)
+- "388 total / 298 conciliados" vem da RPC `get_reconciliation_kpis` (campo `total_count`)
 
-**Causa raiz**: O ciclo de concorrencia funciona assim:
-1. User clica no vibe "Tecnico"
-2. `handleVibeChange` faz `setSelectedVibe('technical')` + `onSaveConfig({ ai_persona: xmlPrompt })`
-3. Save dispara invalidacao do React Query
-4. `currentPersona` atualiza com o XML novo
-5. `useEffect` roda `inferVibeFromPersona(currentPersona)` -- esta funcao usa keyword matching fragil (`SDR`, `CNPJ`, `tecnico`, etc.)
-6. Se as keywords nao batem (ex: o preset "O Geral" nao tem nenhuma das keywords), retorna `null`
-7. `setSelectedVibe(null)` -- **perde a selecao do usuario**
+Ambas as RPCs usam os mesmos filtros base (user_id, banco, datas, is_void). Porem a lista aplica `p_status` e `p_type` como filtros adicionais (mesmo quando "todas/todos" deveria ser identico). A divergencia de 100 itens (488 vs 388) indica que uma das RPCs tem um filtro extra ou diferente.
 
-**Fix**: Substituir `inferVibeFromPersona` (keyword matching fragil) por comparacao direta contra os `xmlPrompt` dos presets. Isso e deterministico e nunca erra:
+**Causa provavel**: A RPC paginada faz LEFT JOIN com `bank_statement_entries` e `profiles` que pode gerar duplicatas via `string_agg` no ledger. Ou a KPI RPC nao filtra por `status IN ('confirmed','completed')` enquanto a lista nao filtra por isso tambem -- porem alguma diferenca sutil no WHERE causa a divergencia.
 
-```ts
-function inferVibeFromPersona(persona: string | null | undefined): VibeId | null {
-  if (!persona) return null;
-  const match = AI_PERSONA_PRESETS.find(p => p.xmlPrompt === persona);
-  if (match && match.id in VIBE_CONFIG) return match.id as VibeId;
-  return null;
-}
-```
-
-Alem disso, adicionar uma **ref de "user intent"** no `StageFlowCard` para ignorar o useEffect quando a mudanca veio do proprio usuario:
-
-```ts
-const userSelectedRef = useRef(false);
-
-const handleVibeChange = useCallback((vibeId: VibeId) => {
-  userSelectedRef.current = true;
-  setSelectedVibe(vibeId);
-  // ... save
-}, [...]);
-
-useEffect(() => {
-  if (userSelectedRef.current) {
-    userSelectedRef.current = false;
-    return; // Skip -- this update came from our own save
-  }
-  const inferred = inferVibeFromPersona(currentPersona);
-  setSelectedVibe(prev => prev === inferred ? prev : inferred);
-}, [currentPersona]);
-```
-
-**Arquivo**: `src/components/automation/StageFlowCard.tsx`
+**Correcao**: Unificar: a KPI RPC deve usar EXATAMENTE a mesma CTE/WHERE da lista paginada (sem os filtros de status/type). Alternativamente, adicionar um campo `kpi_total_count` na propria RPC paginada para garantir fonte unica.
 
 ---
 
-### 2. Remover KPIs inuteis + limpar visual da aba "Configurar Etapas"
+### BUG 2 (ALTO): Periodo Anterior Removido -- Trends Sempre Nulos
 
-O usuario disse: "n quero esses kpis do topo pq n e nada" e "ta feio fora do padrao".
+**Diagnostico**: A versao mais recente de `get_reconciliation_kpis` (migration `20260219141008`) removeu completamente o calculo do periodo anterior. O JSON retornado so tem `current`, sem `previous`. No frontend (linhas 293-300), `calcTrend` sempre retorna `null` porque `previousKpis` esta vazio.
 
-**Mudancas no `AIAutomationDashboard.tsx`**:
-- **Remover** o bloco inteiro de KPIs (linhas 199-226) -- os 3 cards "Total de Conversas" (valor fixo "---"), "Etapas Ativas" e "Taxa de Automacao"
-- O `SalesFlowTimeline` ja mostra `{stages.length} etapas - {activeCount} com IA ativa` na barra interna, tornando os KPIs redundantes
+**Impacto**: Os badges de tendencia ("+X% vs periodo anterior") nunca aparecem. A comparacao temporal esta desabilitada silenciosamente.
 
-**Mudancas visuais gerais (padronizar com o sistema)**:
-- O `StageFlowCard` usa `bg-card/50 backdrop-blur-sm` -- trocar para usar classes semanticas do design system (`border-border bg-card`) sem glass excessivo
-- O `SandboxFloatingCard` esta bom como esta (sticky, col-span-2)
+**Correcao**: Restaurar o bloco de periodo anterior na RPC, calculando `v_prev_start` e `v_prev_end` da mesma forma que `get_financial_summary` faz (subtraindo a duracao do periodo).
 
 ---
 
-### 3. Atualizar catalogo de modelos de IA
+### BUG 3 (MEDIO): Modo Consolidado Infla KPIs com Transacoes Sem Banco
 
-Baseado nos modelos ativos em marco de 2026, reorganizar `MODEL_OPTIONS` com 4 provedores e 2-4 versoes cada:
+**Evidencia SQL**: Existem **170 transacoes sem bank_account_id** no periodo Dec-Feb, sendo 105 delas marcadas como `reconciled = true`. Quando filtrado para "Consolidado (Todos)", tanto a KPI quanto a lista incluem essas 170 transacoes.
 
-```ts
-const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
-  gemini: [
-    { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-    { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
-  ],
-  openai: [
-    { value: "gpt-4.1", label: "GPT-4.1" },
-    { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
-    { value: "o3", label: "o3" },
-    { value: "o4-mini", label: "o4-mini" },
-  ],
-  anthropic: [
-    { value: "claude-sonnet-4", label: "Claude Sonnet 4" },
-    { value: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
-    { value: "claude-3.5-haiku", label: "Claude 3.5 Haiku" },
-  ],
-  deepseek: [
-    { value: "deepseek-v3", label: "DeepSeek V3" },
-    { value: "deepseek-r1", label: "DeepSeek R1" },
-  ],
-};
+```text
+Scope               | Total | Reconciled | Pending
+all_transactions     |  497  |    432     |   65
+with_bank_only       |  327  |    327     |    0
 ```
 
-Atualizar o `<Select>` de provedor para incluir "Anthropic" e "DeepSeek" como opcoes.
+Todos os 65 pendentes sao transacoes SEM banco! Elas aparecem como "aguardando conciliacao" mas nao podem ser conciliadas porque nao estao vinculadas a nenhum banco. O progresso (77%) e artificialmente baixo.
 
-**Nota backend**: A logica de chamada real a API (edge function `chatwoot-dispatcher`) ja usa a API key + model do `crm_ai_global_config`. Adicionar mais provedores na UI nao quebra nada -- o backend ja resolve pelo campo `ai_provider` + `ai_model`. Se o usuario configurar Anthropic mas o dispatcher so suportar Gemini, isso e uma limitacao de backend que nao faz parte desta tarefa de UI.
-
-**Arquivo**: `src/components/automation/AutomationConfigTab.tsx`
+**Correcao**: No modo consolidado, filtrar apenas transacoes COM `bank_account_id IS NOT NULL` na RPC de KPIs e na lista paginada. Alternativamente, separar os KPIs em "Com banco" vs "Sem banco" para dar visibilidade sem distorcer o progresso.
 
 ---
 
-## Arquivos Afetados
+### BUG 4 (MEDIO): Type Variants Inconsistentes Entre RPCs
 
-| Arquivo | Mudanca |
-|---------|---------|
-| `StageFlowCard.tsx` | Fix do bug de persona (inferencia + ref de intent) |
-| `AIAutomationDashboard.tsx` | Remover bloco de KPIs |
-| `AutomationConfigTab.tsx` | Atualizar MODEL_OPTIONS + adicionar provedores |
+**Diagnostico**: A RPC `get_reconciliation_kpis` verifica `type = 'revenue'` e `type = 'expense'` (exato). Mas `get_financial_summary` e `get_bank_statement_paginated` verificam `type IN ('revenue', 'income', 'Entrada')` e `type IN ('expense', 'despesa', 'Saida')`.
 
-Nenhuma API alterada. Nenhum hook modificado. Apenas UI e logica local de estado.
+**Status atual**: Nao ha dados com tipos legados (validado por query). Mas e uma brecha: se qualquer fluxo criar transacao com tipo diferente, a KPI de conciliacao vai ignorar.
 
+**Correcao**: Alinhar o `get_reconciliation_kpis` para usar os mesmos IN-lists de tipo que as demais RPCs.
+
+---
+
+## Plano de Execucao
+
+### Passo 1: Reescrever `get_reconciliation_kpis` (Migration SQL)
+- Adicionar filtro `bank_account_id IS NOT NULL` quando em modo consolidado
+- Restaurar calculo de periodo anterior (previous period)
+- Alinhar type checks para `IN ('revenue', 'income', 'Entrada')` / `IN ('expense', 'despesa', 'Saida')`
+- Manter assinatura identica (4 params)
+
+### Passo 2: Alinhar "registros encontrados" com KPI total
+- No `ReconciliationPage.tsx`, substituir `{totalCount} registros encontrados` por `{kpis.totalCount} registros encontrados` para usar a mesma fonte dos KPI cards
+- Ou melhor: manter `totalCount` da lista paginada para refletir filtros ativos (status/tipo), e exibir separadamente "X de Y" nos KPIs
+
+### Passo 3: Corrigir lista paginada para modo consolidado
+- Na RPC `get_bank_statement_paginated`, quando `v_bank_uuid IS NULL`, adicionar `AND t.bank_account_id IS NOT NULL` para excluir transacoes sem banco da tela de conciliacao bancaria
+
+### Passo 4: Validacao cruzada pos-correcao
+- Query SQL comparando `total_count` do KPI vs `COUNT(*)` da lista com mesmos filtros
+- Verificar que `reconciled_count + pending_count + ignored_count = total_count`
+- Confirmar que progresso 100% quando todos os itens com banco estao conciliados
