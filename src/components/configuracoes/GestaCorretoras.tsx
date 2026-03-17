@@ -65,6 +65,7 @@ export function GestaoCorretoras() {
       cnpj: brokerage.cnpj || '',
       susep_code: brokerage.susep_code || '',
       logo_url: brokerage.logo_url || '',
+      phone: brokerage.phone || '',
       portal_allow_policy_download: brokerage.portal_allow_policy_download ?? false,
       portal_allow_card_download: brokerage.portal_allow_card_download ?? false,
       portal_allow_profile_edit: brokerage.portal_allow_profile_edit ?? false,
