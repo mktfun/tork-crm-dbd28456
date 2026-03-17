@@ -107,6 +107,7 @@ export function StageFlowCard({
   }, [debouncedMission]);
   
   const handleVibeChange = useCallback((vibeId: VibeId) => {
+    userSelectedRef.current = true;
     setSelectedVibe(vibeId);
     const preset = getVibePreset(vibeId);
     if (preset) {
