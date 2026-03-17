@@ -106,7 +106,7 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
     if (!deal) return;
     setLoadingNotes(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('crm_deal_notes')
         .select('id, content, created_by, created_at')
         .eq('deal_id', deal.id)
