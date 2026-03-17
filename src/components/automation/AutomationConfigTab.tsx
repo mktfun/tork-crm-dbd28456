@@ -48,24 +48,34 @@ interface AutomationSettings {
 
 const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
   gemini: [
-    { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-    { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+    { value: "gemini-3.1-pro", label: "Gemini 3.1 Pro" },
+    { value: "gemini-1.5-pro-002", label: "Gemini 1.5 Pro 002" },
+    { value: "gemini-1.5-flash-002", label: "Gemini 1.5 Flash 002" },
+    { value: "veo-3.1", label: "Veo 3.1" },
   ],
   openai: [
+    { value: "gpt-5-pro", label: "GPT-5 Pro" },
+    { value: "gpt-5-mini", label: "GPT-5 Mini" },
     { value: "gpt-4.1", label: "GPT-4.1" },
     { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
-    { value: "o3", label: "o3" },
-    { value: "o4-mini", label: "o4-mini" },
+  ],
+  grok: [
+    { value: "grok-4.20-beta-2", label: "Grok 4.20 Beta 2" },
+    { value: "grok-4.20-beta-1", label: "Grok 4.20 Beta 1" },
+    { value: "grok-4", label: "Grok 4" },
+    { value: "grok-3.5", label: "Grok 3.5" },
   ],
   anthropic: [
-    { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
-    { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
-    { value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku" },
+    { value: "claude-opus-4.6", label: "Claude Opus 4.6" },
+    { value: "claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
+    { value: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+    { value: "claude-3.5-haiku", label: "Claude 3.5 Haiku" },
   ],
   deepseek: [
-    { value: "deepseek-chat", label: "DeepSeek V3" },
-    { value: "deepseek-reasoner", label: "DeepSeek R1" },
+    { value: "deepseek-r1", label: "DeepSeek R1" },
+    { value: "deepseek-v3-0324", label: "DeepSeek V3-0324" },
+    { value: "deepseek-v3-1226", label: "DeepSeek V3-1226" },
+    { value: "deepseek-vl2", label: "DeepSeek VL2" },
   ],
 };
 
@@ -404,6 +414,7 @@ export function AutomationConfigTab() {
                 <SelectContent>
                   <SelectItem value="gemini">Google Gemini</SelectItem>
                   <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="grok">Grok (xAI)</SelectItem>
                   <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
                   <SelectItem value="deepseek">DeepSeek</SelectItem>
                 </SelectContent>
