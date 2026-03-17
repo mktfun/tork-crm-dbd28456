@@ -353,6 +353,14 @@ export default function Policies() {
         />
       </div>
 
+      {/* Filtros Avançados de Data */}
+      <PolicyDateFilterBar
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        periodType={periodType}
+        onPeriodTypeChange={setPeriodType}
+      />
+
       {/* Header e Filtros */}
       <div className="flex flex-col gap-4">
         {/* Linha 1: Título e Ações */}
