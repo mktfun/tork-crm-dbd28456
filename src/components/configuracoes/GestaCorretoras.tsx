@@ -16,6 +16,7 @@ const brokerageSchema = z.object({
   cnpj: z.string().optional(),
   susep_code: z.string().optional(),
   logo_url: z.string().optional(),
+  phone: z.string().min(10, 'Telefone é obrigatório para roteamento (mínimo 10 dígitos)'),
   portal_allow_policy_download: z.boolean().optional(),
   portal_allow_card_download: z.boolean().optional(),
   portal_allow_profile_edit: z.boolean().optional(),
