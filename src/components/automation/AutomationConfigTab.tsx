@@ -48,13 +48,22 @@ interface AutomationSettings {
 
 const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
   gemini: [
+    { value: "gemini-2.5-pro-preview-05-06", label: "Gemini 2.5 Pro (Preview)" },
+    { value: "gemini-2.5-flash-preview-04-17", label: "Gemini 2.5 Flash (Preview)" },
     { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
-    { value: "gemini-2.0-pro", label: "Gemini 2.0 Pro" },
+    { value: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash Lite" },
     { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+    { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
   ],
   openai: [
-    { value: "gpt-4.5", label: "GPT-4.5" },
+    { value: "gpt-4.1", label: "GPT-4.1" },
+    { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+    { value: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
     { value: "gpt-4o", label: "GPT-4o" },
+    { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+    { value: "o3", label: "o3" },
+    { value: "o3-mini", label: "o3-mini" },
+    { value: "o4-mini", label: "o4-mini (Preview)" },
   ],
 };
 
@@ -368,7 +377,7 @@ export function AutomationConfigTab() {
       </div>
 
       {/* AI Engine Config */}
-      <Card>
+      <Card className="bg-background/50 backdrop-blur-md border border-white/10 shadow-lg">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
@@ -415,22 +424,33 @@ export function AutomationConfigTab() {
 
             <div className="space-y-2 md:col-span-2">
               <Label>API Key</Label>
-              <div className="relative">
-                <Input
-                  type={showAiApiKey ? "text" : "password"}
-                  placeholder="Insira a chave do provedor"
-                  value={aiApiKey}
-                  onChange={(e) => setAiApiKey(e.target.value)}
-                  className="pr-10"
-                />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showAiApiKey ? "text" : "password"}
+                    placeholder="Insira a chave do provedor"
+                    value={aiApiKey}
+                    onChange={(e) => setAiApiKey(e.target.value)}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowAiApiKey(!showAiApiKey)}
+                  >
+                    {showAiApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
                 <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowAiApiKey(!showAiApiKey)}
+                  variant="outline"
+                  size="icon"
+                  title="Testar conexão com o provedor"
+                  disabled={!aiApiKey}
+                  className="shrink-0 h-10 w-10"
                 >
-                  {showAiApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  <Wifi className="h-4 w-4" />
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -442,7 +462,7 @@ export function AutomationConfigTab() {
       </Card>
 
       {/* Chatwoot Config */}
-      <Card>
+      <Card className="bg-background/50 backdrop-blur-md border border-white/10 shadow-lg">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
@@ -549,7 +569,7 @@ export function AutomationConfigTab() {
       </Card>
 
       {/* Webhook CRM */}
-      <Card>
+      <Card className="bg-background/50 backdrop-blur-md border border-white/10 shadow-lg">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
@@ -587,7 +607,7 @@ export function AutomationConfigTab() {
       </Card>
 
       {/* n8n Config */}
-      <Card>
+      <Card className="bg-background/50 backdrop-blur-md border border-white/10 shadow-lg">
         <CardHeader>
           <CardTitle>n8n (Automação Avançada)</CardTitle>
           <CardDescription>
