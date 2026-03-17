@@ -11,11 +11,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   Save,
   MessageCircle,
-  ExternalLink,
   Eye,
   EyeOff,
   Loader2,
@@ -26,6 +32,7 @@ import {
   Check,
   Settings,
   Link,
+  Brain,
 } from "lucide-react";
 import { InboxAgentMapping } from "@/components/settings/InboxAgentMapping";
 
@@ -38,6 +45,18 @@ interface AutomationSettings {
   chatwoot_webhook_secret: string;
   n8n_webhook_url: string;
 }
+
+const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  gemini: [
+    { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+    { value: "gemini-2.0-pro", label: "Gemini 2.0 Pro" },
+    { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+  ],
+  openai: [
+    { value: "gpt-4.5", label: "GPT-4.5" },
+    { value: "gpt-4o", label: "GPT-4o" },
+  ],
+};
 
 /** Remove trailing slashes and /api/v1 suffix */
 function sanitizeUrl(url: string): string {
@@ -56,9 +75,16 @@ export function AutomationConfigTab() {
   const [syncing, setSyncing] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
+  const [showAiApiKey, setShowAiApiKey] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [testInboxId, setTestInboxId] = useState("");
   const [testContactId, setTestContactId] = useState("");
+
+  // AI Engine state
+  const [aiProvider, setAiProvider] = useState("gemini");
+  const [aiModel, setAiModel] = useState("gemini-2.0-flash");
+  const [aiApiKey, setAiApiKey] = useState("");
+  const [globalConfigId, setGlobalConfigId] = useState<string | null>(null);
 
   const [settings, setSettings] = useState<AutomationSettings>({
     chatwoot_url: "",
@@ -76,50 +102,59 @@ export function AutomationConfigTab() {
     }
   }, [user?.id]);
 
+  // Reset model when provider changes
+  useEffect(() => {
+    const models = MODEL_OPTIONS[aiProvider] || [];
+    if (!models.find((m) => m.value === aiModel)) {
+      setAiModel(models[0]?.value || "");
+    }
+  }, [aiProvider]);
+
   const fetchSettings = async () => {
     try {
-      // Fetch from both sources in parallel
-      const [brokerageRes, crmRes] = await Promise.all([
+      const [brokerageRes, crmRes, globalRes] = await Promise.all([
         supabase
           .from("brokerages")
-          .select(
-            "id, chatwoot_url, chatwoot_token, chatwoot_account_id, updated_at",
-          )
+          .select("id, chatwoot_url, chatwoot_token, chatwoot_account_id, updated_at")
           .eq("user_id", user?.id ?? "")
           .maybeSingle(),
         supabase
           .from("crm_settings")
-          .select(
-            "id, chatwoot_url, chatwoot_api_key, chatwoot_account_id, chatwoot_webhook_secret, n8n_webhook_url, updated_at",
-          )
+          .select("id, chatwoot_url, chatwoot_api_key, chatwoot_account_id, chatwoot_webhook_secret, n8n_webhook_url, updated_at")
+          .eq("user_id", user?.id ?? "")
+          .maybeSingle(),
+        supabase
+          .from("crm_ai_global_config")
+          .select("id, ai_provider, ai_model, api_key")
           .eq("user_id", user?.id ?? "")
           .maybeSingle(),
       ]);
 
       const brok = brokerageRes.data;
       const crm = crmRes.data;
+      const global = globalRes.data;
 
-      // Merge: crm_settings takes priority for webhook_secret and n8n; for chatwoot creds use most recent
-      const brokDate = brok?.updated_at
-        ? new Date(brok.updated_at).getTime()
-        : 0;
+      const brokDate = brok?.updated_at ? new Date(brok.updated_at).getTime() : 0;
       const crmDate = crm?.updated_at ? new Date(crm.updated_at).getTime() : 0;
       const useCrmCreds = crmDate >= brokDate && crm?.chatwoot_url;
 
       setSettings({
         brokerageId: brok?.id ?? undefined,
         crmSettingsId: crm?.id ?? undefined,
-        chatwoot_url:
-          (useCrmCreds ? crm?.chatwoot_url : brok?.chatwoot_url) || "",
-        chatwoot_api_key:
-          (useCrmCreds ? crm?.chatwoot_api_key : brok?.chatwoot_token) || "",
-        chatwoot_account_id:
-          (useCrmCreds
-            ? crm?.chatwoot_account_id
-            : brok?.chatwoot_account_id) || "",
+        chatwoot_url: (useCrmCreds ? crm?.chatwoot_url : brok?.chatwoot_url) || "",
+        chatwoot_api_key: (useCrmCreds ? crm?.chatwoot_api_key : brok?.chatwoot_token) || "",
+        chatwoot_account_id: (useCrmCreds ? crm?.chatwoot_account_id : brok?.chatwoot_account_id) || "",
         chatwoot_webhook_secret: crm?.chatwoot_webhook_secret || "",
         n8n_webhook_url: crm?.n8n_webhook_url || "",
       });
+
+      // AI Engine fields
+      if (global) {
+        setGlobalConfigId(global.id);
+        setAiProvider((global as any).ai_provider || "gemini");
+        setAiModel((global as any).ai_model || "gemini-2.0-flash");
+        setAiApiKey((global as any).api_key || "");
+      }
     } catch (error) {
       console.error("Error fetching settings:", error);
       toast.error("Erro ao carregar configurações");
@@ -135,7 +170,7 @@ export function AutomationConfigTab() {
     const cleanUrl = sanitizeUrl(settings.chatwoot_url);
 
     try {
-      // 1) Update brokerages (only columns that exist there)
+      // 1) Update brokerages
       if (settings.brokerageId) {
         const { error: brokErr } = await supabase
           .from("brokerages")
@@ -149,7 +184,7 @@ export function AutomationConfigTab() {
         if (brokErr) throw brokErr;
       }
 
-      // 2) Upsert crm_settings (webhook_secret + n8n + mirror of creds)
+      // 2) Upsert crm_settings
       const crmPayload = {
         user_id: user.id,
         chatwoot_url: cleanUrl || null,
@@ -172,6 +207,30 @@ export function AutomationConfigTab() {
         if (crmErr) throw crmErr;
       }
 
+      // 3) Upsert AI engine config
+      const aiPayload = {
+        user_id: user.id,
+        ai_provider: aiProvider,
+        ai_model: aiModel,
+        api_key: aiApiKey || null,
+      };
+
+      if (globalConfigId) {
+        const { error: aiErr } = await supabase
+          .from("crm_ai_global_config")
+          .update(aiPayload)
+          .eq("id", globalConfigId);
+        if (aiErr) throw aiErr;
+      } else {
+        const { data: inserted, error: aiErr } = await supabase
+          .from("crm_ai_global_config")
+          .insert(aiPayload)
+          .select("id")
+          .single();
+        if (aiErr) throw aiErr;
+        if (inserted) setGlobalConfigId(inserted.id);
+      }
+
       toast.success("Configurações salvas com sucesso!");
       fetchSettings();
     } catch (error: any) {
@@ -182,7 +241,6 @@ export function AutomationConfigTab() {
     }
   };
 
-  /** Send config_override so test uses what's on screen, not stale DB */
   const buildConfigOverride = () => ({
     chatwoot_url: sanitizeUrl(settings.chatwoot_url),
     chatwoot_api_key: settings.chatwoot_api_key,
@@ -190,27 +248,18 @@ export function AutomationConfigTab() {
   });
 
   const handleTestChatwoot = async () => {
-    if (
-      !settings.chatwoot_url ||
-      !settings.chatwoot_api_key ||
-      !settings.chatwoot_account_id
-    ) {
+    if (!settings.chatwoot_url || !settings.chatwoot_api_key || !settings.chatwoot_account_id) {
       toast.error("Preencha todos os campos do Chatwoot");
       return;
     }
-
     setTesting(true);
     const toastId = toast.loading("Testando conexão com Chatwoot...");
-
     try {
       const { data, error } = await supabase.functions.invoke("chatwoot-sync", {
         body: { action: "validate", config_override: buildConfigOverride() },
       });
-
       toast.dismiss(toastId);
-
       if (error) throw error;
-
       if (data?.success) {
         toast.success(data.message || "Conexão estabelecida!");
       } else {
@@ -218,36 +267,25 @@ export function AutomationConfigTab() {
       }
     } catch (error: any) {
       toast.dismiss(toastId);
-      toast.error(
-        "Falha na conexão: " + (error.message || "Verifique suas credenciais"),
-      );
+      toast.error("Falha na conexão: " + (error.message || "Verifique suas credenciais"));
     } finally {
       setTesting(false);
     }
   };
 
   const handleSyncLabels = async () => {
-    if (
-      !settings.chatwoot_url ||
-      !settings.chatwoot_api_key ||
-      !settings.chatwoot_account_id
-    ) {
+    if (!settings.chatwoot_url || !settings.chatwoot_api_key || !settings.chatwoot_account_id) {
       toast.error("Configure as credenciais do Chatwoot primeiro");
       return;
     }
-
     setSyncing(true);
     const toastId = toast.loading("Sincronizando etiquetas...");
-
     try {
       const { data, error } = await supabase.functions.invoke("chatwoot-sync", {
         body: { action: "sync_stages", config_override: buildConfigOverride() },
       });
-
       toast.dismiss(toastId);
-
       if (error) throw error;
-
       if (data?.success) {
         toast.success(data.message || "Etiquetas sincronizadas!");
       } else {
@@ -255,11 +293,7 @@ export function AutomationConfigTab() {
       }
     } catch (error: any) {
       toast.dismiss(toastId);
-      console.error("Sync error:", error);
-      toast.error(
-        "Erro ao sincronizar: " +
-          (error.message || "Verifique suas credenciais"),
-      );
+      toast.error("Erro ao sincronizar: " + (error.message || "Verifique suas credenciais"));
     } finally {
       setSyncing(false);
     }
@@ -270,31 +304,22 @@ export function AutomationConfigTab() {
       toast.error("Preencha a URL do webhook n8n");
       return;
     }
-
     if (!testInboxId) {
       toast.error("Preencha o Inbox ID para teste");
       return;
     }
-
     setTestingN8n(true);
     const toastId = toast.loading("Enviando teste para n8n...");
-
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "test-n8n-webhook",
-        {
-          body: {
-            inbox_id: testInboxId,
-            n8n_webhook_url: settings.n8n_webhook_url,
-            contact_id: testContactId || undefined,
-          },
+      const { data, error } = await supabase.functions.invoke("test-n8n-webhook", {
+        body: {
+          inbox_id: testInboxId,
+          n8n_webhook_url: settings.n8n_webhook_url,
+          contact_id: testContactId || undefined,
         },
-      );
-
+      });
       toast.dismiss(toastId);
-
       if (error) throw error;
-
       if (data?.success) {
         toast.success("Teste enviado com sucesso! Verifique o n8n.");
       } else {
@@ -302,9 +327,7 @@ export function AutomationConfigTab() {
       }
     } catch (error: any) {
       toast.dismiss(toastId);
-      toast.error(
-        "Erro ao enviar teste: " + (error.message || "Verifique a URL"),
-      );
+      toast.error("Erro ao enviar teste: " + (error.message || "Verifique a URL"));
     } finally {
       setTestingN8n(false);
     }
@@ -325,6 +348,8 @@ export function AutomationConfigTab() {
     );
   }
 
+  const models = MODEL_OPTIONS[aiProvider] || [];
+
   return (
     <div className="space-y-6 pb-24">
       {/* Header */}
@@ -341,6 +366,80 @@ export function AutomationConfigTab() {
           </p>
         </div>
       </div>
+
+      {/* AI Engine Config */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+              <Brain className="h-5 w-5 text-purple-400" />
+            </div>
+            <div>
+              <CardTitle>Motor de Inteligência</CardTitle>
+              <CardDescription>
+                Provedor, modelo e chave de acesso da IA
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Provedor de IA</Label>
+              <Select value={aiProvider} onValueChange={setAiProvider}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o provedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gemini">Google Gemini</SelectItem>
+                  <SelectItem value="openai">OpenAI</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Modelo</Label>
+              <Select value={aiModel} onValueChange={setAiModel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o modelo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>API Key</Label>
+              <div className="relative">
+                <Input
+                  type={showAiApiKey ? "text" : "password"}
+                  placeholder="Insira a chave do provedor"
+                  value={aiApiKey}
+                  onChange={(e) => setAiApiKey(e.target.value)}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowAiApiKey(!showAiApiKey)}
+                >
+                  {showAiApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Chave de API do provedor selecionado. Armazenada de forma segura.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Chatwoot Config */}
       <Card>
@@ -364,9 +463,7 @@ export function AutomationConfigTab() {
               id="chatwoot_url"
               placeholder="https://seu-chat-tork.com"
               value={settings.chatwoot_url}
-              onChange={(e) =>
-                setSettings({ ...settings, chatwoot_url: e.target.value })
-              }
+              onChange={(e) => setSettings({ ...settings, chatwoot_url: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
               URL base da sua instância Chatwoot (sem /api/v1)
@@ -379,12 +476,7 @@ export function AutomationConfigTab() {
               id="chatwoot_account_id"
               placeholder="1"
               value={settings.chatwoot_account_id}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  chatwoot_account_id: e.target.value,
-                })
-              }
+              onChange={(e) => setSettings({ ...settings, chatwoot_account_id: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
               ID da conta no Chatwoot (Settings → Account)
@@ -399,9 +491,7 @@ export function AutomationConfigTab() {
                 type={showApiKey ? "text" : "password"}
                 placeholder="sua-api-key-aqui"
                 value={settings.chatwoot_api_key}
-                onChange={(e) =>
-                  setSettings({ ...settings, chatwoot_api_key: e.target.value })
-                }
+                onChange={(e) => setSettings({ ...settings, chatwoot_api_key: e.target.value })}
                 className="pr-10"
               />
               <Button
@@ -411,11 +501,7 @@ export function AutomationConfigTab() {
                 className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                 onClick={() => setShowApiKey(!showApiKey)}
               >
-                {showApiKey ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
+                {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -431,12 +517,7 @@ export function AutomationConfigTab() {
                 type={showWebhookSecret ? "text" : "password"}
                 placeholder="seu-webhook-secret"
                 value={settings.chatwoot_webhook_secret}
-                onChange={(e) =>
-                  setSettings({
-                    ...settings,
-                    chatwoot_webhook_secret: e.target.value,
-                  })
-                }
+                onChange={(e) => setSettings({ ...settings, chatwoot_webhook_secret: e.target.value })}
                 className="pr-10"
               />
               <Button
@@ -446,11 +527,7 @@ export function AutomationConfigTab() {
                 className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                 onClick={() => setShowWebhookSecret(!showWebhookSecret)}
               >
-                {showWebhookSecret ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
+                {showWebhookSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -459,29 +536,12 @@ export function AutomationConfigTab() {
           </div>
 
           <div className="flex flex-wrap gap-3 pt-2">
-            <Button
-              variant="outline"
-              onClick={handleTestChatwoot}
-              disabled={testing || !settings.chatwoot_url}
-            >
-              {testing ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Wifi className="h-4 w-4 mr-2" />
-              )}
+            <Button variant="outline" onClick={handleTestChatwoot} disabled={testing || !settings.chatwoot_url}>
+              {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
               Testar Conexão
             </Button>
-
-            <Button
-              variant="outline"
-              onClick={handleSyncLabels}
-              disabled={syncing || !settings.chatwoot_url}
-            >
-              {syncing ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
+            <Button variant="outline" onClick={handleSyncLabels} disabled={syncing || !settings.chatwoot_url}>
+              {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
               Sincronizar Etiquetas
             </Button>
           </div>
@@ -507,11 +567,7 @@ export function AutomationConfigTab() {
           <div className="flex gap-2">
             <Input value={webhookUrl} readOnly className="font-mono text-xs" />
             <Button variant="outline" size="icon" onClick={handleCopyWebhook}>
-              {copiedWebhook ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
+              {copiedWebhook ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             </Button>
           </div>
 
@@ -523,9 +579,7 @@ export function AutomationConfigTab() {
               <li>Acesse Settings → Applications → Webhooks no Chatwoot</li>
               <li>Clique em "Add new webhook"</li>
               <li>Cole a URL acima</li>
-              <li>
-                Selecione os eventos: message_created, conversation_updated
-              </li>
+              <li>Selecione os eventos: message_created, conversation_updated</li>
               <li>Salve e copie o Secret gerado para o campo acima</li>
             </ol>
           </div>
@@ -547,9 +601,7 @@ export function AutomationConfigTab() {
               id="n8n_webhook_url"
               placeholder="https://seu-n8n.com/webhook/..."
               value={settings.n8n_webhook_url}
-              onChange={(e) =>
-                setSettings({ ...settings, n8n_webhook_url: e.target.value })
-              }
+              onChange={(e) => setSettings({ ...settings, n8n_webhook_url: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
               URL do webhook no n8n que receberá os dados do CRM
@@ -569,7 +621,6 @@ export function AutomationConfigTab() {
                 ID de um inbox válido para enviar dados de teste
               </p>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="test_contact_id">Contact ID (opcional)</Label>
               <Input
@@ -590,11 +641,7 @@ export function AutomationConfigTab() {
               onClick={handleTestN8n}
               disabled={testingN8n || !settings.n8n_webhook_url || !testInboxId}
             >
-              {testingN8n ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4 mr-2" />
-              )}
+              {testingN8n ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
               Enviar Teste
             </Button>
           </div>
@@ -606,16 +653,8 @@ export function AutomationConfigTab() {
 
       {/* Sticky Save Button */}
       <div className="sticky bottom-0 bg-background/80 backdrop-blur border-t border-border pt-4 mt-4 flex justify-end">
-        <Button
-          onClick={handleSave}
-          disabled={saving}
-          className="min-w-[120px]"
-        >
-          {saving ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4 mr-2" />
-          )}
+        <Button onClick={handleSave} disabled={saving} className="min-w-[120px]">
+          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
           Salvar Tudo
         </Button>
       </div>
