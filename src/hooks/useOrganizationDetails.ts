@@ -57,7 +57,7 @@ export function useOrganizationDetails(organizationId: string | undefined) {
         // Buscar usuários associados (via user_id do brokerage)
         const { data: users, error: usersError } = await supabase
           .from('profiles')
-          .select('id, nome_completo, email, role, ativo, created_at')
+          .select('id, nome_completo, email, role, ativo, ai_enabled, created_at')
           .eq('id', brokerage.user_id);
 
         if (usersError) {
