@@ -36,6 +36,7 @@ export function GestaoCorretoras() {
       cnpj: '',
       susep_code: '',
       logo_url: '',
+      phone: '',
       portal_allow_policy_download: false,
       portal_allow_card_download: false,
       portal_allow_profile_edit: false,
