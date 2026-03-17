@@ -3,9 +3,11 @@ import { motion } from 'framer-motion';
 import { KanbanBoard } from '@/components/crm/KanbanBoard';
 import { PipelineSelector } from '@/components/crm/PipelineSelector';
 import { PipelineManagerModal } from '@/components/crm/PipelineManagerModal';
+import { CRMAnalytics } from '@/components/crm/CRMAnalytics';
 import { useCRMPipelines } from '@/hooks/useCRMPipelines';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, MessageCircle, Loader2, Plus, Sparkles, Bot } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RefreshCw, MessageCircle, Loader2, Plus, Sparkles, Bot, BarChart3, Kanban } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
@@ -14,8 +16,8 @@ export default function CRM() {
   const { pipelines, isLoading, createPipeline } = useCRMPipelines();
   const [selectedPipelineId, setSelectedPipelineId] = useLocalStorage<string | null>('crm-selected-pipeline', null);
   const [showPipelineManager, setShowPipelineManager] = useState(false);
+  const [activeView, setActiveView] = useLocalStorage<string>('crm-active-view', 'pipeline');
 
-  // Auto-selecionar pipeline default se nenhum selecionado
   useEffect(() => {
     if (!isLoading && pipelines.length > 0 && !selectedPipelineId) {
       const defaultPipeline = pipelines.find(p => p.is_default) || pipelines[0];
@@ -23,7 +25,6 @@ export default function CRM() {
     }
   }, [pipelines, selectedPipelineId, isLoading, setSelectedPipelineId]);
 
-  // Se o pipeline selecionado foi deletado, selecionar outro
   useEffect(() => {
     if (!isLoading && selectedPipelineId && pipelines.length > 0) {
       const exists = pipelines.some(p => p.id === selectedPipelineId);
@@ -55,7 +56,6 @@ export default function CRM() {
     );
   }
 
-  // Estado inicial: sem pipelines
   if (pipelines.length === 0) {
     return (
       <div className="space-y-6">
@@ -122,7 +122,6 @@ export default function CRM() {
             onManage={() => setShowPipelineManager(true)}
           />
           
-          {/* Link to Automation Page */}
           <Button 
             variant="outline" 
             size="sm"
@@ -147,14 +146,39 @@ export default function CRM() {
         </div>
       </motion.div>
 
-      {/* Kanban Board */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <KanbanBoard pipelineId={selectedPipelineId} />
-      </motion.div>
+      {/* Tabs: Pipeline vs Insights */}
+      <Tabs value={activeView} onValueChange={setActiveView}>
+        <TabsList>
+          <TabsTrigger value="pipeline" className="gap-1.5">
+            <Kanban className="h-4 w-4" />
+            Pipeline
+          </TabsTrigger>
+          <TabsTrigger value="insights" className="gap-1.5">
+            <BarChart3 className="h-4 w-4" />
+            Insights
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pipeline">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <KanbanBoard pipelineId={selectedPipelineId} />
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="insights">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <CRMAnalytics pipelineId={selectedPipelineId} />
+          </motion.div>
+        </TabsContent>
+      </Tabs>
 
       {/* Pipeline Manager Modal */}
       <PipelineManagerModal

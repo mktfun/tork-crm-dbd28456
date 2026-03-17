@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -39,7 +40,9 @@ import {
   Plus,
   FileText,
   Trophy,
-  XCircle
+  XCircle,
+  Bot,
+  ArrowRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -62,6 +65,25 @@ interface DealNote {
   author_name?: string;
 }
 
+interface DealEvent {
+  id: string;
+  event_type: string;
+  old_value: string | null;
+  new_value: string | null;
+  source: string;
+  created_by: string | null;
+  created_at: string;
+  author_name?: string;
+}
+
+interface TimelineItem {
+  id: string;
+  type: 'note' | 'event';
+  created_at: string;
+  note?: DealNote;
+  event?: DealEvent;
+}
+
 export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalProps) {
   const { user } = useAuth();
   const { updateDeal, deleteDeal } = useCRMDeals();
@@ -79,9 +101,9 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
   });
 
   // Timeline state
-  const [notes, setNotes] = useState<DealNote[]>([]);
+  const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([]);
   const [newNote, setNewNote] = useState('');
-  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [addingNote, setAddingNote] = useState(false);
 
   useEffect(() => {
@@ -104,20 +126,35 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
     }
   }, [deal]);
 
-  const fetchNotes = useCallback(async () => {
+  const fetchTimeline = useCallback(async () => {
     if (!deal) return;
-    setLoadingNotes(true);
+    setLoadingTimeline(true);
     try {
-      const { data, error } = await (supabase as any)
-        .from('crm_deal_notes')
-        .select('id, content, created_by, created_at')
-        .eq('deal_id', deal.id)
-        .order('created_at', { ascending: false });
+      // Fetch notes and events in parallel
+      const [notesRes, eventsRes] = await Promise.all([
+        (supabase as any)
+          .from('crm_deal_notes')
+          .select('id, content, created_by, created_at')
+          .eq('deal_id', deal.id)
+          .order('created_at', { ascending: false }),
+        (supabase as any)
+          .from('crm_deal_events')
+          .select('id, event_type, old_value, new_value, source, created_by, created_at')
+          .eq('deal_id', deal.id)
+          .order('created_at', { ascending: false })
+      ]);
 
-      if (error) throw error;
+      if (notesRes.error) throw notesRes.error;
 
-      // Fetch author names
-      const authorIds = [...new Set((data || []).map((n: any) => n.created_by as string))];
+      const notes = notesRes.data || [];
+      const events = eventsRes.data || [];
+
+      // Fetch author names for all unique user IDs
+      const authorIds = [...new Set([
+        ...notes.map((n: any) => n.created_by as string),
+        ...events.filter((e: any) => e.created_by).map((e: any) => e.created_by as string)
+      ])];
+      
       let authorMap: Record<string, string> = {};
       if (authorIds.length > 0) {
         const { data: profiles } = await supabase
@@ -129,25 +166,53 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
         }
       }
 
-      setNotes((data || []).map((n: any) => ({
-        id: n.id,
-        content: n.content,
-        created_by: n.created_by,
-        created_at: n.created_at,
-        author_name: authorMap[n.created_by] || 'Usuário'
-      })));
+      // Build timeline items
+      const items: TimelineItem[] = [
+        ...notes.map((n: any) => ({
+          id: `note-${n.id}`,
+          type: 'note' as const,
+          created_at: n.created_at,
+          note: {
+            id: n.id,
+            content: n.content,
+            created_by: n.created_by,
+            created_at: n.created_at,
+            author_name: authorMap[n.created_by] || 'Usuário'
+          }
+        })),
+        ...events.map((e: any) => ({
+          id: `event-${e.id}`,
+          type: 'event' as const,
+          created_at: e.created_at,
+          event: {
+            id: e.id,
+            event_type: e.event_type,
+            old_value: e.old_value,
+            new_value: e.new_value,
+            source: e.source,
+            created_by: e.created_by,
+            created_at: e.created_at,
+            author_name: e.created_by ? (authorMap[e.created_by] || 'Usuário') : undefined
+          }
+        }))
+      ];
+
+      // Sort by created_at DESC
+      items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setTimelineItems(items);
     } catch (error) {
-      console.error('Error fetching notes:', error);
+      console.error('Error fetching timeline:', error);
     } finally {
-      setLoadingNotes(false);
+      setLoadingTimeline(false);
     }
   }, [deal]);
 
   useEffect(() => {
     if (activeTab === 'history' && deal) {
-      fetchNotes();
+      fetchTimeline();
     }
-  }, [activeTab, deal, fetchNotes]);
+  }, [activeTab, deal, fetchTimeline]);
 
   const fetchChatTorkConfig = async () => {
     try {
@@ -169,10 +234,30 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
     ? `${chatTorkConfig.chatwoot_url}/app/accounts/${chatTorkConfig.chatwoot_account_id}/conversations/${deal.chatwoot_conversation_id}`
     : null;
 
+  const emitDealEvent = async (eventType: string, oldValue: string | null, newValue: string | null) => {
+    if (!deal || !user) return;
+    try {
+      await (supabase as any).from('crm_deal_events').insert({
+        deal_id: deal.id,
+        event_type: eventType,
+        old_value: oldValue,
+        new_value: newValue,
+        source: 'manual',
+        created_by: user.id
+      });
+    } catch (err) {
+      console.warn('Failed to emit deal event:', err);
+    }
+  };
+
   const handleSave = async () => {
     if (!deal) return;
     setSaving(true);
     try {
+      const stageChanged = formData.stage_id !== deal.stage_id;
+      const oldStageName = currentStage?.name || null;
+      const newStageName = stageChanged ? stages.find(s => s.id === formData.stage_id)?.name || null : null;
+
       await updateDeal.mutateAsync({
         id: deal.id,
         title: formData.title,
@@ -181,6 +266,11 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
         notes: formData.notes || null,
         stage_id: formData.stage_id
       });
+
+      if (stageChanged) {
+        await emitDealEvent('stage_change', oldStageName, newStageName);
+      }
+
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating deal:', error);
@@ -215,7 +305,7 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
       if (error) throw error;
       setNewNote('');
       toast.success('Nota adicionada!');
-      fetchNotes();
+      fetchTimeline();
     } catch (error) {
       console.error('Error adding note:', error);
       toast.error('Erro ao adicionar nota');
@@ -232,6 +322,7 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
     if (!deal || !wonStage) return;
     try {
       await updateDeal.mutateAsync({ id: deal.id, stage_id: wonStage.id });
+      await emitDealEvent('status_change', currentStage?.name || 'Aberto', wonStage.name);
       toast.success('Negócio marcado como Ganho!');
       onOpenChange(false);
     } catch (error) {
@@ -243,6 +334,7 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
     if (!deal || !lostStage) return;
     try {
       await updateDeal.mutateAsync({ id: deal.id, stage_id: lostStage.id });
+      await emitDealEvent('status_change', currentStage?.name || 'Aberto', lostStage.name);
       toast.success('Negócio marcado como Perdido.');
       onOpenChange(false);
     } catch (error) {
@@ -252,11 +344,39 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
 
   const handleInlineStageChange = async (newStageId: string) => {
     if (!deal || newStageId === deal.stage_id) return;
+    const oldStageName = currentStage?.name || null;
+    const newStageName = stages.find(s => s.id === newStageId)?.name || null;
     try {
       await updateDeal.mutateAsync({ id: deal.id, stage_id: newStageId });
+      await emitDealEvent('stage_change', oldStageName, newStageName);
       toast.success('Etapa atualizada!');
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const renderEventDescription = (event: DealEvent) => {
+    switch (event.event_type) {
+      case 'stage_change':
+        return (
+          <div className="flex items-center gap-1.5 text-sm text-foreground flex-wrap">
+            <span>Etapa alterada de</span>
+            <Badge variant="outline" className="text-xs">{event.old_value || '?'}</Badge>
+            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+            <Badge variant="outline" className="text-xs">{event.new_value || '?'}</Badge>
+          </div>
+        );
+      case 'status_change':
+        return (
+          <div className="flex items-center gap-1.5 text-sm text-foreground flex-wrap">
+            <span>Status alterado para</span>
+            <Badge className="text-xs">{event.new_value || '?'}</Badge>
+          </div>
+        );
+      case 'creation':
+        return <span className="text-sm text-foreground">Negócio criado</span>;
+      default:
+        return <span className="text-sm text-foreground">{event.event_type}</span>;
     }
   };
 
@@ -275,7 +395,6 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
             )}
             <span className="truncate">{isEditing ? 'Editar Negócio' : deal.title}</span>
           </SheetTitle>
-          {/* Quick actions: Won / Lost */}
           {(wonStage || lostStage) && !isEditing && (
             <div className="flex gap-2 pt-1">
               {wonStage && deal.stage_id !== wonStage.id && (
@@ -542,15 +661,15 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
               </Button>
             </div>
 
-            {/* Notes timeline */}
+            {/* Hybrid Timeline */}
             <ScrollArea className="flex-1">
-              {loadingNotes ? (
+              {loadingTimeline ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
-              ) : notes.length === 0 ? (
+              ) : timelineItems.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground text-sm">
-                  Nenhuma anotação ainda.
+                  Nenhum registro ainda.
                 </div>
               ) : (
                 <div className="relative ml-3">
@@ -558,21 +677,50 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
                   <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-primary/20" />
                   
                   <div className="space-y-4">
-                    {notes.map((note) => (
-                      <div key={note.id} className="relative pl-6">
+                    {timelineItems.map((item) => (
+                      <div key={item.id} className="relative pl-6">
                         {/* Timeline dot */}
-                        <div className="absolute left-[-4px] top-2 h-2.5 w-2.5 rounded-full bg-primary border-2 border-background" />
+                        <div className={`absolute left-[-4px] top-2 h-2.5 w-2.5 rounded-full border-2 border-background ${
+                          item.type === 'event' ? 'bg-accent-foreground' : 'bg-primary'
+                        }`} />
                         
                         <div className="p-3 rounded-lg bg-secondary/30">
-                          <p className="text-sm text-foreground whitespace-pre-wrap">{note.content}</p>
-                          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                            <User className="h-3 w-3" />
-                            <span>{note.author_name}</span>
-                            <span>·</span>
-                            <span>
-                              {formatDistanceToNow(new Date(note.created_at), { addSuffix: true, locale: ptBR })}
-                            </span>
-                          </div>
+                          {item.type === 'note' && item.note && (
+                            <>
+                              <p className="text-sm text-foreground whitespace-pre-wrap">{item.note.content}</p>
+                              <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                                <User className="h-3 w-3" />
+                                <span>{item.note.author_name}</span>
+                                <span>·</span>
+                                <span>
+                                  {format(new Date(item.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                                </span>
+                              </div>
+                            </>
+                          )}
+
+                          {item.type === 'event' && item.event && (
+                            <>
+                              {renderEventDescription(item.event)}
+                              <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                                {item.event.source === 'ai_automation' ? (
+                                  <Badge variant="secondary" className="gap-1 text-xs py-0 px-1.5">
+                                    <Bot className="h-3 w-3" />
+                                    IA
+                                  </Badge>
+                                ) : (
+                                  <>
+                                    <User className="h-3 w-3" />
+                                    <span>{item.event.author_name || 'Usuário'}</span>
+                                  </>
+                                )}
+                                <span>·</span>
+                                <span>
+                                  {format(new Date(item.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                                </span>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}
