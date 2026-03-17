@@ -366,7 +366,8 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
       await emitDealEvent('stage_change', oldStageName, newStageName);
       toast.success('Etapa atualizada!');
     } catch (error) {
-      console.error(error);
+      console.error('Error changing stage:', error);
+      toast.error('Erro ao alterar etapa');
     }
   };
 
