@@ -1,6 +1,7 @@
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
 import { logger } from '../_shared/logger.ts';
+import { resolveUserModel } from '../_shared/model-resolver.ts';
 
 // Configuração da API Lovable/Gemini
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_AI_API_KEY');
