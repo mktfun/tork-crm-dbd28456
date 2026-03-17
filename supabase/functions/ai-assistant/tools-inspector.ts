@@ -88,7 +88,8 @@ export async function inspect_document(
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: 'google/gemini-2.5-flash', // Modelo Multimodal Rápido
+                const inspectorModel = await resolveUserModel(supabase, userId);
+                model: inspectorModel, // Modelo dinâmico via config global
                 messages: [
                     { role: 'system', content: auditorSystemPrompt },
                     {
