@@ -37,7 +37,9 @@ import {
   Trash2,
   Clock,
   Plus,
-  FileText
+  FileText,
+  Trophy,
+  XCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -223,6 +225,40 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
   };
 
   const currentStage = stages.find(s => s.id === deal?.stage_id);
+  const wonStage = stages.find(s => s.chatwoot_label?.toLowerCase().includes('ganho'));
+  const lostStage = stages.find(s => s.chatwoot_label?.toLowerCase().includes('perdido'));
+
+  const handleMarkWon = async () => {
+    if (!deal || !wonStage) return;
+    try {
+      await updateDeal.mutateAsync({ id: deal.id, stage_id: wonStage.id });
+      toast.success('Negócio marcado como Ganho!');
+      onOpenChange(false);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleMarkLost = async () => {
+    if (!deal || !lostStage) return;
+    try {
+      await updateDeal.mutateAsync({ id: deal.id, stage_id: lostStage.id });
+      toast.success('Negócio marcado como Perdido.');
+      onOpenChange(false);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleInlineStageChange = async (newStageId: string) => {
+    if (!deal || newStageId === deal.stage_id) return;
+    try {
+      await updateDeal.mutateAsync({ id: deal.id, stage_id: newStageId });
+      toast.success('Etapa atualizada!');
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   if (!deal) return null;
 
@@ -239,6 +275,32 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
             )}
             <span className="truncate">{isEditing ? 'Editar Negócio' : deal.title}</span>
           </SheetTitle>
+          {/* Quick actions: Won / Lost */}
+          {(wonStage || lostStage) && !isEditing && (
+            <div className="flex gap-2 pt-1">
+              {wonStage && deal.stage_id !== wonStage.id && (
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
+                  onClick={handleMarkWon}
+                >
+                  <Trophy className="h-3.5 w-3.5" />
+                  Ganho
+                </Button>
+              )}
+              {lostStage && deal.stage_id !== lostStage.id && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="gap-1.5"
+                  onClick={handleMarkLost}
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                  Perdido
+                </Button>
+              )}
+            </div>
+          )}
         </SheetHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
@@ -365,17 +427,33 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
                     )}
                   </div>
 
-                  {currentStage && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">Etapa:</span>
-                      <div 
-                        className="px-2 py-1 rounded-full text-xs font-medium text-white"
-                        style={{ backgroundColor: currentStage.color }}
-                      >
-                        {currentStage.name}
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Etapa:</span>
+                    <Select value={deal.stage_id} onValueChange={handleInlineStageChange}>
+                      <SelectTrigger className="w-auto h-7 text-xs gap-1.5 px-2">
+                        {currentStage && (
+                          <div 
+                            className="h-2 w-2 rounded-full shrink-0"
+                            style={{ backgroundColor: currentStage.color }}
+                          />
+                        )}
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stages.map((stage) => (
+                          <SelectItem key={stage.id} value={stage.id}>
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="h-2.5 w-2.5 rounded-full"
+                                style={{ backgroundColor: stage.color }}
+                              />
+                              {stage.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   {deal.notes && (
                     <div className="p-3 rounded-lg bg-secondary/20">

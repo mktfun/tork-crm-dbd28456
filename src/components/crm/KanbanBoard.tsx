@@ -12,7 +12,9 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCRMStages, useCRMDeals, CRMStage, CRMDeal } from '@/hooks/useCRMDeals';
+import { useAuth } from '@/hooks/useAuth';
 import { KanbanColumn } from './KanbanColumn';
 import { DealCard } from './DealCard';
 import { DealDetailsModal } from './DealDetailsModal';
@@ -20,13 +22,24 @@ import { NewDealModal } from './NewDealModal';
 import { NewStageModal } from './NewStageModal';
 import { StageEditModal } from './StageEditModal';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Sparkles } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Plus, Loader2, Sparkles, Filter } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface KanbanBoardProps {
   pipelineId: string | null;
 }
 
 export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { stages, isLoading: stagesLoading, initializeStages, reorderStages, deleteStage } = useCRMStages(pipelineId);
   const { deals, isLoading: dealsLoading, moveDeal } = useCRMDeals(pipelineId);
   
@@ -40,24 +53,64 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
   const [showNewStageModal, setShowNewStageModal] = useState(false);
   const [editingStage, setEditingStage] = useState<CRMStage | null>(null);
 
-  // Configure sensors with distance constraint for click vs drag
+  // Filter state
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // 8px movement = drag, less = click
-      },
+      activationConstraint: { distance: 8 },
     })
   );
+
+  // Identify won/lost stage IDs
+  const wonStageIds = useMemo(() => 
+    stages.filter(s => s.chatwoot_label?.toLowerCase().includes('ganho')).map(s => s.id),
+    [stages]
+  );
+  const lostStageIds = useMemo(() => 
+    stages.filter(s => s.chatwoot_label?.toLowerCase().includes('perdido')).map(s => s.id),
+    [stages]
+  );
+
+  // Filter deals
+  const filteredDeals = useMemo(() => {
+    let result = deals;
+
+    if (statusFilter === 'won') {
+      result = result.filter(d => wonStageIds.includes(d.stage_id));
+    } else if (statusFilter === 'lost') {
+      result = result.filter(d => lostStageIds.includes(d.stage_id));
+    } else if (statusFilter === 'open') {
+      result = result.filter(d => !wonStageIds.includes(d.stage_id) && !lostStageIds.includes(d.stage_id));
+    }
+
+    if (dateFrom) {
+      result = result.filter(d => {
+        const date = d.expected_close_date || d.created_at?.split('T')[0];
+        return date && date >= dateFrom;
+      });
+    }
+    if (dateTo) {
+      result = result.filter(d => {
+        const date = d.expected_close_date || d.created_at?.split('T')[0];
+        return date && date <= dateTo;
+      });
+    }
+
+    return result;
+  }, [deals, statusFilter, dateFrom, dateTo, wonStageIds, lostStageIds]);
 
   const dealsByStage = useMemo(() => {
     const grouped: Record<string, CRMDeal[]> = {};
     stages.forEach((stage) => {
-      grouped[stage.id] = deals
+      grouped[stage.id] = filteredDeals
         .filter((deal) => deal.stage_id === stage.id)
         .sort((a, b) => a.position - b.position);
     });
     return grouped;
-  }, [deals, stages]);
+  }, [filteredDeals, stages]);
 
   const activeDeal = useMemo(() => {
     if (!activeId || activeType !== 'deal') return null;
@@ -83,11 +136,9 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
     }
   };
 
-  const handleDragOver = (event: DragOverEvent) => {
-    // Visual feedback handled by isOver in columns
-  };
+  const handleDragOver = (event: DragOverEvent) => {};
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     
     if (!over) {
@@ -124,7 +175,6 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
       const dealId = activeIdStr;
       let targetStageId = overIdStr;
       
-      // If dropped on another deal, get its stage
       if (!overIdStr.startsWith('column-')) {
         const overDeal = deals.find((d) => d.id === overIdStr);
         if (overDeal) {
@@ -134,7 +184,6 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
         targetStageId = overIdStr.replace('column-', '');
       }
 
-      // Validate target stage exists
       const targetStage = stages.find((s) => s.id === targetStageId);
       if (!targetStage) {
         setActiveId(null);
@@ -143,22 +192,37 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
       }
 
       const deal = deals.find((d) => d.id === dealId);
-      if (!deal) {
+      if (!deal || deal.stage_id === targetStageId) {
         setActiveId(null);
         setActiveType(null);
         return;
       }
 
-      // Calculate new position
       const dealsInTargetStage = dealsByStage[targetStageId] || [];
       const newPosition = dealsInTargetStage.length;
 
-      if (deal.stage_id !== targetStageId) {
-        moveDeal.mutate({
-          dealId,
-          newStageId: targetStageId,
-          newPosition,
-        });
+      // Optimistic update
+      const stageIds = stages.map(s => s.id);
+      const queryKey = ['crm-deals', user?.id, pipelineId, stageIds];
+      const previousDeals = queryClient.getQueryData<CRMDeal[]>(queryKey);
+
+      queryClient.setQueryData<CRMDeal[]>(queryKey, (old) => {
+        if (!old) return old;
+        return old.map(d => 
+          d.id === dealId 
+            ? { ...d, stage_id: targetStageId, position: newPosition }
+            : d
+        );
+      });
+
+      try {
+        await moveDeal.mutateAsync({ dealId, newStageId: targetStageId, newPosition });
+      } catch (error) {
+        // Rollback
+        if (previousDeals) {
+          queryClient.setQueryData(queryKey, previousDeals);
+        }
+        toast.error('Erro ao mover negócio. Revertendo...');
       }
     }
 
@@ -188,6 +252,8 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
       initializeStages.mutate(pipelineId);
     }
   };
+
+  const hasActiveFilters = statusFilter !== 'all' || dateFrom || dateTo;
 
   if (stagesLoading || dealsLoading) {
     return (
@@ -247,6 +313,46 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
 
   return (
     <>
+      {/* Filter toolbar */}
+      <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-xl bg-secondary/20 border border-border/50">
+        <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[140px] h-8 text-xs">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="open">Abertos</SelectItem>
+            <SelectItem value="won">Ganhos</SelectItem>
+            <SelectItem value="lost">Perdidos</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          className="w-[140px] h-8 text-xs"
+          placeholder="De"
+        />
+        <Input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          className="w-[140px] h-8 text-xs"
+          placeholder="Até"
+        />
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => { setStatusFilter('all'); setDateFrom(''); setDateTo(''); }}
+          >
+            Limpar
+          </Button>
+        )}
+      </div>
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -254,7 +360,7 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4 min-h-[calc(100vh-220px)]">
+        <div className="flex gap-4 overflow-x-auto pb-4 min-h-[calc(100vh-280px)]">
           <SortableContext
             items={stages.map(s => `column-${s.id}`)}
             strategy={horizontalListSortingStrategy}
@@ -272,7 +378,6 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
             ))}
           </SortableContext>
 
-          {/* New Stage Button */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -302,10 +407,7 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
           easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)'
         }}>
           {activeDeal && (
-            <div 
-              className="w-80 cursor-grabbing"
-              style={{ pointerEvents: 'none' }}
-            >
+            <div className="w-80 cursor-grabbing" style={{ pointerEvents: 'none' }}>
               <DealCard 
                 deal={activeDeal} 
                 isDragging 
@@ -314,10 +416,7 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
             </div>
           )}
           {activeStage && (
-            <div 
-              className="w-80 cursor-grabbing"
-              style={{ pointerEvents: 'none' }}
-            >
+            <div className="w-80 cursor-grabbing" style={{ pointerEvents: 'none' }}>
               <div 
                 className="glass-component rounded-xl p-4"
                 style={{ borderTop: `3px solid ${activeStage.color}` }}
