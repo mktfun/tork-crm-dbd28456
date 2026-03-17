@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCompanyNames } from '@/hooks/useCompanyNames';
@@ -30,6 +31,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, Drawer
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
 import { AppCard } from '@/components/ui/app-card';
+import { PolicyDateFilterBar, PeriodType } from '@/components/policies/PolicyDateFilterBar';
 
 export default function Policies() {
   const { clients } = useClients();
@@ -43,6 +45,8 @@ export default function Policies() {
   const [isAIImportModalOpen, setIsAIImportModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [periodType, setPeriodType] = useState<PeriodType>('expiration_date');
 
   // Estado de paginação e filtros
   const [page, setPage] = useState(1);
@@ -348,6 +352,14 @@ export default function Policies() {
           isLoading={kpisLoading}
         />
       </div>
+
+      {/* Filtros Avançados de Data */}
+      <PolicyDateFilterBar
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        periodType={periodType}
+        onPeriodTypeChange={setPeriodType}
+      />
 
       {/* Header e Filtros */}
       <div className="flex flex-col gap-4">
@@ -657,7 +669,6 @@ export default function Policies() {
       />
 
       {/* Modais */}
-
 
       {/* Modal Nova Apólice */}
       {isNewPolicyModalOpen && (
