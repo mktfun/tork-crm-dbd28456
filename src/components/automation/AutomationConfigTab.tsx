@@ -48,13 +48,22 @@ interface AutomationSettings {
 
 const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
   gemini: [
+    { value: "gemini-2.5-pro-preview-05-06", label: "Gemini 2.5 Pro (Preview)" },
+    { value: "gemini-2.5-flash-preview-04-17", label: "Gemini 2.5 Flash (Preview)" },
     { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
-    { value: "gemini-2.0-pro", label: "Gemini 2.0 Pro" },
+    { value: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash Lite" },
     { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+    { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
   ],
   openai: [
-    { value: "gpt-4.5", label: "GPT-4.5" },
+    { value: "gpt-4.1", label: "GPT-4.1" },
+    { value: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+    { value: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
     { value: "gpt-4o", label: "GPT-4o" },
+    { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+    { value: "o3", label: "o3" },
+    { value: "o3-mini", label: "o3-mini" },
+    { value: "o4-mini", label: "o4-mini (Preview)" },
   ],
 };
 
