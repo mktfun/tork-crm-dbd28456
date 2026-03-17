@@ -74,6 +74,7 @@ export function StageFlowCard({
   const [selectedVibe, setSelectedVibe] = useState<VibeId | null>(inferVibeFromPersona(currentPersona));
   const [mission, setMission] = useState(currentObjective || '');
   const debouncedMission = useDebounce(mission, 1500);
+  const userSelectedRef = useRef(false);
   
   // Sync expanded state with selection
   useEffect(() => {
@@ -85,8 +86,12 @@ export function StageFlowCard({
     setMission(currentObjective || '');
   }, [currentObjective]);
   
-  // Sync vibe with external data (guard to prevent flicker)
+  // Sync vibe with external data — skip when change came from user click
   useEffect(() => {
+    if (userSelectedRef.current) {
+      userSelectedRef.current = false;
+      return;
+    }
     const inferred = inferVibeFromPersona(currentPersona);
     setSelectedVibe(prev => prev === inferred ? prev : inferred);
   }, [currentPersona]);
