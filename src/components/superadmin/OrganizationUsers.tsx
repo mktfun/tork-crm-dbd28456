@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Users as UsersIcon } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface User {
   id: string;
@@ -8,6 +12,7 @@ interface User {
   email: string;
   role: string;
   ativo: boolean;
+  ai_enabled?: boolean;
   created_at: string;
 }
 
@@ -17,15 +22,35 @@ interface Props {
 }
 
 export function OrganizationUsers({ organizationId, users }: Props) {
+  const [aiStates, setAiStates] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(users.map(u => [u.id, u.ai_enabled ?? true]))
+  );
+
   const getRoleBadge = (role: string) => {
     const roleMap: Record<string, { label: string; className: string }> = {
       admin: { label: 'Admin', className: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
       corretor: { label: 'Corretor', className: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
       produtor: { label: 'Produtor', className: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+      assistente: { label: 'Assistente', className: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
     };
-
     const config = roleMap[role] || { label: role, className: 'bg-muted text-muted-foreground' };
     return <Badge className={config.className}>{config.label}</Badge>;
+  };
+
+  const handleToggleAi = async (userId: string, newValue: boolean) => {
+    setAiStates(prev => ({ ...prev, [userId]: newValue }));
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ ai_enabled: newValue } as any)
+      .eq('id', userId);
+
+    if (error) {
+      setAiStates(prev => ({ ...prev, [userId]: !newValue }));
+      toast.error('Erro ao atualizar status da IA');
+    } else {
+      toast.success(`IA ${newValue ? 'ativada' : 'desativada'} com sucesso`);
+    }
   };
 
   return (
@@ -48,8 +73,9 @@ export function OrganizationUsers({ organizationId, users }: Props) {
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="text-muted-foreground">Nome</TableHead>
                 <TableHead className="text-muted-foreground">Email</TableHead>
-                <TableHead className="text-muted-foreground">Função</TableHead>
+                <TableHead className="text-muted-foreground">Tipo</TableHead>
                 <TableHead className="text-muted-foreground">Status</TableHead>
+                <TableHead className="text-muted-foreground">IA</TableHead>
                 <TableHead className="text-muted-foreground">Cadastrado em</TableHead>
               </TableRow>
             </TableHeader>
@@ -66,6 +92,12 @@ export function OrganizationUsers({ organizationId, users }: Props) {
                     }>
                       {user.ativo ? 'Ativo' : 'Inativo'}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={aiStates[user.id] ?? true}
+                      onCheckedChange={(val) => handleToggleAi(user.id, val)}
+                    />
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {new Date(user.created_at).toLocaleDateString('pt-BR')}
