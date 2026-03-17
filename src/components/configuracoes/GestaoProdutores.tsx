@@ -48,7 +48,7 @@ export function GestaoProdutores() {
       const submitData = {
         ...data,
         email: data.email || null,
-        phone: data.phone || null,
+        phone: data.phone,
         cpfCnpj: data.cpfCnpj || null,
         companyName: data.companyName || null,
       };
@@ -201,7 +201,7 @@ export function GestaoProdutores() {
                   </div>
 
                   <div className="flex sm:items-center px-4 py-3 flex-col sm:flex-row gap-2 sm:gap-0">
-                    <Label htmlFor="phone" className="text-muted-foreground w-1/3 text-left">Telefone</Label>
+                    <Label htmlFor="phone" className="text-muted-foreground w-1/3 text-left">Telefone *</Label>
                     <Input
                       id="phone"
                       {...form.register('phone')}
@@ -209,6 +209,7 @@ export function GestaoProdutores() {
                       className="border-0 bg-transparent sm:text-right shadow-none focus-visible:ring-0 px-0 flex-1 text-foreground"
                     />
                   </div>
+                  {form.formState.errors.phone && <p className="text-xs text-destructive px-4 py-2 bg-destructive/10">{form.formState.errors.phone.message}</p>}
 
                   <div className="flex sm:items-center px-4 py-3 flex-col sm:flex-row gap-2 sm:gap-0">
                     <Label htmlFor="brokerage_id" className="text-muted-foreground w-1/3 text-left">Corretora Vinculada</Label>

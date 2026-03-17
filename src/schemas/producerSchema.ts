@@ -55,7 +55,7 @@ const isValidCNPJ = (cnpj: string): boolean => {
 export const producerSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
-  phone: z.string().optional(),
+  phone: z.string().min(10, 'Telefone é obrigatório para roteamento (mínimo 10 dígitos)'),
   cpfCnpj: z.string().optional().refine((value) => {
     if (!value) return true; // Campo opcional
     const clean = value.replace(/\D/g, '');

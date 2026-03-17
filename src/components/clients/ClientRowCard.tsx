@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { Client } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { format, isToday } from 'date-fns';
-import { Cake, Mail, Phone, FileText, Calendar } from 'lucide-react';
+import { Cake, Mail, Phone, FileText, Calendar, Bot } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ClientRowCardProps {
   client: Client & {
@@ -17,6 +21,22 @@ export function ClientRowCard({
   onClick
 }: ClientRowCardProps) {
   const isBirthday = client.birthDate && isToday(new Date(client.birthDate));
+  const [aiEnabled, setAiEnabled] = useState(client.ai_enabled ?? true);
+
+  const handleAiToggle = async (newValue: boolean, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAiEnabled(newValue);
+    const { error } = await supabase
+      .from('clientes')
+      .update({ ai_enabled: newValue } as any)
+      .eq('id', client.id);
+    if (error) {
+      setAiEnabled(!newValue);
+      toast.error('Erro ao atualizar IA do cliente');
+    } else {
+      toast.success(newValue ? 'IA ativada para este cliente' : 'IA desativada para este cliente');
+    }
+  };
 
   return (
     <div
@@ -41,17 +61,25 @@ export function ClientRowCard({
             </Badge>
           )}
         </div>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-          }}
-          className="flex-shrink-0"
-        >
-          Ver Detalhes
-        </Button>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <Bot size={14} className={aiEnabled ? 'text-primary' : 'text-muted-foreground'} />
+            <Switch
+              checked={aiEnabled}
+              onCheckedChange={(val) => handleAiToggle(val, { stopPropagation: () => {} } as any)}
+            />
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick();
+            }}
+          >
+            Ver Detalhes
+          </Button>
+        </div>
       </div>
 
       {/* Linha 2: Grid de informações com truncate */}

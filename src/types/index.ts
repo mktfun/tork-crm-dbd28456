@@ -21,6 +21,9 @@ export interface Client {
   city?: string;
   state?: string;
 
+  // --- CONTROLE DE IA ---
+  ai_enabled?: boolean;
+
   // --- CAMPO ABERTO ---
   observations?: string;
 }

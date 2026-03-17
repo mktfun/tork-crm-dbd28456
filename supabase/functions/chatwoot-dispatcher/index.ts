@@ -340,11 +340,40 @@ Deno.serve(async (req) => {
     const inboxId = conversation?.inbox_id
 
     // 2. Resolve user
-    const { userId, brokerageId, role, aiEnabled } = await resolveUser(assigneeEmail, inboxId)
+    let { userId, brokerageId, role, aiEnabled } = await resolveUser(assigneeEmail, inboxId)
 
     if (!aiEnabled) {
       console.log('🚫 AI disabled for user:', userId)
       return new Response(JSON.stringify({ message: 'AI disabled for this user' }), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // 2.5 — Auto-detect producer or brokerage owner as admin by phone
+    const senderPhone = sender?.phone_number?.replace(/\D/g, '')
+    if (senderPhone && role !== 'admin') {
+      const { data: producer } = await supabase
+        .from('producers')
+        .select('id, brokerage_id')
+        .ilike('phone', `%${senderPhone}%`)
+        .maybeSingle()
+
+      if (producer) {
+        role = 'admin'
+        if (!brokerageId) brokerageId = producer.brokerage_id
+        console.log('👑 Sender is a producer → admin mode')
+      } else {
+        const { data: brokerage } = await supabase
+          .from('brokerages')
+          .select('id, user_id')
+          .ilike('phone', `%${senderPhone}%`)
+          .maybeSingle()
+
+        if (brokerage) {
+          role = 'admin'
+          if (!brokerageId) brokerageId = brokerage.id
+          if (!userId) userId = brokerage.user_id
+          console.log('👑 Sender is a brokerage owner → admin mode')
+        }
+      }
     }
 
     // 3. Analysis session logic (batch mode — kept from v1)
@@ -408,12 +437,19 @@ Deno.serve(async (req) => {
     const contactEmail = sender?.email
 
     if (contactPhone || contactEmail) {
-      let clientQuery = supabase.from('clientes').select('id')
+      let clientQuery = supabase.from('clientes').select('id, ai_enabled')
       if (contactPhone) clientQuery = clientQuery.ilike('phone', `%${contactPhone.replace(/\D/g, '')}%`)
       else if (contactEmail) clientQuery = clientQuery.eq('email', contactEmail)
 
       const { data: clientData } = await clientQuery.maybeSingle()
       clientId = clientData?.id || null
+
+      // Guard: ai_enabled do cliente
+      const clientAiEnabled = clientData?.ai_enabled ?? true
+      if (!clientAiEnabled && role !== 'admin') {
+        console.log('🚫 AI disabled for client:', clientId)
+        return new Response(JSON.stringify({ message: 'IA desativada para este cliente, aguardando atendimento humano' }), { headers: { 'Content-Type': 'application/json' } })
+      }
 
       if (clientId) {
         const { data: deals } = await supabase

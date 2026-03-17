@@ -1,11 +1,15 @@
 
+import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, User } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { MessageCircle, User, Bot } from 'lucide-react';
 import { Client } from '@/types';
 import { generateWhatsAppUrl } from '@/utils/whatsapp';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ClientListViewProps {
   clients: Client[];
@@ -14,6 +18,11 @@ interface ClientListViewProps {
 
 export function ClientListView({ clients, getActivePoliciesCount }: ClientListViewProps) {
   const navigate = useNavigate();
+  const [aiStates, setAiStates] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    clients.forEach(c => { initial[c.id] = c.ai_enabled ?? true; });
+    return initial;
+  });
 
   const handleWhatsAppClick = (client: Client, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -26,6 +35,21 @@ export function ClientListView({ clients, getActivePoliciesCount }: ClientListVi
     navigate(`/clients/${clientId}`);
   };
 
+  const handleAiToggle = async (clientId: string, newValue: boolean, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAiStates(prev => ({ ...prev, [clientId]: newValue }));
+    const { error } = await supabase
+      .from('clientes')
+      .update({ ai_enabled: newValue } as any)
+      .eq('id', clientId);
+    if (error) {
+      setAiStates(prev => ({ ...prev, [clientId]: !newValue }));
+      toast.error('Erro ao atualizar IA do cliente');
+    } else {
+      toast.success(newValue ? 'IA ativada para este cliente' : 'IA desativada para este cliente');
+    }
+  };
+
   return (
     <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
       <Table>
@@ -35,6 +59,12 @@ export function ClientListView({ clients, getActivePoliciesCount }: ClientListVi
             <TableHead className="text-white/80 font-medium">Contato</TableHead>
             <TableHead className="text-white/80 font-medium">Seguros</TableHead>
             <TableHead className="text-white/80 font-medium">Status</TableHead>
+            <TableHead className="text-white/80 font-medium">
+              <div className="flex items-center gap-1">
+                <Bot size={14} />
+                IA
+              </div>
+            </TableHead>
             <TableHead className="text-white/80 font-medium">Ações</TableHead>
           </TableRow>
         </TableHeader>
@@ -68,6 +98,14 @@ export function ClientListView({ clients, getActivePoliciesCount }: ClientListVi
                 <Badge variant={client.status === 'Ativo' ? 'default' : 'secondary'}>
                   {client.status || 'Ativo'}
                 </Badge>
+              </TableCell>
+              <TableCell>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Switch
+                    checked={aiStates[client.id] ?? true}
+                    onCheckedChange={(val) => handleAiToggle(client.id, val, { stopPropagation: () => {} } as any)}
+                  />
+                </div>
               </TableCell>
               <TableCell>
                 <Button
