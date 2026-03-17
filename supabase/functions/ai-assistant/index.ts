@@ -2213,7 +2213,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
+            model: userModel,
             messages: currentMessages,
             tools: TOOLS,
             tool_choice: 'auto',
