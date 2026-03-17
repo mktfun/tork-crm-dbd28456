@@ -2402,6 +2402,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ai_enabled: boolean
           ativo: boolean
           avatar_url: string | null
           birthday_message_template: string | null
@@ -2419,6 +2420,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_enabled?: boolean
           ativo?: boolean
           avatar_url?: string | null
           birthday_message_template?: string | null
@@ -2436,6 +2438,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_enabled?: boolean
           ativo?: boolean
           avatar_url?: string | null
           birthday_message_template?: string | null
