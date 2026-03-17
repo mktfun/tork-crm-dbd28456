@@ -1312,6 +1312,9 @@ export type Database = {
       crm_ai_global_config: {
         Row: {
           agent_name: string | null
+          ai_model: string | null
+          ai_provider: string | null
+          api_key: string | null
           base_instructions: string | null
           company_name: string | null
           created_at: string | null
@@ -1323,6 +1326,9 @@ export type Database = {
         }
         Insert: {
           agent_name?: string | null
+          ai_model?: string | null
+          ai_provider?: string | null
+          api_key?: string | null
           base_instructions?: string | null
           company_name?: string | null
           created_at?: string | null
@@ -1334,6 +1340,9 @@ export type Database = {
         }
         Update: {
           agent_name?: string | null
+          ai_model?: string | null
+          ai_provider?: string | null
+          api_key?: string | null
           base_instructions?: string | null
           company_name?: string | null
           created_at?: string | null
