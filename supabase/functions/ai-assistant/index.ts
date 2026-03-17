@@ -2078,6 +2078,10 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Resolve dynamic model from user's global config
+    const userModel = await resolveUserModel(supabase, userId);
+    console.log(`[MODEL] Using model: ${userModel} for user ${userId}`);
+
     // Process attachments in user messages
     const processedMessages = messages.map((msg: any) => {
       if (msg.role === 'user' && typeof msg.content === 'string') {
