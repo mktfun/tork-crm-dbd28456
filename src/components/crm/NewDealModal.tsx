@@ -186,85 +186,89 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Título *</Label>
-            <Input
-              id="title"
-              placeholder="Ex: Renovação Auto - João Silva"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              required
-            />
-          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {/* Título - full width */}
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="title">Título *</Label>
+              <Input
+                id="title"
+                placeholder="Ex: Renovação Auto - João Silva"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                required
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="client">Cliente</Label>
-            <ClientSearchCombobox
-              clients={clients}
-              value={formData.client_id}
-              onValueChange={(clientId) => setFormData({ ...formData, client_id: clientId })}
-              isLoading={loadingClients}
-              placeholder="Buscar por nome, telefone ou email..."
-            />
-          </div>
+            {/* Cliente - full width */}
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="client">Cliente</Label>
+              <ClientSearchCombobox
+                clients={clients}
+                value={formData.client_id}
+                onValueChange={(clientId) => setFormData({ ...formData, client_id: clientId })}
+                isLoading={loadingClients}
+                placeholder="Buscar por nome, telefone ou email..."
+              />
+            </div>
 
-          {/* Pipeline selector */}
-          <div className="space-y-2">
-            <Label>Funil de Vendas *</Label>
-            <Select value={pipelineId} onValueChange={handlePipelineChange}>
-              <SelectTrigger>
-                <SelectValue placeholder={loadingPipelines ? "Carregando..." : "Selecione o funil"} />
-              </SelectTrigger>
-              <SelectContent>
-                {pipelines.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}{p.is_default ? ' (padrão)' : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            {/* Pipeline */}
+            <div className="space-y-2">
+              <Label>Funil de Vendas *</Label>
+              <Select value={pipelineId} onValueChange={handlePipelineChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingPipelines ? "Carregando..." : "Selecione o funil"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {pipelines.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}{p.is_default ? ' (padrão)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="stage">Etapa *</Label>
-            <Select
-              value={formData.stage_id}
-              onValueChange={(value) => setFormData({ ...formData, stage_id: value })}
-              required
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={loadingStages ? "Carregando..." : "Selecione a etapa"} />
-              </SelectTrigger>
-              <SelectContent>
-                {loadingStages ? (
-                  <SelectItem value="loading" disabled>
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Carregando etapas...
-                    </div>
-                  </SelectItem>
-                ) : !stages || stages.length === 0 ? (
-                  <SelectItem value="empty" disabled>
-                    Nenhuma etapa encontrada
-                  </SelectItem>
-                ) : (
-                  stages.map((stage: CRMStage) => (
-                    <SelectItem key={stage.id} value={stage.id}>
+            {/* Etapa */}
+            <div className="space-y-2">
+              <Label htmlFor="stage">Etapa *</Label>
+              <Select
+                value={formData.stage_id}
+                onValueChange={(value) => setFormData({ ...formData, stage_id: value })}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingStages ? "Carregando..." : "Selecione a etapa"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingStages ? (
+                    <SelectItem value="loading" disabled>
                       <div className="flex items-center gap-2">
-                        <div 
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: stage.color }}
-                        />
-                        {stage.name}
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Carregando etapas...
                       </div>
                     </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
+                  ) : !stages || stages.length === 0 ? (
+                    <SelectItem value="empty" disabled>
+                      Nenhuma etapa encontrada
+                    </SelectItem>
+                  ) : (
+                    stages.map((stage: CRMStage) => (
+                      <SelectItem key={stage.id} value={stage.id}>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: stage.color }}
+                          />
+                          {stage.name}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="grid grid-cols-2 gap-4">
+            {/* Valor */}
             <div className="space-y-2">
               <Label htmlFor="value">Valor (R$)</Label>
               <Input
@@ -276,6 +280,8 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
                 onChange={(e) => setFormData({ ...formData, value: e.target.value })}
               />
             </div>
+
+            {/* Data */}
             <div className="space-y-2">
               <Label htmlFor="date">Previsão Fechamento</Label>
               <Input
@@ -285,20 +291,21 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
                 onChange={(e) => setFormData({ ...formData, expected_close_date: e.target.value })}
               />
             </div>
+
+            {/* Observações - full width */}
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="notes">Observações</Label>
+              <Textarea
+                id="notes"
+                placeholder="Anotações sobre o negócio..."
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={2}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Observações</Label>
-            <Textarea
-              id="notes"
-              placeholder="Anotações sobre o negócio..."
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
