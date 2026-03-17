@@ -87,7 +87,7 @@ interface TimelineItem {
 export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalProps) {
   const { user } = useAuth();
   const { updateDeal, deleteDeal } = useCRMDeals();
-  const { stages } = useCRMStages();
+  const { stages: allStages } = useCRMStages();
   const [chatTorkConfig, setChatTorkConfig] = useState<ChatTorkConfig | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
