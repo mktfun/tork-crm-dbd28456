@@ -48,7 +48,7 @@ export function GestaoProdutores() {
       const submitData = {
         ...data,
         email: data.email || null,
-        phone: data.phone || null,
+        phone: data.phone,
         cpfCnpj: data.cpfCnpj || null,
         companyName: data.companyName || null,
       };
