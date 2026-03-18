@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Bot, Loader2 } from "lucide-react";
+import { Bot, Loader2, Layers, Sparkles, Settings2, GitBranch } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCRMPipelines } from "@/hooks/useCRMPipelines";
 import { useCRMStages } from "@/hooks/useCRMDeals";
@@ -195,6 +195,34 @@ export function AIAutomationDashboard() {
           value="etapas"
           className="flex-1 m-0 overflow-y-auto relative"
         >
+          {/* KPI Strip */}
+          {(() => {
+            const activeCount = aiSettings.filter((s) => s.is_active).length;
+            const coveragePct = stages.length > 0 ? Math.round((activeCount / stages.length) * 100) : 0;
+            const kpis = [
+              { label: "Etapas no Funil", value: stages.length, icon: Layers, color: "bg-blue-500/10 text-blue-500" },
+              { label: "IA Ativa", value: activeCount, icon: Sparkles, color: "bg-emerald-500/10 text-emerald-500", subtitle: `${coveragePct}% cobertura` },
+              { label: "Configuradas", value: aiSettings.length, icon: Settings2, color: "bg-amber-500/10 text-amber-500" },
+              { label: "Funis Totais", value: pipelines.length, icon: GitBranch, color: "bg-purple-500/10 text-purple-500" },
+            ];
+            return (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-4 pt-4">
+                {kpis.map((kpi) => (
+                  <div key={kpi.label} className="rounded-xl border border-border bg-card p-4 flex items-start justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-muted-foreground">{kpi.label}</p>
+                      <p className="text-2xl font-bold text-foreground">{kpi.value}</p>
+                      {kpi.subtitle && <p className="text-xs text-muted-foreground">{kpi.subtitle}</p>}
+                    </div>
+                    <div className={`p-2 rounded-lg ${kpi.color}`}>
+                      <kpi.icon className="h-5 w-5" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           <div className="grid grid-cols-1 lg:grid-cols-5 items-start">
             {/* Left column — flows naturally, scrolls with the page */}
             <div className="lg:col-span-3 p-4">

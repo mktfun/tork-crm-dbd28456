@@ -1,43 +1,74 @@
 
+# Auditoria dos KPIs da Tela de Conciliacao
 
-# Fase Final: KPIs no Dashboard + Campo `is_active` no Dispatcher
+## Discrepancias Identificadas (com evidencia SQL)
 
-## 1. Edge Function — chatwoot-dispatcher
+### BUG 1 (CRITICO): Contagem "Registros Encontrados" vs "Progresso" Divergentes
 
-Analisando o `derived_data` atual (linhas 504-530), já existem:
-- `deal_title` (linha 511) ✅
-- `pipeline_id` (linha 512) ✅  
-- `stage_id` (linha 513) ✅
-- `stage_ai_is_active` (linha 518) — vem do `promptResult`, não diretamente do `stageAiSettings`
+**Evidencia no screenshot**: O header da lista mostra **488 registros encontrados** mas o card de Progresso mostra **298 de 388 conciliados**. Sao duas fontes diferentes:
+- "488 registros" vem da RPC `get_bank_statement_paginated` (campo `total_count` via `COUNT(*) OVER()`)
+- "388 total / 298 conciliados" vem da RPC `get_reconciliation_kpis` (campo `total_count`)
 
-**Falta apenas**: `is_active: stageAiSettings?.is_active ?? true` como campo direto do `stageAiSettings`.
+Ambas as RPCs usam os mesmos filtros base (user_id, banco, datas, is_void). Porem a lista aplica `p_status` e `p_type` como filtros adicionais (mesmo quando "todas/todos" deveria ser identico). A divergencia de 100 itens (488 vs 388) indica que uma das RPCs tem um filtro extra ou diferente.
 
-**Mudança**: Adicionar uma linha no bloco `derived_data`:
-```ts
-is_active: stageAiSettings?.is_active ?? true,
+**Causa provavel**: A RPC paginada faz LEFT JOIN com `bank_statement_entries` e `profiles` que pode gerar duplicatas via `string_agg` no ledger. Ou a KPI RPC nao filtra por `status IN ('confirmed','completed')` enquanto a lista nao filtra por isso tambem -- porem alguma diferenca sutil no WHERE causa a divergencia.
+
+**Correcao**: Unificar: a KPI RPC deve usar EXATAMENTE a mesma CTE/WHERE da lista paginada (sem os filtros de status/type). Alternativamente, adicionar um campo `kpi_total_count` na propria RPC paginada para garantir fonte unica.
+
+---
+
+### BUG 2 (ALTO): Periodo Anterior Removido -- Trends Sempre Nulos
+
+**Diagnostico**: A versao mais recente de `get_reconciliation_kpis` (migration `20260219141008`) removeu completamente o calculo do periodo anterior. O JSON retornado so tem `current`, sem `previous`. No frontend (linhas 293-300), `calcTrend` sempre retorna `null` porque `previousKpis` esta vazio.
+
+**Impacto**: Os badges de tendencia ("+X% vs periodo anterior") nunca aparecem. A comparacao temporal esta desabilitada silenciosamente.
+
+**Correcao**: Restaurar o bloco de periodo anterior na RPC, calculando `v_prev_start` e `v_prev_end` da mesma forma que `get_financial_summary` faz (subtraindo a duracao do periodo).
+
+---
+
+### BUG 3 (MEDIO): Modo Consolidado Infla KPIs com Transacoes Sem Banco
+
+**Evidencia SQL**: Existem **170 transacoes sem bank_account_id** no periodo Dec-Feb, sendo 105 delas marcadas como `reconciled = true`. Quando filtrado para "Consolidado (Todos)", tanto a KPI quanto a lista incluem essas 170 transacoes.
+
+```text
+Scope               | Total | Reconciled | Pending
+all_transactions     |  497  |    432     |   65
+with_bank_only       |  327  |    327     |    0
 ```
 
-Inserir logo após `stage_ai_is_active` (linha 518).
+Todos os 65 pendentes sao transacoes SEM banco! Elas aparecem como "aguardando conciliacao" mas nao podem ser conciliadas porque nao estao vinculadas a nenhum banco. O progresso (77%) e artificialmente baixo.
 
-## 2. KPIs no AIAutomationDashboard.tsx
+**Correcao**: No modo consolidado, filtrar apenas transacoes COM `bank_account_id IS NOT NULL` na RPC de KPIs e na lista paginada. Alternativamente, separar os KPIs em "Com banco" vs "Sem banco" para dar visibilidade sem distorcer o progresso.
 
-Adicionar uma faixa de 4 KPI cards inline (sem criar arquivo novo) acima do grid de Timeline+Sandbox, dentro do `TabsContent value="etapas"`.
+---
 
-### Métricas calculadas com dados já disponíveis:
+### BUG 4 (MEDIO): Type Variants Inconsistentes Entre RPCs
 
-| KPI | Cálculo | Ícone | Cor |
-|---|---|---|---|
-| Etapas no Funil | `stages.length` | `Layers` | `bg-blue-500/10 text-blue-500` |
-| IA Ativa | `aiSettings.filter(s => s.is_active).length` + subtítulo `X% cobertura` | `Sparkles` | `bg-emerald-500/10 text-emerald-500` |
-| Configuradas | `aiSettings.length` | `Settings2` | `bg-amber-500/10 text-amber-500` |
-| Funis Totais | `pipelines.length` | `GitBranch` | `bg-purple-500/10 text-purple-500` |
+**Diagnostico**: A RPC `get_reconciliation_kpis` verifica `type = 'revenue'` e `type = 'expense'` (exato). Mas `get_financial_summary` e `get_bank_statement_paginated` verificam `type IN ('revenue', 'income', 'Entrada')` e `type IN ('expense', 'despesa', 'Saida')`.
 
-### Layout:
-- Grid `grid-cols-2 lg:grid-cols-4 gap-4` com padding `px-4 pt-4`
-- Cada card: `rounded-xl border border-border bg-card p-4` com ícone em container colorido, valor em `text-2xl font-bold`, label em `text-sm text-muted-foreground`, subtítulo opcional em `text-xs`
-- KPI card abstraído como função inline ou sub-componente local no mesmo arquivo
+**Status atual**: Nao ha dados com tipos legados (validado por query). Mas e uma brecha: se qualquer fluxo criar transacao com tipo diferente, a KPI de conciliacao vai ignorar.
 
-### Arquivos afetados:
-- `supabase/functions/chatwoot-dispatcher/index.ts` — 1 linha adicionada
-- `src/components/automation/AIAutomationDashboard.tsx` — KPI strip + imports de ícones
+**Correcao**: Alinhar o `get_reconciliation_kpis` para usar os mesmos IN-lists de tipo que as demais RPCs.
 
+---
+
+## Plano de Execucao
+
+### Passo 1: Reescrever `get_reconciliation_kpis` (Migration SQL)
+- Adicionar filtro `bank_account_id IS NOT NULL` quando em modo consolidado
+- Restaurar calculo de periodo anterior (previous period)
+- Alinhar type checks para `IN ('revenue', 'income', 'Entrada')` / `IN ('expense', 'despesa', 'Saida')`
+- Manter assinatura identica (4 params)
+
+### Passo 2: Alinhar "registros encontrados" com KPI total
+- No `ReconciliationPage.tsx`, substituir `{totalCount} registros encontrados` por `{kpis.totalCount} registros encontrados` para usar a mesma fonte dos KPI cards
+- Ou melhor: manter `totalCount` da lista paginada para refletir filtros ativos (status/tipo), e exibir separadamente "X de Y" nos KPIs
+
+### Passo 3: Corrigir lista paginada para modo consolidado
+- Na RPC `get_bank_statement_paginated`, quando `v_bank_uuid IS NULL`, adicionar `AND t.bank_account_id IS NOT NULL` para excluir transacoes sem banco da tela de conciliacao bancaria
+
+### Passo 4: Validacao cruzada pos-correcao
+- Query SQL comparando `total_count` do KPI vs `COUNT(*)` da lista com mesmos filtros
+- Verificar que `reconciled_count + pending_count + ignored_count = total_count`
+- Confirmar que progresso 100% quando todos os itens com banco estao conciliados
