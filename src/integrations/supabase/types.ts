@@ -2406,6 +2406,47 @@ export type Database = {
           },
         ]
       }
+      organization_payments: {
+        Row: {
+          amount: number
+          brokerage_id: number
+          created_at: string
+          id: string
+          payment_date: string
+          period_added: string
+          recorded_by: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          brokerage_id: number
+          created_at?: string
+          id?: string
+          payment_date?: string
+          period_added: string
+          recorded_by: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          brokerage_id?: number
+          created_at?: string
+          id?: string
+          payment_date?: string
+          period_added?: string
+          recorded_by?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_payments_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       policy_renewal_history: {
         Row: {
           created_at: string
@@ -4623,7 +4664,7 @@ export type Database = {
         }
         Returns: Json
       }
-      is_admin: { Args: { user_id?: string }; Returns: boolean }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
       link_manual_transactions: { Args: { p_user_id: string }; Returns: string }
       manual_reconcile_transaction:
         | { Args: { p_transaction_id: string }; Returns: undefined }
