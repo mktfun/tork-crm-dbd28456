@@ -90,6 +90,7 @@ export function AutomationConfigTab() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testingN8n, setTestingN8n] = useState(false);
+  const [testingAi, setTestingAi] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
@@ -351,6 +352,32 @@ export function AutomationConfigTab() {
     }
   };
 
+  const handleTestAiApiKey = async () => {
+    if (!aiApiKey) {
+      toast.error("Insira a API Key antes de testar");
+      return;
+    }
+    setTestingAi(true);
+    const toastId = toast.loading(`Validando chave ${aiProvider}...`);
+    try {
+      const { data, error } = await supabase.functions.invoke("test-ai-apikey", {
+        body: { provider: aiProvider, model: aiModel, api_key: aiApiKey },
+      });
+      toast.dismiss(toastId);
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`✅ Chave válida! Provedor: ${aiProvider}`);
+      } else {
+        toast.error(data?.message || "Chave inválida ou sem permissão");
+      }
+    } catch (err: any) {
+      toast.dismiss(toastId);
+      toast.error("Erro ao testar: " + (err.message || "Verifique a chave"));
+    } finally {
+      setTestingAi(false);
+    }
+  };
+
   const handleCopyWebhook = () => {
     navigator.clipboard.writeText(webhookUrl);
     setCopiedWebhook(true);
@@ -462,10 +489,11 @@ export function AutomationConfigTab() {
                   variant="outline"
                   size="icon"
                   title="Testar conexão com o provedor"
-                  disabled={!aiApiKey}
+                  disabled={!aiApiKey || testingAi}
+                  onClick={handleTestAiApiKey}
                   className="shrink-0 h-10 w-10"
                 >
-                  <Wifi className="h-4 w-4" />
+                  {testingAi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wifi className="h-4 w-4" />}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
