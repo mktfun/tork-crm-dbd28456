@@ -824,13 +824,18 @@ Deno.serve(async (req) => {
             stageAiSettings = settings
           }
         } else if (userId && role !== 'admin') {
-          // Auto-create deal for leads without negotiation
-          const autoResult = await autoCreateDeal(userId, clientId, clientData?.name || sender?.name || null)
+          // Auto-create deal for leads without negotiation (AI-driven classification)
+          const autoResult = await autoCreateDeal(
+            userId, clientId, clientData?.name || sender?.name || null,
+            content || '', mediaResult.transcription, mediaResult.extractedText
+          )
           if (autoResult) {
             currentDeal = autoResult.deal
             currentStage = autoResult.stage
             stageAiSettings = autoResult.stageAiSettings
             autoCreatedDeal = true
+            autoCreatedProductId = autoResult.productId
+            autoCreatedProductName = autoResult.productName
           }
         }
       }
