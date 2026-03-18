@@ -1,130 +1,115 @@
 
 
-# Plano: Integrar Follow-ups no Dispatcher (arquitetura profissional)
+# Plano: Módulo de Produtos (CRM) + Funis Padrão + Frontend
 
-## Conceito
+## Resumo
 
-O dispatcher já tem o ponto exato de interceptação: **após receber a resposta do n8n** (linha 938-943). Hoje ele ignora o corpo da resposta. A abordagem profissional é:
+4 mudanças: criar tabela `crm_products`, adicionar `product_id` em `crm_deals`, atualizar seed de onboarding com funis e produtos padrão, criar tela de gestão de produtos em Settings, e integrar `ProductSelect` nos formulários de Deal.
 
-1. **Parsear a resposta do n8n** para detectar sinais de follow-up
-2. **Usar configuração por etapa** (`crm_ai_settings`) para definir comportamento de follow-up
-3. **Cancelar follow-ups anteriores** quando o cliente envia nova mensagem (o dispatcher já é chamado a cada mensagem incoming)
+---
 
-## Arquitetura
+## MUDANÇA 1: Banco de Dados (2 Migrations)
 
-```text
-Cliente manda msg → Dispatcher
-  ├─ Cancela follow-ups pendentes deste deal (cliente respondeu!)
-  ├─ Processa normalmente (resolve deal, prompt, etc.)
-  ├─ Envia ao n8n
-  ├─ Parseia resposta do n8n
-  │   └─ Se resposta contém URL/proposta/cotação OU stage tem follow-up habilitado
-  │       └─ Cria ai_follow_up com next_check_at = now + interval
-  └─ Retorna sucesso
-
-check-followups (cron 5min) → já implementado, cuida do resto
-```
-
-## Mudanças
-
-### 1. Adicionar colunas em `crm_ai_settings` (migration)
+### Migration A — Tabela `crm_products`
 
 ```sql
-alter table crm_ai_settings 
-  add column if not exists follow_up_enabled boolean default false,
-  add column if not exists follow_up_interval_minutes int default 60,
-  add column if not exists follow_up_max_attempts int default 3,
-  add column if not exists follow_up_message text;
+CREATE TABLE public.crm_products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_crm_products_user_id ON public.crm_products(user_id);
+ALTER TABLE public.crm_products ENABLE ROW LEVEL SECURITY;
+
+-- RLS (padrão user_id como todo o CRM)
+CREATE POLICY "Users can view own products" ON public.crm_products FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own products" ON public.crm_products FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own products" ON public.crm_products FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own products" ON public.crm_products FOR DELETE USING (auth.uid() = user_id);
+
+CREATE TRIGGER update_crm_products_updated_at BEFORE UPDATE ON public.crm_products
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
-Isso permite configurar follow-up **por etapa do funil** na UI de automação.
+**Nota**: `company_id` é nullable (produto pode existir sem vínculo direto a seguradora). `user_id` é a chave de ownership para RLS, consistente com todo o sistema.
 
-### 2. No dispatcher: 3 novos blocos de lógica
+### Migration B — Coluna `product_id` em `crm_deals`
 
-**Bloco A — Cancelar follow-ups ao receber mensagem incoming (antes de tudo)**
-
-Logo após resolver o deal (linha ~798), se o deal existe, cancelar follow-ups pendentes:
-
-```typescript
-if (currentDeal?.id) {
-  await supabase
-    .from('ai_follow_ups')
-    .update({ status: 'responded', updated_at: new Date().toISOString() })
-    .eq('deal_id', currentDeal.id)
-    .eq('status', 'pending');
-}
+```sql
+ALTER TABLE public.crm_deals ADD COLUMN product_id UUID REFERENCES public.crm_products(id) ON DELETE SET NULL;
+CREATE INDEX idx_crm_deals_product_id ON public.crm_deals(product_id);
 ```
 
-Isso é limpo porque: o dispatcher **sempre** é chamado quando o cliente manda mensagem. Se ele respondeu, qualquer follow-up pendente vira "responded".
+---
 
-**Bloco B — Parsear resposta do n8n (após envio)**
+## MUDANÇA 2: Seed de Onboarding (`seed_user_defaults`)
 
-```typescript
-const n8nResponse = await fetch(finalN8nUrl, { ... });
-let n8nResponseBody: any = null;
-if (n8nResponse.ok) {
-  try { n8nResponseBody = await n8nResponse.json(); } catch { /* ignore */ }
-}
-```
+Atualizar a função SQL `seed_user_defaults` via nova migration com `CREATE OR REPLACE FUNCTION`:
 
-**Bloco C — Criar follow-up se necessário**
+- Adicionar criação de 2 pipelines padrão: **"Seguros"** (is_default=true) e **"Sinistros e Assistência"** (is_default=false), com etapas padrão para cada um.
+- Inserir 5 produtos padrão na `crm_products`: "Seguro Auto", "Seguro Vida", "Seguro Residencial", "Consórcio", "Fiança Locatícia".
 
-Duas fontes de decisão (OR):
-1. **Configuração da etapa**: `stageAiSettings?.follow_up_enabled === true`
-2. **Heurística da resposta do n8n**: presença de URL, palavras-chave ("cotação", "proposta", "link")
+Esses registros usam `p_user_id` como `user_id`, sem `company_id` (genéricos).
 
-```typescript
-async function shouldCreateFollowUp(
-  stageAiSettings: any,
-  n8nResponseBody: any,
-): boolean {
-  if (stageAiSettings?.follow_up_enabled) return true;
-  
-  const agentMessage = n8nResponseBody?.output || n8nResponseBody?.text || '';
-  const hasUrl = /https?:\/\//.test(agentMessage);
-  const hasKeywords = /cotação|proposta|orçamento|link|formulário/i.test(agentMessage);
-  return hasUrl || hasKeywords;
-}
-```
+---
 
-Se `true`, inserir na `ai_follow_ups`:
+## MUDANÇA 3: Frontend — Tela de Produtos
 
-```typescript
-await supabase.from('ai_follow_ups').insert({
-  deal_id: currentDeal.id,
-  user_id: userId,
-  chatwoot_conversation_id: conversation.id,
-  brokerage_id: brokerageId,
-  trigger_reason: stageAiSettings?.follow_up_enabled ? 'stage_config' : 'heuristic',
-  follow_up_message: stageAiSettings?.follow_up_message || null,
-  max_attempts: stageAiSettings?.follow_up_max_attempts || 3,
-  interval_minutes: stageAiSettings?.follow_up_interval_minutes || 60,
-  next_check_at: new Date(Date.now() + (stageAiSettings?.follow_up_interval_minutes || 60) * 60 * 1000),
-});
-```
+### Novos arquivos:
 
-### 3. Atualizar UI de automação (`crm_ai_settings` editor)
+| Arquivo | Função |
+|---|---|
+| `src/hooks/useProducts.ts` | Hook com `useQuery`/`useMutation` para CRUD de `crm_products` |
+| `src/components/settings/ProductsManager.tsx` | Componente principal: DataTable + botão criar |
+| `src/components/settings/ProductDialog.tsx` | Dialog modal para criar/editar produto |
+| `src/pages/settings/ProductSettings.tsx` | Page wrapper |
 
-Adicionar toggle "Follow-up automático" por etapa com campos:
-- Ativar/desativar
-- Intervalo (minutos)
-- Max tentativas
-- Mensagem personalizada (opcional)
+### Rota:
+- Em `App.tsx`: adicionar `<Route path="products" element={<ProductSettings />} />` dentro do bloco `settings`.
+- Em `SettingsLayout.tsx` e `SettingsNavigation.tsx`: adicionar tab "Produtos" com ícone `Package` entre Ramos e Chat Tork.
+
+### Layout da tela:
+- Header: "Produtos / Ramos" com subtexto descritivo
+- DataTable com colunas: Nome, Descrição (truncada), Status (Badge verde/cinza), Ações (DropdownMenu com Editar/Desativar/Excluir)
+- `ProductDialog`: form com campos Nome, Descrição (textarea), toggle is_active
+- Deleção: soft delete (is_active=false) se houver deals vinculados, hard delete se não houver
+
+---
+
+## MUDANÇA 4: ProductSelect nos Formulários de Deal
+
+### Novo componente:
+`src/components/crm/ProductSelect.tsx` — Select/Combobox que busca `crm_products` ativos via `useProducts` hook.
+
+### Integração:
+- **`NewDealModal.tsx`**: Adicionar campo `product_id` no `formData`, renderizar `<ProductSelect>` entre Pipeline/Etapa e Valor, passar no `createDeal.mutateAsync`.
+- **`DealDetailsModal.tsx`**: Adicionar `product_id` ao `formData` de edição, exibir na seção de detalhes, incluir no `handleSave`. Exibir como Badge o nome do produto no header do deal.
+- **`useCRMDeals.ts`**: Expandir a query do `createDeal` e `updateDeal` para incluir `product_id`. Adicionar join no select: `product:crm_products(id, name)`.
+- **Interface `CRMDeal`**: Adicionar `product_id` e `product?: { id: string; name: string }`.
+
+---
 
 ## Arquivos afetados
 
-| Arquivo | Ação |
+| Arquivo | Tipo |
 |---|---|
-| Nova migration | Adicionar colunas de follow-up em `crm_ai_settings` |
-| `supabase/functions/chatwoot-dispatcher/index.ts` | Blocos A, B, C (cancelar, parsear, criar follow-up) |
-| UI de automação (stage settings) | Campos de follow-up por etapa |
-| `src/integrations/supabase/types.ts` | Auto-atualizado pela migration |
-
-## Por que essa arquitetura é boa
-
-- **Zero duplicação**: o `check-followups` já existe e cuida da execução; o dispatcher só cria e cancela
-- **Configurável por etapa**: cada stage do funil pode ter comportamento diferente
-- **Auto-cancelamento**: quando o cliente responde, o dispatcher cancela automaticamente (sem depender do cron)
-- **Duas fontes de decisão**: config explícita (previsível) + heurística (inteligente)
-- **Idempotente**: se já existe follow-up pendente para o deal, não cria outro
+| Nova migration SQL (crm_products + alter crm_deals) | Criar |
+| Nova migration SQL (seed_user_defaults atualizado) | Criar |
+| `src/hooks/useProducts.ts` | Criar |
+| `src/components/settings/ProductsManager.tsx` | Criar |
+| `src/components/settings/ProductDialog.tsx` | Criar |
+| `src/pages/settings/ProductSettings.tsx` | Criar |
+| `src/components/crm/ProductSelect.tsx` | Criar |
+| `src/App.tsx` | Editar (nova rota) |
+| `src/layouts/SettingsLayout.tsx` | Editar (nova tab) |
+| `src/components/settings/SettingsNavigation.tsx` | Editar (novo item) |
+| `src/hooks/useCRMDeals.ts` | Editar (product_id no CRUD + join) |
+| `src/components/crm/NewDealModal.tsx` | Editar (ProductSelect) |
+| `src/components/crm/DealDetailsModal.tsx` | Editar (ProductSelect + exibição) |
 

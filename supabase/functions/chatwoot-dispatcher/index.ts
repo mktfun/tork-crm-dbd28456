@@ -800,13 +800,26 @@ Deno.serve(async (req) => {
           currentStage = currentDeal.crm_stages
           console.log(`✅ Deal: ${currentDeal.title} → Stage: ${currentStage?.name}`)
 
-          if (currentStage?.id) {
+           if (currentStage?.id) {
             const { data: settings } = await supabase
               .from('crm_ai_settings')
               .select('*')
               .eq('stage_id', currentStage.id)
               .maybeSingle()
             stageAiSettings = settings
+          }
+
+          // BLOCO A: Cancel pending follow-ups (client responded!)
+          if (currentDeal?.id) {
+            const { data: cancelledFollowUps } = await supabase
+              .from('ai_follow_ups')
+              .update({ status: 'responded', updated_at: new Date().toISOString() })
+              .eq('deal_id', currentDeal.id)
+              .eq('status', 'pending')
+              .select('id')
+            if (cancelledFollowUps?.length) {
+              console.log(`✅ Cancelled ${cancelledFollowUps.length} pending follow-ups (client responded)`)
+            }
           }
         } else if (userId && role !== 'admin') {
           // Auto-create deal for leads without negotiation (AI-driven classification)
@@ -941,6 +954,56 @@ Deno.serve(async (req) => {
         body: JSON.stringify(payload),
       })
       console.log(`n8n Response: ${n8nResponse.status}`)
+
+      // BLOCO B: Parse n8n response body
+      let n8nResponseBody: any = null
+      if (n8nResponse.ok) {
+        try { n8nResponseBody = await n8nResponse.json() } catch { /* non-JSON response, ignore */ }
+      }
+
+      // BLOCO C: Create follow-up if needed (idempotent — skip if pending exists)
+      if (currentDeal?.id && userId && role !== 'admin') {
+        const shouldFollowUp = (() => {
+          if (stageAiSettings?.follow_up_enabled) return true
+          if (!n8nResponseBody) return false
+          const agentMessage = n8nResponseBody?.output || n8nResponseBody?.text || n8nResponseBody?.message || ''
+          if (!agentMessage) return false
+          const hasUrl = /https?:\/\//.test(agentMessage)
+          const hasKeywords = /cotação|proposta|orçamento|link|formulário|aguard/i.test(agentMessage)
+          return hasUrl || hasKeywords
+        })()
+
+        if (shouldFollowUp) {
+          // Check idempotency: don't create if one is already pending
+          const { data: existingFollowUp } = await supabase
+            .from('ai_follow_ups')
+            .select('id')
+            .eq('deal_id', currentDeal.id)
+            .eq('status', 'pending')
+            .maybeSingle()
+
+          if (!existingFollowUp) {
+            const intervalMinutes = stageAiSettings?.follow_up_interval_minutes || 60
+            const { error: followUpError } = await supabase.from('ai_follow_ups').insert({
+              deal_id: currentDeal.id,
+              user_id: userId,
+              chatwoot_conversation_id: conversation.id,
+              brokerage_id: brokerageId || null,
+              trigger_reason: stageAiSettings?.follow_up_enabled ? 'stage_config' : 'heuristic',
+              follow_up_message: stageAiSettings?.follow_up_message || null,
+              max_attempts: stageAiSettings?.follow_up_max_attempts || 3,
+              interval_minutes: intervalMinutes,
+              next_check_at: new Date(Date.now() + intervalMinutes * 60 * 1000).toISOString(),
+              status: 'pending',
+            })
+            if (followUpError) {
+              console.error('⚠️ Failed to create follow-up:', followUpError.message)
+            } else {
+              console.log(`📅 Follow-up created for deal ${currentDeal.id} (reason: ${stageAiSettings?.follow_up_enabled ? 'stage_config' : 'heuristic'}, interval: ${intervalMinutes}min)`)
+            }
+          }
+        }
+      }
     } else {
       console.warn('⚠️ No N8N_WEBHOOK_URL configured')
     }

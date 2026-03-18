@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Bot, Zap, Sparkles, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bot, Zap, Sparkles, RotateCcw, ChevronDown, ChevronUp, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { VibeSelector, VibeId, VIBE_CONFIG } from './VibeSelector';
@@ -27,6 +28,10 @@ interface AiSetting {
   ai_custom_rules?: string | null;
   is_active?: boolean | null;
   max_messages_before_human?: number | null;
+  follow_up_enabled?: boolean | null;
+  follow_up_interval_minutes?: number | null;
+  follow_up_max_attempts?: number | null;
+  follow_up_message?: string | null;
 }
 
 interface StageFlowCardProps {
@@ -247,6 +252,70 @@ export function StageFlowCard({
             <p className="text-[10px] text-muted-foreground mt-1">
               Salva automaticamente • Variáveis: {'{{deal_title}}'}, {'{{pipeline_name}}'}
             </p>
+          </div>
+
+          {/* Follow-up Section */}
+          <div className="space-y-3 p-3 rounded-lg bg-secondary/30 border border-border/50">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Bell className="h-3.5 w-3.5" />
+                Follow-up automático
+              </label>
+              <Switch
+                checked={aiSetting?.follow_up_enabled ?? false}
+                onCheckedChange={(checked) => onSaveConfig({
+                  stage_id: stage.id,
+                  follow_up_enabled: checked,
+                })}
+                disabled={isSaving}
+                className="data-[state=checked]:bg-amber-500 scale-90"
+              />
+            </div>
+            {aiSetting?.follow_up_enabled && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-muted-foreground">Intervalo (min)</label>
+                    <Input
+                      type="number"
+                      min={5}
+                      value={aiSetting?.follow_up_interval_minutes ?? 60}
+                      onChange={(e) => onSaveConfig({
+                        stage_id: stage.id,
+                        follow_up_interval_minutes: parseInt(e.target.value) || 60,
+                      })}
+                      className="h-7 text-xs bg-background/50"
+                      disabled={isSaving}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground">Max tentativas</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={aiSetting?.follow_up_max_attempts ?? 3}
+                      onChange={(e) => onSaveConfig({
+                        stage_id: stage.id,
+                        follow_up_max_attempts: parseInt(e.target.value) || 3,
+                      })}
+                      className="h-7 text-xs bg-background/50"
+                      disabled={isSaving}
+                    />
+                  </div>
+                </div>
+                <Textarea
+                  value={aiSetting?.follow_up_message ?? ''}
+                  onChange={(e) => onSaveConfig({
+                    stage_id: stage.id,
+                    follow_up_message: e.target.value,
+                  })}
+                  placeholder="Mensagem personalizada (opcional). Padrão: templates automáticos."
+                  className="min-h-[40px] text-xs bg-background/50 border-border/50 resize-none"
+                  disabled={isSaving}
+                />
+              </div>
+            )}
           </div>
           
           {/* Actions */}
