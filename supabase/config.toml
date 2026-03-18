@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.chatwoot-dispatcher]
 verify_jwt = false
+
+[functions.check-followups]
+verify_jwt = false
