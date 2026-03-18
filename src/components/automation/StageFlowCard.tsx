@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { VibeSelector, VibeId, getVibePreset, VIBE_CONFIG } from './VibeSelector';
+import { VibeSelector, VibeId, VIBE_CONFIG } from './VibeSelector';
 import { AI_PERSONA_PRESETS } from './aiPresets';
 import { ConfigSourceBadge } from './ConfigSourceBadge';
 import { useDebounce } from '@/hooks/useDebounce';
