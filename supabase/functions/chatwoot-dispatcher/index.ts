@@ -829,7 +829,7 @@ Deno.serve(async (req) => {
     // 5b. Build client context summary for injection in system prompt
     const clientContextForPrompt = clientId
       ? `## CONTEXTO DO CLIENTE (pré-carregado — NÃO pergunte dados que já estão aqui)\nNome cadastrado: ${clientData?.name || sender?.name || 'desconhecido'}\nTelefone: ${contactPhone || 'desconhecido'}\nID interno: ${clientId}\n${currentDeal ? `Última negociação: "${currentDeal.title}" (etapa: ${currentStage?.name})` : 'Nenhuma negociação aberta registrada.'}\n`
-      : `## CLIENTE NÃO CADASTRADO\nNome (do Chatwoot): ${sender?.name || 'desconhecido'}\nTelefone: ${contactPhone || 'desconhecido'}\nPRECISA CRIAR CADASTRO com create_contact antes de abrir atendimento.\n`
+      : `## NOVO CONTATO\nNome (do Chatwoot): ${sender?.name || 'desconhecido'}\nTelefone: ${contactPhone || 'desconhecido'}\nEste contato ainda não possui cadastro. O sistema cuidará automaticamente do cadastro e roteamento.\n`
 
     // 6. Build system prompt
     const promptResult = await buildSystemPrompt({

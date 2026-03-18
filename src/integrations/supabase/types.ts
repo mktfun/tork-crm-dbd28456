@@ -82,6 +82,79 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_follow_ups: {
+        Row: {
+          attempt_count: number
+          brokerage_id: number | null
+          chatwoot_conversation_id: number
+          created_at: string
+          deal_id: string
+          follow_up_message: string | null
+          id: string
+          interval_minutes: number
+          max_attempts: number
+          next_check_at: string
+          status: string
+          trigger_reason: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          brokerage_id?: number | null
+          chatwoot_conversation_id: number
+          created_at?: string
+          deal_id: string
+          follow_up_message?: string | null
+          id?: string
+          interval_minutes?: number
+          max_attempts?: number
+          next_check_at: string
+          status?: string
+          trigger_reason: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempt_count?: number
+          brokerage_id?: number | null
+          chatwoot_conversation_id?: number
+          created_at?: string
+          deal_id?: string
+          follow_up_message?: string | null
+          id?: string
+          interval_minutes?: number
+          max_attempts?: number
+          next_check_at?: string
+          status?: string
+          trigger_reason?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_follow_ups_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_follow_ups_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_follow_ups_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "v_n8n_agent_config"
+            referencedColumns: ["deal_id"]
+          },
+        ]
+      }
       ai_improvement_log: {
         Row: {
           after_value: Json | null
