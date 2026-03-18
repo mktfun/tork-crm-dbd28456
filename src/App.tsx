@@ -44,7 +44,7 @@ import ProductSettings from "./pages/settings/ProductSettings";
 import Documentation from "./pages/Documentation";
 import { PortalInboxLayout, PortalInboxSolicitacoes, PortalInboxConfig } from "./pages/PortalInbox";
 import { JJSegurosPublicRoutes } from "./modules/jjseguros/JJSegurosPublicRoutes";
-import AdminDashboard from "./modules/jjseguros/pages/admin/AdminDashboard";
+import JJAdminDashboard from "./modules/jjseguros/pages/admin/AdminDashboard";
 import AdminLeads from "./modules/jjseguros/pages/admin/AdminLeads";
 import AdminLeadDetail from "./modules/jjseguros/pages/admin/AdminLeadDetail";
 import AdminLogs from "./modules/jjseguros/pages/admin/AdminLogs";
@@ -205,7 +205,7 @@ function App() {
                     <Route path="documentacao" element={<Documentation />} />
                     <Route path="solicitacoes-portal" element={<PortalInboxLayout />}>
                       <Route index element={<PortalInboxSolicitacoes />} />
-                      <Route path="admin" element={<AdminDashboard />} />
+                      <Route path="admin" element={<JJAdminDashboard />} />
                       <Route path="admin/leads" element={<AdminLeads />} />
                       <Route path="admin/leads/:id" element={<AdminLeadDetail />} />
                       <Route path="admin/logs" element={<AdminLogs />} />

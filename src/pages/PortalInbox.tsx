@@ -158,7 +158,7 @@ export function PortalInboxLayout() {
             to="/dashboard/solicitacoes-portal"
             end
             className={({ isActive }) => 
-              \`flex items-center px-1 pb-3 text-sm font-medium transition-colors hover:text-foreground \${isActive || currentPath === '/dashboard/solicitacoes-portal' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground'}\`
+              `flex items-center px-1 pb-3 text-sm font-medium transition-colors hover:text-foreground ${isActive || currentPath === '/dashboard/solicitacoes-portal' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground'}`
             }
           >
             <Inbox className="w-4 h-4 mr-2" />
@@ -168,7 +168,7 @@ export function PortalInboxLayout() {
           <NavLink
             to="/dashboard/solicitacoes-portal/admin"
             className={({ isActive }) => 
-              \`flex items-center px-1 pb-3 text-sm font-medium transition-colors hover:text-foreground \${isActive || currentPath.includes('/admin') ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground'}\`
+              `flex items-center px-1 pb-3 text-sm font-medium transition-colors hover:text-foreground ${isActive || currentPath.includes('/admin') ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground'}`
             }
           >
             <LayoutDashboard className="w-4 h-4 mr-2" />
@@ -178,7 +178,7 @@ export function PortalInboxLayout() {
           <NavLink
             to="/dashboard/solicitacoes-portal/config"
             className={({ isActive }) => 
-              \`flex items-center px-1 pb-3 text-sm font-medium transition-colors hover:text-foreground \${isActive ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground'}\`
+              `flex items-center px-1 pb-3 text-sm font-medium transition-colors hover:text-foreground ${isActive ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground'}`
             }
           >
             <Globe className="w-4 h-4 mr-2" />
