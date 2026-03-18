@@ -397,6 +397,7 @@ async function buildSystemPrompt(params: {
   let nextStageId: string | null = null
   let nextStageName: string | null = null
   let allowedTools: string[] = []
+  let globalBaseInstructions: string | null = null
 
   // Fetch global config
   if (userId) {
@@ -410,9 +411,8 @@ async function buildSystemPrompt(params: {
       agentName = globalConfig.agent_name || agentName
       companyName = globalConfig.company_name || companyName
       voiceTone = globalConfig.voice_tone || voiceTone
+      globalBaseInstructions = globalConfig.base_instructions || null
     }
-
-    const globalBaseInstructions = globalConfig?.base_instructions || null
 
     const { data: aiConfig } = await supabase
       .from('crm_ai_config')
