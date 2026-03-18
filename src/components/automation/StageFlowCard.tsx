@@ -113,13 +113,10 @@ export function StageFlowCard({
   const handleVibeChange = useCallback((vibeId: VibeId) => {
     userSelectedRef.current = true;
     setSelectedVibe(vibeId);
-    const preset = getVibePreset(vibeId);
-    if (preset) {
-      onSaveConfig({
-        stage_id: stage.id,
-        ai_persona: preset.xmlPrompt,
-      });
-    }
+    onSaveConfig({
+      stage_id: stage.id,
+      ai_persona: vibeId,
+    });
   }, [stage.id, onSaveConfig]);
   
   const handleToggleExpand = () => {
