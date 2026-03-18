@@ -20,6 +20,7 @@ export interface CRMDeal {
   user_id: string;
   client_id: string | null;
   stage_id: string;
+  product_id: string | null;
   chatwoot_conversation_id: number | null;
   title: string;
   value: number;
@@ -35,6 +36,10 @@ export interface CRMDeal {
     name: string;
     phone: string;
     email: string;
+  };
+  product?: {
+    id: string;
+    name: string;
   };
 }
 
@@ -258,7 +263,8 @@ export function useCRMDeals(pipelineId: string | null = null) {
         .from('crm_deals')
         .select(`
           *,
-          client:clientes(id, name, phone, email)
+          client:clientes(id, name, phone, email),
+          product:crm_products(id, name)
         `)
         .eq('user_id', user!.id);
 
@@ -309,6 +315,7 @@ export function useCRMDeals(pipelineId: string | null = null) {
           title: deal.title!,
           stage_id: deal.stage_id!,
           client_id: deal.client_id || null,
+          product_id: (deal as any).product_id || null,
           value: deal.value || 0,
           expected_close_date: deal.expected_close_date || null,
           notes: deal.notes || null,
@@ -316,7 +323,7 @@ export function useCRMDeals(pipelineId: string | null = null) {
           user_id: user!.id,
           sync_token: crypto.randomUUID(),
           last_sync_source: 'crm' as const
-        })
+        } as any)
         .select()
         .single();
 

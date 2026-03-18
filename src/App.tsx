@@ -40,6 +40,7 @@ import CRM from "./pages/CRM";
 import AIAutomation from "./pages/AIAutomation";
 import ChatTorkSettings from "./pages/settings/ChatTorkSettings";
 import PortalSettings from "./pages/settings/PortalSettings";
+import ProductSettings from "./pages/settings/ProductSettings";
 import Documentation from "./pages/Documentation";
 import PortalInbox from "./pages/PortalInbox";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
@@ -209,6 +210,7 @@ function App() {
                       <Route path="producers" element={<ProducerSettings />} />
                       <Route path="companies" element={<CompanySettings />} />
                       <Route path="ramos" element={<RamoSettings />} />
+                      <Route path="products" element={<ProductSettings />} />
                       <Route path="transactions" element={<TransactionSettings />} />
                       <Route path="chat-tork" element={<ChatTorkSettings />} />
                       <Route path="portal" element={<PortalSettings />} />

@@ -1514,6 +1514,7 @@ export type Database = {
           last_sync_source: string | null
           notes: string | null
           position: number
+          product_id: string | null
           stage_id: string
           sync_token: string | null
           title: string
@@ -1530,6 +1531,7 @@ export type Database = {
           last_sync_source?: string | null
           notes?: string | null
           position?: number
+          product_id?: string | null
           stage_id: string
           sync_token?: string | null
           title: string
@@ -1546,6 +1548,7 @@ export type Database = {
           last_sync_source?: string | null
           notes?: string | null
           position?: number
+          product_id?: string | null
           stage_id?: string
           sync_token?: string | null
           title?: string
@@ -1566,6 +1569,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deals_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "crm_products"
             referencedColumns: ["id"]
           },
           {
@@ -1676,6 +1686,54 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      crm_products: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_with_ramos_count"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       crm_settings: {
         Row: {

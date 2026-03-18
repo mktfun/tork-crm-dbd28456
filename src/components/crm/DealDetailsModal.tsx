@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { CRMDeal, useCRMDeals, useCRMStages } from '@/hooks/useCRMDeals';
+import { ProductSelect } from './ProductSelect';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -42,7 +43,8 @@ import {
   Trophy,
   XCircle,
   Bot,
-  ArrowRight
+  ArrowRight,
+  Package
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -97,7 +99,8 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
     value: '',
     expected_close_date: '',
     notes: '',
-    stage_id: ''
+    stage_id: '',
+    product_id: ''
   });
 
   // Timeline state
@@ -119,7 +122,8 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
         value: deal.value?.toString() || '',
         expected_close_date: deal.expected_close_date || '',
         notes: deal.notes || '',
-        stage_id: deal.stage_id || ''
+        stage_id: deal.stage_id || '',
+        product_id: deal.product_id || ''
       });
       setIsEditing(false);
       setActiveTab('details');
@@ -264,8 +268,9 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
         value: parseFloat(formData.value) || 0,
         expected_close_date: formData.expected_close_date || null,
         notes: formData.notes || null,
-        stage_id: formData.stage_id
-      });
+        stage_id: formData.stage_id,
+        product_id: formData.product_id && formData.product_id !== 'none' ? formData.product_id : null
+      } as any);
 
       if (stageChanged) {
         await emitDealEvent('stage_change', oldStageName, newStageName);
@@ -511,6 +516,14 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
                     </Select>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label>Produto</Label>
+                    <ProductSelect
+                      value={formData.product_id}
+                      onValueChange={(value) => setFormData({ ...formData, product_id: value })}
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="edit-value">Valor (R$)</Label>
@@ -561,6 +574,15 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
                       </div>
                     )}
                   </div>
+
+                  {(deal as any).product && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                      <Badge variant="outline" className="text-xs">
+                        {(deal as any).product.name}
+                      </Badge>
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">Etapa:</span>
