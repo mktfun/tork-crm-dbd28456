@@ -1,6 +1,6 @@
 
 import { NavLink } from 'react-router-dom';
-import { User, Building, Users, Shield, Tag, Package, MessageCircle, Globe } from 'lucide-react';
+import { User, Building, Users, Shield, Tag } from 'lucide-react';
 import { AppCard } from '@/components/ui/app-card';
 
 const navItems = [
