@@ -7,7 +7,8 @@ import { CRMAnalytics } from '@/components/crm/CRMAnalytics';
 import { useCRMPipelines } from '@/hooks/useCRMPipelines';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw, MessageCircle, Loader2, Plus, Sparkles, Bot, BarChart3, Kanban } from 'lucide-react';
+import { RefreshCw, MessageCircle, Loader2, Plus, Sparkles, Bot, BarChart3, Kanban, Package } from 'lucide-react';
+import { ProductsManager } from '@/components/settings/ProductsManager';
 import { useNavigate } from 'react-router-dom';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
@@ -157,6 +158,10 @@ export default function CRM() {
             <BarChart3 className="h-4 w-4" />
             Insights
           </TabsTrigger>
+          <TabsTrigger value="products" className="gap-1.5">
+            <Package className="h-4 w-4" />
+            Produtos
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pipeline">
@@ -176,6 +181,16 @@ export default function CRM() {
             transition={{ delay: 0.1 }}
           >
             <CRMAnalytics pipelineId={selectedPipelineId} />
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="products">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <ProductsManager />
           </motion.div>
         </TabsContent>
       </Tabs>

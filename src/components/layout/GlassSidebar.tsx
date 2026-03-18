@@ -18,8 +18,7 @@ import {
   Wallet,
   BookOpen,
   Bot,
-  Inbox,
-  Package
+  Inbox
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChangelogs } from '@/hooks/useChangelogs';
@@ -47,7 +46,6 @@ const menuSections = [
     items: [
       { id: 'crm', name: 'CRM', icon: Kanban, path: '/dashboard/crm' },
       { id: 'automation', name: 'Automação IA', icon: Bot, path: '/dashboard/crm/automation' },
-      { id: 'products', name: 'Produtos', icon: Package, path: '/dashboard/products' },
       { id: 'portal-inbox', name: 'Inbox Portal', icon: Inbox, path: '/dashboard/solicitacoes-portal' },
     ]
   },
