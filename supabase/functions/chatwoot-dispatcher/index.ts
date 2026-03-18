@@ -586,24 +586,19 @@ async function buildSystemPrompt(params: {
   if (transcription) systemPrompt += `<transcription>\nO cliente enviou um áudio. Transcrição:\n${transcription}\n</transcription>\n\n`
   if (extractedText) systemPrompt += `<extracted_document>\nO cliente enviou um documento. Conteúdo extraído:\n${extractedText}\n</extracted_document>\n\n`
 
-  systemPrompt += `<tools_manual>\n`
-  systemPrompt += `1. search_contact: SEMPRE use antes de criar um contato para evitar duplicados.\n`
-  systemPrompt += `2. create_contact: Use se search_contact não retornar nada. Peça nome e telefone.\n`
-  systemPrompt += `3. list_pipelines_and_stages: Use para conhecer os funis disponíveis antes de criar um negócio.\n`
-  systemPrompt += `4. create_deal: Use para abrir uma oportunidade. Requer client_id e stage_id.\n`
-  systemPrompt += `5. update_deal_stage: Use para mover o cliente no funil ao atingir o objetivo.\n`
-  systemPrompt += `</tools_manual>\n\n`
-
   if (!deal) {
-    // No deal — client not registered yet (auto-creation couldn't run)
+    // No deal — triage mode: understand what the client needs
     const basePerson = globalBaseInstructions || stageAiSettings?.ai_persona || 'Você é um assistente de vendas útil e amigável.'
     systemPrompt += `<persona>\n${basePerson}\n</persona>\n\n`
     systemPrompt += `<objective>\n`
-    systemPrompt += `CLIENTE NÃO CADASTRADO: Primeiro crie o contato com create_contact (peça nome e telefone).\n`
-    systemPrompt += `Após criar o contato, o sistema criará automaticamente a negociação na próxima mensagem.\n`
+    systemPrompt += `NOVO CONTATO — TRIAGEM INICIAL\n`
+    systemPrompt += `Este cliente ainda não tem negociação aberta. Seu objetivo é entender o que ele precisa.\n`
+    systemPrompt += `Pergunte de forma natural o que ele está buscando (cotação, sinistro, endosso, cancelamento, segunda via, etc.).\n`
+    systemPrompt += `NÃO tente vender nada ainda. Apenas identifique a necessidade para encaminhamento correto.\n`
+    systemPrompt += `O sistema cuidará automaticamente do cadastro e roteamento.\n`
     systemPrompt += `</objective>\n\n`
 
-    allowedTools = ['search_contact', 'create_contact']
+    allowedTools = []
   } else {
     // Has deal — stage-specific mode
     stageAiIsActive = stageAiSettings?.is_active ?? false
@@ -622,7 +617,7 @@ async function buildSystemPrompt(params: {
       systemPrompt += `<custom_rules>\n${stageAiSettings.ai_custom_rules}\n</custom_rules>\n\n`
     }
 
-    // Resolve next stage for auto-progression
+    // Resolve next stage info (used by dispatcher for auto-progression, NOT by the AI)
     if (stage?.pipeline_id && stage?.position !== undefined) {
       const { data: nextStage } = await supabase
         .from('crm_stages')
@@ -636,18 +631,6 @@ async function buildSystemPrompt(params: {
       if (nextStage) {
         nextStageId = nextStage.id
         nextStageName = nextStage.name
-
-        systemPrompt += `<auto_progression>\n`
-        systemPrompt += `Ao concluir o objetivo desta etapa com sucesso, use update_deal_stage para avançar:\n`
-        systemPrompt += `- deal_id: "${deal.id}"\n`
-        systemPrompt += `- new_stage_id: "${nextStageId}"\n`
-        systemPrompt += `Próxima etapa: "${nextStageName}"\n`
-        systemPrompt += `</auto_progression>\n\n`
-      } else {
-        systemPrompt += `<auto_progression>\n`
-        systemPrompt += `Esta é a ÚLTIMA etapa do funil. Não há próxima etapa automática.\n`
-        systemPrompt += `Ao concluir o objetivo, informe que um membro da equipe dará continuidade.\n`
-        systemPrompt += `</auto_progression>\n\n`
       }
 
       // Also handle completion action from stage settings
@@ -664,7 +647,7 @@ async function buildSystemPrompt(params: {
       }
     }
 
-    allowedTools = ['search_contact', 'create_contact', 'create_deal', 'update_deal_stage', 'list_pipelines_and_stages']
+    allowedTools = []
   }
 
   return { systemPrompt, knowledgeContext, agentName, companyName, voiceTone, aiIsActive, stageAiIsActive, nextStageId, nextStageName, allowedTools }
