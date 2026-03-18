@@ -14,6 +14,7 @@ import { KpiCard } from '@/components/policies/KpiCard';
 import { AppCard } from '@/components/ui/app-card';
 import { ApiKeysManager } from '@/components/superadmin/ApiKeysManager';
 import { AuditLogsViewer } from '@/components/superadmin/AuditLogsViewer';
+import { AdminControlCenter } from '@/components/superadmin/AdminControlCenter';
 import { 
   LayoutDashboard, 
   Cpu, 
@@ -25,7 +26,8 @@ import {
   Eye,
   CheckCircle2,
   XCircle,
-  Clock
+  Clock,
+  SlidersHorizontal
 } from 'lucide-react';
 
 export default function SuperAdmin() {
@@ -106,6 +108,13 @@ export default function SuperAdmin() {
           >
             <Activity className="h-4 w-4" />
             Auditoria
+          </TabsTrigger>
+          <TabsTrigger 
+            value="control" 
+            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 gap-2"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Control Center
           </TabsTrigger>
           <TabsTrigger 
             value="system" 
@@ -296,6 +305,11 @@ export default function SuperAdmin() {
         {/* Audit Tab */}
         <TabsContent value="audit" className="mt-6">
           <AuditLogsViewer />
+        </TabsContent>
+
+        {/* Control Center Tab */}
+        <TabsContent value="control" className="mt-6">
+          <AdminControlCenter />
         </TabsContent>
 
         {/* System Tab */}
