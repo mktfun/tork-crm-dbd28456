@@ -372,7 +372,7 @@ export function AutomationConfigTab() {
     <div className="space-y-6 pb-24">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+        <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
           <Settings className="h-5 w-5 text-primary" />
         </div>
         <div>
@@ -385,17 +385,20 @@ export function AutomationConfigTab() {
         </div>
       </div>
 
-      {/* AI Engine Config */}
-      <Card className="bg-background/50 backdrop-blur-md border border-white/10 shadow-lg">
+      {/* ── Card 0: Motor de IA ── */}
+      <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
               <Brain className="h-5 w-5 text-purple-400" />
             </div>
-            <div>
-              <CardTitle>Motor de Inteligência</CardTitle>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base">Motor de Inteligência</CardTitle>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">IA</Badge>
+              </div>
               <CardDescription>
-                Provedor, modelo e chave de acesso da IA — usado pelo Assistente Tork e Relatórios Estratégicos
+                Provedor, modelo e chave de acesso — usado pelo Assistente Tork e Relatórios
               </CardDescription>
             </div>
           </div>
@@ -473,106 +476,111 @@ export function AutomationConfigTab() {
         </CardContent>
       </Card>
 
-      {/* Chatwoot Config */}
-      <Card className="bg-background/50 backdrop-blur-md border border-white/10 shadow-lg">
+      {/* ── Card 1: Chat Tork (Chatwoot) ── */}
+      <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
               <MessageCircle className="h-5 w-5 text-blue-400" />
             </div>
-            <div>
-              <CardTitle>Chatwoot (Chat Tork)</CardTitle>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base">Chat Tork (Chatwoot)</CardTitle>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">Integração</Badge>
+              </div>
               <CardDescription>
-                Configure a integração com o Chatwoot
+                Credenciais da instância Chatwoot para comunicação em tempo real
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="chatwoot_url">URL da Instância *</Label>
-            <Input
-              id="chatwoot_url"
-              placeholder="https://seu-chat-tork.com"
-              value={settings.chatwoot_url}
-              onChange={(e) => setSettings({ ...settings, chatwoot_url: e.target.value })}
-            />
-            <p className="text-xs text-muted-foreground">
-              URL base da sua instância Chatwoot (sem /api/v1)
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="chatwoot_account_id">Account ID *</Label>
-            <Input
-              id="chatwoot_account_id"
-              placeholder="1"
-              value={settings.chatwoot_account_id}
-              onChange={(e) => setSettings({ ...settings, chatwoot_account_id: e.target.value })}
-            />
-            <p className="text-xs text-muted-foreground">
-              ID da conta no Chatwoot (Settings → Account)
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="chatwoot_api_key">API Key *</Label>
-            <div className="relative">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="chatwoot_url">URL da Instância *</Label>
               <Input
-                id="chatwoot_api_key"
-                type={showApiKey ? "text" : "password"}
-                placeholder="sua-api-key-aqui"
-                value={settings.chatwoot_api_key}
-                onChange={(e) => setSettings({ ...settings, chatwoot_api_key: e.target.value })}
-                className="pr-10"
+                id="chatwoot_url"
+                placeholder="https://seu-chat-tork.com"
+                value={settings.chatwoot_url}
+                onChange={(e) => setSettings({ ...settings, chatwoot_url: e.target.value })}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                onClick={() => setShowApiKey(!showApiKey)}
-              >
-                {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
+              <p className="text-xs text-muted-foreground">
+                URL base da sua instância Chatwoot (sem /api/v1)
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Token de acesso da API (Profile → Access Token)
-            </p>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="chatwoot_webhook_secret">Webhook Secret</Label>
-            <div className="relative">
+            <div className="space-y-2">
+              <Label htmlFor="chatwoot_account_id">Account ID *</Label>
               <Input
-                id="chatwoot_webhook_secret"
-                type={showWebhookSecret ? "text" : "password"}
-                placeholder="seu-webhook-secret"
-                value={settings.chatwoot_webhook_secret}
-                onChange={(e) => setSettings({ ...settings, chatwoot_webhook_secret: e.target.value })}
-                className="pr-10"
+                id="chatwoot_account_id"
+                placeholder="1"
+                value={settings.chatwoot_account_id}
+                onChange={(e) => setSettings({ ...settings, chatwoot_account_id: e.target.value })}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                onClick={() => setShowWebhookSecret(!showWebhookSecret)}
-              >
-                {showWebhookSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
+              <p className="text-xs text-muted-foreground">
+                ID da conta no Chatwoot (Settings → Account)
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Secret para validar webhooks (opcional, mas recomendado)
-            </p>
+
+            <div className="space-y-2">
+              <Label htmlFor="chatwoot_api_key">API Key *</Label>
+              <div className="relative">
+                <Input
+                  id="chatwoot_api_key"
+                  type={showApiKey ? "text" : "password"}
+                  placeholder="sua-api-key-aqui"
+                  value={settings.chatwoot_api_key}
+                  onChange={(e) => setSettings({ ...settings, chatwoot_api_key: e.target.value })}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                >
+                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Token de acesso da API (Profile → Access Token)
+              </p>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="chatwoot_webhook_secret">Webhook Secret</Label>
+              <div className="relative">
+                <Input
+                  id="chatwoot_webhook_secret"
+                  type={showWebhookSecret ? "text" : "password"}
+                  placeholder="seu-webhook-secret"
+                  value={settings.chatwoot_webhook_secret}
+                  onChange={(e) => setSettings({ ...settings, chatwoot_webhook_secret: e.target.value })}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowWebhookSecret(!showWebhookSecret)}
+                >
+                  {showWebhookSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Secret para validar webhooks (opcional, mas recomendado)
+              </p>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Button variant="outline" onClick={handleTestChatwoot} disabled={testing || !settings.chatwoot_url}>
+          <div className="flex flex-wrap gap-3 pt-2 border-t border-border/50">
+            <Button variant="outline" size="sm" onClick={handleTestChatwoot} disabled={testing || !settings.chatwoot_url}>
               {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wifi className="h-4 w-4 mr-2" />}
               Testar Conexão
             </Button>
-            <Button variant="outline" onClick={handleSyncLabels} disabled={syncing || !settings.chatwoot_url}>
+            <Button variant="outline" size="sm" onClick={handleSyncLabels} disabled={syncing || !settings.chatwoot_url}>
               {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
               Sincronizar Etiquetas
             </Button>
@@ -580,15 +588,18 @@ export function AutomationConfigTab() {
         </CardContent>
       </Card>
 
-      {/* Webhook CRM */}
-      <Card className="bg-background/50 backdrop-blur-md border border-white/10 shadow-lg">
+      {/* ── Card 2: Webhook do CRM ── */}
+      <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
               <Link className="h-5 w-5 text-emerald-400" />
             </div>
-            <div>
-              <CardTitle>Webhook do CRM</CardTitle>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base">Webhook do CRM</CardTitle>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">Endpoint</Badge>
+              </div>
               <CardDescription>
                 Configure no Chatwoot para receber eventos em tempo real
               </CardDescription>
@@ -597,34 +608,45 @@ export function AutomationConfigTab() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
-            <Input value={webhookUrl} readOnly className="font-mono text-xs" />
-            <Button variant="outline" size="icon" onClick={handleCopyWebhook}>
+            <Input value={webhookUrl} readOnly className="font-mono text-xs bg-muted/30" />
+            <Button variant="outline" size="icon" onClick={handleCopyWebhook} className="shrink-0">
               {copiedWebhook ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             </Button>
           </div>
 
-          <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <h4 className="text-sm font-medium text-blue-400 mb-2">
-              Como configurar:
-            </h4>
-            <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-              <li>Acesse Settings → Applications → Webhooks no Chatwoot</li>
-              <li>Clique em "Add new webhook"</li>
-              <li>Cole a URL acima</li>
-              <li>Selecione os eventos: message_created, conversation_updated</li>
-              <li>Salve e copie o Secret gerado para o campo acima</li>
-            </ol>
-          </div>
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              <h4 className="text-sm font-medium mb-2">Como configurar:</h4>
+              <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                <li>Acesse Settings → Applications → Webhooks no Chatwoot</li>
+                <li>Clique em "Add new webhook"</li>
+                <li>Cole a URL acima</li>
+                <li>Selecione os eventos: message_created, conversation_updated</li>
+                <li>Salve e copie o Secret gerado para o campo acima</li>
+              </ol>
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
 
-      {/* n8n Config */}
-      <Card className="bg-background/50 backdrop-blur-md border border-white/10 shadow-lg">
+      {/* ── Card 3: n8n — Automação Avançada ── */}
+      <Card>
         <CardHeader>
-          <CardTitle>n8n (Automação Avançada)</CardTitle>
-          <CardDescription>
-            Configure o webhook do n8n para automações
-          </CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+              <Zap className="h-5 w-5 text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base">n8n — Automação Avançada</CardTitle>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">Webhook</Badge>
+              </div>
+              <CardDescription>
+                Configure o webhook do n8n para automações externas
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -667,9 +689,10 @@ export function AutomationConfigTab() {
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 pt-2 border-t border-border/50">
             <Button
               variant="outline"
+              size="sm"
               onClick={handleTestN8n}
               disabled={testingN8n || !settings.n8n_webhook_url || !testInboxId}
             >
@@ -680,15 +703,41 @@ export function AutomationConfigTab() {
         </CardContent>
       </Card>
 
-      {/* Inbox Agent Mapping */}
-      <InboxAgentMapping />
+      {/* ── Card 4: Mapeamento de Inboxes ── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+              <Users className="h-5 w-5 text-purple-400" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base">Mapeamento de Inboxes</CardTitle>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">Roteamento</Badge>
+              </div>
+              <CardDescription>
+                Determine quem herda os leads de cada caixa de entrada
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <InboxAgentMapping />
+        </CardContent>
+      </Card>
 
-      {/* Sticky Save Button */}
-      <div className="sticky bottom-0 bg-background/80 backdrop-blur border-t border-border pt-4 mt-4 flex justify-end">
-        <Button onClick={handleSave} disabled={saving} className="min-w-[120px]">
-          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-          Salvar Tudo
-        </Button>
+      {/* ── Sticky Save Bar — Glassmorphism ── */}
+      <div className="sticky bottom-0 z-10 -mx-1 px-1 py-4 bg-background/60 backdrop-blur-xl border-t border-border/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Shield className="h-3.5 w-3.5" />
+            <span>Credenciais armazenadas com criptografia AES-256</span>
+          </div>
+          <Button onClick={handleSave} disabled={saving} size="lg" className="min-w-[180px]">
+            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Salvar Configurações
+          </Button>
+        </div>
       </div>
     </div>
   );
