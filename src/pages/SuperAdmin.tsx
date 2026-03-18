@@ -307,6 +307,11 @@ export default function SuperAdmin() {
           <AuditLogsViewer />
         </TabsContent>
 
+        {/* Control Center Tab */}
+        <TabsContent value="control" className="mt-6">
+          <AdminControlCenter />
+        </TabsContent>
+
         {/* System Tab */}
         <TabsContent value="system" className="mt-6">
           <div className="glass-component p-0 shadow-lg border-border bg-card">
