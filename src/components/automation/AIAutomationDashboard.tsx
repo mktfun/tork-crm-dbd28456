@@ -8,7 +8,6 @@ import { useGlobalAiConfig } from "@/hooks/useGlobalAiConfig";
 import { usePipelineAiDefaults } from "@/hooks/usePipelineAiDefaults";
 import { SalesFlowTimeline } from "./SalesFlowTimeline";
 import { AISandbox } from "./AISandbox";
-import { SandboxFloatingCard } from "./SandboxFloatingCard";
 import { PipelineAiDefaultsModal } from "./PipelineAiDefaultsModal";
 import { NewPipelineModal } from "@/components/crm/NewPipelineModal";
 import { NewStageModal } from "@/components/crm/NewStageModal";
