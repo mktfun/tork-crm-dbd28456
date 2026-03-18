@@ -197,6 +197,8 @@ async function buildSystemPrompt(params: {
       voiceTone = globalConfig.voice_tone || voiceTone
     }
 
+    const globalBaseInstructions = globalConfig?.base_instructions || null
+
     const { data: aiConfig } = await supabase
       .from('crm_ai_config')
       .select('is_active')
