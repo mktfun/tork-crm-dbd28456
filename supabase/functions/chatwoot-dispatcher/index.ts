@@ -782,6 +782,8 @@ Deno.serve(async (req) => {
     let currentStage: any = null
     let stageAiSettings: any = null
     let autoCreatedDeal = false
+    let autoCreatedProductId: string | null = null
+    let autoCreatedProductName: string | null = null
 
     const contactPhone = sender?.phone_number
     const contactEmail = sender?.email
