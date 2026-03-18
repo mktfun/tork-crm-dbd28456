@@ -429,6 +429,7 @@ Deno.serve(async (req) => {
 
     // 5. Resolve client & deal context
     let clientId: string | null = null
+    let clientData: { id: string; name: string | null; ai_enabled: boolean | null } | null = null
     let currentDeal: any = null
     let currentStage: any = null
     let stageAiSettings: any = null
@@ -437,11 +438,12 @@ Deno.serve(async (req) => {
     const contactEmail = sender?.email
 
     if (contactPhone || contactEmail) {
-      let clientQuery = supabase.from('clientes').select('id, ai_enabled')
+      let clientQuery = supabase.from('clientes').select('id, name, ai_enabled')
       if (contactPhone) clientQuery = clientQuery.ilike('phone', `%${contactPhone.replace(/\D/g, '')}%`)
       else if (contactEmail) clientQuery = clientQuery.eq('email', contactEmail)
 
-      const { data: clientData } = await clientQuery.maybeSingle()
+      const { data: fetchedClient } = await clientQuery.maybeSingle()
+      clientData = fetchedClient
       clientId = clientData?.id || null
 
       // Guard: ai_enabled do cliente
@@ -476,6 +478,11 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 5b. Build client context summary for injection in system prompt
+    const clientContextForPrompt = clientId
+      ? `## CONTEXTO DO CLIENTE (pré-carregado — NÃO pergunte dados que já estão aqui)\nNome cadastrado: ${clientData?.name || sender?.name || 'desconhecido'}\nTelefone: ${contactPhone || 'desconhecido'}\nID interno: ${clientId}\n${currentDeal ? `Última negociação: "${currentDeal.title}" (etapa: ${currentStage?.name})` : 'Nenhuma negociação aberta registrada.'}\n`
+      : `## CLIENTE NÃO CADASTRADO\nNome (do Chatwoot): ${sender?.name || 'desconhecido'}\nTelefone: ${contactPhone || 'desconhecido'}\nPRECISA CRIAR CADASTRO com create_contact antes de abrir atendimento.\n`
+
     // 6. Build system prompt
     const promptResult = await buildSystemPrompt({
       role, userId, clientId,
@@ -484,6 +491,11 @@ Deno.serve(async (req) => {
       transcription: mediaResult.transcription,
       extractedText: mediaResult.extractedText,
     })
+
+    // Inject client context at the start of the system prompt
+    const finalSystemPrompt = clientContextForPrompt
+      ? `${clientContextForPrompt}\n---\n\n${promptResult.systemPrompt}`
+      : promptResult.systemPrompt
 
     if (!promptResult.aiIsActive && role !== 'admin') {
       console.log('🚫 AI inactive for this user config')
@@ -517,7 +529,7 @@ Deno.serve(async (req) => {
           ai_is_active: promptResult.aiIsActive,
           stage_ai_is_active: promptResult.stageAiIsActive,
           is_active: stageAiSettings?.is_active ?? true,
-          ai_system_prompt: promptResult.systemPrompt,
+          ai_system_prompt: finalSystemPrompt,
           agent_name: promptResult.agentName,
           company_name: promptResult.companyName,
           voice_tone: promptResult.voiceTone,
