@@ -245,7 +245,7 @@ async function buildSystemPrompt(params: {
 
   if (!deal) {
     // No deal — generic mode, infer context
-    const basePerson = stageAiSettings?.ai_persona || 'Você é um assistente de vendas útil e amigável.'
+    const basePerson = globalBaseInstructions || stageAiSettings?.ai_persona || 'Você é um assistente de vendas útil e amigável.'
     systemPrompt += `<persona>\n${basePerson}\n</persona>\n\n`
     systemPrompt += `<objective>\n`
     systemPrompt += `CLIENTE NOVO: Não há negociação aberta para este contato.\n`
