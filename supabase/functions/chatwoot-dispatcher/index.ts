@@ -459,20 +459,15 @@ async function buildSystemPrompt(params: {
   systemPrompt += `</tools_manual>\n\n`
 
   if (!deal) {
-    // No deal — generic mode, infer context
+    // No deal — client not registered yet (auto-creation couldn't run)
     const basePerson = globalBaseInstructions || stageAiSettings?.ai_persona || 'Você é um assistente de vendas útil e amigável.'
     systemPrompt += `<persona>\n${basePerson}\n</persona>\n\n`
     systemPrompt += `<objective>\n`
-    systemPrompt += `CLIENTE NOVO: Não há negociação aberta para este contato.\n`
-    systemPrompt += `Sua missão:\n`
-    systemPrompt += `1. Conversar naturalmente, sem perguntar diretamente "o que você precisa?"\n`
-    systemPrompt += `2. Identificar nas entrelinhas: qual produto o cliente busca, urgência, perfil\n`
-    systemPrompt += `3. Ao identificar o contexto, use list_pipelines_and_stages para ver funis disponíveis\n`
-    systemPrompt += `4. Crie o deal com create_deal no funil/etapa mais adequados\n`
-    systemPrompt += `5. A partir daí, siga o objetivo da etapa automaticamente\n`
+    systemPrompt += `CLIENTE NÃO CADASTRADO: Primeiro crie o contato com create_contact (peça nome e telefone).\n`
+    systemPrompt += `Após criar o contato, o sistema criará automaticamente a negociação na próxima mensagem.\n`
     systemPrompt += `</objective>\n\n`
 
-    allowedTools = ['search_contact', 'create_contact', 'create_deal', 'list_pipelines_and_stages', 'update_deal_stage']
+    allowedTools = ['search_contact', 'create_contact']
   } else {
     // Has deal — stage-specific mode
     stageAiIsActive = stageAiSettings?.is_active ?? false
