@@ -800,13 +800,26 @@ Deno.serve(async (req) => {
           currentStage = currentDeal.crm_stages
           console.log(`✅ Deal: ${currentDeal.title} → Stage: ${currentStage?.name}`)
 
-          if (currentStage?.id) {
+           if (currentStage?.id) {
             const { data: settings } = await supabase
               .from('crm_ai_settings')
               .select('*')
               .eq('stage_id', currentStage.id)
               .maybeSingle()
             stageAiSettings = settings
+          }
+
+          // BLOCO A: Cancel pending follow-ups (client responded!)
+          if (currentDeal?.id) {
+            const { data: cancelledFollowUps } = await supabase
+              .from('ai_follow_ups')
+              .update({ status: 'responded', updated_at: new Date().toISOString() })
+              .eq('deal_id', currentDeal.id)
+              .eq('status', 'pending')
+              .select('id')
+            if (cancelledFollowUps?.length) {
+              console.log(`✅ Cancelled ${cancelledFollowUps.length} pending follow-ups (client responded)`)
+            }
           }
         } else if (userId && role !== 'admin') {
           // Auto-create deal for leads without negotiation (AI-driven classification)
