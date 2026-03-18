@@ -49,6 +49,10 @@ interface StageFlowCardProps {
 // Deterministic vibe inference via exact xmlPrompt match
 function inferVibeFromPersona(persona: string | null | undefined): VibeId | null {
   if (!persona) return null;
+  // Match direto por ID curto (novo formato)
+  const validIds: VibeId[] = ['proactive', 'technical', 'supportive_sales', 'supportive'];
+  if (validIds.includes(persona as VibeId)) return persona as VibeId;
+  // Fallback: match por xmlPrompt (dados legados)
   const match = AI_PERSONA_PRESETS.find(p => p.xmlPrompt === persona);
   if (match && match.id in VIBE_CONFIG) return match.id as VibeId;
   return null;
