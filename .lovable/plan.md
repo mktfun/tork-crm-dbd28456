@@ -1,115 +1,111 @@
 
 
-# Plano: Módulo de Produtos (CRM) + Funis Padrão + Frontend
+# Plano: Corrigir Prompt de Triagem + Sistema Autônomo de Follow-ups
 
-## Resumo
+## Parte 1 — Bug no prompt (rápido)
 
-4 mudanças: criar tabela `crm_products`, adicionar `product_id` em `crm_deals`, atualizar seed de onboarding com funis e produtos padrão, criar tela de gestão de produtos em Settings, e integrar `ProductSelect` nos formulários de Deal.
+**Problema**: Linha 832 do dispatcher ainda injeta `"PRECISA CRIAR CADASTRO com create_contact"` no contexto do cliente não cadastrado, mesmo após a remoção das tools.
 
----
+**Correção**: Reescrever o bloco `clientContextForPrompt` para clientes sem cadastro, removendo referência a tools.
 
-## MUDANÇA 1: Banco de Dados (2 Migrations)
+## Parte 2 — Sistema Autônomo de Follow-ups (feature nova)
 
-### Migration A — Tabela `crm_products`
+### Conceito
+
+O dispatcher ganha "consciência temporal": quando envia uma mensagem com link/cotação/proposta, registra um follow-up pendente. Um cron job verifica periodicamente se o cliente respondeu. Se não, dispara mensagem de lembrete via Chatwoot. Após 3 tentativas sem resposta, desativa a IA e deixa a negociação parada.
+
+### Arquitetura
+
+```text
+┌──────────────┐     ┌─────────────────┐     ┌──────────────────┐
+│  Dispatcher   │────▶│ ai_follow_ups   │◀────│  Cron Job        │
+│  (cria entry) │     │ (tabela)        │     │  (check-followups│
+└──────────────┘     └─────────────────┘     │   edge function) │
+                                              └────────┬─────────┘
+                                                       │
+                                              ┌────────▼─────────┐
+                                              │  Chatwoot API    │
+                                              │  (envia msg)     │
+                                              └──────────────────┘
+```
+
+### 1. Nova tabela: `ai_follow_ups`
 
 ```sql
-CREATE TABLE public.crm_products (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+create table public.ai_follow_ups (
+  id uuid primary key default gen_random_uuid(),
+  deal_id uuid references crm_deals(id) on delete cascade not null,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  chatwoot_conversation_id bigint not null,
+  brokerage_id bigint references brokerages(id),
+  trigger_reason text not null,          -- 'link_sent', 'proposal_sent', 'waiting_response'
+  follow_up_message text,                -- mensagem personalizada do lembrete
+  attempt_count int default 0,
+  max_attempts int default 3,
+  next_check_at timestamptz not null,    -- quando verificar
+  interval_minutes int default 60,       -- intervalo entre tentativas
+  status text default 'pending',         -- 'pending', 'responded', 'exhausted', 'cancelled'
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
-CREATE INDEX idx_crm_products_user_id ON public.crm_products(user_id);
-ALTER TABLE public.crm_products ENABLE ROW LEVEL SECURITY;
-
--- RLS (padrão user_id como todo o CRM)
-CREATE POLICY "Users can view own products" ON public.crm_products FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own products" ON public.crm_products FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own products" ON public.crm_products FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own products" ON public.crm_products FOR DELETE USING (auth.uid() = user_id);
-
-CREATE TRIGGER update_crm_products_updated_at BEFORE UPDATE ON public.crm_products
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+alter table public.ai_follow_ups enable row level security;
+create index idx_follow_ups_pending on ai_follow_ups(status, next_check_at) where status = 'pending';
 ```
 
-**Nota**: `company_id` é nullable (produto pode existir sem vínculo direto a seguradora). `user_id` é a chave de ownership para RLS, consistente com todo o sistema.
+### 2. Nova Edge Function: `check-followups`
 
-### Migration B — Coluna `product_id` em `crm_deals`
+Executada via `pg_cron` a cada 5 minutos. Fluxo:
+1. Busca `ai_follow_ups` onde `status = 'pending'` e `next_check_at <= now()`
+2. Para cada entry, checa no Chatwoot se houve mensagem incoming após o `created_at`
+3. **Se respondeu** → marca `status = 'responded'`, segue fluxo normal
+4. **Se não respondeu**:
+   - Se `attempt_count < max_attempts`: envia mensagem via Chatwoot API, incrementa `attempt_count`, atualiza `next_check_at += interval_minutes`
+   - Se `attempt_count >= max_attempts`: marca `status = 'exhausted'`, desativa IA no cliente (`clientes.ai_enabled = false`), loga evento no deal
+
+### 3. Alteração no Dispatcher
+
+No dispatcher, após enviar ao n8n, adicionar lógica de detecção de "gatilho de espera":
+- A IA (via n8n) pode retornar um campo `follow_up_needed: true` no response
+- Ou o dispatcher pode inferir: se a mensagem do agente contém link, proposta, ou pergunta direta → criar follow-up
+
+Abordagem mais simples: **o n8n insere o follow-up** via API do Supabase quando a resposta da IA contém indicação de espera. Assim não precisamos mudar o dispatcher agora.
+
+Abordagem integrada: o dispatcher cria o follow-up baseado em heurísticas (presença de URL na resposta, palavras-chave como "proposta", "cotação", "link").
+
+### 4. Mensagens de follow-up (templates)
+
+```
+Tentativa 1: "Oi {nome}! Vi que mandei umas informações mais cedo, conseguiu dar uma olhada?"
+Tentativa 2: "Opa {nome}, tudo certo? Fico à disposição se tiver alguma dúvida sobre o que enviei!"
+Tentativa 3: "Fala {nome}! Vou dar uma pausa aqui, mas qualquer coisa é só chamar que retomo na hora 👋"
+```
+
+### 5. pg_cron setup
 
 ```sql
-ALTER TABLE public.crm_deals ADD COLUMN product_id UUID REFERENCES public.crm_products(id) ON DELETE SET NULL;
-CREATE INDEX idx_crm_deals_product_id ON public.crm_deals(product_id);
+select cron.schedule(
+  'check-ai-followups',
+  '*/5 * * * *',
+  $$ select net.http_post(
+    url:='https://jaouwhckqqnaxqyfvgyq.supabase.co/functions/v1/check-followups',
+    headers:='{"Authorization": "Bearer ANON_KEY", "Content-Type": "application/json"}'::jsonb,
+    body:='{}'::jsonb
+  ) as request_id; $$
+);
 ```
-
----
-
-## MUDANÇA 2: Seed de Onboarding (`seed_user_defaults`)
-
-Atualizar a função SQL `seed_user_defaults` via nova migration com `CREATE OR REPLACE FUNCTION`:
-
-- Adicionar criação de 2 pipelines padrão: **"Seguros"** (is_default=true) e **"Sinistros e Assistência"** (is_default=false), com etapas padrão para cada um.
-- Inserir 5 produtos padrão na `crm_products`: "Seguro Auto", "Seguro Vida", "Seguro Residencial", "Consórcio", "Fiança Locatícia".
-
-Esses registros usam `p_user_id` como `user_id`, sem `company_id` (genéricos).
-
----
-
-## MUDANÇA 3: Frontend — Tela de Produtos
-
-### Novos arquivos:
-
-| Arquivo | Função |
-|---|---|
-| `src/hooks/useProducts.ts` | Hook com `useQuery`/`useMutation` para CRUD de `crm_products` |
-| `src/components/settings/ProductsManager.tsx` | Componente principal: DataTable + botão criar |
-| `src/components/settings/ProductDialog.tsx` | Dialog modal para criar/editar produto |
-| `src/pages/settings/ProductSettings.tsx` | Page wrapper |
-
-### Rota:
-- Em `App.tsx`: adicionar `<Route path="products" element={<ProductSettings />} />` dentro do bloco `settings`.
-- Em `SettingsLayout.tsx` e `SettingsNavigation.tsx`: adicionar tab "Produtos" com ícone `Package` entre Ramos e Chat Tork.
-
-### Layout da tela:
-- Header: "Produtos / Ramos" com subtexto descritivo
-- DataTable com colunas: Nome, Descrição (truncada), Status (Badge verde/cinza), Ações (DropdownMenu com Editar/Desativar/Excluir)
-- `ProductDialog`: form com campos Nome, Descrição (textarea), toggle is_active
-- Deleção: soft delete (is_active=false) se houver deals vinculados, hard delete se não houver
-
----
-
-## MUDANÇA 4: ProductSelect nos Formulários de Deal
-
-### Novo componente:
-`src/components/crm/ProductSelect.tsx` — Select/Combobox que busca `crm_products` ativos via `useProducts` hook.
-
-### Integração:
-- **`NewDealModal.tsx`**: Adicionar campo `product_id` no `formData`, renderizar `<ProductSelect>` entre Pipeline/Etapa e Valor, passar no `createDeal.mutateAsync`.
-- **`DealDetailsModal.tsx`**: Adicionar `product_id` ao `formData` de edição, exibir na seção de detalhes, incluir no `handleSave`. Exibir como Badge o nome do produto no header do deal.
-- **`useCRMDeals.ts`**: Expandir a query do `createDeal` e `updateDeal` para incluir `product_id`. Adicionar join no select: `product:crm_products(id, name)`.
-- **Interface `CRMDeal`**: Adicionar `product_id` e `product?: { id: string; name: string }`.
-
----
 
 ## Arquivos afetados
 
-| Arquivo | Tipo |
+| Arquivo | Ação |
 |---|---|
-| Nova migration SQL (crm_products + alter crm_deals) | Criar |
-| Nova migration SQL (seed_user_defaults atualizado) | Criar |
-| `src/hooks/useProducts.ts` | Criar |
-| `src/components/settings/ProductsManager.tsx` | Criar |
-| `src/components/settings/ProductDialog.tsx` | Criar |
-| `src/pages/settings/ProductSettings.tsx` | Criar |
-| `src/components/crm/ProductSelect.tsx` | Criar |
-| `src/App.tsx` | Editar (nova rota) |
-| `src/layouts/SettingsLayout.tsx` | Editar (nova tab) |
-| `src/components/settings/SettingsNavigation.tsx` | Editar (novo item) |
-| `src/hooks/useCRMDeals.ts` | Editar (product_id no CRUD + join) |
-| `src/components/crm/NewDealModal.tsx` | Editar (ProductSelect) |
-| `src/components/crm/DealDetailsModal.tsx` | Editar (ProductSelect + exibição) |
+| `supabase/functions/chatwoot-dispatcher/index.ts` | Corrigir `clientContextForPrompt` (remover ref a tools) |
+| Nova migration | Criar tabela `ai_follow_ups` |
+| `supabase/functions/check-followups/index.ts` | Nova edge function para cron |
+| `supabase/config.toml` | Registrar `check-followups` |
+| SQL (pg_cron) | Agendar execução a cada 5 min |
+
+## Complexidade
+
+Não é "muito complexo" — é modular. A tabela + cron + edge function são padrões já usados no projeto. O mais delicado é a integração com Chatwoot para enviar mensagens de follow-up e checar se houve resposta, mas já temos esse padrão no dispatcher.
 
