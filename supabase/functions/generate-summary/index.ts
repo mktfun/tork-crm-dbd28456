@@ -72,8 +72,18 @@ Deno.serve(async (req) => {
     console.log(`[SUMMARY] Gathering data for user ${user.id}, scope=${scope}, focus=${focus}`);
     const context = await gatherContext(supabase, user.id, scope, focus);
 
+    // Resolve user's configured model and API key
+    const resolved = await resolveUserModel(supabase, user.id);
+    const effectiveApiKey = resolved.apiKey || apiKey;
+    if (!effectiveApiKey) {
+      return new Response(
+        JSON.stringify({ error: "Nenhuma API Key configurada. Configure na tela de Automação IA ou adicione LOVABLE_API_KEY." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Call AI
-    const summary = await callAI(apiKey, context, scope, focus, supabase, user.id);
+    const summary = await callAI(effectiveApiKey, context, scope, focus, resolved.model);
 
     // Save to cache (upsert)
     await supabase.from("ai_summaries").upsert(
