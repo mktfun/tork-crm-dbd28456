@@ -887,10 +887,13 @@ export type Database = {
           portal_enabled: boolean | null
           portal_show_cards: boolean | null
           portal_show_policies: boolean | null
+          quote_form_enabled: boolean | null
           slug: string
           susep_code: string | null
+          theme_color: string | null
           updated_at: string
           user_id: string
+          whatsapp_number: string | null
         }
         Insert: {
           api_key?: string | null
@@ -910,10 +913,13 @@ export type Database = {
           portal_enabled?: boolean | null
           portal_show_cards?: boolean | null
           portal_show_policies?: boolean | null
+          quote_form_enabled?: boolean | null
           slug: string
           susep_code?: string | null
+          theme_color?: string | null
           updated_at?: string
           user_id: string
+          whatsapp_number?: string | null
         }
         Update: {
           api_key?: string | null
@@ -933,10 +939,13 @@ export type Database = {
           portal_enabled?: boolean | null
           portal_show_cards?: boolean | null
           portal_show_policies?: boolean | null
+          quote_form_enabled?: boolean | null
           slug?: string
           susep_code?: string | null
+          theme_color?: string | null
           updated_at?: string
           user_id?: string
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
@@ -1734,6 +1743,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      crm_quotes: {
+        Row: {
+          brokerage_slug: string
+          created_at: string | null
+          description: string | null
+          email: string | null
+          id: string
+          name: string
+          phone: string
+          product_type: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          brokerage_slug: string
+          created_at?: string | null
+          description?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          phone: string
+          product_type: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          brokerage_slug?: string
+          created_at?: string | null
+          description?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string
+          product_type?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       crm_settings: {
         Row: {
