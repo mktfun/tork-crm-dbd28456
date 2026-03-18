@@ -8,52 +8,186 @@ const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
 const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions'
 
 // ──────────────────────────────────────────────
-// HELPER: Auto-create deal for leads without negotiation
+// HELPER: AI-driven classification for pipeline, stage, and product
 // ──────────────────────────────────────────────
-async function autoCreateDeal(userId: string, clientId: string, clientName: string | null): Promise<{
-  deal: any; stage: any; stageAiSettings: any; autoCreated: boolean;
+async function classifyLeadWithAI(
+  messageContent: string,
+  pipelines: Array<{ id: string; name: string; stages: Array<{ id: string; name: string; position: number }> }>,
+  products: Array<{ id: string; name: string }>,
+): Promise<{ pipeline_id: string; stage_id: string; product_id: string | null } | null> {
+  if (!LOVABLE_API_KEY || !messageContent) return null
+
+  try {
+    const pipelinesText = pipelines.map(p => {
+      const stagesList = p.stages.map(s => `${s.name} (id: ${s.id})`).join(', ')
+      return `- Pipeline "${p.name}" (id: ${p.id}): etapas [${stagesList}]`
+    }).join('\n')
+
+    const productsText = products.length > 0
+      ? products.map(p => `- "${p.name}" (id: ${p.id})`).join('\n')
+      : '- Nenhum produto cadastrado'
+
+    const prompt = `Dado o contexto da mensagem do cliente e as opções disponíveis, escolha o melhor funil, etapa inicial e produto.
+
+Mensagem: "${messageContent}"
+
+Funis disponíveis:
+${pipelinesText}
+
+Produtos disponíveis:
+${productsText}
+
+Responda APENAS com JSON: {"pipeline_id":"...","stage_id":"...","product_id":"..." ou null}
+Use a primeira etapa (menor posição) do funil escolhido como stage_id.
+Se não conseguir determinar o produto, use null.`
+
+    const response = await fetch(AI_GATEWAY_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-lite',
+        messages: [
+          { role: 'system', content: 'Você é um classificador de leads para uma corretora de seguros. Responda apenas com JSON válido, sem markdown.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.1,
+      }),
+    })
+
+    if (!response.ok) {
+      console.warn('⚠️ AI classification failed:', response.status)
+      return null
+    }
+
+    const data = await response.json()
+    const text = data.choices?.[0]?.message?.content?.trim() || ''
+    
+    // Extract JSON from response (handle possible markdown wrapping)
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return null
+
+    const parsed = JSON.parse(jsonMatch[0])
+    
+    // Validate returned IDs exist in our data
+    const validPipeline = pipelines.find(p => p.id === parsed.pipeline_id)
+    const validStage = validPipeline?.stages.find(s => s.id === parsed.stage_id)
+    const validProduct = parsed.product_id ? products.find(p => p.id === parsed.product_id) : null
+
+    if (!validPipeline || !validStage) {
+      console.warn('⚠️ AI returned invalid pipeline/stage IDs, falling back')
+      return null
+    }
+
+    console.log(`🤖 AI classified → Pipeline: "${validPipeline.name}", Stage: "${validStage.name}", Product: ${validProduct?.name || 'none'}`)
+    return {
+      pipeline_id: validPipeline.id,
+      stage_id: validStage.id,
+      product_id: validProduct?.id || null,
+    }
+  } catch (err) {
+    console.warn('⚠️ AI classification error:', err)
+    return null
+  }
+}
+
+async function autoCreateDeal(
+  userId: string,
+  clientId: string,
+  clientName: string | null,
+  messageContent: string,
+  transcription: string | null,
+  extractedText: string | null,
+): Promise<{
+  deal: any; stage: any; stageAiSettings: any; autoCreated: boolean; productId: string | null; productName: string | null;
 } | null> {
   try {
-    // Find default pipeline
-    const { data: defaultPipeline } = await supabase
+    // Fetch all pipelines + stages for this user
+    const { data: allPipelines } = await supabase
       .from('crm_pipelines')
-      .select('id, name')
+      .select('id, name, is_default, position')
       .eq('user_id', userId)
-      .eq('is_default', true)
-      .maybeSingle()
+      .order('position', { ascending: true })
 
-    if (!defaultPipeline) {
-      console.log('⚠️ No default pipeline found for user:', userId)
+    if (!allPipelines || allPipelines.length === 0) {
+      console.log('⚠️ No pipelines found for user:', userId)
       return null
     }
 
-    // Find first stage of default pipeline
-    const { data: firstStage } = await supabase
+    // Fetch stages for all pipelines
+    const pipelineIds = allPipelines.map(p => p.id)
+    const { data: allStages } = await supabase
       .from('crm_stages')
       .select('id, name, pipeline_id, position')
-      .eq('pipeline_id', defaultPipeline.id)
+      .in('pipeline_id', pipelineIds)
       .order('position', { ascending: true })
-      .limit(1)
-      .maybeSingle()
 
-    if (!firstStage) {
-      console.log('⚠️ No stages found in default pipeline:', defaultPipeline.id)
+    if (!allStages || allStages.length === 0) {
+      console.log('⚠️ No stages found for any pipeline')
       return null
     }
 
-    // Create deal
+    // Fetch active products
+    const { data: activeProducts } = await supabase
+      .from('crm_products')
+      .select('id, name')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+
+    // Build structured pipelines with stages
+    const pipelinesWithStages = allPipelines.map(p => ({
+      ...p,
+      stages: (allStages || []).filter(s => s.pipeline_id === p.id).sort((a, b) => a.position - b.position),
+    }))
+
+    // Combine message context for classification
+    const fullContext = [messageContent, transcription, extractedText].filter(Boolean).join('\n')
+
+    // Try AI classification
+    let targetStageId: string
+    let targetPipelineId: string
+    let productId: string | null = null
+    let productName: string | null = null
+
+    const aiResult = await classifyLeadWithAI(fullContext, pipelinesWithStages, activeProducts || [])
+
+    if (aiResult) {
+      targetPipelineId = aiResult.pipeline_id
+      targetStageId = aiResult.stage_id
+      productId = aiResult.product_id
+      productName = (activeProducts || []).find(p => p.id === aiResult.product_id)?.name || null
+    } else {
+      // Fallback: default pipeline + first stage
+      const defaultPipeline = allPipelines.find(p => p.is_default) || allPipelines[0]
+      const firstStage = pipelinesWithStages.find(p => p.id === defaultPipeline.id)?.stages[0]
+      if (!firstStage) {
+        console.log('⚠️ No stages found in fallback pipeline')
+        return null
+      }
+      targetPipelineId = defaultPipeline.id
+      targetStageId = firstStage.id
+      console.log('⚠️ Using fallback: default pipeline + first stage')
+    }
+
+    // Get target stage details
+    const targetStage = allStages.find(s => s.id === targetStageId)!
+
+    // Create deal with product
     const dealTitle = clientName ? `Atendimento - ${clientName}` : 'Novo Atendimento'
     const { data: newDeal, error: dealError } = await supabase
       .from('crm_deals')
       .insert({
         user_id: userId,
         client_id: clientId,
-        stage_id: firstStage.id,
+        stage_id: targetStageId,
+        product_id: productId,
         title: dealTitle,
         position: 0,
         last_sync_source: 'dispatcher',
       })
-      .select('id, title, stage_id')
+      .select('id, title, stage_id, product_id')
       .single()
 
     if (dealError) {
@@ -61,20 +195,22 @@ async function autoCreateDeal(userId: string, clientId: string, clientName: stri
       return null
     }
 
-    console.log(`✅ Auto-created deal "${newDeal.title}" in stage "${firstStage.name}"`)
+    console.log(`✅ Auto-created deal "${newDeal.title}" in stage "${targetStage.name}"${productName ? ` with product "${productName}"` : ''}`)
 
     // Load AI settings for this stage
     const { data: settings } = await supabase
       .from('crm_ai_settings')
       .select('*')
-      .eq('stage_id', firstStage.id)
+      .eq('stage_id', targetStageId)
       .maybeSingle()
 
     return {
-      deal: { ...newDeal, crm_stages: firstStage },
-      stage: firstStage,
+      deal: { ...newDeal, crm_stages: targetStage },
+      stage: targetStage,
       stageAiSettings: settings,
       autoCreated: true,
+      productId,
+      productName,
     }
   } catch (err) {
     console.error('❌ autoCreateDeal error:', err)
@@ -646,6 +782,8 @@ Deno.serve(async (req) => {
     let currentStage: any = null
     let stageAiSettings: any = null
     let autoCreatedDeal = false
+    let autoCreatedProductId: string | null = null
+    let autoCreatedProductName: string | null = null
 
     const contactPhone = sender?.phone_number
     const contactEmail = sender?.email
@@ -688,13 +826,18 @@ Deno.serve(async (req) => {
             stageAiSettings = settings
           }
         } else if (userId && role !== 'admin') {
-          // Auto-create deal for leads without negotiation
-          const autoResult = await autoCreateDeal(userId, clientId, clientData?.name || sender?.name || null)
+          // Auto-create deal for leads without negotiation (AI-driven classification)
+          const autoResult = await autoCreateDeal(
+            userId, clientId, clientData?.name || sender?.name || null,
+            content || '', mediaResult.transcription, mediaResult.extractedText
+          )
           if (autoResult) {
             currentDeal = autoResult.deal
             currentStage = autoResult.stage
             stageAiSettings = autoResult.stageAiSettings
             autoCreatedDeal = true
+            autoCreatedProductId = autoResult.productId
+            autoCreatedProductName = autoResult.productName
           }
         }
       }
@@ -799,6 +942,8 @@ Deno.serve(async (req) => {
           knowledge_context: promptResult.knowledgeContext,
           // New enriched fields
           auto_created_deal: autoCreatedDeal,
+          auto_created_product_id: autoCreatedProductId,
+          auto_created_product_name: autoCreatedProductName,
           stage_completed: objectiveResult.completed,
           previous_stage_id: objectiveResult.previousStageId,
           previous_stage_name: objectiveResult.previousStageName,
