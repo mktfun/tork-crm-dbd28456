@@ -42,13 +42,7 @@ import ChatTorkSettings from "./pages/settings/ChatTorkSettings";
 import PortalSettings from "./pages/settings/PortalSettings";
 import ProductSettings from "./pages/settings/ProductSettings";
 import Documentation from "./pages/Documentation";
-import { PortalInboxLayout, PortalInboxSolicitacoes, PortalInboxConfig } from "./pages/PortalInbox";
-import { JJSegurosPublicRoutes } from "./modules/jjseguros/JJSegurosPublicRoutes";
-import JJAdminDashboard from "./modules/jjseguros/pages/admin/AdminDashboard";
-import AdminLeads from "./modules/jjseguros/pages/admin/AdminLeads";
-import AdminLeadDetail from "./modules/jjseguros/pages/admin/AdminLeadDetail";
-import AdminLogs from "./modules/jjseguros/pages/admin/AdminLogs";
-import AdminConfig from "./modules/jjseguros/pages/admin/AdminConfig";
+import PortalInbox from "./pages/PortalInbox";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
 import SuperAdmin from "./pages/SuperAdmin";
 import OrganizationDetails from "./pages/OrganizationDetails";
@@ -203,15 +197,7 @@ function App() {
                     <Route path="crm" element={<CRM />} />
                     <Route path="crm/automation" element={<AIAutomation />} />
                     <Route path="documentacao" element={<Documentation />} />
-                    <Route path="solicitacoes-portal" element={<PortalInboxLayout />}>
-                      <Route index element={<PortalInboxSolicitacoes />} />
-                      <Route path="admin" element={<JJAdminDashboard />} />
-                      <Route path="admin/leads" element={<AdminLeads />} />
-                      <Route path="admin/leads/:id" element={<AdminLeadDetail />} />
-                      <Route path="admin/logs" element={<AdminLogs />} />
-                      <Route path="admin/config" element={<AdminConfig />} />
-                      <Route path="config" element={<PortalInboxConfig />} />
-                    </Route>
+                    <Route path="solicitacoes-portal" element={<PortalInbox />} />
                     <Route path="products" element={<ProductSettings />} />
 
                     {/* Super Admin routes moved outside - see below */}
@@ -259,8 +245,8 @@ function App() {
                     <Route path="organizations/:id" element={<OrganizationDetails />} />
                   </Route>
 
-                  {/* Rota pública para Landing Page B2C (JJSeguros 100% Modular) */}
-                  <Route path="/quote/:slug/*" element={<JJSegurosPublicRoutes />} />
+                  {/* Rota pública para Landing Page B2C (JJSeguros) */}
+                  <Route path="/quote/:slug" element={<div className="min-h-screen flex items-center justify-center bg-background"><p className="text-muted-foreground">Landing Page — em breve</p></div>} />
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>

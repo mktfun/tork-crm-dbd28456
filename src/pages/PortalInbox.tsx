@@ -5,12 +5,27 @@ import { RequestsFilters } from '@/components/portal-inbox/RequestsFilters';
 import { RequestsList, type PortalRequestRow } from '@/components/portal-inbox/RequestsList';
 import { RequestDetailsSheet } from '@/components/portal-inbox/RequestDetailsSheet';
 import { Inbox, LayoutDashboard, Globe } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PortalSettings from '@/pages/settings/PortalSettings';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
-export function PortalInboxConfig() {
+function PortalAdminPlaceholder() {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 gap-4">
+      <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+        <LayoutDashboard className="w-8 h-8 text-primary" />
+      </div>
+      <h2 className="text-xl font-semibold text-foreground">Painel Administrativo</h2>
+      <p className="text-sm text-muted-foreground max-w-md text-center">
+        Este painel será o centro de controle do módulo JJSeguros. 
+        O dashboard administrativo completo será integrado aqui em breve.
+      </p>
+    </div>
+  );
+}
+
+function PortalTab() {
   const { user } = useAuth();
   const [brokerageSlug, setBrokerageSlug] = useState<string | null>(null);
 
@@ -32,7 +47,8 @@ export function PortalInboxConfig() {
     : '—';
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8">
+      {/* URL da Landing Page */}
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <div>
           <h3 className="text-lg font-semibold text-foreground">URL da Landing Page</h3>
@@ -50,12 +66,14 @@ export function PortalInboxConfig() {
           />
         </div>
       </div>
+
+      {/* Portal Settings existente */}
       <PortalSettings />
     </div>
   );
 }
 
-export function PortalInboxSolicitacoes() {
+export default function PortalInbox() {
   const { user } = useAuth();
   const [requests, setRequests] = useState<PortalRequestRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,18 +85,28 @@ export function PortalInboxSolicitacoes() {
   const fetchRequests = async () => {
     if (!user) return;
     setIsLoading(true);
+
     let query = (supabase as any)
       .from('portal_requests')
       .select('*, clientes(name, phone, email)')
       .eq('brokerage_user_id', user.id)
       .order('created_at', { ascending: false });
-    if (statusFilter !== 'todos') query = query.eq('status', statusFilter);
+
+    if (statusFilter !== 'todos') {
+      query = query.eq('status', statusFilter);
+    }
+
     const { data, error } = await query;
-    if (!error && data) setRequests(data as PortalRequestRow[]);
+
+    if (!error && data) {
+      setRequests(data as PortalRequestRow[]);
+    }
     setIsLoading(false);
   };
 
-  useEffect(() => { fetchRequests(); }, [user, statusFilter]);
+  useEffect(() => {
+    fetchRequests();
+  }, [user, statusFilter]);
 
   const filteredRequests = useMemo(() => {
     if (!searchQuery.trim()) return requests;
@@ -97,6 +125,7 @@ export function PortalInboxSolicitacoes() {
         .from('portal_requests')
         .select('status')
         .eq('brokerage_user_id', user.id);
+
       if (data) {
         const all = data as { status: string }[];
         setAllCounts({
@@ -110,33 +139,14 @@ export function PortalInboxSolicitacoes() {
     fetchCounts();
   }, [user, requests]);
 
-  return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <RequestsFilters
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        counts={allCounts}
-      />
-      <RequestsList
-        requests={filteredRequests}
-        isLoading={isLoading}
-        onSelect={(req) => { setSelectedRequest(req); setSheetOpen(true); }}
-      />
-      <RequestDetailsSheet
-        request={selectedRequest}
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        onStatusUpdated={fetchRequests}
-      />
-    </div>
-  );
-}
+  const handleSelect = (req: PortalRequestRow) => {
+    setSelectedRequest(req);
+    setSheetOpen(true);
+  };
 
-export function PortalInboxLayout() {
-  const location = useLocation();
-  const currentPath = location.pathname;
+  const handleStatusUpdated = () => {
+    fetchRequests();
+  };
 
   return (
     <div className="space-y-6">
@@ -152,47 +162,62 @@ export function PortalInboxLayout() {
         </div>
       </div>
 
-      <div className="w-full">
-        <div className="flex bg-transparent border-b border-border w-full justify-start gap-4 px-0">
-          <NavLink
-            to="/dashboard/solicitacoes-portal"
-            end
-            className={({ isActive }) => 
-              `flex items-center px-1 pb-3 text-sm font-medium transition-colors hover:text-foreground ${isActive || currentPath === '/dashboard/solicitacoes-portal' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground'}`
-            }
+      <Tabs defaultValue="solicitacoes" className="w-full">
+        <TabsList className="bg-transparent border-b border-border rounded-none w-full justify-start gap-4 px-0">
+          <TabsTrigger
+            value="solicitacoes"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-foreground rounded-none bg-transparent px-1 pb-3 text-muted-foreground"
           >
             <Inbox className="w-4 h-4 mr-2" />
             Solicitações
-          </NavLink>
-          
-          <NavLink
-            to="/dashboard/solicitacoes-portal/admin"
-            className={({ isActive }) => 
-              `flex items-center px-1 pb-3 text-sm font-medium transition-colors hover:text-foreground ${isActive || currentPath.includes('/admin') ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground'}`
-            }
+          </TabsTrigger>
+          <TabsTrigger
+            value="admin"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-foreground rounded-none bg-transparent px-1 pb-3 text-muted-foreground"
           >
             <LayoutDashboard className="w-4 h-4 mr-2" />
             Admin
-          </NavLink>
-
-          <NavLink
-            to="/dashboard/solicitacoes-portal/config"
-            className={({ isActive }) => 
-              `flex items-center px-1 pb-3 text-sm font-medium transition-colors hover:text-foreground ${isActive ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground'}`
-            }
+          </TabsTrigger>
+          <TabsTrigger
+            value="portal"
+            className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-foreground rounded-none bg-transparent px-1 pb-3 text-muted-foreground"
           >
             <Globe className="w-4 h-4 mr-2" />
             Portal
-          </NavLink>
-        </div>
+          </TabsTrigger>
+        </TabsList>
 
-        <div className="mt-6">
-          <Outlet />
-        </div>
-      </div>
+        <TabsContent value="solicitacoes" className="mt-6">
+          <div className="space-y-6">
+            <RequestsFilters
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              counts={allCounts}
+            />
+            <RequestsList
+              requests={filteredRequests}
+              isLoading={isLoading}
+              onSelect={handleSelect}
+            />
+            <RequestDetailsSheet
+              request={selectedRequest}
+              open={sheetOpen}
+              onOpenChange={setSheetOpen}
+              onStatusUpdated={handleStatusUpdated}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="admin" className="mt-6">
+          <PortalAdminPlaceholder />
+        </TabsContent>
+
+        <TabsContent value="portal" className="mt-6">
+          <PortalTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
-
-// Para manter retrocompatibilidade com quem importava default
-export default PortalInboxLayout;
