@@ -1,115 +1,57 @@
 
 
-# Plano: Módulo de Produtos (CRM) + Funis Padrão + Frontend
+# Plano: Limpar System Prompt do Dispatcher (remover tools obsoletas, corrigir triagem)
 
-## Resumo
+## Problemas Identificados
 
-4 mudanças: criar tabela `crm_products`, adicionar `product_id` em `crm_deals`, atualizar seed de onboarding com funis e produtos padrão, criar tela de gestão de produtos em Settings, e integrar `ProductSelect` nos formulários de Deal.
+### 1. `<tools_manual>` obsoleto (linhas 589-595)
+O dispatcher agora faz auto-criação de deal e progressão de etapa internamente. O prompt ainda lista 5 tools (`search_contact`, `create_contact`, `list_pipelines_and_stages`, `create_deal`, `update_deal_stage`) como se a IA precisasse chamá-las. **Nenhuma dessas é necessária no prompt de vendas** — o dispatcher já cuida de tudo.
 
----
+### 2. Prompt sem deal (linhas 597-606) — foco errado
+Quando `!deal` (cliente não cadastrado), o prompt diz "crie o contato com create_contact". Mas o objetivo real deveria ser **triagem**: entender o que o cliente precisa ("cotação auto", "sinistro", "endosso", "consórcio") para que na próxima mensagem o dispatcher classifique corretamente com IA e crie o deal no pipeline certo.
 
-## MUDANÇA 1: Banco de Dados (2 Migrations)
+### 3. `<auto_progression>` (linhas 640-651) — redundante
+O dispatcher já faz `evaluateObjectiveCompletion` internamente. O prompt ainda manda a IA usar `update_deal_stage`, duplicando a lógica e podendo causar conflitos.
 
-### Migration A — Tabela `crm_products`
+### 4. `allowedTools` (linhas 606, 667) — expõe tools desnecessárias
+Tanto no modo sem-deal quanto com-deal, expõe tools que o dispatcher já executa.
 
-```sql
-CREATE TABLE public.crm_products (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+## Correções no `buildSystemPrompt`
 
-CREATE INDEX idx_crm_products_user_id ON public.crm_products(user_id);
-ALTER TABLE public.crm_products ENABLE ROW LEVEL SECURITY;
+### A. Remover `<tools_manual>` inteiro (linhas 589-595)
+Não é mais necessário no modo vendas. O n8n/IA não precisa saber dessas tools.
 
--- RLS (padrão user_id como todo o CRM)
-CREATE POLICY "Users can view own products" ON public.crm_products FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own products" ON public.crm_products FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own products" ON public.crm_products FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own products" ON public.crm_products FOR DELETE USING (auth.uid() = user_id);
+### B. Reescrever bloco sem-deal (linhas 597-606)
+Novo objetivo: **triagem conversacional**. A IA deve:
+- Cumprimentar o cliente
+- Entender o que ele precisa (cotação, sinistro, endosso, cancelamento, etc.)
+- Fazer perguntas curtas para captar o interesse
+- NÃO mencionar criação de contato, deal, ou tools
 
-CREATE TRIGGER update_crm_products_updated_at BEFORE UPDATE ON public.crm_products
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+```
+<objective>
+NOVO CONTATO — TRIAGEM INICIAL
+Este cliente ainda não tem negociação. Seu objetivo é entender o que ele precisa.
+Pergunte de forma natural o que ele está buscando (cotação, sinistro, endosso, cancelamento, etc.).
+NÃO tente vender nada ainda. Apenas identifique a necessidade para encaminhamento correto.
+O sistema cuidará automaticamente do cadastro e roteamento.
+</objective>
 ```
 
-**Nota**: `company_id` é nullable (produto pode existir sem vínculo direto a seguradora). `user_id` é a chave de ownership para RLS, consistente com todo o sistema.
+### C. Remover `<auto_progression>` (linhas 640-651)
+O dispatcher já move o deal automaticamente. Remover esse bloco evita que a IA tente fazer o mesmo via tool.
 
-### Migration B — Coluna `product_id` em `crm_deals`
+### D. Simplificar `allowedTools`
+- Sem deal: `[]` (vazio — IA só conversa)
+- Com deal: `[]` (vazio — dispatcher cuida de tudo)
+- Admin: manter como está
 
-```sql
-ALTER TABLE public.crm_deals ADD COLUMN product_id UUID REFERENCES public.crm_products(id) ON DELETE SET NULL;
-CREATE INDEX idx_crm_deals_product_id ON public.crm_deals(product_id);
-```
+### E. Manter `<objective>` do deal com etapa
+O bloco que injeta `stageAiSettings.ai_objective` (linha 618) está correto — é o objetivo configurado pelo usuário para aquela etapa. Manter.
 
----
+## Arquivo afetado
 
-## MUDANÇA 2: Seed de Onboarding (`seed_user_defaults`)
-
-Atualizar a função SQL `seed_user_defaults` via nova migration com `CREATE OR REPLACE FUNCTION`:
-
-- Adicionar criação de 2 pipelines padrão: **"Seguros"** (is_default=true) e **"Sinistros e Assistência"** (is_default=false), com etapas padrão para cada um.
-- Inserir 5 produtos padrão na `crm_products`: "Seguro Auto", "Seguro Vida", "Seguro Residencial", "Consórcio", "Fiança Locatícia".
-
-Esses registros usam `p_user_id` como `user_id`, sem `company_id` (genéricos).
-
----
-
-## MUDANÇA 3: Frontend — Tela de Produtos
-
-### Novos arquivos:
-
-| Arquivo | Função |
+| Arquivo | Ação |
 |---|---|
-| `src/hooks/useProducts.ts` | Hook com `useQuery`/`useMutation` para CRUD de `crm_products` |
-| `src/components/settings/ProductsManager.tsx` | Componente principal: DataTable + botão criar |
-| `src/components/settings/ProductDialog.tsx` | Dialog modal para criar/editar produto |
-| `src/pages/settings/ProductSettings.tsx` | Page wrapper |
-
-### Rota:
-- Em `App.tsx`: adicionar `<Route path="products" element={<ProductSettings />} />` dentro do bloco `settings`.
-- Em `SettingsLayout.tsx` e `SettingsNavigation.tsx`: adicionar tab "Produtos" com ícone `Package` entre Ramos e Chat Tork.
-
-### Layout da tela:
-- Header: "Produtos / Ramos" com subtexto descritivo
-- DataTable com colunas: Nome, Descrição (truncada), Status (Badge verde/cinza), Ações (DropdownMenu com Editar/Desativar/Excluir)
-- `ProductDialog`: form com campos Nome, Descrição (textarea), toggle is_active
-- Deleção: soft delete (is_active=false) se houver deals vinculados, hard delete se não houver
-
----
-
-## MUDANÇA 4: ProductSelect nos Formulários de Deal
-
-### Novo componente:
-`src/components/crm/ProductSelect.tsx` — Select/Combobox que busca `crm_products` ativos via `useProducts` hook.
-
-### Integração:
-- **`NewDealModal.tsx`**: Adicionar campo `product_id` no `formData`, renderizar `<ProductSelect>` entre Pipeline/Etapa e Valor, passar no `createDeal.mutateAsync`.
-- **`DealDetailsModal.tsx`**: Adicionar `product_id` ao `formData` de edição, exibir na seção de detalhes, incluir no `handleSave`. Exibir como Badge o nome do produto no header do deal.
-- **`useCRMDeals.ts`**: Expandir a query do `createDeal` e `updateDeal` para incluir `product_id`. Adicionar join no select: `product:crm_products(id, name)`.
-- **Interface `CRMDeal`**: Adicionar `product_id` e `product?: { id: string; name: string }`.
-
----
-
-## Arquivos afetados
-
-| Arquivo | Tipo |
-|---|---|
-| Nova migration SQL (crm_products + alter crm_deals) | Criar |
-| Nova migration SQL (seed_user_defaults atualizado) | Criar |
-| `src/hooks/useProducts.ts` | Criar |
-| `src/components/settings/ProductsManager.tsx` | Criar |
-| `src/components/settings/ProductDialog.tsx` | Criar |
-| `src/pages/settings/ProductSettings.tsx` | Criar |
-| `src/components/crm/ProductSelect.tsx` | Criar |
-| `src/App.tsx` | Editar (nova rota) |
-| `src/layouts/SettingsLayout.tsx` | Editar (nova tab) |
-| `src/components/settings/SettingsNavigation.tsx` | Editar (novo item) |
-| `src/hooks/useCRMDeals.ts` | Editar (product_id no CRUD + join) |
-| `src/components/crm/NewDealModal.tsx` | Editar (ProductSelect) |
-| `src/components/crm/DealDetailsModal.tsx` | Editar (ProductSelect + exibição) |
+| `supabase/functions/chatwoot-dispatcher/index.ts` | Limpar tools_manual, reescrever prompt de triagem, remover auto_progression |
 
