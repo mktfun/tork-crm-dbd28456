@@ -516,6 +516,7 @@ Deno.serve(async (req) => {
           next_stage_name: promptResult.nextStageName,
           ai_is_active: promptResult.aiIsActive,
           stage_ai_is_active: promptResult.stageAiIsActive,
+          is_active: stageAiSettings?.is_active ?? true,
           ai_system_prompt: promptResult.systemPrompt,
           agent_name: promptResult.agentName,
           company_name: promptResult.companyName,
