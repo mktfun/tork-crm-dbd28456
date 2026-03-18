@@ -1,115 +1,57 @@
 
 
-# Plano: Módulo de Produtos (CRM) + Funis Padrão + Frontend
+# Plano: Dispatcher Assume Roteamento e Progressão de Etapas
 
-## Resumo
+## Problema Atual
 
-4 mudanças: criar tabela `crm_products`, adicionar `product_id` em `crm_deals`, atualizar seed de onboarding com funis e produtos padrão, criar tela de gestão de produtos em Settings, e integrar `ProductSelect` nos formulários de Deal.
+O dispatcher delega duas decisões críticas para a IA via function calling (tools), o que causa problemas no n8n:
+1. **Lead sem deal** → IA precisa chamar `list_pipelines_and_stages` + `create_deal` (lento, inconsistente)
+2. **Conclusão de objetivo** → IA decide sozinha quando chamar `update_deal_stage` (sem validação)
 
----
+## Solução: Dispatcher faz tudo antes de enviar ao n8n
 
-## MUDANÇA 1: Banco de Dados (2 Migrations)
+### 1. Auto-criação de deal para leads sem negociação (linhas 246-258)
 
-### Migration A — Tabela `crm_products`
+Quando `!deal` e o cliente já existe (`clientId` presente):
+- Buscar o pipeline padrão (`is_default = true`) do usuário
+- Buscar a primeira etapa desse pipeline (`position` menor)
+- Criar o deal automaticamente via INSERT em `crm_deals`
+- Carregar as `crm_ai_settings` dessa etapa
+- Montar o prompt com o objetivo da etapa (não mais o bloco genérico "CLIENTE NOVO")
 
-```sql
-CREATE TABLE public.crm_products (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+Se o cliente não existe ainda (`!clientId`): manter o prompt pedindo que o n8n/IA crie o contato primeiro, e na próxima mensagem o dispatcher já terá o cliente e criará o deal.
 
-CREATE INDEX idx_crm_products_user_id ON public.crm_products(user_id);
-ALTER TABLE public.crm_products ENABLE ROW LEVEL SECURITY;
+**Resultado**: O payload enviado ao n8n já inclui `deal_id`, `stage_id`, `pipeline_id` e o prompt correto da etapa — sem depender de function calling.
 
--- RLS (padrão user_id como todo o CRM)
-CREATE POLICY "Users can view own products" ON public.crm_products FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own products" ON public.crm_products FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own products" ON public.crm_products FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own products" ON public.crm_products FOR DELETE USING (auth.uid() = user_id);
+### 2. Detecção de conclusão de objetivo (pré-avaliação)
 
-CREATE TRIGGER update_crm_products_updated_at BEFORE UPDATE ON public.crm_products
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+Após montar o prompt para deals existentes, o dispatcher faz uma chamada rápida à IA (Gemini Flash) com um prompt curto de avaliação:
+
+```
+Dado o objetivo: "{ai_objective}"
+E o histórico recente da conversa: "{últimas mensagens}"
+O objetivo foi atingido? Responda APENAS "SIM" ou "NAO".
 ```
 
-**Nota**: `company_id` é nullable (produto pode existir sem vínculo direto a seguradora). `user_id` é a chave de ownership para RLS, consistente com todo o sistema.
+- Se **SIM**: o dispatcher executa o `update_deal_stage` (move para próxima etapa ou `target_stage_id` configurado) ANTES de enviar ao n8n. O payload incluirá `stage_completed: true` e os dados da nova etapa.
+- Se **NAO**: fluxo normal, o prompt continua com o objetivo atual.
 
-### Migration B — Coluna `product_id` em `crm_deals`
+Para buscar as últimas mensagens, o dispatcher consultará a API do Chatwoot (usando as credenciais da `brokerages`) para pegar as ~5 últimas mensagens da conversa.
 
-```sql
-ALTER TABLE public.crm_deals ADD COLUMN product_id UUID REFERENCES public.crm_products(id) ON DELETE SET NULL;
-CREATE INDEX idx_crm_deals_product_id ON public.crm_deals(product_id);
-```
+### 3. Payload enriquecido ao n8n
 
----
-
-## MUDANÇA 2: Seed de Onboarding (`seed_user_defaults`)
-
-Atualizar a função SQL `seed_user_defaults` via nova migration com `CREATE OR REPLACE FUNCTION`:
-
-- Adicionar criação de 2 pipelines padrão: **"Seguros"** (is_default=true) e **"Sinistros e Assistência"** (is_default=false), com etapas padrão para cada um.
-- Inserir 5 produtos padrão na `crm_products`: "Seguro Auto", "Seguro Vida", "Seguro Residencial", "Consórcio", "Fiança Locatícia".
-
-Esses registros usam `p_user_id` como `user_id`, sem `company_id` (genéricos).
-
----
-
-## MUDANÇA 3: Frontend — Tela de Produtos
-
-### Novos arquivos:
-
-| Arquivo | Função |
-|---|---|
-| `src/hooks/useProducts.ts` | Hook com `useQuery`/`useMutation` para CRUD de `crm_products` |
-| `src/components/settings/ProductsManager.tsx` | Componente principal: DataTable + botão criar |
-| `src/components/settings/ProductDialog.tsx` | Dialog modal para criar/editar produto |
-| `src/pages/settings/ProductSettings.tsx` | Page wrapper |
-
-### Rota:
-- Em `App.tsx`: adicionar `<Route path="products" element={<ProductSettings />} />` dentro do bloco `settings`.
-- Em `SettingsLayout.tsx` e `SettingsNavigation.tsx`: adicionar tab "Produtos" com ícone `Package` entre Ramos e Chat Tork.
-
-### Layout da tela:
-- Header: "Produtos / Ramos" com subtexto descritivo
-- DataTable com colunas: Nome, Descrição (truncada), Status (Badge verde/cinza), Ações (DropdownMenu com Editar/Desativar/Excluir)
-- `ProductDialog`: form com campos Nome, Descrição (textarea), toggle is_active
-- Deleção: soft delete (is_active=false) se houver deals vinculados, hard delete se não houver
-
----
-
-## MUDANÇA 4: ProductSelect nos Formulários de Deal
-
-### Novo componente:
-`src/components/crm/ProductSelect.tsx` — Select/Combobox que busca `crm_products` ativos via `useProducts` hook.
-
-### Integração:
-- **`NewDealModal.tsx`**: Adicionar campo `product_id` no `formData`, renderizar `<ProductSelect>` entre Pipeline/Etapa e Valor, passar no `createDeal.mutateAsync`.
-- **`DealDetailsModal.tsx`**: Adicionar `product_id` ao `formData` de edição, exibir na seção de detalhes, incluir no `handleSave`. Exibir como Badge o nome do produto no header do deal.
-- **`useCRMDeals.ts`**: Expandir a query do `createDeal` e `updateDeal` para incluir `product_id`. Adicionar join no select: `product:crm_products(id, name)`.
-- **Interface `CRMDeal`**: Adicionar `product_id` e `product?: { id: string; name: string }`.
-
----
+O `derived_data` passará a incluir:
+- `auto_created_deal: true/false` — indica se o deal foi criado neste request
+- `stage_completed: true/false` — indica se o objetivo foi atingido e a etapa avançou
+- `previous_stage_id` / `previous_stage_name` — se houve progressão
 
 ## Arquivos afetados
 
-| Arquivo | Tipo |
+| Arquivo | Ação |
 |---|---|
-| Nova migration SQL (crm_products + alter crm_deals) | Criar |
-| Nova migration SQL (seed_user_defaults atualizado) | Criar |
-| `src/hooks/useProducts.ts` | Criar |
-| `src/components/settings/ProductsManager.tsx` | Criar |
-| `src/components/settings/ProductDialog.tsx` | Criar |
-| `src/pages/settings/ProductSettings.tsx` | Criar |
-| `src/components/crm/ProductSelect.tsx` | Criar |
-| `src/App.tsx` | Editar (nova rota) |
-| `src/layouts/SettingsLayout.tsx` | Editar (nova tab) |
-| `src/components/settings/SettingsNavigation.tsx` | Editar (novo item) |
-| `src/hooks/useCRMDeals.ts` | Editar (product_id no CRUD + join) |
-| `src/components/crm/NewDealModal.tsx` | Editar (ProductSelect) |
-| `src/components/crm/DealDetailsModal.tsx` | Editar (ProductSelect + exibição) |
+| `supabase/functions/chatwoot-dispatcher/index.ts` | Adicionar auto-criação de deal + pré-avaliação de objetivo |
+
+## Deploy
+
+Deploy automático da edge function `chatwoot-dispatcher` após alteração.
 
