@@ -942,6 +942,8 @@ Deno.serve(async (req) => {
           knowledge_context: promptResult.knowledgeContext,
           // New enriched fields
           auto_created_deal: autoCreatedDeal,
+          auto_created_product_id: autoCreatedProductId,
+          auto_created_product_name: autoCreatedProductName,
           stage_completed: objectiveResult.completed,
           previous_stage_id: objectiveResult.previousStageId,
           previous_stage_name: objectiveResult.previousStageName,
