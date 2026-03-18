@@ -198,6 +198,7 @@ function App() {
                     <Route path="crm/automation" element={<AIAutomation />} />
                     <Route path="documentacao" element={<Documentation />} />
                     <Route path="solicitacoes-portal" element={<PortalInbox />} />
+                    <Route path="products" element={<ProductSettings />} />
 
                     {/* Super Admin routes moved outside - see below */}
                     <Route path="demo/mobile-menu" element={<ModernMobileMenuDemo />} />
@@ -210,10 +211,7 @@ function App() {
                       <Route path="producers" element={<ProducerSettings />} />
                       <Route path="companies" element={<CompanySettings />} />
                       <Route path="ramos" element={<RamoSettings />} />
-                      <Route path="products" element={<ProductSettings />} />
                       <Route path="transactions" element={<TransactionSettings />} />
-                      <Route path="chat-tork" element={<ChatTorkSettings />} />
-                      <Route path="portal" element={<PortalSettings />} />
                     </Route>
                   </Route>
 
@@ -246,6 +244,9 @@ function App() {
                     <Route index element={<SuperAdmin />} />
                     <Route path="organizations/:id" element={<OrganizationDetails />} />
                   </Route>
+
+                  {/* Rota pública para Landing Page B2C (JJSeguros) */}
+                  <Route path="/quote/:slug" element={<div className="min-h-screen flex items-center justify-center bg-background"><p className="text-muted-foreground">Landing Page — em breve</p></div>} />
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>
