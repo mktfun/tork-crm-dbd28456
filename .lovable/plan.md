@@ -1,115 +1,47 @@
 
 
-# Plano: Módulo de Produtos (CRM) + Funis Padrão + Frontend
+# Plano: Tela de Detalhes da Corretora (via Control Center)
 
-## Resumo
+## Contexto
 
-4 mudanças: criar tabela `crm_products`, adicionar `product_id` em `crm_deals`, atualizar seed de onboarding com funis e produtos padrão, criar tela de gestão de produtos em Settings, e integrar `ProductSelect` nos formulários de Deal.
+Já existe uma página `OrganizationDetails.tsx` em `/superadmin/organizations/:id` com abas básicas (Visão Geral, Usuários, Chat Tork, Configurações). O Control Center atualmente abre um Sheet lateral ao clicar "Ver Detalhes". O objetivo é que o "Ver Detalhes" do Control Center navegue para a página completa de detalhes, enriquecida com as informações de plano, módulos e faturamento.
 
----
+## Alterações
 
-## MUDANÇA 1: Banco de Dados (2 Migrations)
+### 1. `AdminControlCenter.tsx` — Navegar em vez de abrir Sheet
 
-### Migration A — Tabela `crm_products`
+- Importar `useNavigate` do react-router-dom.
+- Alterar `openDetails()` para navegar para `/superadmin/organizations/{org.id}` em vez de abrir o Sheet.
+- Remover o Sheet lateral, o Dialog de pagamento e todo o estado associado (simplificar o componente para ser apenas a tabela).
 
-```sql
-CREATE TABLE public.crm_products (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+### 2. `OrganizationDetails.tsx` — Absorver funcionalidades do Control Center
 
-CREATE INDEX idx_crm_products_user_id ON public.crm_products(user_id);
-ALTER TABLE public.crm_products ENABLE ROW LEVEL SECURITY;
+Adicionar duas novas abas ao lado das existentes:
 
--- RLS (padrão user_id como todo o CRM)
-CREATE POLICY "Users can view own products" ON public.crm_products FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own products" ON public.crm_products FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own products" ON public.crm_products FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own products" ON public.crm_products FOR DELETE USING (auth.uid() = user_id);
+**Aba "Plano & Módulos"**:
+- Card com Select para plano (Free/Pro) + Badge de status (Ativo/Vencido) + data de vencimento.
+- Seção de métricas (Progress bars: Tokens IA, Armazenamento).
+- 4 cards de permissões globais com Switch + descrição (CRM, Portal, IA, Config) — mesmo layout que existia no Sheet.
 
-CREATE TRIGGER update_crm_products_updated_at BEFORE UPDATE ON public.crm_products
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-```
+**Aba "Faturamento"**:
+- Card de status de vencimento (data + badge Ativo/Vencido).
+- Botão "Registrar Pagamento Manual" abrindo Dialog.
+- Tabela de histórico de pagamentos.
+- Dialog de registro de pagamento (valor, período, data).
 
-**Nota**: `company_id` é nullable (produto pode existir sem vínculo direto a seguradora). `user_id` é a chave de ownership para RLS, consistente com todo o sistema.
+### 3. `useOrganizationDetails.ts` — Incluir campos de controle
 
-### Migration B — Coluna `product_id` em `crm_deals`
+Adicionar ao retorno: `plan_type`, `subscription_valid_until`, `has_crm_access`, `has_portal_access`, `has_ai_access`, `has_config_access` (vindos da query ao `brokerages`).
 
-```sql
-ALTER TABLE public.crm_deals ADD COLUMN product_id UUID REFERENCES public.crm_products(id) ON DELETE SET NULL;
-CREATE INDEX idx_crm_deals_product_id ON public.crm_deals(product_id);
-```
+### 4. Hooks reutilizados
 
----
-
-## MUDANÇA 2: Seed de Onboarding (`seed_user_defaults`)
-
-Atualizar a função SQL `seed_user_defaults` via nova migration com `CREATE OR REPLACE FUNCTION`:
-
-- Adicionar criação de 2 pipelines padrão: **"Seguros"** (is_default=true) e **"Sinistros e Assistência"** (is_default=false), com etapas padrão para cada um.
-- Inserir 5 produtos padrão na `crm_products`: "Seguro Auto", "Seguro Vida", "Seguro Residencial", "Consórcio", "Fiança Locatícia".
-
-Esses registros usam `p_user_id` como `user_id`, sem `company_id` (genéricos).
-
----
-
-## MUDANÇA 3: Frontend — Tela de Produtos
-
-### Novos arquivos:
-
-| Arquivo | Função |
-|---|---|
-| `src/hooks/useProducts.ts` | Hook com `useQuery`/`useMutation` para CRUD de `crm_products` |
-| `src/components/settings/ProductsManager.tsx` | Componente principal: DataTable + botão criar |
-| `src/components/settings/ProductDialog.tsx` | Dialog modal para criar/editar produto |
-| `src/pages/settings/ProductSettings.tsx` | Page wrapper |
-
-### Rota:
-- Em `App.tsx`: adicionar `<Route path="products" element={<ProductSettings />} />` dentro do bloco `settings`.
-- Em `SettingsLayout.tsx` e `SettingsNavigation.tsx`: adicionar tab "Produtos" com ícone `Package` entre Ramos e Chat Tork.
-
-### Layout da tela:
-- Header: "Produtos / Ramos" com subtexto descritivo
-- DataTable com colunas: Nome, Descrição (truncada), Status (Badge verde/cinza), Ações (DropdownMenu com Editar/Desativar/Excluir)
-- `ProductDialog`: form com campos Nome, Descrição (textarea), toggle is_active
-- Deleção: soft delete (is_active=false) se houver deals vinculados, hard delete se não houver
-
----
-
-## MUDANÇA 4: ProductSelect nos Formulários de Deal
-
-### Novo componente:
-`src/components/crm/ProductSelect.tsx` — Select/Combobox que busca `crm_products` ativos via `useProducts` hook.
-
-### Integração:
-- **`NewDealModal.tsx`**: Adicionar campo `product_id` no `formData`, renderizar `<ProductSelect>` entre Pipeline/Etapa e Valor, passar no `createDeal.mutateAsync`.
-- **`DealDetailsModal.tsx`**: Adicionar `product_id` ao `formData` de edição, exibir na seção de detalhes, incluir no `handleSave`. Exibir como Badge o nome do produto no header do deal.
-- **`useCRMDeals.ts`**: Expandir a query do `createDeal` e `updateDeal` para incluir `product_id`. Adicionar join no select: `product:crm_products(id, name)`.
-- **Interface `CRMDeal`**: Adicionar `product_id` e `product?: { id: string; name: string }`.
-
----
+Reutilizar `useBrokeragePayments`, `useToggleModuleAccess`, `useUpdateBrokeragePlan` e `useRegisterPayment` do `useAdminControlCenter.ts` na página de detalhes.
 
 ## Arquivos afetados
 
-| Arquivo | Tipo |
+| Arquivo | Ação |
 |---|---|
-| Nova migration SQL (crm_products + alter crm_deals) | Criar |
-| Nova migration SQL (seed_user_defaults atualizado) | Criar |
-| `src/hooks/useProducts.ts` | Criar |
-| `src/components/settings/ProductsManager.tsx` | Criar |
-| `src/components/settings/ProductDialog.tsx` | Criar |
-| `src/pages/settings/ProductSettings.tsx` | Criar |
-| `src/components/crm/ProductSelect.tsx` | Criar |
-| `src/App.tsx` | Editar (nova rota) |
-| `src/layouts/SettingsLayout.tsx` | Editar (nova tab) |
-| `src/components/settings/SettingsNavigation.tsx` | Editar (novo item) |
-| `src/hooks/useCRMDeals.ts` | Editar (product_id no CRUD + join) |
-| `src/components/crm/NewDealModal.tsx` | Editar (ProductSelect) |
-| `src/components/crm/DealDetailsModal.tsx` | Editar (ProductSelect + exibição) |
+| `src/components/superadmin/AdminControlCenter.tsx` | Simplificar (remover Sheet/Dialog, navegar) |
+| `src/pages/OrganizationDetails.tsx` | Adicionar abas Plano & Módulos + Faturamento |
+| `src/hooks/useOrganizationDetails.ts` | Incluir campos de plano/módulos |
 
