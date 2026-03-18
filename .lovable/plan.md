@@ -1,42 +1,115 @@
 
 
-# Plano: Corrigir System Prompt do Dispatcher e Motor de IA do Dashboard
+# Plano: Módulo de Produtos (CRM) + Funis Padrão + Frontend
 
-## Problema 1 — Dispatcher envia prompt genérico para contatos sem deal
+## Resumo
 
-No `buildSystemPrompt`, quando não há deal (linha 246), o código tenta usar `stageAiSettings?.ai_persona` — mas `stageAiSettings` é **sempre null** nesse cenário porque nenhuma etapa foi encontrada. O fallback é uma string hardcoded mínima: `"Você é um assistente de vendas útil e amigável."`.
-
-O correto é usar o `base_instructions` da configuração global (`crm_ai_global_config`), que é o prompt completo configurado na tela de automação. O `globalConfig` já é carregado na função (linha 188-198) mas só extrai `agent_name`, `company_name` e `voice_tone` — ignora `base_instructions`.
-
-### Correção
-
-- Extrair `base_instructions` do `globalConfig` junto com os outros campos (linha 194-197).
-- Na seção "no deal" (linha 246), usar `globalConfig.base_instructions` como persona principal em vez de `stageAiSettings?.ai_persona`.
-- Manter o fallback hardcoded apenas se `base_instructions` também estiver vazio.
+4 mudanças: criar tabela `crm_products`, adicionar `product_id` em `crm_deals`, atualizar seed de onboarding com funis e produtos padrão, criar tela de gestão de produtos em Settings, e integrar `ProductSelect` nos formulários de Deal.
 
 ---
 
-## Problema 2 — `generate-summary` usa LOVABLE_API_KEY em vez da IA configurada
+## MUDANÇA 1: Banco de Dados (2 Migrations)
 
-A Edge Function `generate-summary` já usa `resolveUserModel()` para pegar o modelo correto da `crm_ai_global_config`, mas sempre autentica com `LOVABLE_API_KEY` (Lovable Gateway). O usuário configurou sua própria API key na tela de automação (`crm_ai_global_config.api_key`), e essa key deve ser usada.
+### Migration A — Tabela `crm_products`
 
-### Correção
+```sql
+CREATE TABLE public.crm_products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-- Atualizar `model-resolver.ts` para retornar também a `api_key` do usuário (além do modelo).
-- No `generate-summary`, usar a API key do usuário quando disponível, com fallback para `LOVABLE_API_KEY`.
-- Mesma lógica: se o usuário tem key própria configurada → usa ela. Se não → Lovable Gateway.
+CREATE INDEX idx_crm_products_user_id ON public.crm_products(user_id);
+ALTER TABLE public.crm_products ENABLE ROW LEVEL SECURITY;
+
+-- RLS (padrão user_id como todo o CRM)
+CREATE POLICY "Users can view own products" ON public.crm_products FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own products" ON public.crm_products FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own products" ON public.crm_products FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own products" ON public.crm_products FOR DELETE USING (auth.uid() = user_id);
+
+CREATE TRIGGER update_crm_products_updated_at BEFORE UPDATE ON public.crm_products
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+```
+
+**Nota**: `company_id` é nullable (produto pode existir sem vínculo direto a seguradora). `user_id` é a chave de ownership para RLS, consistente com todo o sistema.
+
+### Migration B — Coluna `product_id` em `crm_deals`
+
+```sql
+ALTER TABLE public.crm_deals ADD COLUMN product_id UUID REFERENCES public.crm_products(id) ON DELETE SET NULL;
+CREATE INDEX idx_crm_deals_product_id ON public.crm_deals(product_id);
+```
+
+---
+
+## MUDANÇA 2: Seed de Onboarding (`seed_user_defaults`)
+
+Atualizar a função SQL `seed_user_defaults` via nova migration com `CREATE OR REPLACE FUNCTION`:
+
+- Adicionar criação de 2 pipelines padrão: **"Seguros"** (is_default=true) e **"Sinistros e Assistência"** (is_default=false), com etapas padrão para cada um.
+- Inserir 5 produtos padrão na `crm_products`: "Seguro Auto", "Seguro Vida", "Seguro Residencial", "Consórcio", "Fiança Locatícia".
+
+Esses registros usam `p_user_id` como `user_id`, sem `company_id` (genéricos).
+
+---
+
+## MUDANÇA 3: Frontend — Tela de Produtos
+
+### Novos arquivos:
+
+| Arquivo | Função |
+|---|---|
+| `src/hooks/useProducts.ts` | Hook com `useQuery`/`useMutation` para CRUD de `crm_products` |
+| `src/components/settings/ProductsManager.tsx` | Componente principal: DataTable + botão criar |
+| `src/components/settings/ProductDialog.tsx` | Dialog modal para criar/editar produto |
+| `src/pages/settings/ProductSettings.tsx` | Page wrapper |
+
+### Rota:
+- Em `App.tsx`: adicionar `<Route path="products" element={<ProductSettings />} />` dentro do bloco `settings`.
+- Em `SettingsLayout.tsx` e `SettingsNavigation.tsx`: adicionar tab "Produtos" com ícone `Package` entre Ramos e Chat Tork.
+
+### Layout da tela:
+- Header: "Produtos / Ramos" com subtexto descritivo
+- DataTable com colunas: Nome, Descrição (truncada), Status (Badge verde/cinza), Ações (DropdownMenu com Editar/Desativar/Excluir)
+- `ProductDialog`: form com campos Nome, Descrição (textarea), toggle is_active
+- Deleção: soft delete (is_active=false) se houver deals vinculados, hard delete se não houver
+
+---
+
+## MUDANÇA 4: ProductSelect nos Formulários de Deal
+
+### Novo componente:
+`src/components/crm/ProductSelect.tsx` — Select/Combobox que busca `crm_products` ativos via `useProducts` hook.
+
+### Integração:
+- **`NewDealModal.tsx`**: Adicionar campo `product_id` no `formData`, renderizar `<ProductSelect>` entre Pipeline/Etapa e Valor, passar no `createDeal.mutateAsync`.
+- **`DealDetailsModal.tsx`**: Adicionar `product_id` ao `formData` de edição, exibir na seção de detalhes, incluir no `handleSave`. Exibir como Badge o nome do produto no header do deal.
+- **`useCRMDeals.ts`**: Expandir a query do `createDeal` e `updateDeal` para incluir `product_id`. Adicionar join no select: `product:crm_products(id, name)`.
+- **Interface `CRMDeal`**: Adicionar `product_id` e `product?: { id: string; name: string }`.
 
 ---
 
 ## Arquivos afetados
 
-| Arquivo | Ação |
+| Arquivo | Tipo |
 |---|---|
-| `supabase/functions/chatwoot-dispatcher/index.ts` | Usar `base_instructions` do globalConfig como persona para contatos sem deal |
-| `supabase/functions/_shared/model-resolver.ts` | Retornar também `api_key` do usuário |
-| `supabase/functions/generate-summary/index.ts` | Usar API key do usuário quando configurada |
-
-## Deploy necessário
-
-Após as alterações, será preciso fazer deploy das 3 Edge Functions afetadas.
+| Nova migration SQL (crm_products + alter crm_deals) | Criar |
+| Nova migration SQL (seed_user_defaults atualizado) | Criar |
+| `src/hooks/useProducts.ts` | Criar |
+| `src/components/settings/ProductsManager.tsx` | Criar |
+| `src/components/settings/ProductDialog.tsx` | Criar |
+| `src/pages/settings/ProductSettings.tsx` | Criar |
+| `src/components/crm/ProductSelect.tsx` | Criar |
+| `src/App.tsx` | Editar (nova rota) |
+| `src/layouts/SettingsLayout.tsx` | Editar (nova tab) |
+| `src/components/settings/SettingsNavigation.tsx` | Editar (novo item) |
+| `src/hooks/useCRMDeals.ts` | Editar (product_id no CRUD + join) |
+| `src/components/crm/NewDealModal.tsx` | Editar (ProductSelect) |
+| `src/components/crm/DealDetailsModal.tsx` | Editar (ProductSelect + exibição) |
 

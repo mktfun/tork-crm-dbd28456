@@ -72,8 +72,18 @@ Deno.serve(async (req) => {
     console.log(`[SUMMARY] Gathering data for user ${user.id}, scope=${scope}, focus=${focus}`);
     const context = await gatherContext(supabase, user.id, scope, focus);
 
+    // Resolve user's configured model and API key
+    const resolved = await resolveUserModel(supabase, user.id);
+    const effectiveApiKey = resolved.apiKey || apiKey;
+    if (!effectiveApiKey) {
+      return new Response(
+        JSON.stringify({ error: "Nenhuma API Key configurada. Configure na tela de Automação IA ou adicione LOVABLE_API_KEY." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Call AI
-    const summary = await callAI(apiKey, context, scope, focus, supabase, user.id);
+    const summary = await callAI(effectiveApiKey, context, scope, focus, resolved.model);
 
     // Save to cache (upsert)
     await supabase.from("ai_summaries").upsert(
@@ -220,17 +230,8 @@ async function gatherContext(
   return parts.join("\n\n") || "Sem dados disponíveis para análise.";
 }
 
-async function callAI(apiKey: string, context: string, scope: string, focus: string, supabase?: any, userId?: string): Promise<string> {
-  if (!apiKey.startsWith("sk_")) {
-    throw new Error("LOVABLE_API_KEY inválida. Atualize o segredo com uma chave Lovable AI válida (prefixo sk_).");
-  }
-
-  // Resolve dynamic model from user's global config
-  let model = "google/gemini-2.5-flash";
-  if (supabase && userId) {
-    model = await resolveUserModel(supabase, userId);
-    console.log(`[SUMMARY] Using model: ${model} for user ${userId}`);
-  }
+async function callAI(apiKey: string, context: string, scope: string, focus: string, model: string = "google/gemini-2.5-flash"): Promise<string> {
+  console.log(`[SUMMARY] Using model: ${model}, key prefix: ${apiKey.substring(0, 6)}...`);
 
   const scopeLabel = scope === "day" ? "do dia" : scope === "week" ? "da semana" : "do mês";
   const focusLabel =

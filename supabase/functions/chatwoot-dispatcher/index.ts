@@ -197,6 +197,8 @@ async function buildSystemPrompt(params: {
       voiceTone = globalConfig.voice_tone || voiceTone
     }
 
+    const globalBaseInstructions = globalConfig?.base_instructions || null
+
     const { data: aiConfig } = await supabase
       .from('crm_ai_config')
       .select('is_active')
@@ -243,7 +245,7 @@ async function buildSystemPrompt(params: {
 
   if (!deal) {
     // No deal — generic mode, infer context
-    const basePerson = stageAiSettings?.ai_persona || 'Você é um assistente de vendas útil e amigável.'
+    const basePerson = globalBaseInstructions || stageAiSettings?.ai_persona || 'Você é um assistente de vendas útil e amigável.'
     systemPrompt += `<persona>\n${basePerson}\n</persona>\n\n`
     systemPrompt += `<objective>\n`
     systemPrompt += `CLIENTE NOVO: Não há negociação aberta para este contato.\n`
