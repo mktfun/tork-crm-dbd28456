@@ -12,10 +12,7 @@ export function SettingsLayout() {
     { id: '/dashboard/settings/brokerages', label: <span className="flex items-center gap-2"><Building className="w-4 h-4" /> Corretoras</span> },
     { id: '/dashboard/settings/producers', label: <span className="flex items-center gap-2"><Users className="w-4 h-4" /> Produtores</span> },
     { id: '/dashboard/settings/companies', label: <span className="flex items-center gap-2"><Shield className="w-4 h-4" /> Seguradoras</span> },
-    { id: '/dashboard/settings/ramos', label: <span className="flex items-center gap-2"><Tag className="w-4 h-4" /> Ramos</span> },
-    { id: '/dashboard/settings/products', label: <span className="flex items-center gap-2"><Package className="w-4 h-4" /> Produtos</span> },
-    { id: '/dashboard/settings/chat-tork', label: <span className="flex items-center gap-2"><MessageCircle className="w-4 h-4" /> Chat</span> },
-    { id: '/dashboard/settings/portal', label: <span className="flex items-center gap-2"><Globe className="w-4 h-4" /> Portal</span> }
+    { id: '/dashboard/settings/ramos', label: <span className="flex items-center gap-2"><Tag className="w-4 h-4" /> Ramos</span> }
   ];
 
   const getActiveTabFromPath = () => {

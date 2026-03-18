@@ -245,6 +245,9 @@ function App() {
                     <Route path="organizations/:id" element={<OrganizationDetails />} />
                   </Route>
 
+                  {/* Rota pública para Landing Page B2C (JJSeguros) */}
+                  <Route path="/quote/:slug" element={<div className="min-h-screen flex items-center justify-center bg-background"><p className="text-muted-foreground">Landing Page — em breve</p></div>} />
+
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </div>

@@ -34,24 +34,6 @@ const navItems = [
     icon: Tag,
     description: 'Ramos de seguro'
   },
-  {
-    name: 'Produtos',
-    path: '/dashboard/settings/products',
-    icon: Package,
-    description: 'Ramos e produtos CRM'
-  },
-  {
-    name: 'Chat Tork',
-    path: '/dashboard/settings/chat-tork',
-    icon: MessageCircle,
-    description: 'Integração CRM'
-  },
-  {
-    name: 'Portal do Cliente',
-    path: '/dashboard/settings/portal',
-    icon: Globe,
-    description: 'Acesso dos segurados'
-  }
 ];
 
 export function SettingsNavigation() {

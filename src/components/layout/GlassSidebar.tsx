@@ -18,7 +18,8 @@ import {
   Wallet,
   BookOpen,
   Bot,
-  Inbox
+  Inbox,
+  Package
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useChangelogs } from '@/hooks/useChangelogs';
