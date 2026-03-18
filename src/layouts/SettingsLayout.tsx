@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { User, Building, Users, Shield, Tag, Package, MessageCircle, Globe } from 'lucide-react';
+import { User, Building, Users, Shield, Tag } from 'lucide-react';
 import { AnimatedTabs, Tab } from '@/components/ui/animated-tabs';
 
 export function SettingsLayout() {
