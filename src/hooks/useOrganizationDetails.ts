@@ -6,10 +6,16 @@ export interface OrganizationDetails {
   name: string;
   slug: string;
   logo_url: string | null;
-  settings: any;
+  settings: Record<string, unknown>;
   active: boolean;
   created_at: string;
   updated_at: string;
+  plan_type: string;
+  subscription_valid_until: string | null;
+  has_crm_access: boolean;
+  has_portal_access: boolean;
+  has_ai_access: boolean;
+  has_config_access: boolean;
   users: Array<{
     id: string;
     nome_completo: string;
@@ -42,7 +48,6 @@ export function useOrganizationDetails(organizationId: string | undefined) {
       if (!organizationId) return null;
 
       try {
-        // Por enquanto, usamos brokerages como fallback
         const { data: brokerage, error: brokerageError } = await supabase
           .from('brokerages')
           .select('*')
@@ -54,7 +59,8 @@ export function useOrganizationDetails(organizationId: string | undefined) {
           return null;
         }
 
-        // Buscar usuários associados (via user_id do brokerage)
+        const row = brokerage as unknown as Record<string, unknown>;
+
         const { data: users, error: usersError } = await supabase
           .from('profiles')
           .select('id, nome_completo, email, role, ativo, ai_enabled, created_at')
@@ -64,7 +70,6 @@ export function useOrganizationDetails(organizationId: string | undefined) {
           console.warn('Error fetching users:', usersError.message);
         }
 
-        // Buscar configurações de CRM
         const { data: crmSettings, error: crmError } = await supabase
           .from('crm_settings')
           .select('*')
@@ -75,26 +80,22 @@ export function useOrganizationDetails(organizationId: string | undefined) {
           console.warn('Error fetching CRM settings:', crmError.message);
         }
 
-        // Contar clientes
         const { count: clientsCount } = await supabase
           .from('clientes')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', brokerage.user_id);
 
-        // Contar apólices
         const { count: policiesCount } = await supabase
           .from('apolices')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', brokerage.user_id);
 
-        // Contar apólices ativas
         const { count: activePoliciesCount } = await supabase
           .from('apolices')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', brokerage.user_id)
           .eq('status', 'Ativa');
 
-        // Contar deals
         const { count: dealsCount } = await supabase
           .from('crm_deals')
           .select('*', { count: 'exact', head: true })
@@ -111,6 +112,12 @@ export function useOrganizationDetails(organizationId: string | undefined) {
           active: true,
           created_at: brokerage.created_at,
           updated_at: brokerage.updated_at,
+          plan_type: (row.plan_type as string) ?? 'Free',
+          subscription_valid_until: (row.subscription_valid_until as string) ?? null,
+          has_crm_access: (row.has_crm_access as boolean) ?? false,
+          has_portal_access: (row.has_portal_access as boolean) ?? false,
+          has_ai_access: (row.has_ai_access as boolean) ?? false,
+          has_config_access: (row.has_config_access as boolean) ?? false,
           users: usersList.map(u => ({
             id: u.id,
             nome_completo: u.nome_completo || '',
