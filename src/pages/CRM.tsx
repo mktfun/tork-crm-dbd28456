@@ -7,7 +7,8 @@ import { CRMAnalytics } from '@/components/crm/CRMAnalytics';
 import { useCRMPipelines } from '@/hooks/useCRMPipelines';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw, MessageCircle, Loader2, Plus, Sparkles, Bot, BarChart3, Kanban } from 'lucide-react';
+import { RefreshCw, MessageCircle, Loader2, Plus, Sparkles, Bot, BarChart3, Kanban, Package } from 'lucide-react';
+import { ProductsManager } from '@/components/settings/ProductsManager';
 import { useNavigate } from 'react-router-dom';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
