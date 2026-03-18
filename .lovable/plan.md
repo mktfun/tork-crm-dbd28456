@@ -1,115 +1,115 @@
 
 
-# Plano: Módulo de Produtos (CRM) + Funis Padrão + Frontend
+# Plano: Integrar Control Center com Backend Real
 
-## Resumo
+## Contexto
 
-4 mudanças: criar tabela `crm_products`, adicionar `product_id` em `crm_deals`, atualizar seed de onboarding com funis e produtos padrão, criar tela de gestão de produtos em Settings, e integrar `ProductSelect` nos formulários de Deal.
+O sistema usa `brokerages` como tabela de organizações (id: number, name, cnpj, slug...). A autenticação admin usa `profiles.role = 'admin'`. Já existe uma função `get_user_role`. Não existe tabela `organizations` — o Control Center deve operar sobre `brokerages`.
 
 ---
 
-## MUDANÇA 1: Banco de Dados (2 Migrations)
+## TAREFA 1: Migration SQL
 
-### Migration A — Tabela `crm_products`
+### 1a. Adicionar colunas à tabela `brokerages`
 
 ```sql
-CREATE TABLE public.crm_products (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+ALTER TABLE public.brokerages
+  ADD COLUMN IF NOT EXISTS plan_type text NOT NULL DEFAULT 'Free',
+  ADD COLUMN IF NOT EXISTS subscription_valid_until timestamptz,
+  ADD COLUMN IF NOT EXISTS has_crm_access boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS has_portal_access boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS has_ai_access boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS has_config_access boolean NOT NULL DEFAULT false;
+```
+
+### 1b. Criar tabela `organization_payments`
+
+```sql
+CREATE TABLE public.organization_payments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  brokerage_id integer NOT NULL REFERENCES public.brokerages(id) ON DELETE CASCADE,
+  amount numeric(10,2) NOT NULL,
+  period_added text NOT NULL,
+  payment_date timestamptz NOT NULL DEFAULT now(),
+  status text NOT NULL DEFAULT 'paid',
+  recorded_by uuid NOT NULL REFERENCES auth.users(id),
+  created_at timestamptz NOT NULL DEFAULT now()
 );
-
-CREATE INDEX idx_crm_products_user_id ON public.crm_products(user_id);
-ALTER TABLE public.crm_products ENABLE ROW LEVEL SECURITY;
-
--- RLS (padrão user_id como todo o CRM)
-CREATE POLICY "Users can view own products" ON public.crm_products FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own products" ON public.crm_products FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own products" ON public.crm_products FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own products" ON public.crm_products FOR DELETE USING (auth.uid() = user_id);
-
-CREATE TRIGGER update_crm_products_updated_at BEFORE UPDATE ON public.crm_products
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
-**Nota**: `company_id` é nullable (produto pode existir sem vínculo direto a seguradora). `user_id` é a chave de ownership para RLS, consistente com todo o sistema.
-
-### Migration B — Coluna `product_id` em `crm_deals`
+### 1c. Função SECURITY DEFINER para check de admin
 
 ```sql
-ALTER TABLE public.crm_deals ADD COLUMN product_id UUID REFERENCES public.crm_products(id) ON DELETE SET NULL;
-CREATE INDEX idx_crm_deals_product_id ON public.crm_deals(product_id);
+CREATE OR REPLACE FUNCTION public.is_admin(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles WHERE id = _user_id AND role = 'admin'
+  );
+$$;
+```
+
+### 1d. RLS Policies
+
+**`brokerages`** — policy para admin atualizar colunas de acesso (a tabela já tem RLS; adicionar policy de UPDATE para admin):
+
+```sql
+CREATE POLICY "Admins can update brokerages" ON public.brokerages
+  FOR UPDATE TO authenticated
+  USING (public.is_admin(auth.uid()));
+```
+
+**`organization_payments`**:
+
+```sql
+ALTER TABLE public.organization_payments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can select payments" ON public.organization_payments
+  FOR SELECT TO authenticated USING (public.is_admin(auth.uid()));
+
+CREATE POLICY "Admins can insert payments" ON public.organization_payments
+  FOR INSERT TO authenticated WITH CHECK (public.is_admin(auth.uid()));
 ```
 
 ---
 
-## MUDANÇA 2: Seed de Onboarding (`seed_user_defaults`)
+## TAREFA 2: Hook `useAdminControlCenter.ts`
 
-Atualizar a função SQL `seed_user_defaults` via nova migration com `CREATE OR REPLACE FUNCTION`:
+Criar `src/hooks/useAdminControlCenter.ts` com React Query:
 
-- Adicionar criação de 2 pipelines padrão: **"Seguros"** (is_default=true) e **"Sinistros e Assistência"** (is_default=false), com etapas padrão para cada um.
-- Inserir 5 produtos padrão na `crm_products`: "Seguro Auto", "Seguro Vida", "Seguro Residencial", "Consórcio", "Fiança Locatícia".
+### Queries
+- **`useBrokeragesAdmin()`**: Fetch `brokerages` com colunas relevantes (id, name, cnpj, plan_type, subscription_valid_until, has_crm_access, has_portal_access, has_ai_access, has_config_access). QueryKey: `['admin-brokerages']`.
 
-Esses registros usam `p_user_id` como `user_id`, sem `company_id` (genéricos).
+- **`useBrokeragePayments(brokerageId)`**: Fetch `organization_payments` filtrado por brokerage_id, join com `profiles` para nome do admin. QueryKey: `['brokerage-payments', brokerageId]`.
 
----
+### Mutations
+- **`useToggleModuleAccess()`**: UPDATE em `brokerages` a coluna correspondente (has_crm_access, etc.). Invalida `['admin-brokerages']`.
 
-## MUDANÇA 3: Frontend — Tela de Produtos
+- **`useUpdateBrokeragePlan()`**: UPDATE `plan_type` em `brokerages`. Invalida `['admin-brokerages']`.
 
-### Novos arquivos:
-
-| Arquivo | Função |
-|---|---|
-| `src/hooks/useProducts.ts` | Hook com `useQuery`/`useMutation` para CRUD de `crm_products` |
-| `src/components/settings/ProductsManager.tsx` | Componente principal: DataTable + botão criar |
-| `src/components/settings/ProductDialog.tsx` | Dialog modal para criar/editar produto |
-| `src/pages/settings/ProductSettings.tsx` | Page wrapper |
-
-### Rota:
-- Em `App.tsx`: adicionar `<Route path="products" element={<ProductSettings />} />` dentro do bloco `settings`.
-- Em `SettingsLayout.tsx` e `SettingsNavigation.tsx`: adicionar tab "Produtos" com ícone `Package` entre Ramos e Chat Tork.
-
-### Layout da tela:
-- Header: "Produtos / Ramos" com subtexto descritivo
-- DataTable com colunas: Nome, Descrição (truncada), Status (Badge verde/cinza), Ações (DropdownMenu com Editar/Desativar/Excluir)
-- `ProductDialog`: form com campos Nome, Descrição (textarea), toggle is_active
-- Deleção: soft delete (is_active=false) se houver deals vinculados, hard delete se não houver
+- **`useRegisterPayment()`**: INSERT em `organization_payments` + UPDATE `subscription_valid_until` em `brokerages` (calculando nova data baseada no período). Invalida ambas queries.
 
 ---
 
-## MUDANÇA 4: ProductSelect nos Formulários de Deal
+## TAREFA 3: Refatorar `AdminControlCenter.tsx`
 
-### Novo componente:
-`src/components/crm/ProductSelect.tsx` — Select/Combobox que busca `crm_products` ativos via `useProducts` hook.
-
-### Integração:
-- **`NewDealModal.tsx`**: Adicionar campo `product_id` no `formData`, renderizar `<ProductSelect>` entre Pipeline/Etapa e Valor, passar no `createDeal.mutateAsync`.
-- **`DealDetailsModal.tsx`**: Adicionar `product_id` ao `formData` de edição, exibir na seção de detalhes, incluir no `handleSave`. Exibir como Badge o nome do produto no header do deal.
-- **`useCRMDeals.ts`**: Expandir a query do `createDeal` e `updateDeal` para incluir `product_id`. Adicionar join no select: `product:crm_products(id, name)`.
-- **Interface `CRMDeal`**: Adicionar `product_id` e `product?: { id: string; name: string }`.
+- Substituir mock data por dados do hook `useBrokeragesAdmin()`.
+- Substituir `Organization` type por tipo derivado da query real.
+- `handleModuleToggle` → chamar `toggleModuleAccess.mutate()`.
+- `handlePlanChange` → chamar `updateBrokeragePlan.mutate()`.
+- `handleSavePayment` → chamar `registerPayment.mutate()`.
+- Sheet lateral: carregar `useBrokeragePayments(selectedOrg.id)` na aba Faturamento.
+- Adicionar estados de loading/skeleton.
+- Nota: `brokerages.id` é `number`, não `string` — ajustar tipos.
 
 ---
 
 ## Arquivos afetados
 
-| Arquivo | Tipo |
+| Arquivo | Ação |
 |---|---|
-| Nova migration SQL (crm_products + alter crm_deals) | Criar |
-| Nova migration SQL (seed_user_defaults atualizado) | Criar |
-| `src/hooks/useProducts.ts` | Criar |
-| `src/components/settings/ProductsManager.tsx` | Criar |
-| `src/components/settings/ProductDialog.tsx` | Criar |
-| `src/pages/settings/ProductSettings.tsx` | Criar |
-| `src/components/crm/ProductSelect.tsx` | Criar |
-| `src/App.tsx` | Editar (nova rota) |
-| `src/layouts/SettingsLayout.tsx` | Editar (nova tab) |
-| `src/components/settings/SettingsNavigation.tsx` | Editar (novo item) |
-| `src/hooks/useCRMDeals.ts` | Editar (product_id no CRUD + join) |
-| `src/components/crm/NewDealModal.tsx` | Editar (ProductSelect) |
-| `src/components/crm/DealDetailsModal.tsx` | Editar (ProductSelect + exibição) |
+| Migration SQL | Criar (via tool) |
+| `src/hooks/useAdminControlCenter.ts` | Criar |
+| `src/components/superadmin/AdminControlCenter.tsx` | Refatorar |
 
