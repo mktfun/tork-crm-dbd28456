@@ -18,6 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import {
   Save,
@@ -33,6 +35,10 @@ import {
   Settings,
   Link,
   Brain,
+  Zap,
+  Shield,
+  Info,
+  Users,
 } from "lucide-react";
 import { InboxAgentMapping } from "@/components/settings/InboxAgentMapping";
 
