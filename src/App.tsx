@@ -198,7 +198,7 @@ function App() {
                     <Route path="crm/automation" element={<AIAutomation />} />
                     <Route path="documentacao" element={<Documentation />} />
                     <Route path="solicitacoes-portal" element={<PortalInbox />} />
-                    <Route path="products" element={<ProductSettings />} />
+                    
 
                     {/* Super Admin routes moved outside - see below */}
                     <Route path="demo/mobile-menu" element={<ModernMobileMenuDemo />} />

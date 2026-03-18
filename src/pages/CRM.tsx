@@ -183,6 +183,16 @@ export default function CRM() {
             <CRMAnalytics pipelineId={selectedPipelineId} />
           </motion.div>
         </TabsContent>
+
+        <TabsContent value="products">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <ProductsManager />
+          </motion.div>
+        </TabsContent>
       </Tabs>
 
       {/* Pipeline Manager Modal */}
