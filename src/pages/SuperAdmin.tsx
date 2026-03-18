@@ -110,6 +110,13 @@ export default function SuperAdmin() {
             Auditoria
           </TabsTrigger>
           <TabsTrigger 
+            value="control" 
+            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 gap-2"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Control Center
+          </TabsTrigger>
+          <TabsTrigger 
             value="system" 
             className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 gap-2"
           >
