@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { VibeSelector, VibeId, getVibePreset, VIBE_CONFIG } from './VibeSelector';
+import { VibeSelector, VibeId, VIBE_CONFIG } from './VibeSelector';
 import { AI_PERSONA_PRESETS } from './aiPresets';
 import { ConfigSourceBadge } from './ConfigSourceBadge';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -49,6 +49,10 @@ interface StageFlowCardProps {
 // Deterministic vibe inference via exact xmlPrompt match
 function inferVibeFromPersona(persona: string | null | undefined): VibeId | null {
   if (!persona) return null;
+  // Match direto por ID curto (novo formato)
+  const validIds: VibeId[] = ['proactive', 'technical', 'supportive_sales', 'supportive'];
+  if (validIds.includes(persona as VibeId)) return persona as VibeId;
+  // Fallback: match por xmlPrompt (dados legados)
   const match = AI_PERSONA_PRESETS.find(p => p.xmlPrompt === persona);
   if (match && match.id in VIBE_CONFIG) return match.id as VibeId;
   return null;
@@ -109,13 +113,10 @@ export function StageFlowCard({
   const handleVibeChange = useCallback((vibeId: VibeId) => {
     userSelectedRef.current = true;
     setSelectedVibe(vibeId);
-    const preset = getVibePreset(vibeId);
-    if (preset) {
-      onSaveConfig({
-        stage_id: stage.id,
-        ai_persona: preset.xmlPrompt,
-      });
-    }
+    onSaveConfig({
+      stage_id: stage.id,
+      ai_persona: vibeId,
+    });
   }, [stage.id, onSaveConfig]);
   
   const handleToggleExpand = () => {

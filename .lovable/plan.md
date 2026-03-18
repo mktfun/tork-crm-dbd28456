@@ -1,80 +1,74 @@
 
+# Auditoria dos KPIs da Tela de Conciliacao
 
-# Plano: 3 Bug Fixes — Persona, XML Sandbox, Layout Sticky
+## Discrepancias Identificadas (com evidencia SQL)
 
-## 1. Bug da Persona (StageFlowCard.tsx)
+### BUG 1 (CRITICO): Contagem "Registros Encontrados" vs "Progresso" Divergentes
 
-**Problema**: `handleVibeChange` salva `preset.xmlPrompt` (texto enorme) no banco. `inferVibeFromPersona` tenta match exato com xmlPrompt — falha quando presets compartilham palavras.
+**Evidencia no screenshot**: O header da lista mostra **488 registros encontrados** mas o card de Progresso mostra **298 de 388 conciliados**. Sao duas fontes diferentes:
+- "488 registros" vem da RPC `get_bank_statement_paginated` (campo `total_count` via `COUNT(*) OVER()`)
+- "388 total / 298 conciliados" vem da RPC `get_reconciliation_kpis` (campo `total_count`)
 
-**Fix**:
-- `handleVibeChange`: salvar o **ID curto** (`vibeId`) na coluna `ai_persona` em vez de `preset.xmlPrompt`
-- `inferVibeFromPersona`: primeiro verificar se o valor é um ID curto válido (`proactive`, `technical`, `supportive_sales`, `supportive`). Se sim, retornar direto. Senão, fallback para match por xmlPrompt (retrocompatibilidade com dados antigos).
+Ambas as RPCs usam os mesmos filtros base (user_id, banco, datas, is_void). Porem a lista aplica `p_status` e `p_type` como filtros adicionais (mesmo quando "todas/todos" deveria ser identico). A divergencia de 100 itens (488 vs 388) indica que uma das RPCs tem um filtro extra ou diferente.
 
-```ts
-// StageFlowCard.tsx — linha 109
-const handleVibeChange = useCallback((vibeId: VibeId) => {
-  userSelectedRef.current = true;
-  setSelectedVibe(vibeId);
-  onSaveConfig({
-    stage_id: stage.id,
-    ai_persona: vibeId,  // salva ID curto, não xmlPrompt
-  });
-}, [stage.id, onSaveConfig]);
+**Causa provavel**: A RPC paginada faz LEFT JOIN com `bank_statement_entries` e `profiles` que pode gerar duplicatas via `string_agg` no ledger. Ou a KPI RPC nao filtra por `status IN ('confirmed','completed')` enquanto a lista nao filtra por isso tambem -- porem alguma diferenca sutil no WHERE causa a divergencia.
+
+**Correcao**: Unificar: a KPI RPC deve usar EXATAMENTE a mesma CTE/WHERE da lista paginada (sem os filtros de status/type). Alternativamente, adicionar um campo `kpi_total_count` na propria RPC paginada para garantir fonte unica.
+
+---
+
+### BUG 2 (ALTO): Periodo Anterior Removido -- Trends Sempre Nulos
+
+**Diagnostico**: A versao mais recente de `get_reconciliation_kpis` (migration `20260219141008`) removeu completamente o calculo do periodo anterior. O JSON retornado so tem `current`, sem `previous`. No frontend (linhas 293-300), `calcTrend` sempre retorna `null` porque `previousKpis` esta vazio.
+
+**Impacto**: Os badges de tendencia ("+X% vs periodo anterior") nunca aparecem. A comparacao temporal esta desabilitada silenciosamente.
+
+**Correcao**: Restaurar o bloco de periodo anterior na RPC, calculando `v_prev_start` e `v_prev_end` da mesma forma que `get_financial_summary` faz (subtraindo a duracao do periodo).
+
+---
+
+### BUG 3 (MEDIO): Modo Consolidado Infla KPIs com Transacoes Sem Banco
+
+**Evidencia SQL**: Existem **170 transacoes sem bank_account_id** no periodo Dec-Feb, sendo 105 delas marcadas como `reconciled = true`. Quando filtrado para "Consolidado (Todos)", tanto a KPI quanto a lista incluem essas 170 transacoes.
+
+```text
+Scope               | Total | Reconciled | Pending
+all_transactions     |  497  |    432     |   65
+with_bank_only       |  327  |    327     |    0
 ```
 
-```ts
-// StageFlowCard.tsx — linha 50
-function inferVibeFromPersona(persona: string | null | undefined): VibeId | null {
-  if (!persona) return null;
-  // Match direto por ID curto
-  const validIds: VibeId[] = ['proactive', 'technical', 'supportive_sales', 'supportive'];
-  if (validIds.includes(persona as VibeId)) return persona as VibeId;
-  // Fallback: match por xmlPrompt (dados legados)
-  const match = AI_PERSONA_PRESETS.find(p => p.xmlPrompt === persona);
-  if (match && match.id in VIBE_CONFIG) return match.id as VibeId;
-  return null;
-}
-```
+Todos os 65 pendentes sao transacoes SEM banco! Elas aparecem como "aguardando conciliacao" mas nao podem ser conciliadas porque nao estao vinculadas a nenhum banco. O progresso (77%) e artificialmente baixo.
 
-## 2. Bug do XML Raso (AISandbox.tsx)
+**Correcao**: No modo consolidado, filtrar apenas transacoes COM `bank_account_id IS NOT NULL` na RPC de KPIs e na lista paginada. Alternativamente, separar os KPIs em "Com banco" vs "Sem banco" para dar visibilidade sem distorcer o progresso.
 
-**Problema**: Agora `ai_persona` pode ser `"supportive_sales"` (ID curto). O sandbox precisa resolver para o xmlPrompt real antes de montar o system prompt.
+---
 
-**Fix** (linha 76-78):
-```ts
-const activePersona = aiSetting?.ai_persona ?? pipelineDefault?.ai_persona ?? undefined;
-// Resolve ID curto → xmlPrompt completo
-const resolvedPreset = activePersona
-  ? AI_PERSONA_PRESETS.find(p => p.id === activePersona) ?? AI_PERSONA_PRESETS.find(p => p.xmlPrompt === activePersona)
-  : undefined;
+### BUG 4 (MEDIO): Type Variants Inconsistentes Entre RPCs
 
-// No sandboxConfig (linha 88):
-aiPersona: resolvedPreset?.xmlPrompt ?? activePersona,
-allowEmojis: resolvedPreset?.allowEmojis ?? false,
-```
+**Diagnostico**: A RPC `get_reconciliation_kpis` verifica `type = 'revenue'` e `type = 'expense'` (exato). Mas `get_financial_summary` e `get_bank_statement_paginated` verificam `type IN ('revenue', 'income', 'Entrada')` e `type IN ('expense', 'despesa', 'Saida')`.
 
-## 3. Bug de Layout (AIAutomationDashboard.tsx + SandboxFloatingCard.tsx)
+**Status atual**: Nao ha dados com tipos legados (validado por query). Mas e uma brecha: se qualquer fluxo criar transacao com tipo diferente, a KPI de conciliacao vai ignorar.
 
-**Problema**: `SandboxFloatingCard` com `col-span-2` e classes de posicionamento interfere na rolagem.
+**Correcao**: Alinhar o `get_reconciliation_kpis` para usar os mesmos IN-lists de tipo que as demais RPCs.
 
-**Fix**: Eliminar o wrapper `SandboxFloatingCard` do dashboard. Colocar o `AISandbox` direto na coluna direita com `sticky top-4`:
+---
 
-```tsx
-{/* AIAutomationDashboard.tsx — linha 222-238 */}
-<div className="hidden lg:flex lg:col-span-2 sticky top-4 self-start">
-  <div className="w-full h-[calc(100vh-12rem)] max-h-[680px] overflow-hidden rounded-2xl border border-border/50 bg-card/80 backdrop-blur-xl shadow-2xl">
-    <AISandbox ... />
-  </div>
-</div>
-```
+## Plano de Execucao
 
-O `SandboxFloatingCard.tsx` pode ser mantido mas não será mais usado no dashboard. O import será removido.
+### Passo 1: Reescrever `get_reconciliation_kpis` (Migration SQL)
+- Adicionar filtro `bank_account_id IS NOT NULL` quando em modo consolidado
+- Restaurar calculo de periodo anterior (previous period)
+- Alinhar type checks para `IN ('revenue', 'income', 'Entrada')` / `IN ('expense', 'despesa', 'Saida')`
+- Manter assinatura identica (4 params)
 
-## Arquivos Afetados
+### Passo 2: Alinhar "registros encontrados" com KPI total
+- No `ReconciliationPage.tsx`, substituir `{totalCount} registros encontrados` por `{kpis.totalCount} registros encontrados` para usar a mesma fonte dos KPI cards
+- Ou melhor: manter `totalCount` da lista paginada para refletir filtros ativos (status/tipo), e exibir separadamente "X de Y" nos KPIs
 
-| Arquivo | Mudanca |
-|---|---|
-| `StageFlowCard.tsx` | `inferVibeFromPersona` com match por ID curto + `handleVibeChange` salva ID |
-| `AISandbox.tsx` | Resolver ID curto → xmlPrompt antes de montar config |
-| `AIAutomationDashboard.tsx` | Inline sticky div, remover `SandboxFloatingCard` |
+### Passo 3: Corrigir lista paginada para modo consolidado
+- Na RPC `get_bank_statement_paginated`, quando `v_bank_uuid IS NULL`, adicionar `AND t.bank_account_id IS NOT NULL` para excluir transacoes sem banco da tela de conciliacao bancaria
 
+### Passo 4: Validacao cruzada pos-correcao
+- Query SQL comparando `total_count` do KPI vs `COUNT(*)` da lista com mesmos filtros
+- Verificar que `reconciled_count + pending_count + ignored_count = total_count`
+- Confirmar que progresso 100% quando todos os itens com banco estao conciliados

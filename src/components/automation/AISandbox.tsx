@@ -74,8 +74,9 @@ export function AISandbox({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const activePersona = aiSetting?.ai_persona ?? pipelineDefault?.ai_persona ?? undefined;
-  const matchedPreset = activePersona
-    ? AI_PERSONA_PRESETS.find(p => p.xmlPrompt === activePersona)
+  // Resolve ID curto → xmlPrompt completo (retrocompat: tenta match por id, depois por xmlPrompt)
+  const resolvedPreset = activePersona
+    ? AI_PERSONA_PRESETS.find(p => p.id === activePersona) ?? AI_PERSONA_PRESETS.find(p => p.xmlPrompt === activePersona)
     : undefined;
   
   const sandboxConfig = selectedStage && selectedPipeline ? {
@@ -85,12 +86,12 @@ export function AISandbox({
     stageName: selectedStage.name,
     nextStageName,
     aiName: aiSetting?.ai_name ?? pipelineDefault?.ai_name ?? globalAgentName ?? undefined,
-    aiPersona: activePersona,
+    aiPersona: resolvedPreset?.xmlPrompt ?? activePersona,
     aiObjective: aiSetting?.ai_objective ?? pipelineDefault?.ai_objective ?? undefined,
     dealTitle: selectedPipeline.name,
     companyName,
     globalBaseInstructions,
-    allowEmojis: matchedPreset?.allowEmojis ?? false,
+    allowEmojis: resolvedPreset?.allowEmojis ?? false,
   } : null;
   
   const { messages, isLoading, lastViolations, sendMessage, clearChat } = useAISandbox(sandboxConfig);

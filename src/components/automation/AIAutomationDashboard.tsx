@@ -8,7 +8,6 @@ import { useGlobalAiConfig } from "@/hooks/useGlobalAiConfig";
 import { usePipelineAiDefaults } from "@/hooks/usePipelineAiDefaults";
 import { SalesFlowTimeline } from "./SalesFlowTimeline";
 import { AISandbox } from "./AISandbox";
-import { SandboxFloatingCard } from "./SandboxFloatingCard";
 import { PipelineAiDefaultsModal } from "./PipelineAiDefaultsModal";
 import { NewPipelineModal } from "@/components/crm/NewPipelineModal";
 import { NewStageModal } from "@/components/crm/NewStageModal";
@@ -220,21 +219,23 @@ export function AIAutomationDashboard() {
               />
             </div>
 
-            {/* Right column — floating card pinned to viewport */}
-            <SandboxFloatingCard>
-              <AISandbox
-                selectedStage={selectedStage}
-                selectedPipeline={selectedPipeline}
-                aiSetting={selectedAiSetting}
-                pipelineDefault={pipelineDefault}
-                nextStageName={nextStage?.name}
-                companyName={globalConfig?.company_name ?? undefined}
-                globalBaseInstructions={
-                  globalConfig?.base_instructions ?? undefined
-                }
-                globalAgentName={globalConfig?.agent_name ?? undefined}
-              />
-            </SandboxFloatingCard>
+            {/* Right column — sticky sidebar */}
+            <div className="hidden lg:flex lg:col-span-2 sticky top-4 self-start">
+              <div className="w-full h-[calc(100vh-12rem)] max-h-[680px] overflow-hidden rounded-2xl border border-border/50 bg-card/80 backdrop-blur-xl shadow-2xl">
+                <AISandbox
+                  selectedStage={selectedStage}
+                  selectedPipeline={selectedPipeline}
+                  aiSetting={selectedAiSetting}
+                  pipelineDefault={pipelineDefault}
+                  nextStageName={nextStage?.name}
+                  companyName={globalConfig?.company_name ?? undefined}
+                  globalBaseInstructions={
+                    globalConfig?.base_instructions ?? undefined
+                  }
+                  globalAgentName={globalConfig?.agent_name ?? undefined}
+                />
+              </div>
+            </div>
           </div>
         </TabsContent>
 
