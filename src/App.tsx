@@ -210,10 +210,7 @@ function App() {
                       <Route path="producers" element={<ProducerSettings />} />
                       <Route path="companies" element={<CompanySettings />} />
                       <Route path="ramos" element={<RamoSettings />} />
-                      <Route path="products" element={<ProductSettings />} />
                       <Route path="transactions" element={<TransactionSettings />} />
-                      <Route path="chat-tork" element={<ChatTorkSettings />} />
-                      <Route path="portal" element={<PortalSettings />} />
                     </Route>
                   </Route>
 
