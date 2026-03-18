@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Bot, Loader2 } from "lucide-react";
+import { Bot, Loader2, Layers, Sparkles, Settings2, GitBranch } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCRMPipelines } from "@/hooks/useCRMPipelines";
 import { useCRMStages } from "@/hooks/useCRMDeals";
