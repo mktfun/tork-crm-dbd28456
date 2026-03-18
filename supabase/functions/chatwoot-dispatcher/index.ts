@@ -729,6 +729,41 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ message: 'AI inactive' }), { headers: { 'Content-Type': 'application/json' } })
     }
 
+    // 6b. Pre-evaluate objective completion (only for existing deals with objectives, not auto-created)
+    let objectiveResult = { completed: false, previousStageId: null as string | null, previousStageName: null as string | null, newStageId: null as string | null, newStageName: null as string | null }
+    if (currentDeal && !autoCreatedDeal && stageAiSettings?.ai_objective && userId && role !== 'admin') {
+      objectiveResult = await evaluateObjectiveCompletion({
+        deal: currentDeal,
+        stage: currentStage,
+        stageAiSettings,
+        userId,
+        chatwootConversationId: conversation.id,
+        brokerageId,
+      })
+
+      // If stage was completed, update references for payload
+      if (objectiveResult.completed && objectiveResult.newStageId) {
+        // Reload new stage settings for the prompt
+        const { data: newStageData } = await supabase
+          .from('crm_stages')
+          .select('id, name, pipeline_id, position')
+          .eq('id', objectiveResult.newStageId)
+          .maybeSingle()
+
+        if (newStageData) {
+          currentStage = newStageData
+          currentDeal = { ...currentDeal, stage_id: newStageData.id }
+
+          const { data: newSettings } = await supabase
+            .from('crm_ai_settings')
+            .select('*')
+            .eq('stage_id', newStageData.id)
+            .maybeSingle()
+          stageAiSettings = newSettings
+        }
+      }
+    }
+
     // 7. Resolve n8n webhook URL
     let finalN8nUrl = N8N_WEBHOOK_URL
     if (userId) {
@@ -767,6 +802,11 @@ Deno.serve(async (req) => {
           attachment_urls: mediaResult.attachmentUrls,
           allowed_tools: promptResult.allowedTools,
           knowledge_context: promptResult.knowledgeContext,
+          // New enriched fields
+          auto_created_deal: autoCreatedDeal,
+          stage_completed: objectiveResult.completed,
+          previous_stage_id: objectiveResult.previousStageId,
+          previous_stage_name: objectiveResult.previousStageName,
         }
       }
 
