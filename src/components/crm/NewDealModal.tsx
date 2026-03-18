@@ -5,6 +5,7 @@ import { useCRMDeals, useCRMStages } from '@/hooks/useCRMDeals';
 import { useCRMPipelines } from '@/hooks/useCRMPipelines';
 import type { CRMStage } from '@/hooks/useCRMDeals';
 import { ClientSearchCombobox, type ClientOption } from './ClientSearchCombobox';
+import { ProductSelect } from './ProductSelect';
 import {
   Dialog,
   DialogContent,
@@ -49,6 +50,7 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
     title: '',
     client_id: '',
     stage_id: '',
+    product_id: '',
     value: '',
     expected_close_date: '',
     notes: ''
@@ -69,6 +71,7 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
         title: defaultTitle || '',
         client_id: defaultClientId || '',
         stage_id: defaultStageId || '',
+        product_id: '',
         value: '',
         expected_close_date: '',
         notes: defaultNotes || ''
@@ -154,11 +157,12 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
         title: formData.title,
         client_id: formData.client_id || null,
         stage_id: formData.stage_id,
+        product_id: formData.product_id && formData.product_id !== 'none' ? formData.product_id : null,
         value: parseFloat(formData.value) || 0,
         expected_close_date: formData.expected_close_date || null,
         notes: formData.notes || null,
         position
-      });
+      } as any);
 
       if (formData.client_id) {
         syncChatwootInBackground(newDeal.id);
@@ -266,6 +270,15 @@ export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClient
                   )}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Produto */}
+            <div className="col-span-2 space-y-2">
+              <Label>Produto</Label>
+              <ProductSelect
+                value={formData.product_id}
+                onValueChange={(value) => setFormData({ ...formData, product_id: value })}
+              />
             </div>
 
             {/* Valor */}
