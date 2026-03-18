@@ -205,7 +205,7 @@ function App() {
                     <Route path="documentacao" element={<Documentation />} />
                     <Route path="solicitacoes-portal" element={<PortalInboxLayout />}>
                       <Route index element={<PortalInboxSolicitacoes />} />
-                      <Route path="admin" element={<AdminDashboard />} />
+                      <Route path="admin" element={<JJAdminDashboard />} />
                       <Route path="admin/leads" element={<AdminLeads />} />
                       <Route path="admin/leads/:id" element={<AdminLeadDetail />} />
                       <Route path="admin/logs" element={<AdminLogs />} />
