@@ -40,7 +40,7 @@ import CRM from "./pages/CRM";
 import AIAutomation from "./pages/AIAutomation";
 import ChatTorkSettings from "./pages/settings/ChatTorkSettings";
 import PortalSettings from "./pages/settings/PortalSettings";
-import ProductSettings from "./pages/settings/ProductSettings";
+
 import Documentation from "./pages/Documentation";
 import PortalInbox from "./pages/PortalInbox";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
