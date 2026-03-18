@@ -1,74 +1,115 @@
 
-# Auditoria dos KPIs da Tela de Conciliacao
 
-## Discrepancias Identificadas (com evidencia SQL)
+# Plano: Módulo de Produtos (CRM) + Funis Padrão + Frontend
 
-### BUG 1 (CRITICO): Contagem "Registros Encontrados" vs "Progresso" Divergentes
+## Resumo
 
-**Evidencia no screenshot**: O header da lista mostra **488 registros encontrados** mas o card de Progresso mostra **298 de 388 conciliados**. Sao duas fontes diferentes:
-- "488 registros" vem da RPC `get_bank_statement_paginated` (campo `total_count` via `COUNT(*) OVER()`)
-- "388 total / 298 conciliados" vem da RPC `get_reconciliation_kpis` (campo `total_count`)
-
-Ambas as RPCs usam os mesmos filtros base (user_id, banco, datas, is_void). Porem a lista aplica `p_status` e `p_type` como filtros adicionais (mesmo quando "todas/todos" deveria ser identico). A divergencia de 100 itens (488 vs 388) indica que uma das RPCs tem um filtro extra ou diferente.
-
-**Causa provavel**: A RPC paginada faz LEFT JOIN com `bank_statement_entries` e `profiles` que pode gerar duplicatas via `string_agg` no ledger. Ou a KPI RPC nao filtra por `status IN ('confirmed','completed')` enquanto a lista nao filtra por isso tambem -- porem alguma diferenca sutil no WHERE causa a divergencia.
-
-**Correcao**: Unificar: a KPI RPC deve usar EXATAMENTE a mesma CTE/WHERE da lista paginada (sem os filtros de status/type). Alternativamente, adicionar um campo `kpi_total_count` na propria RPC paginada para garantir fonte unica.
+4 mudanças: criar tabela `crm_products`, adicionar `product_id` em `crm_deals`, atualizar seed de onboarding com funis e produtos padrão, criar tela de gestão de produtos em Settings, e integrar `ProductSelect` nos formulários de Deal.
 
 ---
 
-### BUG 2 (ALTO): Periodo Anterior Removido -- Trends Sempre Nulos
+## MUDANÇA 1: Banco de Dados (2 Migrations)
 
-**Diagnostico**: A versao mais recente de `get_reconciliation_kpis` (migration `20260219141008`) removeu completamente o calculo do periodo anterior. O JSON retornado so tem `current`, sem `previous`. No frontend (linhas 293-300), `calcTrend` sempre retorna `null` porque `previousKpis` esta vazio.
+### Migration A — Tabela `crm_products`
 
-**Impacto**: Os badges de tendencia ("+X% vs periodo anterior") nunca aparecem. A comparacao temporal esta desabilitada silenciosamente.
+```sql
+CREATE TABLE public.crm_products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-**Correcao**: Restaurar o bloco de periodo anterior na RPC, calculando `v_prev_start` e `v_prev_end` da mesma forma que `get_financial_summary` faz (subtraindo a duracao do periodo).
+CREATE INDEX idx_crm_products_user_id ON public.crm_products(user_id);
+ALTER TABLE public.crm_products ENABLE ROW LEVEL SECURITY;
 
----
+-- RLS (padrão user_id como todo o CRM)
+CREATE POLICY "Users can view own products" ON public.crm_products FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own products" ON public.crm_products FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own products" ON public.crm_products FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own products" ON public.crm_products FOR DELETE USING (auth.uid() = user_id);
 
-### BUG 3 (MEDIO): Modo Consolidado Infla KPIs com Transacoes Sem Banco
-
-**Evidencia SQL**: Existem **170 transacoes sem bank_account_id** no periodo Dec-Feb, sendo 105 delas marcadas como `reconciled = true`. Quando filtrado para "Consolidado (Todos)", tanto a KPI quanto a lista incluem essas 170 transacoes.
-
-```text
-Scope               | Total | Reconciled | Pending
-all_transactions     |  497  |    432     |   65
-with_bank_only       |  327  |    327     |    0
+CREATE TRIGGER update_crm_products_updated_at BEFORE UPDATE ON public.crm_products
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
-Todos os 65 pendentes sao transacoes SEM banco! Elas aparecem como "aguardando conciliacao" mas nao podem ser conciliadas porque nao estao vinculadas a nenhum banco. O progresso (77%) e artificialmente baixo.
+**Nota**: `company_id` é nullable (produto pode existir sem vínculo direto a seguradora). `user_id` é a chave de ownership para RLS, consistente com todo o sistema.
 
-**Correcao**: No modo consolidado, filtrar apenas transacoes COM `bank_account_id IS NOT NULL` na RPC de KPIs e na lista paginada. Alternativamente, separar os KPIs em "Com banco" vs "Sem banco" para dar visibilidade sem distorcer o progresso.
+### Migration B — Coluna `product_id` em `crm_deals`
 
----
-
-### BUG 4 (MEDIO): Type Variants Inconsistentes Entre RPCs
-
-**Diagnostico**: A RPC `get_reconciliation_kpis` verifica `type = 'revenue'` e `type = 'expense'` (exato). Mas `get_financial_summary` e `get_bank_statement_paginated` verificam `type IN ('revenue', 'income', 'Entrada')` e `type IN ('expense', 'despesa', 'Saida')`.
-
-**Status atual**: Nao ha dados com tipos legados (validado por query). Mas e uma brecha: se qualquer fluxo criar transacao com tipo diferente, a KPI de conciliacao vai ignorar.
-
-**Correcao**: Alinhar o `get_reconciliation_kpis` para usar os mesmos IN-lists de tipo que as demais RPCs.
+```sql
+ALTER TABLE public.crm_deals ADD COLUMN product_id UUID REFERENCES public.crm_products(id) ON DELETE SET NULL;
+CREATE INDEX idx_crm_deals_product_id ON public.crm_deals(product_id);
+```
 
 ---
 
-## Plano de Execucao
+## MUDANÇA 2: Seed de Onboarding (`seed_user_defaults`)
 
-### Passo 1: Reescrever `get_reconciliation_kpis` (Migration SQL)
-- Adicionar filtro `bank_account_id IS NOT NULL` quando em modo consolidado
-- Restaurar calculo de periodo anterior (previous period)
-- Alinhar type checks para `IN ('revenue', 'income', 'Entrada')` / `IN ('expense', 'despesa', 'Saida')`
-- Manter assinatura identica (4 params)
+Atualizar a função SQL `seed_user_defaults` via nova migration com `CREATE OR REPLACE FUNCTION`:
 
-### Passo 2: Alinhar "registros encontrados" com KPI total
-- No `ReconciliationPage.tsx`, substituir `{totalCount} registros encontrados` por `{kpis.totalCount} registros encontrados` para usar a mesma fonte dos KPI cards
-- Ou melhor: manter `totalCount` da lista paginada para refletir filtros ativos (status/tipo), e exibir separadamente "X de Y" nos KPIs
+- Adicionar criação de 2 pipelines padrão: **"Seguros"** (is_default=true) e **"Sinistros e Assistência"** (is_default=false), com etapas padrão para cada um.
+- Inserir 5 produtos padrão na `crm_products`: "Seguro Auto", "Seguro Vida", "Seguro Residencial", "Consórcio", "Fiança Locatícia".
 
-### Passo 3: Corrigir lista paginada para modo consolidado
-- Na RPC `get_bank_statement_paginated`, quando `v_bank_uuid IS NULL`, adicionar `AND t.bank_account_id IS NOT NULL` para excluir transacoes sem banco da tela de conciliacao bancaria
+Esses registros usam `p_user_id` como `user_id`, sem `company_id` (genéricos).
 
-### Passo 4: Validacao cruzada pos-correcao
-- Query SQL comparando `total_count` do KPI vs `COUNT(*)` da lista com mesmos filtros
-- Verificar que `reconciled_count + pending_count + ignored_count = total_count`
-- Confirmar que progresso 100% quando todos os itens com banco estao conciliados
+---
+
+## MUDANÇA 3: Frontend — Tela de Produtos
+
+### Novos arquivos:
+
+| Arquivo | Função |
+|---|---|
+| `src/hooks/useProducts.ts` | Hook com `useQuery`/`useMutation` para CRUD de `crm_products` |
+| `src/components/settings/ProductsManager.tsx` | Componente principal: DataTable + botão criar |
+| `src/components/settings/ProductDialog.tsx` | Dialog modal para criar/editar produto |
+| `src/pages/settings/ProductSettings.tsx` | Page wrapper |
+
+### Rota:
+- Em `App.tsx`: adicionar `<Route path="products" element={<ProductSettings />} />` dentro do bloco `settings`.
+- Em `SettingsLayout.tsx` e `SettingsNavigation.tsx`: adicionar tab "Produtos" com ícone `Package` entre Ramos e Chat Tork.
+
+### Layout da tela:
+- Header: "Produtos / Ramos" com subtexto descritivo
+- DataTable com colunas: Nome, Descrição (truncada), Status (Badge verde/cinza), Ações (DropdownMenu com Editar/Desativar/Excluir)
+- `ProductDialog`: form com campos Nome, Descrição (textarea), toggle is_active
+- Deleção: soft delete (is_active=false) se houver deals vinculados, hard delete se não houver
+
+---
+
+## MUDANÇA 4: ProductSelect nos Formulários de Deal
+
+### Novo componente:
+`src/components/crm/ProductSelect.tsx` — Select/Combobox que busca `crm_products` ativos via `useProducts` hook.
+
+### Integração:
+- **`NewDealModal.tsx`**: Adicionar campo `product_id` no `formData`, renderizar `<ProductSelect>` entre Pipeline/Etapa e Valor, passar no `createDeal.mutateAsync`.
+- **`DealDetailsModal.tsx`**: Adicionar `product_id` ao `formData` de edição, exibir na seção de detalhes, incluir no `handleSave`. Exibir como Badge o nome do produto no header do deal.
+- **`useCRMDeals.ts`**: Expandir a query do `createDeal` e `updateDeal` para incluir `product_id`. Adicionar join no select: `product:crm_products(id, name)`.
+- **Interface `CRMDeal`**: Adicionar `product_id` e `product?: { id: string; name: string }`.
+
+---
+
+## Arquivos afetados
+
+| Arquivo | Tipo |
+|---|---|
+| Nova migration SQL (crm_products + alter crm_deals) | Criar |
+| Nova migration SQL (seed_user_defaults atualizado) | Criar |
+| `src/hooks/useProducts.ts` | Criar |
+| `src/components/settings/ProductsManager.tsx` | Criar |
+| `src/components/settings/ProductDialog.tsx` | Criar |
+| `src/pages/settings/ProductSettings.tsx` | Criar |
+| `src/components/crm/ProductSelect.tsx` | Criar |
+| `src/App.tsx` | Editar (nova rota) |
+| `src/layouts/SettingsLayout.tsx` | Editar (nova tab) |
+| `src/components/settings/SettingsNavigation.tsx` | Editar (novo item) |
+| `src/hooks/useCRMDeals.ts` | Editar (product_id no CRUD + join) |
+| `src/components/crm/NewDealModal.tsx` | Editar (ProductSelect) |
+| `src/components/crm/DealDetailsModal.tsx` | Editar (ProductSelect + exibição) |
+
