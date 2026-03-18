@@ -158,6 +158,10 @@ export default function CRM() {
             <BarChart3 className="h-4 w-4" />
             Insights
           </TabsTrigger>
+          <TabsTrigger value="products" className="gap-1.5">
+            <Package className="h-4 w-4" />
+            Produtos
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pipeline">
