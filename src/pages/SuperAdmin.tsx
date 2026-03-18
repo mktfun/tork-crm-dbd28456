@@ -14,6 +14,7 @@ import { KpiCard } from '@/components/policies/KpiCard';
 import { AppCard } from '@/components/ui/app-card';
 import { ApiKeysManager } from '@/components/superadmin/ApiKeysManager';
 import { AuditLogsViewer } from '@/components/superadmin/AuditLogsViewer';
+import { AdminControlCenter } from '@/components/superadmin/AdminControlCenter';
 import { 
   LayoutDashboard, 
   Cpu, 
@@ -25,7 +26,8 @@ import {
   Eye,
   CheckCircle2,
   XCircle,
-  Clock
+  Clock,
+  SlidersHorizontal
 } from 'lucide-react';
 
 export default function SuperAdmin() {
