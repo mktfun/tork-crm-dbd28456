@@ -7,6 +7,221 @@ const N8N_WEBHOOK_URL = Deno.env.get('N8N_WEBHOOK_URL')
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
 const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions'
 
+// ──────────────────────────────────────────────
+// HELPER: Auto-create deal for leads without negotiation
+// ──────────────────────────────────────────────
+async function autoCreateDeal(userId: string, clientId: string, clientName: string | null): Promise<{
+  deal: any; stage: any; stageAiSettings: any; autoCreated: boolean;
+} | null> {
+  try {
+    // Find default pipeline
+    const { data: defaultPipeline } = await supabase
+      .from('crm_pipelines')
+      .select('id, name')
+      .eq('user_id', userId)
+      .eq('is_default', true)
+      .maybeSingle()
+
+    if (!defaultPipeline) {
+      console.log('⚠️ No default pipeline found for user:', userId)
+      return null
+    }
+
+    // Find first stage of default pipeline
+    const { data: firstStage } = await supabase
+      .from('crm_stages')
+      .select('id, name, pipeline_id, position')
+      .eq('pipeline_id', defaultPipeline.id)
+      .order('position', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (!firstStage) {
+      console.log('⚠️ No stages found in default pipeline:', defaultPipeline.id)
+      return null
+    }
+
+    // Create deal
+    const dealTitle = clientName ? `Atendimento - ${clientName}` : 'Novo Atendimento'
+    const { data: newDeal, error: dealError } = await supabase
+      .from('crm_deals')
+      .insert({
+        user_id: userId,
+        client_id: clientId,
+        stage_id: firstStage.id,
+        title: dealTitle,
+        position: 0,
+        last_sync_source: 'dispatcher',
+      })
+      .select('id, title, stage_id')
+      .single()
+
+    if (dealError) {
+      console.error('❌ Failed to auto-create deal:', dealError)
+      return null
+    }
+
+    console.log(`✅ Auto-created deal "${newDeal.title}" in stage "${firstStage.name}"`)
+
+    // Load AI settings for this stage
+    const { data: settings } = await supabase
+      .from('crm_ai_settings')
+      .select('*')
+      .eq('stage_id', firstStage.id)
+      .maybeSingle()
+
+    return {
+      deal: { ...newDeal, crm_stages: firstStage },
+      stage: firstStage,
+      stageAiSettings: settings,
+      autoCreated: true,
+    }
+  } catch (err) {
+    console.error('❌ autoCreateDeal error:', err)
+    return null
+  }
+}
+
+// ──────────────────────────────────────────────
+// HELPER: Pre-evaluate stage objective completion
+// ──────────────────────────────────────────────
+async function evaluateObjectiveCompletion(params: {
+  deal: any;
+  stage: any;
+  stageAiSettings: any;
+  userId: string;
+  chatwootConversationId: number;
+  brokerageId: number | null;
+}): Promise<{ completed: boolean; previousStageId: string | null; previousStageName: string | null; newStageId: string | null; newStageName: string | null }> {
+  const result = { completed: false, previousStageId: null as string | null, previousStageName: null as string | null, newStageId: null as string | null, newStageName: null as string | null }
+
+  const objective = params.stageAiSettings?.ai_objective
+  if (!objective || !LOVABLE_API_KEY) return result
+
+  // Fetch last messages from Chatwoot
+  let recentMessages = ''
+  try {
+    if (params.brokerageId) {
+      const { data: brokerage } = await supabase
+        .from('brokerages')
+        .select('chatwoot_url, chatwoot_token, chatwoot_account_id')
+        .eq('id', params.brokerageId)
+        .maybeSingle()
+
+      if (brokerage?.chatwoot_url && brokerage?.chatwoot_token && brokerage?.chatwoot_account_id) {
+        const cwUrl = brokerage.chatwoot_url.replace(/\/+$/, '')
+        const messagesResp = await fetch(
+          `${cwUrl}/api/v1/accounts/${brokerage.chatwoot_account_id}/conversations/${params.chatwootConversationId}/messages`,
+          { headers: { api_access_token: brokerage.chatwoot_token } }
+        )
+        if (messagesResp.ok) {
+          const messagesData = await messagesResp.json()
+          const msgs = (messagesData.payload || []).slice(-6)
+          recentMessages = msgs.map((m: any) => `${m.message_type === 0 ? 'Cliente' : 'Agente'}: ${m.content || '[mídia]'}`).join('\n')
+        }
+      }
+    }
+  } catch (err) {
+    console.error('⚠️ Failed to fetch Chatwoot messages for evaluation:', err)
+  }
+
+  if (!recentMessages) return result
+
+  // Quick AI evaluation
+  try {
+    const evalResp = await fetch(AI_GATEWAY_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'Você é um avaliador. Responda APENAS "SIM" ou "NAO", sem explicações.' },
+          { role: 'user', content: `Dado o objetivo da etapa: "${objective}"\n\nHistórico recente:\n${recentMessages}\n\nO objetivo foi atingido?` }
+        ],
+        max_tokens: 5,
+        temperature: 0,
+      })
+    })
+
+    if (evalResp.ok) {
+      const evalData = await evalResp.json()
+      const answer = (evalData.choices?.[0]?.message?.content || '').trim().toUpperCase()
+      console.log(`🎯 Objective evaluation: "${answer}" for deal ${params.deal.id}`)
+
+      if (answer === 'SIM') {
+        result.completed = true
+        result.previousStageId = params.stage.id
+        result.previousStageName = params.stage.name
+
+        // Determine target stage
+        let targetStageId: string | null = null
+
+        // Check completion action first
+        if (params.stageAiSettings?.ai_completion_action) {
+          try {
+            const action = typeof params.stageAiSettings.ai_completion_action === 'string'
+              ? JSON.parse(params.stageAiSettings.ai_completion_action)
+              : params.stageAiSettings.ai_completion_action
+            if (action.type === 'move_stage' && action.target_stage_id) {
+              targetStageId = action.target_stage_id
+            }
+          } catch { /* ignore */ }
+        }
+
+        // Fallback: next stage by position
+        if (!targetStageId && params.stage.pipeline_id) {
+          const { data: nextStage } = await supabase
+            .from('crm_stages')
+            .select('id, name')
+            .eq('pipeline_id', params.stage.pipeline_id)
+            .gt('position', params.stage.position)
+            .order('position', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+          if (nextStage) targetStageId = nextStage.id
+        }
+
+        if (targetStageId) {
+          // Move the deal
+          const { error: moveError } = await supabase
+            .from('crm_deals')
+            .update({ stage_id: targetStageId, last_sync_source: 'dispatcher' })
+            .eq('id', params.deal.id)
+
+          if (!moveError) {
+            const { data: newStageData } = await supabase
+              .from('crm_stages')
+              .select('id, name')
+              .eq('id', targetStageId)
+              .maybeSingle()
+
+            result.newStageId = targetStageId
+            result.newStageName = newStageData?.name || null
+            console.log(`🚀 Deal ${params.deal.id} moved from "${params.stage.name}" to "${result.newStageName}"`)
+
+            // Log event
+            await supabase.from('crm_deal_events').insert({
+              deal_id: params.deal.id,
+              event_type: 'stage_change',
+              old_value: params.stage.name,
+              new_value: result.newStageName,
+              source: 'dispatcher_auto',
+              created_by: params.userId,
+            }).catch(() => {})
+          } else {
+            console.error('❌ Failed to move deal:', moveError)
+            result.completed = false
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('⚠️ Objective evaluation error:', err)
+  }
+
+  return result
+}
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 // ──────────────────────────────────────────────
@@ -182,6 +397,7 @@ async function buildSystemPrompt(params: {
   let nextStageId: string | null = null
   let nextStageName: string | null = null
   let allowedTools: string[] = []
+  let globalBaseInstructions: string | null = null
 
   // Fetch global config
   if (userId) {
@@ -195,9 +411,8 @@ async function buildSystemPrompt(params: {
       agentName = globalConfig.agent_name || agentName
       companyName = globalConfig.company_name || companyName
       voiceTone = globalConfig.voice_tone || voiceTone
+      globalBaseInstructions = globalConfig.base_instructions || null
     }
-
-    const globalBaseInstructions = globalConfig?.base_instructions || null
 
     const { data: aiConfig } = await supabase
       .from('crm_ai_config')
@@ -244,20 +459,15 @@ async function buildSystemPrompt(params: {
   systemPrompt += `</tools_manual>\n\n`
 
   if (!deal) {
-    // No deal — generic mode, infer context
+    // No deal — client not registered yet (auto-creation couldn't run)
     const basePerson = globalBaseInstructions || stageAiSettings?.ai_persona || 'Você é um assistente de vendas útil e amigável.'
     systemPrompt += `<persona>\n${basePerson}\n</persona>\n\n`
     systemPrompt += `<objective>\n`
-    systemPrompt += `CLIENTE NOVO: Não há negociação aberta para este contato.\n`
-    systemPrompt += `Sua missão:\n`
-    systemPrompt += `1. Conversar naturalmente, sem perguntar diretamente "o que você precisa?"\n`
-    systemPrompt += `2. Identificar nas entrelinhas: qual produto o cliente busca, urgência, perfil\n`
-    systemPrompt += `3. Ao identificar o contexto, use list_pipelines_and_stages para ver funis disponíveis\n`
-    systemPrompt += `4. Crie o deal com create_deal no funil/etapa mais adequados\n`
-    systemPrompt += `5. A partir daí, siga o objetivo da etapa automaticamente\n`
+    systemPrompt += `CLIENTE NÃO CADASTRADO: Primeiro crie o contato com create_contact (peça nome e telefone).\n`
+    systemPrompt += `Após criar o contato, o sistema criará automaticamente a negociação na próxima mensagem.\n`
     systemPrompt += `</objective>\n\n`
 
-    allowedTools = ['search_contact', 'create_contact', 'create_deal', 'list_pipelines_and_stages', 'update_deal_stage']
+    allowedTools = ['search_contact', 'create_contact']
   } else {
     // Has deal — stage-specific mode
     stageAiIsActive = stageAiSettings?.is_active ?? false
@@ -435,6 +645,7 @@ Deno.serve(async (req) => {
     let currentDeal: any = null
     let currentStage: any = null
     let stageAiSettings: any = null
+    let autoCreatedDeal = false
 
     const contactPhone = sender?.phone_number
     const contactEmail = sender?.email
@@ -476,6 +687,15 @@ Deno.serve(async (req) => {
               .maybeSingle()
             stageAiSettings = settings
           }
+        } else if (userId && role !== 'admin') {
+          // Auto-create deal for leads without negotiation
+          const autoResult = await autoCreateDeal(userId, clientId, clientData?.name || sender?.name || null)
+          if (autoResult) {
+            currentDeal = autoResult.deal
+            currentStage = autoResult.stage
+            stageAiSettings = autoResult.stageAiSettings
+            autoCreatedDeal = true
+          }
         }
       }
     }
@@ -502,6 +722,41 @@ Deno.serve(async (req) => {
     if (!promptResult.aiIsActive && role !== 'admin') {
       console.log('🚫 AI inactive for this user config')
       return new Response(JSON.stringify({ message: 'AI inactive' }), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // 6b. Pre-evaluate objective completion (only for existing deals with objectives, not auto-created)
+    let objectiveResult = { completed: false, previousStageId: null as string | null, previousStageName: null as string | null, newStageId: null as string | null, newStageName: null as string | null }
+    if (currentDeal && !autoCreatedDeal && stageAiSettings?.ai_objective && userId && role !== 'admin') {
+      objectiveResult = await evaluateObjectiveCompletion({
+        deal: currentDeal,
+        stage: currentStage,
+        stageAiSettings,
+        userId,
+        chatwootConversationId: conversation.id,
+        brokerageId,
+      })
+
+      // If stage was completed, update references for payload
+      if (objectiveResult.completed && objectiveResult.newStageId) {
+        // Reload new stage settings for the prompt
+        const { data: newStageData } = await supabase
+          .from('crm_stages')
+          .select('id, name, pipeline_id, position')
+          .eq('id', objectiveResult.newStageId)
+          .maybeSingle()
+
+        if (newStageData) {
+          currentStage = newStageData
+          currentDeal = { ...currentDeal, stage_id: newStageData.id }
+
+          const { data: newSettings } = await supabase
+            .from('crm_ai_settings')
+            .select('*')
+            .eq('stage_id', newStageData.id)
+            .maybeSingle()
+          stageAiSettings = newSettings
+        }
+      }
     }
 
     // 7. Resolve n8n webhook URL
@@ -542,6 +797,11 @@ Deno.serve(async (req) => {
           attachment_urls: mediaResult.attachmentUrls,
           allowed_tools: promptResult.allowedTools,
           knowledge_context: promptResult.knowledgeContext,
+          // New enriched fields
+          auto_created_deal: autoCreatedDeal,
+          stage_completed: objectiveResult.completed,
+          previous_stage_id: objectiveResult.previousStageId,
+          previous_stage_name: objectiveResult.previousStageName,
         }
       }
 
