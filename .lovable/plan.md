@@ -1,115 +1,51 @@
 
 
-# Plano: Módulo de Produtos (CRM) + Funis Padrão + Frontend
+# Plano: Limpar dados CRM da conta JJ Amorim e alinhar com seed padrão
 
-## Resumo
+## Situação atual (contato@jjamorimseguros.com.br)
 
-4 mudanças: criar tabela `crm_products`, adicionar `product_id` em `crm_deals`, atualizar seed de onboarding com funis e produtos padrão, criar tela de gestão de produtos em Settings, e integrar `ProductSelect` nos formulários de Deal.
+**Pipelines existentes:**
+- "Auto" (default) — 7 etapas (inclui "teste")
+- "Consorcio" — 6 etapas
 
----
+**Deals:** 3 deals no pipeline "Consorcio" (todos em "Perdido" — são testes)
 
-## MUDANÇA 1: Banco de Dados (2 Migrations)
+**Produtos:** Apenas "Auto" e "Residencial"
 
-### Migration A — Tabela `crm_products`
+**O que o seed cria para novos usuários:**
+- Pipeline "Seguros" (default): Novo Lead → Em Contato → Proposta Enviada → Negociação → Fechado Ganho → Perdido
+- Pipeline "Sinistros e Assistência": Abertura → Documentação → Em Análise → Aprovado → Negado → Concluído
+- Produtos: Seguro Auto, Seguro Vida, Seguro Residencial, Consórcio, Fiança Locatícia
 
-```sql
-CREATE TABLE public.crm_products (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+## Ações (via SQL direto no banco — dados, não schema)
 
-CREATE INDEX idx_crm_products_user_id ON public.crm_products(user_id);
-ALTER TABLE public.crm_products ENABLE ROW LEVEL SECURITY;
+### 1. Deletar deals de teste
+Os 3 deals são testes em "Perdido". Deletar para limpar referências.
 
--- RLS (padrão user_id como todo o CRM)
-CREATE POLICY "Users can view own products" ON public.crm_products FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own products" ON public.crm_products FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own products" ON public.crm_products FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own products" ON public.crm_products FOR DELETE USING (auth.uid() = user_id);
+### 2. Deletar AI settings, stages e pipelines antigos
+Remover `crm_ai_settings` → `crm_stages` → `crm_pipelines` do user `65b85549...`
 
-CREATE TRIGGER update_crm_products_updated_at BEFORE UPDATE ON public.crm_products
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-```
+### 3. Deletar produtos antigos
+Remover "Auto" e "Residencial"
 
-**Nota**: `company_id` é nullable (produto pode existir sem vínculo direto a seguradora). `user_id` é a chave de ownership para RLS, consistente com todo o sistema.
+### 4. Executar seed padrão
+Chamar `seed_user_defaults('65b85549-c928-4513-8d56-a3ef41512dc8')` — mas isso também recriaria seguradoras e ramos (que já existem).
 
-### Migration B — Coluna `product_id` em `crm_deals`
+**Alternativa melhor:** inserir manualmente apenas os pipelines, stages e produtos padrão para evitar duplicar seguradoras/ramos.
 
-```sql
-ALTER TABLE public.crm_deals ADD COLUMN product_id UUID REFERENCES public.crm_products(id) ON DELETE SET NULL;
-CREATE INDEX idx_crm_deals_product_id ON public.crm_deals(product_id);
-```
+### 5. Atualizar DEFAULT_STAGES no frontend
+O array `DEFAULT_STAGES` em `useCRMPipelines.ts` (linha 24-30) ainda usa as etapas genéricas. Atualizar para refletir as etapas do pipeline "Seguros" (que são as mesmas, então na verdade já está correto).
 
----
+## Resumo de operações
 
-## MUDANÇA 2: Seed de Onboarding (`seed_user_defaults`)
-
-Atualizar a função SQL `seed_user_defaults` via nova migration com `CREATE OR REPLACE FUNCTION`:
-
-- Adicionar criação de 2 pipelines padrão: **"Seguros"** (is_default=true) e **"Sinistros e Assistência"** (is_default=false), com etapas padrão para cada um.
-- Inserir 5 produtos padrão na `crm_products`: "Seguro Auto", "Seguro Vida", "Seguro Residencial", "Consórcio", "Fiança Locatícia".
-
-Esses registros usam `p_user_id` como `user_id`, sem `company_id` (genéricos).
-
----
-
-## MUDANÇA 3: Frontend — Tela de Produtos
-
-### Novos arquivos:
-
-| Arquivo | Função |
+| Operação | Tipo |
 |---|---|
-| `src/hooks/useProducts.ts` | Hook com `useQuery`/`useMutation` para CRUD de `crm_products` |
-| `src/components/settings/ProductsManager.tsx` | Componente principal: DataTable + botão criar |
-| `src/components/settings/ProductDialog.tsx` | Dialog modal para criar/editar produto |
-| `src/pages/settings/ProductSettings.tsx` | Page wrapper |
+| DELETE deals de teste | Dados (SQL insert tool) |
+| DELETE ai_settings do user | Dados |
+| DELETE stages do user | Dados |
+| DELETE pipelines do user | Dados |
+| DELETE produtos do user | Dados |
+| INSERT 2 pipelines + 12 stages + 5 produtos | Dados |
 
-### Rota:
-- Em `App.tsx`: adicionar `<Route path="products" element={<ProductSettings />} />` dentro do bloco `settings`.
-- Em `SettingsLayout.tsx` e `SettingsNavigation.tsx`: adicionar tab "Produtos" com ícone `Package` entre Ramos e Chat Tork.
-
-### Layout da tela:
-- Header: "Produtos / Ramos" com subtexto descritivo
-- DataTable com colunas: Nome, Descrição (truncada), Status (Badge verde/cinza), Ações (DropdownMenu com Editar/Desativar/Excluir)
-- `ProductDialog`: form com campos Nome, Descrição (textarea), toggle is_active
-- Deleção: soft delete (is_active=false) se houver deals vinculados, hard delete se não houver
-
----
-
-## MUDANÇA 4: ProductSelect nos Formulários de Deal
-
-### Novo componente:
-`src/components/crm/ProductSelect.tsx` — Select/Combobox que busca `crm_products` ativos via `useProducts` hook.
-
-### Integração:
-- **`NewDealModal.tsx`**: Adicionar campo `product_id` no `formData`, renderizar `<ProductSelect>` entre Pipeline/Etapa e Valor, passar no `createDeal.mutateAsync`.
-- **`DealDetailsModal.tsx`**: Adicionar `product_id` ao `formData` de edição, exibir na seção de detalhes, incluir no `handleSave`. Exibir como Badge o nome do produto no header do deal.
-- **`useCRMDeals.ts`**: Expandir a query do `createDeal` e `updateDeal` para incluir `product_id`. Adicionar join no select: `product:crm_products(id, name)`.
-- **Interface `CRMDeal`**: Adicionar `product_id` e `product?: { id: string; name: string }`.
-
----
-
-## Arquivos afetados
-
-| Arquivo | Tipo |
-|---|---|
-| Nova migration SQL (crm_products + alter crm_deals) | Criar |
-| Nova migration SQL (seed_user_defaults atualizado) | Criar |
-| `src/hooks/useProducts.ts` | Criar |
-| `src/components/settings/ProductsManager.tsx` | Criar |
-| `src/components/settings/ProductDialog.tsx` | Criar |
-| `src/pages/settings/ProductSettings.tsx` | Criar |
-| `src/components/crm/ProductSelect.tsx` | Criar |
-| `src/App.tsx` | Editar (nova rota) |
-| `src/layouts/SettingsLayout.tsx` | Editar (nova tab) |
-| `src/components/settings/SettingsNavigation.tsx` | Editar (novo item) |
-| `src/hooks/useCRMDeals.ts` | Editar (product_id no CRUD + join) |
-| `src/components/crm/NewDealModal.tsx` | Editar (ProductSelect) |
-| `src/components/crm/DealDetailsModal.tsx` | Editar (ProductSelect + exibição) |
+Nenhuma alteração de schema. Nenhuma alteração de código (o seed já está correto).
 
