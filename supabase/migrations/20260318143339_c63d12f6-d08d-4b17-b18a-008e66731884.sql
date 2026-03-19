@@ -173,5 +173,11 @@ BEGIN
     (p_user_id, 'Consórcio', 'Consórcio de bens e imóveis'),
     (p_user_id, 'Fiança Locatícia', 'Garantia locatícia para contratos de aluguel');
 
+  -- =============================================
+  -- Configuração Global de IA Padrão
+  -- =============================================
+  INSERT INTO public.crm_ai_global_config (user_id, agent_name, company_name, voice_tone, base_instructions, onboarding_completed, ai_provider, ai_model) VALUES
+    (p_user_id, 'Assistente Tork', 'Corretora', 'friendly', 'Você é um assistente de vendas útil e amigável.', false, 'gemini', 'gemini-2.0-flash');
+
 END;
 $$;
