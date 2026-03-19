@@ -780,6 +780,34 @@ Deno.serve(async (req) => {
       clientData = fetchedClient
       clientId = clientData?.id || null
 
+      // Auto-register new client from Chatwoot contact
+      if (!clientId && userId && role !== 'admin') {
+        const newClientName = sender?.name || 'Contato Chatwoot'
+        const newPhone = contactPhone ? contactPhone.replace(/\D/g, '') : ''
+        const newEmail = contactEmail || ''
+
+        const { data: newClient, error: clientErr } = await supabase
+          .from('clientes')
+          .insert({
+            user_id: userId,
+            name: newClientName,
+            phone: newPhone,
+            email: newEmail,
+            chatwoot_contact_id: sender?.id || null,
+            observations: 'Cadastrado automaticamente via Chatwoot',
+          })
+          .select('id, name, ai_enabled')
+          .single()
+
+        if (newClient && !clientErr) {
+          clientData = newClient
+          clientId = newClient.id
+          console.log(`✅ Auto-registered client: "${newClientName}" (${clientId})`)
+        } else {
+          console.warn('⚠️ Failed to auto-register client:', clientErr?.message)
+        }
+      }
+
       // Guard: ai_enabled do cliente
       const clientAiEnabled = clientData?.ai_enabled ?? true
       if (!clientAiEnabled && role !== 'admin') {
