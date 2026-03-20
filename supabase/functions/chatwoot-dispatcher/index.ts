@@ -745,18 +745,10 @@ async function buildSystemPrompt(params: {
 }
 
 // ──────────────────────────────────────────────
-// MAIN HANDLER
+// BACKGROUND PROCESSOR
 // ──────────────────────────────────────────────
-Deno.serve(async (req) => {
+async function processWebhook(body: any) {
   try {
-    const body = await req.json()
-    console.log('📥 Dispatcher v2 — Event:', body.event)
-
-    // 1. Validate event
-    if (body.event !== 'message_created' || body.message_type !== 'incoming') {
-      return new Response(JSON.stringify({ message: 'Ignored event' }), { headers: { 'Content-Type': 'application/json' } })
-    }
-
     const { conversation, sender, content, attachments } = body
     const assigneeEmail = conversation?.meta?.assignee?.email
     const inboxId = conversation?.inbox_id
@@ -766,7 +758,7 @@ Deno.serve(async (req) => {
 
     if (!aiEnabled) {
       console.log('🚫 AI disabled for user:', userId)
-      return new Response(JSON.stringify({ message: 'AI disabled for this user' }), { headers: { 'Content-Type': 'application/json' } })
+      return
     }
 
     // 2.5 — Auto-detect producer or brokerage owner as admin by phone
@@ -824,7 +816,7 @@ Deno.serve(async (req) => {
             chatwoot_conversation_id: conversation.id,
             status: 'compiling', collected_data: [body],
           })
-          return new Response(JSON.stringify({ message: 'Modo de análise iniciado. Envie arquivos e digite "processar" para finalizar.' }), { headers: { 'Content-Type': 'application/json' } })
+          return
         }
       }
 
@@ -843,10 +835,10 @@ Deno.serve(async (req) => {
         if (messageContent2.includes('processar')) {
           await supabase.from('ai_analysis_sessions').update({ status: 'ready_for_processing', collected_data: collectedData }).eq('id', activeSession.id)
           supabase.functions.invoke('process-analysis-session', { body: { session_id: activeSession.id } }).catch(console.error)
-          return new Response(JSON.stringify({ message: 'Análise iniciada. Você será notificado quando terminar.' }), { headers: { 'Content-Type': 'application/json' } })
+          return
         } else {
           await supabase.from('ai_analysis_sessions').update({ collected_data: collectedData, expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() }).eq('id', activeSession.id)
-          return new Response(JSON.stringify({ message: 'Dados recebidos. Envie "processar" quando terminar.' }), { headers: { 'Content-Type': 'application/json' } })
+          return
         }
       }
     }
@@ -910,7 +902,7 @@ Deno.serve(async (req) => {
       const clientAiEnabled = clientData?.ai_enabled ?? true
       if (!clientAiEnabled && role !== 'admin') {
         console.log('🚫 AI disabled for client:', clientId)
-        return new Response(JSON.stringify({ message: 'IA desativada para este cliente, aguardando atendimento humano' }), { headers: { 'Content-Type': 'application/json' } })
+        return
       }
 
       if (clientId) {
@@ -973,7 +965,6 @@ Deno.serve(async (req) => {
       : `## NOVO CONTATO\nNome (do Chatwoot): ${sender?.name || 'desconhecido'}\nTelefone: ${contactPhone || 'desconhecido'}\nEste contato ainda não possui cadastro. O sistema cuidará automaticamente do cadastro e roteamento.\n`
 
     // 6. Build system prompt
-    // If we just auto-created a deal, we want to use the stage settings of the newly created deal
     const promptResult = await buildSystemPrompt({
       role, userId, clientId,
       deal: currentDeal, stage: currentStage, stageAiSettings,
@@ -989,7 +980,7 @@ Deno.serve(async (req) => {
 
     if (!promptResult.aiIsActive && role !== 'admin') {
       console.log('🚫 AI inactive for this user config')
-      return new Response(JSON.stringify({ message: 'AI inactive' }), { headers: { 'Content-Type': 'application/json' } })
+      return
     }
 
     // 6b. Pre-evaluate objective completion (only for existing deals with objectives, not auto-created)
@@ -1006,7 +997,6 @@ Deno.serve(async (req) => {
 
       // If stage was completed, update references for payload
       if (objectiveResult.completed && objectiveResult.newStageId) {
-        // Reload new stage settings for the prompt
         const { data: newStageData } = await supabase
           .from('crm_stages')
           .select('id, name, pipeline_id, position')
@@ -1065,7 +1055,6 @@ Deno.serve(async (req) => {
           attachment_urls: mediaResult.attachmentUrls,
           allowed_tools: promptResult.allowedTools,
           knowledge_context: promptResult.knowledgeContext,
-          // New enriched fields
           auto_created_deal: autoCreatedDeal,
           auto_created_product_id: autoCreatedProductId,
           auto_created_product_name: autoCreatedProductName,
@@ -1103,7 +1092,6 @@ Deno.serve(async (req) => {
         })()
 
         if (shouldFollowUp) {
-          // Check idempotency: don't create if one is already pending
           const { data: existingFollowUp } = await supabase
             .from('ai_follow_ups')
             .select('id')
@@ -1137,6 +1125,35 @@ Deno.serve(async (req) => {
       console.warn('⚠️ No N8N_WEBHOOK_URL configured')
     }
 
+    console.log('✅ Dispatcher processing complete')
+  } catch (error) {
+    console.error('❌ Background processing error:', error)
+  }
+}
+
+// ──────────────────────────────────────────────
+// MAIN HANDLER — Respond immediately, process in background
+// ──────────────────────────────────────────────
+Deno.serve(async (req) => {
+  try {
+    const body = await req.json()
+    console.log('📥 Dispatcher v2 — Event:', body.event)
+
+    // Quick validation — ignore non-incoming messages
+    if (body.event !== 'message_created' || body.message_type !== 'incoming') {
+      return new Response(JSON.stringify({ message: 'Ignored event' }), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // Fire-and-forget: process in background
+    const processing = processWebhook(body)
+
+    // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(processing)
+    }
+
+    // Return 200 immediately to Chatwoot
     return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } })
 
   } catch (error) {
@@ -1144,3 +1161,4 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: (error as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 })
+
