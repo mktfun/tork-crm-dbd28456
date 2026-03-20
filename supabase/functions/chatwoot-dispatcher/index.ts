@@ -181,8 +181,38 @@ async function autoCreateDeal(
       stages: (allStages || []).filter(s => s.pipeline_id === p.id).sort((a, b) => a.position - b.position),
     }))
 
-    // Combine message context for classification
-    const fullContext = [messageContent, transcription, extractedText].filter(Boolean).join('\n')
+    // Combine message context for classification — use conversation window when available
+    let fullContext = [messageContent, transcription, extractedText].filter(Boolean).join('\n')
+
+    // Fetch recent Chatwoot messages for better classification context
+    if (brokerageId && chatwootConversationId) {
+      try {
+        const { data: brokerage } = await supabase
+          .from('brokerages')
+          .select('chatwoot_url, chatwoot_token, chatwoot_account_id')
+          .eq('id', brokerageId)
+          .maybeSingle()
+
+        if (brokerage?.chatwoot_url && brokerage?.chatwoot_token && brokerage?.chatwoot_account_id) {
+          const cwUrl = brokerage.chatwoot_url.replace(/\/+$/, '')
+          const messagesResp = await fetch(
+            `${cwUrl}/api/v1/accounts/${brokerage.chatwoot_account_id}/conversations/${chatwootConversationId}/messages`,
+            { headers: { api_access_token: brokerage.chatwoot_token } }
+          )
+          if (messagesResp.ok) {
+            const messagesData = await messagesResp.json()
+            const msgs = (messagesData.payload || []).slice(-10)
+            const conversationHistory = msgs.map((m: any) => `${m.message_type === 0 ? 'Cliente' : 'Agente'}: ${m.content || '[mídia]'}`).join('\n')
+            if (conversationHistory) {
+              fullContext = conversationHistory
+              console.log(`📜 Classification using ${msgs.length} conversation messages`)
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Failed to fetch conversation history for classification:', err)
+      }
+    }
 
     // Try AI classification
     let targetStageId: string
