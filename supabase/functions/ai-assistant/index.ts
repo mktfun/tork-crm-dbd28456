@@ -2252,18 +2252,18 @@ serve(async (req) => {
       // Agora fazemos a chamada final com streaming
       console.log(`[STREAM-MODE] Tool calls resolved, starting final stream...`);
 
-      const streamResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      const streamResponse = await fetch(aiBaseUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Authorization': aiAuthHeader,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: userModel,
+          model: aiModelName,
           messages: currentMessages,
           stream: true,
-          max_tokens: 8192, // FASE P5: Expansão para respostas técnicas longas
-          temperature: 0.2, // FASE P5: Concisão técnica
+          max_tokens: 8192,
+          temperature: 0.2,
         }),
         signal: controller.signal,
       });
