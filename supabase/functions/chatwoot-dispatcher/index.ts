@@ -488,11 +488,11 @@ async function processAttachments(attachments: any[] | undefined) {
           }
 
         } else if (contentType.startsWith("image/") || contentType === "application/pdf") {
-          const aiResp = await fetch(AI_GATEWAY_URL, {
+          const aiResp = await fetch(resolvedAI.url, {
             method: "POST",
-            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+            headers: { Authorization: resolvedAI.auth, "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
+              model: resolvedAI.model,
               messages: [
                 { role: "system", content: "Extraia TODO o texto visível desta imagem/documento. Retorne o texto extraído de forma organizada, sem comentários adicionais." },
                 { role: "user", content: [
