@@ -263,7 +263,7 @@ async function evaluateObjectiveCompletion(params: {
   const result = { completed: false, previousStageId: null as string | null, previousStageName: null as string | null, newStageId: null as string | null, newStageName: null as string | null }
 
   const objective = params.stageAiSettings?.ai_objective
-  if (!objective || !LOVABLE_API_KEY) return result
+  if (!objective || !resolvedAI.auth) return result
 
   // Fetch last messages from Chatwoot
   let recentMessages = ''
