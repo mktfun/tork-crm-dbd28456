@@ -1,11 +1,42 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolveUserModel } from '../_shared/model-resolver.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const N8N_WEBHOOK_URL = Deno.env.get('N8N_WEBHOOK_URL')
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
 const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions'
+
+// Dynamic AI config — resolved per-request after userId is known
+let resolvedAI = {
+  url: AI_GATEWAY_URL,
+  auth: `Bearer ${LOVABLE_API_KEY || ''}`,
+  model: 'google/gemini-2.5-flash-lite',
+}
+
+function initAIConfig(resolved: { model: string; apiKey: string | null; provider: string | null }) {
+  if (resolved.apiKey && resolved.provider === 'gemini') {
+    resolvedAI = {
+      url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+      auth: `Bearer ${resolved.apiKey}`,
+      model: resolved.model.replace('google/', ''),
+    }
+  } else if (resolved.apiKey && resolved.provider === 'openai') {
+    resolvedAI = {
+      url: 'https://api.openai.com/v1/chat/completions',
+      auth: `Bearer ${resolved.apiKey}`,
+      model: resolved.model.replace('openai/', ''),
+    }
+  } else if (LOVABLE_API_KEY) {
+    resolvedAI = {
+      url: AI_GATEWAY_URL,
+      auth: `Bearer ${LOVABLE_API_KEY}`,
+      model: resolved.model || 'google/gemini-2.5-flash-lite',
+    }
+  }
+  console.log(`🔑 AI Config resolved: provider=${resolved.provider}, model=${resolvedAI.model}`)
+}
 
 // ──────────────────────────────────────────────
 // HELPER: AI-driven classification for pipeline, stage, and product
