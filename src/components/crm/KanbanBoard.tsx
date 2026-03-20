@@ -391,6 +391,7 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
   }
 
   return (
+    <>
     <div className="h-full flex flex-col">
       {/* Filter toolbar */}
       <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-xl bg-secondary/20 border border-border/50 shrink-0">
@@ -515,6 +516,7 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
           )}
         </DragOverlay>
       </DndContext>
+    </div>
 
       <NewDealModal
         open={showNewDealModal}
