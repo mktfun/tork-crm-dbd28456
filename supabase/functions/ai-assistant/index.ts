@@ -1139,20 +1139,6 @@ const TOOLS = [
   {
     type: "function",
     function: {
-      name: "analyze_client_360",
-      description: "SUPER TOOL: Realiza uma análise completa (360º) de um cliente. Retorna Perfil, Saúde, Risco de Churn, Apólices e Oportunidades em uma única chamada. USE SEMPRE que precisar saber 'tudo' sobre um cliente.",
-      parameters: {
-        type: "object",
-        properties: {
-          client_id: { type: "string", description: "ID do cliente a ser analisado." }
-        },
-        required: ["client_id"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
       name: "inspect_document",
       description: "SUPER CONSULTOR: Analisa documentos (Apólice, Vistoria) e gera argumentos de VENDA. Use quando o usuário pedir 'analise esta apólice', 'veja se serve', 'me ajude a vender'.",
       parameters: {
