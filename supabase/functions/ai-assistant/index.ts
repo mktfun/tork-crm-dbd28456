@@ -584,14 +584,14 @@ async function retrieveContext(query: string, supabase: any): Promise<string> {
       return '';
     }
 
-    // Generate embedding using Gemini text-embedding-004
+    // Generate embedding using Gemini text-embedding-005
     const embeddingResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${geminiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-005:embedContent?key=${geminiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'models/text-embedding-004',
+          model: 'models/text-embedding-005',
           content: { parts: [{ text: query }] },
           taskType: 'RETRIEVAL_QUERY',
           outputDimensionality: 768 // Match our vector column size
