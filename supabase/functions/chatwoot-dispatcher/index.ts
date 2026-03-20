@@ -1,11 +1,42 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolveUserModel } from '../_shared/model-resolver.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const N8N_WEBHOOK_URL = Deno.env.get('N8N_WEBHOOK_URL')
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
 const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions'
+
+// Dynamic AI config — resolved per-request after userId is known
+let resolvedAI = {
+  url: AI_GATEWAY_URL,
+  auth: `Bearer ${LOVABLE_API_KEY || ''}`,
+  model: 'google/gemini-2.5-flash-lite',
+}
+
+function initAIConfig(resolved: { model: string; apiKey: string | null; provider: string | null }) {
+  if (resolved.apiKey && resolved.provider === 'gemini') {
+    resolvedAI = {
+      url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+      auth: `Bearer ${resolved.apiKey}`,
+      model: resolved.model.replace('google/', ''),
+    }
+  } else if (resolved.apiKey && resolved.provider === 'openai') {
+    resolvedAI = {
+      url: 'https://api.openai.com/v1/chat/completions',
+      auth: `Bearer ${resolved.apiKey}`,
+      model: resolved.model.replace('openai/', ''),
+    }
+  } else if (LOVABLE_API_KEY) {
+    resolvedAI = {
+      url: AI_GATEWAY_URL,
+      auth: `Bearer ${LOVABLE_API_KEY}`,
+      model: resolved.model || 'google/gemini-2.5-flash-lite',
+    }
+  }
+  console.log(`🔑 AI Config resolved: provider=${resolved.provider}, model=${resolvedAI.model}`)
+}
 
 // ──────────────────────────────────────────────
 // HELPER: AI-driven classification for pipeline, stage, and product
@@ -15,7 +46,7 @@ async function classifyLeadWithAI(
   pipelines: Array<{ id: string; name: string; stages: Array<{ id: string; name: string; position: number }> }>,
   products: Array<{ id: string; name: string }>,
 ): Promise<{ pipeline_id: string; stage_id: string; product_id: string | null } | null> {
-  if (!LOVABLE_API_KEY || !messageContent) return null
+  if (!resolvedAI.auth || !messageContent) return null
 
   try {
     const pipelinesText = pipelines.map(p => {
@@ -45,14 +76,14 @@ Regras rigorosas:
 5. Use a primeira etapa (menor posição) do funil escolhido como stage_id.
 6. Responda APENAS com o JSON válido ou a palavra null. Não inclua markdown (\`\`\`json) nem explicações.`
 
-    const response = await fetch(AI_GATEWAY_URL, {
+    const response = await fetch(resolvedAI.url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': resolvedAI.auth,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
+        model: resolvedAI.model,
         messages: [
           { role: 'system', content: 'Você é um classificador de leads para uma corretora de seguros. Responda apenas com JSON válido ou null, sem markdown.' },
           { role: 'user', content: prompt },
@@ -106,6 +137,8 @@ async function autoCreateDeal(
   messageContent: string,
   transcription: string | null,
   extractedText: string | null,
+  brokerageId: number | null,
+  chatwootConversationId: number | null,
 ): Promise<{
   deal: any; stage: any; stageAiSettings: any; autoCreated: boolean; productId: string | null; productName: string | null;
 } | null> {
@@ -148,8 +181,38 @@ async function autoCreateDeal(
       stages: (allStages || []).filter(s => s.pipeline_id === p.id).sort((a, b) => a.position - b.position),
     }))
 
-    // Combine message context for classification
-    const fullContext = [messageContent, transcription, extractedText].filter(Boolean).join('\n')
+    // Combine message context for classification — use conversation window when available
+    let fullContext = [messageContent, transcription, extractedText].filter(Boolean).join('\n')
+
+    // Fetch recent Chatwoot messages for better classification context
+    if (brokerageId && chatwootConversationId) {
+      try {
+        const { data: brokerage } = await supabase
+          .from('brokerages')
+          .select('chatwoot_url, chatwoot_token, chatwoot_account_id')
+          .eq('id', brokerageId)
+          .maybeSingle()
+
+        if (brokerage?.chatwoot_url && brokerage?.chatwoot_token && brokerage?.chatwoot_account_id) {
+          const cwUrl = brokerage.chatwoot_url.replace(/\/+$/, '')
+          const messagesResp = await fetch(
+            `${cwUrl}/api/v1/accounts/${brokerage.chatwoot_account_id}/conversations/${chatwootConversationId}/messages`,
+            { headers: { api_access_token: brokerage.chatwoot_token } }
+          )
+          if (messagesResp.ok) {
+            const messagesData = await messagesResp.json()
+            const msgs = (messagesData.payload || []).slice(-10)
+            const conversationHistory = msgs.map((m: any) => `${m.message_type === 0 ? 'Cliente' : 'Agente'}: ${m.content || '[mídia]'}`).join('\n')
+            if (conversationHistory) {
+              fullContext = conversationHistory
+              console.log(`📜 Classification using ${msgs.length} conversation messages`)
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Failed to fetch conversation history for classification:', err)
+      }
+    }
 
     // Try AI classification
     let targetStageId: string
@@ -232,7 +295,7 @@ async function evaluateObjectiveCompletion(params: {
   const result = { completed: false, previousStageId: null as string | null, previousStageName: null as string | null, newStageId: null as string | null, newStageName: null as string | null }
 
   const objective = params.stageAiSettings?.ai_objective
-  if (!objective || !LOVABLE_API_KEY) return result
+  if (!objective || !resolvedAI.auth) return result
 
   // Fetch last messages from Chatwoot
   let recentMessages = ''
@@ -265,11 +328,11 @@ async function evaluateObjectiveCompletion(params: {
 
   // Quick AI evaluation
   try {
-    const evalResp = await fetch(AI_GATEWAY_URL, {
+    const evalResp = await fetch(resolvedAI.url, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: resolvedAI.auth, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: resolvedAI.model,
         messages: [
           { role: 'system', content: 'Você é um avaliador. Responda APENAS "SIM" ou "NAO", sem explicações.' },
           { role: 'user', content: `Dado o objetivo da etapa: "${objective}"\n\nHistórico recente:\n${recentMessages}\n\nO objetivo foi atingido?` }
@@ -421,7 +484,7 @@ async function processAttachments(attachments: any[] | undefined) {
     attachmentUrls: [] as string[],
   }
 
-  if (!attachments || attachments.length === 0 || !LOVABLE_API_KEY) return result
+  if (!attachments || attachments.length === 0 || !resolvedAI.auth) return result
 
     const processPromises = attachments.map(async (att) => {
       const url = att.data_url || att.url
@@ -436,11 +499,11 @@ async function processAttachments(attachments: any[] | undefined) {
           const audioBuffer = await audioResp.arrayBuffer()
           const base64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)))
 
-          const aiResp = await fetch(AI_GATEWAY_URL, {
+          const aiResp = await fetch(resolvedAI.url, {
             method: "POST",
-            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+            headers: { Authorization: resolvedAI.auth, "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
+              model: resolvedAI.model,
               messages: [
                 { role: "system", content: "Transcreva o áudio a seguir em português brasileiro. Retorne APENAS a transcrição, sem comentários." },
                 { role: "user", content: [
@@ -457,11 +520,11 @@ async function processAttachments(attachments: any[] | undefined) {
           }
 
         } else if (contentType.startsWith("image/") || contentType === "application/pdf") {
-          const aiResp = await fetch(AI_GATEWAY_URL, {
+          const aiResp = await fetch(resolvedAI.url, {
             method: "POST",
-            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+            headers: { Authorization: resolvedAI.auth, "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
+              model: resolvedAI.model,
               messages: [
                 { role: "system", content: "Extraia TODO o texto visível desta imagem/documento. Retorne o texto extraído de forma organizada, sem comentários adicionais." },
                 { role: "user", content: [
@@ -735,6 +798,12 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 2.6 — Resolve AI config from user's global settings
+    if (userId) {
+      const resolved = await resolveUserModel(supabase, userId)
+      initAIConfig(resolved)
+    }
+
     // 3. Analysis session logic (batch mode — kept from v1)
     const isAdmin = role === 'admin'
     if (userId && brokerageId) {
@@ -883,7 +952,8 @@ Deno.serve(async (req) => {
           // Auto-create deal for leads without negotiation (AI-driven classification)
           const autoResult = await autoCreateDeal(
             userId, clientId, clientData?.name || sender?.name || null,
-            content || '', mediaResult.transcription, mediaResult.extractedText
+            content || '', mediaResult.transcription, mediaResult.extractedText,
+            brokerageId, conversation?.id || null
           )
           if (autoResult) {
             currentDeal = autoResult.deal
