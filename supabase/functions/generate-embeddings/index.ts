@@ -9,7 +9,7 @@ const corsHeaders = {
 /**
  * Edge Function: generate-embeddings
  * 
- * Gera embeddings usando Gemini text-embedding-004 e armazena na base de conhecimento.
+ * Gera embeddings usando Gemini text-embedding-005 e armazena na base de conhecimento.
  * Usado para popular ai_knowledge_base com dados de normas SUSEP, produtos, etc.
  * 
  * Payload esperado:
