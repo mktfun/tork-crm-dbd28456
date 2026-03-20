@@ -46,7 +46,7 @@ async function classifyLeadWithAI(
   pipelines: Array<{ id: string; name: string; stages: Array<{ id: string; name: string; position: number }> }>,
   products: Array<{ id: string; name: string }>,
 ): Promise<{ pipeline_id: string; stage_id: string; product_id: string | null } | null> {
-  if (!LOVABLE_API_KEY || !messageContent) return null
+  if (!resolvedAI.auth || !messageContent) return null
 
   try {
     const pipelinesText = pipelines.map(p => {
