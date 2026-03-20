@@ -384,7 +384,7 @@ async function evaluateObjectiveCompletion(params: {
           // Move the deal
           const { error: moveError } = await supabase
             .from('crm_deals')
-            .update({ stage_id: targetStageId, last_sync_source: 'dispatcher' })
+            .update({ stage_id: targetStageId, last_sync_source: 'chatwoot' })
             .eq('id', params.deal.id)
 
           if (!moveError) {
