@@ -2069,18 +2069,38 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      clearTimeout(timeoutId);
-      throw new Error('LOVABLE_API_KEY não configurada');
-    }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Resolve dynamic model from user's global config
-    const userModel = await resolveUserModel(supabase, userId);
-    console.log(`[MODEL] Using model: ${userModel} for user ${userId}`);
+    const resolved = await resolveUserModel(supabase, userId);
+    
+    // Determine AI endpoint and auth based on user's config
+    let aiBaseUrl = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+    let aiAuthHeader = `Bearer ${LOVABLE_API_KEY}`;
+    let aiModelName = resolved.model;
+    
+    if (resolved.apiKey && resolved.provider === 'gemini') {
+      // User has their own Gemini key — call Google's OpenAI-compatible endpoint directly
+      aiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+      aiAuthHeader = `Bearer ${resolved.apiKey}`;
+      // Strip 'google/' prefix for direct Google API
+      aiModelName = resolved.model.replace('google/', '');
+      console.log(`[MODEL] Using user's Gemini key, model: ${aiModelName} for user ${userId}`);
+    } else if (resolved.apiKey && resolved.provider === 'openai') {
+      // User has their own OpenAI key
+      aiBaseUrl = 'https://api.openai.com/v1/chat/completions';
+      aiAuthHeader = `Bearer ${resolved.apiKey}`;
+      aiModelName = resolved.model.replace('openai/', '');
+      console.log(`[MODEL] Using user's OpenAI key, model: ${aiModelName} for user ${userId}`);
+    } else if (LOVABLE_API_KEY) {
+      console.log(`[MODEL] Using Lovable Gateway, model: ${aiModelName} for user ${userId}`);
+    } else {
+      clearTimeout(timeoutId);
+      throw new Error('Nenhuma API key configurada (nem Lovable, nem do usuário)');
+    }
 
     // Process attachments in user messages
     const processedMessages = messages.map((msg: any) => {
