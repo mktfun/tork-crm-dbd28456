@@ -40,8 +40,6 @@ export interface CRMDeal {
   product?: {
     id: string;
     name: string;
-    color?: string;
-    icon?: string;
   };
 }
 
