@@ -76,14 +76,14 @@ Regras rigorosas:
 5. Use a primeira etapa (menor posição) do funil escolhido como stage_id.
 6. Responda APENAS com o JSON válido ou a palavra null. Não inclua markdown (\`\`\`json) nem explicações.`
 
-    const response = await fetch(AI_GATEWAY_URL, {
+    const response = await fetch(resolvedAI.url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': resolvedAI.auth,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
+        model: resolvedAI.model,
         messages: [
           { role: 'system', content: 'Você é um classificador de leads para uma corretora de seguros. Responda apenas com JSON válido ou null, sem markdown.' },
           { role: 'user', content: prompt },
