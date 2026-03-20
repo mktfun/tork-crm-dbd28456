@@ -2226,19 +2226,19 @@ serve(async (req) => {
           });
         }
 
-        response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        response = await fetch(aiBaseUrl, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Authorization': aiAuthHeader,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: userModel,
+            model: aiModelName,
             messages: currentMessages,
             tools: TOOLS,
             tool_choice: 'auto',
-            max_tokens: 8192, // FASE P5: Expansão para alta densidade de dados
-            temperature: 0.2, // FASE P5: Concisão técnica e redução de alucinações
+            max_tokens: 8192,
+            temperature: 0.2,
           }),
           signal: controller.signal,
         });
