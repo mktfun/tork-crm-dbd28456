@@ -467,11 +467,11 @@ async function processAttachments(attachments: any[] | undefined) {
           const audioBuffer = await audioResp.arrayBuffer()
           const base64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)))
 
-          const aiResp = await fetch(AI_GATEWAY_URL, {
+          const aiResp = await fetch(resolvedAI.url, {
             method: "POST",
-            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+            headers: { Authorization: resolvedAI.auth, "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
+              model: resolvedAI.model,
               messages: [
                 { role: "system", content: "Transcreva o áudio a seguir em português brasileiro. Retorne APENAS a transcrição, sem comentários." },
                 { role: "user", content: [
