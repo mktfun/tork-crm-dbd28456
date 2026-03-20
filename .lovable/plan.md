@@ -1,69 +1,72 @@
 
 
-# Plano: Reescrever os 4 System Prompts com técnicas avançadas de humanização
+# Plano: 5 correções no CRM (Realtime, Badge IA, Histórico, Duplicatas, Layout)
 
-## Diagnóstico
+## 1. Realtime ainda não atualiza (deal não aparece sem F5)
 
-Os prompts atuais em `aiPresets.ts` têm problemas sérios:
+**Causa raiz**: O `REPLICA IDENTITY FULL` foi aplicado, mas o problema persiste. Investigando o código, o canal Realtime em `useCRMDeals.ts` (linha 289) usa `filter: user_id=eq.${user.id}`. Deals inseridos pelo dispatcher via `service_role` podem não emitir o payload completo mesmo com REPLICA IDENTITY FULL se o Realtime subscription foi criado antes da migration.
 
-1. **Emojis dentro de tags XML** (🛑, 💼, 📊) — poluem o prompt e confundem a IA
-2. **Instruções genéricas** — "Vá direto ao ponto", "Texto curto" são vagas demais
-3. **Sem técnicas avançadas** — faltam: chain-of-thought interno, few-shot examples, guardrails de alucinação, controle de tom por mensagem, anti-looping, fallback behavior
-4. **Não adaptados por persona** — a estrutura é copy-paste com pequenas variações de adjetivo
-5. **Sem simulação de pensamento** — a IA não tem um `<internal_reasoning>` para decidir o que fazer antes de responder
-6. **Sem regras de contexto WhatsApp** — não há instrução sobre tamanho de mensagem, quebras, tempo de resposta percebido
+**Correção dupla (fallback robusto)**:
+- Remover o filtro `filter` do canal Realtime em `useCRMDeals.ts` — ouvir todos os eventos de `crm_deals` e deixar o React Query filtrar no client-side. Isso garante que qualquer insert via service_role seja capturado.
+- Adicionar também `crm-deals` ao `useRealtimeClients.ts` como fallback global (já invalida `clients` e `all-clients`, adicionar `crm-deals`).
 
-## Solução — Prompt Engineering avançado por persona
+## 2. Badge "IA" no DealCard
 
-Cada persona receberá um prompt completo com estas seções técnicas:
+**O que**: Adicionar um badge pequeno no canto superior direito do card quando o deal foi criado pela IA (`last_sync_source === 'chatwoot'` e o deal não tem `notes` manual, ou melhor: usar a presença de `chatwoot_conversation_id` + verificar que `last_sync_source` é `'chatwoot'`).
 
-```text
-<system_prompt>
-  <identity>          — Quem é, backstory, traços de personalidade únicos
-  <voice>             — Tom exato, vocabulário permitido/proibido, cadência
-  <internal_reasoning>— Chain-of-thought silencioso antes de cada resposta
-  <conversation_flow> — Regras de fluxo (1 pergunta, anti-loop, fallback)
-  <qualification>     — Lógica de qualificação adaptada ao perfil
-  <objection_handling>— Como lidar com objeções (específico por persona)
-  <mission_protocol>  — Protocolo de conclusão com {{missao_ai}}
-  <output_rules>      — Formatação WhatsApp (max chars, quebras, proibições)
-  <few_shot_examples> — 2-3 exemplos de diálogo ideal por persona
-  <guardrails>        — Anti-alucinação, anti-promessa, anti-fuga de contexto
-</system_prompt>
+**Correção**: No `DealCard.tsx`, adicionar um badge "IA" no header do card quando `deal.last_sync_source === 'chatwoot'`.
+
+## 3. Evento de criação no histórico
+
+**Causa raiz**: O dispatcher não insere um `crm_deal_events` ao criar o deal. Quando o usuário abre o histórico, não há registro de criação.
+
+**Correção**: No dispatcher (`autoCreateDeal`), após criar o deal com sucesso, inserir um evento:
+```
+{ deal_id, event_type: 'creation', new_value: 'Criado pela IA | Produto: X | Funil: Y | Etapa: Z', source: 'ai_automation', created_by: null }
 ```
 
-### Diferenciação real entre personas
+O `renderEventDescription` já trata `event_type === 'creation'` e `source === 'ai_automation'` mostra badge "IA". Só precisa enriquecer a mensagem de criação para incluir produto/funil/etapa.
 
-| Persona | Diferencial técnico no prompt |
-|---|---|
-| **O Vendedor** | Raciocínio interno focado em qualificação BANT, âncoras de preço, urgência artificial, tom assertivo sem ser rude |
-| **O Amigo** | Espelhamento emocional (mirroring), validação antes de perguntar, transições suaves, vocabulário coloquial calibrado |
-| **O Técnico** | Diagnóstico por eliminação, jargão controlado (adapta ao nível do lead), autoridade via dados, zero opinião pessoal |
-| **O Geral** | Detecção dinâmica de contexto — começa amigável, endurece se o lead é B2B grande, suaviza se é pessoa física insegura |
+## 4. IA cria 3 deals ao invés de 1 (duplicatas)
 
-### Few-shot examples (novo)
+**Causa raiz**: O Chatwoot envia múltiplos webhooks rapidamente (message_created para cada mensagem, mais message_updated). O dispatcher recebe 3 webhooks quase simultâneos. Para cada um, a query de deals existentes (linha 948-954) retorna 0 resultados porque o primeiro insert ainda não commitou quando o segundo webhook chega.
 
-Cada persona terá 2-3 exemplos de troca de mensagens dentro de `<examples>` para ancorar o comportamento. Isso é a técnica mais eficaz para controlar tom e formato.
+**Correção**: Adicionar um check por `chatwoot_conversation_id` antes de criar o deal. Se já existe um deal aberto para aquela conversa, não criar outro:
+```sql
+-- Before autoCreateDeal insert:
+SELECT id FROM crm_deals 
+WHERE chatwoot_conversation_id = $conversationId 
+AND status = 'open' LIMIT 1
+```
+Se existir, pular a criação. Isso é mais confiável que o check por `client_id` porque a conversation_id é única.
 
-### Internal reasoning (novo)
-
-```xml
-<internal_reasoning>
-Antes de CADA resposta, pense silenciosamente (não escreva isso):
-1. O que o lead acabou de revelar? (dado novo)
-2. O que ainda falta para completar a missão?
-3. Qual a melhor próxima pergunta para avançar sem parecer interrogatório?
-4. O tom da última mensagem dele foi positivo, neutro ou resistente?
-   → Se resistente: valide antes de avançar
-   → Se positivo: avance naturalmente
-</internal_reasoning>
+Além disso, adicionar um `UNIQUE` constraint (parcial) na tabela para garantir no nível do banco:
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS crm_deals_unique_open_conversation 
+ON crm_deals (chatwoot_conversation_id) 
+WHERE status = 'open' AND chatwoot_conversation_id IS NOT NULL;
 ```
 
-## Arquivo afetado
+## 5. Layout — scrollbars excessivos e conteúdo cortado no zoom
+
+**Causa raiz**: O `RootLayout.tsx` linha 47 tem `max-w-7xl mx-auto` (~80rem = 1280px). Quando o viewport é maior (ex: zoom out), o conteúdo fica centralizado e "cortado" nos lados. As colunas do Kanban com `overflow-y-auto` cada uma gera seu próprio scrollbar.
+
+**Correção**:
+- `RootLayout.tsx`: Trocar `max-w-7xl` por `max-w-[1600px]` ou remover completamente para a página de CRM usar a largura total
+- `KanbanColumn.tsx` linha 129: Esconder scrollbar visual com `no-scrollbar` class (manter funcionalidade de scroll)
+- `KanbanBoard.tsx` linha 443: No container horizontal, também aplicar `no-scrollbar` para esconder o scrollbar horizontal, ou deixar um scrollbar mais fino com classes personalizadas
+
+## Arquivos afetados
 
 | Arquivo | Ação |
 |---|---|
-| `src/components/automation/aiPresets.ts` | Reescrever os 4 `xmlPrompt` com técnicas avançadas. Manter IDs (`proactive`, `supportive_sales`, `technical`, `supportive`), nomes e estrutura `AIPreset` intactos |
-
-Sem migration. Sem mudança de backend. Apenas os prompts no frontend (que são injetados no dispatcher e sandbox).
+| `src/hooks/useCRMDeals.ts` | Remover filtro do Realtime channel |
+| `src/hooks/useRealtimeClients.ts` | Adicionar invalidação de `crm-deals` |
+| `src/components/crm/DealCard.tsx` | Adicionar badge "IA" no canto superior direito |
+| `src/components/crm/DealDetailsModal.tsx` | Enriquecer `renderEventDescription` para `creation` com detalhes (produto/funil/etapa) |
+| `supabase/functions/chatwoot-dispatcher/index.ts` | (1) Check de conversa existente antes de criar deal. (2) Inserir `crm_deal_events` de criação |
+| `src/layouts/RootLayout.tsx` | Aumentar `max-w` para `max-w-[1600px]` |
+| `src/components/crm/KanbanColumn.tsx` | Adicionar `no-scrollbar` ao container de deals |
+| `src/components/crm/KanbanBoard.tsx` | Adicionar `no-scrollbar` ao container horizontal |
+| Migration SQL | Criar unique index parcial em `crm_deals(chatwoot_conversation_id) WHERE status='open'` |
 
