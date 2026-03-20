@@ -452,7 +452,7 @@ async function processAttachments(attachments: any[] | undefined) {
     attachmentUrls: [] as string[],
   }
 
-  if (!attachments || attachments.length === 0 || !LOVABLE_API_KEY) return result
+  if (!attachments || attachments.length === 0 || !resolvedAI.auth) return result
 
     const processPromises = attachments.map(async (att) => {
       const url = att.data_url || att.url
