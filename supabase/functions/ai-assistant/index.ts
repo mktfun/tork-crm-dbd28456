@@ -2170,14 +2170,14 @@ serve(async (req) => {
       const maxToolIterations = 10; // FASE GOD MODE: Aumentado para suportar cadeias complexas
 
       // Resolve tool calls first (não é possível streamar durante tool calls)
-      let response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      let response = await fetch(aiBaseUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Authorization': aiAuthHeader,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: userModel,
+          model: aiModelName,
           messages: currentMessages,
           tools: TOOLS,
           tool_choice: 'auto',
