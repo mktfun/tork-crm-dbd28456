@@ -952,7 +952,8 @@ Deno.serve(async (req) => {
           // Auto-create deal for leads without negotiation (AI-driven classification)
           const autoResult = await autoCreateDeal(
             userId, clientId, clientData?.name || sender?.name || null,
-            content || '', mediaResult.transcription, mediaResult.extractedText
+            content || '', mediaResult.transcription, mediaResult.extractedText,
+            brokerageId, conversation?.id || null
           )
           if (autoResult) {
             currentDeal = autoResult.deal
