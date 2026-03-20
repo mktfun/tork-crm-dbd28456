@@ -248,6 +248,8 @@ export function StageFlowCard({
             <Textarea
               value={mission}
               onChange={(e) => setMission(e.target.value)}
+              onFocus={() => { missionFocusedRef.current = true; }}
+              onBlur={() => { missionFocusedRef.current = false; }}
               placeholder="Ex: Descobrir CNPJ e quantidade de vidas"
               className="min-h-[60px] bg-secondary/50 border-border/50 text-sm resize-none"
               disabled={isSaving}
