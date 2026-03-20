@@ -1,16 +1,27 @@
 
 
-# Plano: Corrigir erro de build — Fragment JSX faltando
+# Plano: Corrigir bugs da IA (2 erros)
 
-## Problema
+## Erro 1 — `Duplicate function declaration: analyze_client_360` (400)
 
-`KanbanBoard.tsx` linha 542 tem `</>` (fechamento de fragment), mas não existe `<>` (abertura de fragment) correspondente. O `return` na linha 393 abre com `<div>` diretamente, mas depois na linha 519 existem modais como irmãos desse div, exigindo um fragment wrapper.
+A tool `analyze_client_360` está declarada **duas vezes** no array de tools:
+- Primeira: linha 879-892 (seção ANALYTICS)
+- Duplicata: linhas 1139-1152 (depois das tools CRUD)
 
-## Correção
+A API do Gemini rejeita tools duplicadas com erro 400.
 
-Adicionar `<>` na linha 394 (antes do `<div>`) para abrir o fragment que fecha na linha 542.
+**Correção**: Remover o bloco duplicado (linhas 1139-1152).
+
+## Erro 2 — RAG Embedding 404 (`text-embedding-004 not found`)
+
+O modelo `text-embedding-004` não existe mais na API v1beta do Gemini. Preciso verificar qual endpoint/modelo está sendo usado e atualizar.
+
+**Correção**: Localizar a chamada de embedding e atualizar o modelo para `text-embedding-005` ou o equivalente atual.
+
+## Arquivos afetados
 
 | Arquivo | Ação |
 |---|---|
-| `src/components/crm/KanbanBoard.tsx` | Adicionar `<>` após `return (` na linha 393-394 |
+| `supabase/functions/ai-assistant/index.ts` | Remover declaração duplicada de `analyze_client_360` (linhas 1139-1152) |
+| Arquivo de RAG/embedding (a localizar) | Atualizar modelo de embedding |
 
