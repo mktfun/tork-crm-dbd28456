@@ -1,98 +1,47 @@
 
 
-# Plano: Dispatcher usando config do usuário + classificação com janela de conversa
+# Plano: Corrigir 2 bugs na tela de Automação
 
-## Diagnóstico
+## Bug 1 — Missão "conclui do nada" enquanto digita
 
-Encontrei **2 problemas raiz** que causam o 401 e a falta de criação do deal:
+**Causa raiz**: O auto-save com debounce funciona assim:
+1. Usuário digita → `mission` muda → debounce 1.5s → `onSaveConfig()` salva no banco
+2. `onSuccess` do mutation chama `invalidateQueries(['crm-ai-settings'])` → re-fetch
+3. Re-fetch atualiza `aiSetting` → `currentObjective` muda → `useEffect` linha 94 executa `setMission(currentObjective)` → **textarea reseta para o valor do banco enquanto o usuário ainda digita**
+4. Toast "Configuração de IA salva com sucesso!" aparece a cada save, dando impressão de "concluído"
 
-### Problema 1: Dispatcher ignora a config de IA do usuário
-O dispatcher usa `LOVABLE_API_KEY` + `ai.gateway.lovable.dev` **hardcoded** em 5 pontos:
-- `classifyLeadWithAI()` (linha 48-51)
-- `evaluateObjectiveCompletion()` (linha 268-270)
-- `processAttachments()` (linhas 439-442, 460-462)
+**Correção**:
+- No `useEffect` de sync (linha 94-96): só sincronizar se o textarea **não estiver focado** (usar ref de foco)
+- Remover o toast de sucesso do `upsertSetting` (ou trocar para toast silencioso/sem notificação para auto-saves)
+- Alternativa mais simples: no `useEffect` de auto-save, não chamar `mutateAsync` (que mostra toast), e sim uma versão silenciosa
 
-Mas o `LOVABLE_API_KEY` do projeto retorna **401** no gateway. Enquanto isso, o usuário tem uma **Gemini API key funcional** salva em `crm_ai_global_config.api_key` (provider: `gemini`, model: `gemini-2.5-flash`).
+## Bug 2 — Follow-up não salva (dá erro)
 
-O `ai-assistant` e o `generate-summary` já foram corrigidos para usar `resolveUserModel()` e rotear direto para a API do Google quando há chave Gemini do usuário. Mas o **dispatcher nunca foi atualizado** — continua batendo no gateway com uma key que dá 401.
+**Causa raiz**: O `UpsertAiSettingParams` no hook `useCrmAiSettings.ts` **não inclui** os campos `follow_up_enabled`, `follow_up_interval_minutes`, `follow_up_max_attempts`, `follow_up_message`. O objeto de update/insert também não os passa. Quando o Switch de follow-up chama `onSaveConfig({ stage_id, follow_up_enabled: true })`, o mutation ignora o campo e o Supabase update envia `undefined` para tudo (setando campos para NULL).
 
-### Problema 2: Classificação usa só a última mensagem
-O `classifyLeadWithAI()` recebe só o `content` da mensagem atual. Quando o cliente diz "residencial" na 3a mensagem, o contexto de "preciso de um seguro" já se perdeu. A classificação recebe só "residencial" e pode não ter contexto suficiente para decidir.
+**Correção**:
+- Adicionar os 4 campos de follow-up ao `UpsertAiSettingParams`
+- Incluí-los no `.update()` e `.insert()` do mutation
+- Usar spread seletivo para não enviar `undefined` (que zera outros campos)
 
-### Problema 3: crm_ai_settings vazios
-Nenhuma etapa do pipeline "Seguros" tem `crm_ai_settings` configurado (todos `null`). Isso significa que mesmo se o deal fosse criado, o `stageAiIsActive` seria `false` e não teria persona/objetivo customizado. Isso não é um bug de código, mas o usuário precisa configurar na tela de automação.
-
-## Solução
-
-### 1. Importar `resolveUserModel` no dispatcher e resolver config dinâmica
-
-Após resolver o `userId`, chamar `resolveUserModel(supabase, userId)` para obter `{ model, apiKey, provider }`. Usar esses valores em vez dos hardcoded em todos os pontos de chamada de IA.
-
-Criar helper no topo do dispatcher:
-
-```typescript
-import { resolveUserModel } from '../_shared/model-resolver.ts'
-
-// Resolved at request time, after userId is known
-let resolvedAI: { url: string; auth: string; model: string } = {
-  url: AI_GATEWAY_URL,
-  auth: `Bearer ${LOVABLE_API_KEY}`,
-  model: 'google/gemini-2.5-flash-lite',
-}
-
-function initAIConfig(resolved: { model: string; apiKey: string | null; provider: string | null }) {
-  if (resolved.apiKey && resolved.provider === 'gemini') {
-    resolvedAI = {
-      url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-      auth: `Bearer ${resolved.apiKey}`,
-      model: resolved.model.replace('google/', ''),
-    }
-  } else if (resolved.apiKey && resolved.provider === 'openai') {
-    resolvedAI = {
-      url: 'https://api.openai.com/v1/chat/completions',
-      auth: `Bearer ${resolved.apiKey}`,
-      model: resolved.model.replace('openai/', ''),
-    }
-  } else if (LOVABLE_API_KEY) {
-    resolvedAI = {
-      url: AI_GATEWAY_URL,
-      auth: `Bearer ${LOVABLE_API_KEY}`,
-      model: resolved.model || 'google/gemini-2.5-flash-lite',
-    }
-  }
-}
-```
-
-Substituir todas as chamadas `fetch(AI_GATEWAY_URL, { headers: { Authorization: Bearer ${LOVABLE_API_KEY} } })` por `fetch(resolvedAI.url, { headers: { Authorization: resolvedAI.auth } })` e `model: resolvedAI.model`.
-
-**Pontos de substituição:** `classifyLeadWithAI`, `evaluateObjectiveCompletion`, `processAttachments` (2 chamadas).
-
-### 2. Classificação com janela de conversa
-
-Antes de chamar `classifyLeadWithAI`, buscar as últimas N mensagens da conversa no Chatwoot (já temos as credenciais via `brokerageId`) e concatenar como contexto:
-
-```typescript
-// Inside autoCreateDeal, before calling classifyLeadWithAI:
-let conversationHistory = messageContent
-if (brokerageId) {
-  // fetch last 10 messages from Chatwoot conversation
-  const msgs = await fetchRecentMessages(brokerageId, conversationId, 10)
-  if (msgs) conversationHistory = msgs + '\n' + messageContent
-}
-const aiResult = await classifyLeadWithAI(conversationHistory, pipelinesWithStages, activeProducts || [])
-```
-
-Isso requer passar `brokerageId` e `conversation.id` para `autoCreateDeal`.
-
-### 3. Assinatura atualizada de `autoCreateDeal`
-
-Adicionar parâmetros `brokerageId` e `chatwootConversationId` para poder buscar histórico.
-
-## Arquivos afetados
+## Mudanças
 
 | Arquivo | Ação |
 |---|---|
-| `supabase/functions/chatwoot-dispatcher/index.ts` | Importar `resolveUserModel`, criar helper `initAIConfig`, substituir 5 chamadas hardcoded, adicionar busca de histórico na classificação |
+| `src/hooks/useCrmAiSettings.ts` | Adicionar follow-up fields à interface e ao mutation. Mudar update para spread seletivo (só enviar campos presentes). |
+| `src/components/automation/StageFlowCard.tsx` | Adicionar ref de foco no textarea de missão para evitar sync durante digitação |
 
-Nenhuma migration. Nenhuma mudança de frontend. Apenas o dispatcher.
+## Detalhe técnico — Update seletivo
+
+O problema fundamental é que o update **sempre envia todos os campos**, mesmo quando `undefined`. Isso faz com que salvar `follow_up_enabled: true` zere `ai_objective` (porque não foi passado). A correção é filtrar campos `undefined` antes do update:
+
+```typescript
+// Build update payload with only defined fields
+const updatePayload: Record<string, any> = {};
+if (params.ai_name !== undefined) updatePayload.ai_name = params.ai_name;
+if (params.ai_objective !== undefined) updatePayload.ai_objective = params.ai_objective;
+// ... same for all fields including follow_up_*
+```
+
+Isso garante que salvar só o follow-up não zere a missão, e vice-versa.
 
