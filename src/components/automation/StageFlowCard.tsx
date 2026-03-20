@@ -91,9 +91,11 @@ export function StageFlowCard({
     if (isSelected) setIsExpanded(true);
   }, [isSelected]);
   
-  // Sync mission with external data
+  // Sync mission with external data — skip if user is typing
   useEffect(() => {
-    setMission(currentObjective || '');
+    if (!missionFocusedRef.current) {
+      setMission(currentObjective || '');
+    }
   }, [currentObjective]);
   
   // Sync vibe with external data — skip when change came from user click
