@@ -584,14 +584,14 @@ async function retrieveContext(query: string, supabase: any): Promise<string> {
       return '';
     }
 
-    // Generate embedding using Gemini text-embedding-004
+    // Generate embedding using Gemini text-embedding-005
     const embeddingResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${geminiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-005:embedContent?key=${geminiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'models/text-embedding-004',
+          model: 'models/text-embedding-005',
           content: { parts: [{ text: query }] },
           taskType: 'RETRIEVAL_QUERY',
           outputDimensionality: 768 // Match our vector column size
@@ -1133,20 +1133,6 @@ const TOOLS = [
           confirmed: { type: "boolean", description: "Deve ser true para confirmar a exclusão" }
         },
         required: ["policy_id", "confirmed"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "analyze_client_360",
-      description: "SUPER TOOL: Realiza uma análise completa (360º) de um cliente. Retorna Perfil, Saúde, Risco de Churn, Apólices e Oportunidades em uma única chamada. USE SEMPRE que precisar saber 'tudo' sobre um cliente.",
-      parameters: {
-        type: "object",
-        properties: {
-          client_id: { type: "string", description: "ID do cliente a ser analisado." }
-        },
-        required: ["client_id"]
       }
     }
   },
