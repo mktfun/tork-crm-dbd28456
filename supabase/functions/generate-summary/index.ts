@@ -247,8 +247,8 @@ async function gatherContext(
   return parts.join("\n\n") || "Sem dados disponíveis para análise.";
 }
 
-async function callAI(apiKey: string, context: string, scope: string, focus: string, model: string = "google/gemini-2.5-flash"): Promise<string> {
-  console.log(`[SUMMARY] Using model: ${model}, key prefix: ${apiKey.substring(0, 6)}...`);
+async function callAI(authHeader: string, url: string, context: string, scope: string, focus: string, model: string = "google/gemini-2.5-flash"): Promise<string> {
+  console.log(`[SUMMARY] Using model: ${model}, url: ${url}`);
 
   const scopeLabel = scope === "day" ? "do dia" : scope === "week" ? "da semana" : "do mês";
   const focusLabel =
@@ -267,10 +267,10 @@ REGRAS ABSOLUTAS:
 
   const userPrompt = `Analise os dados ${scopeLabel} com foco ${focusLabel} e gere um resumo executivo:\n\n${context}`;
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const response = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: authHeader,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
