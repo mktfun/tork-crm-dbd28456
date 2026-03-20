@@ -248,7 +248,7 @@ async function autoCreateDeal(
         product_id: productId,
         title: dealTitle,
         position: 0,
-        last_sync_source: 'dispatcher',
+        last_sync_source: 'chatwoot',
       })
       .select('id, title, stage_id, product_id')
       .single()
