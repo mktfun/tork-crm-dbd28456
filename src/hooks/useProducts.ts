@@ -9,6 +9,8 @@ export interface CRMProduct {
   company_id: string | null;
   name: string;
   description: string | null;
+  color: string | null;
+  icon: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -36,13 +38,15 @@ export function useProducts() {
   const activeProducts = (productsQuery.data || []).filter(p => p.is_active);
 
   const createProduct = useMutation({
-    mutationFn: async (product: { name: string; description?: string }) => {
+    mutationFn: async (product: { name: string; description?: string; color?: string; icon?: string }) => {
       const { data, error } = await (supabase as any)
         .from('crm_products')
         .insert({
           user_id: user!.id,
           name: product.name,
-          description: product.description || null
+          description: product.description || null,
+          color: product.color || null,
+          icon: product.icon || null
         })
         .select()
         .single();

@@ -137,7 +137,67 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
     }
   };
 
-  const handleDragOver = (event: DragOverEvent) => {};
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    if (activeId === overId) return;
+
+    const isActiveDeal = !activeId.startsWith('column-');
+    const isOverDeal = !overId.startsWith('column-');
+    const isOverColumn = overId.startsWith('column-');
+
+    if (!isActiveDeal) return;
+
+    // Dropping a deal over another deal
+    if (isActiveDeal && isOverDeal) {
+      const activeDeal = deals.find(d => d.id === activeId);
+      const overDeal = deals.find(d => d.id === overId);
+
+      if (!activeDeal || !overDeal) return;
+
+      if (activeDeal.stage_id !== overDeal.stage_id) {
+        // Optimistic update for cross-column drag over
+        const stageIds = stages.map(s => s.id);
+        const queryKey = ['crm-deals', user?.id, pipelineId, stageIds];
+        
+        queryClient.setQueryData<CRMDeal[]>(queryKey, (old) => {
+          if (!old) return old;
+          return old.map(d =>
+            d.id === activeId
+              ? { ...d, stage_id: overDeal.stage_id }
+              : d
+          );
+        });
+      }
+    }
+
+    // Dropping a deal over an empty column
+    if (isActiveDeal && isOverColumn) {
+      const activeDeal = deals.find(d => d.id === activeId);
+      const overStageId = overId.replace('column-', '');
+
+      if (!activeDeal) return;
+
+      if (activeDeal.stage_id !== overStageId) {
+        // Optimistic update for empty column drag over
+        const stageIds = stages.map(s => s.id);
+        const queryKey = ['crm-deals', user?.id, pipelineId, stageIds];
+        
+        queryClient.setQueryData<CRMDeal[]>(queryKey, (old) => {
+          if (!old) return old;
+          return old.map(d =>
+            d.id === activeId
+              ? { ...d, stage_id: overStageId }
+              : d
+          );
+        });
+      }
+    }
+  };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -193,7 +253,13 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
       }
 
       const deal = deals.find((d) => d.id === dealId);
-      if (!deal || deal.stage_id === targetStageId) {
+      if (!deal) {
+        setActiveId(null);
+        setActiveType(null);
+        return;
+      }
+
+      if (deal.stage_id === targetStageId) {
         setActiveId(null);
         setActiveType(null);
         return;
@@ -325,9 +391,9 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
   }
 
   return (
-    <>
+    <div className="h-full flex flex-col">
       {/* Filter toolbar */}
-      <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-xl bg-secondary/20 border border-border/50">
+      <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-xl bg-secondary/20 border border-border/50 shrink-0">
         <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[140px] h-8 text-xs">
@@ -373,7 +439,7 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4 min-h-[calc(100vh-280px)]">
+        <div className="flex gap-4 overflow-x-auto pb-4 flex-1 min-h-0">
           <SortableContext
             items={stages.map(s => `column-${s.id}`)}
             strategy={horizontalListSortingStrategy}

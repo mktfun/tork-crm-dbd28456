@@ -71,6 +71,22 @@ export function DealCard({ deal, isDragging, onClick, stageColor = '#3B82F6' }: 
         </h4>
       </div>
 
+      {/* Product Badge */}
+      {deal.product && (
+        <div className="mb-3">
+          <div 
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium shadow-sm border border-white/10"
+            style={{ 
+              backgroundColor: deal.product.color ? `${deal.product.color}20` : 'rgba(255,255,255,0.1)',
+              color: deal.product.color || '#fff'
+            }}
+          >
+            {deal.product.icon && <span>{deal.product.icon}</span>}
+            <span>{deal.product.name}</span>
+          </div>
+        </div>
+      )}
+
       {/* Client Info */}
       {deal.client && (
         <div className="mb-3 p-2.5 rounded-lg bg-secondary/30 backdrop-blur-sm">

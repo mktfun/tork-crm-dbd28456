@@ -27,7 +27,7 @@ async function classifyLeadWithAI(
       ? products.map(p => `- "${p.name}" (id: ${p.id})`).join('\n')
       : '- Nenhum produto cadastrado'
 
-    const prompt = `Dado o contexto da mensagem do cliente e as opções disponíveis, escolha o melhor funil, etapa inicial e produto.
+    const prompt = `Dado o contexto da mensagem do cliente e as opções disponíveis, identifique se é possível determinar com clareza o funil e o produto desejado.
 
 Mensagem: "${messageContent}"
 
@@ -37,9 +37,13 @@ ${pipelinesText}
 Produtos disponíveis:
 ${productsText}
 
-Responda APENAS com JSON: {"pipeline_id":"...","stage_id":"...","product_id":"..." ou null}
-Use a primeira etapa (menor posição) do funil escolhido como stage_id.
-Se não conseguir determinar o produto, use null.`
+Regras rigorosas:
+1. Se o cliente APENAS saudar (ex: "bom dia", "olá") ou pedir uma cotação genérica (ex: "preciso de uma cotação", "quero ver um seguro") SEM especificar o tipo de seguro/produto, você DEVE retornar null.
+2. Se o cliente ESPECIFICAR o tipo de seguro ou produto (ex: "seguro residencial", "seguro auto", "plano de saúde", "seguro de vida"), retorne o JSON com os IDs correspondentes.
+3. ATENÇÃO: Os funis podem ser genéricos (ex: "Seguros", "Vendas", "Sinistros"). Escolha o funil que melhor corresponde à intenção geral (ex: nova cotação vai para "Seguros") e use o product_id para especificar qual é o seguro exato.
+4. O JSON deve ter o formato exato: {"pipeline_id":"...","stage_id":"...","product_id":"..."}
+5. Use a primeira etapa (menor posição) do funil escolhido como stage_id.
+6. Responda APENAS com o JSON válido ou a palavra null. Não inclua markdown (\`\`\`json) nem explicações.`
 
     const response = await fetch(AI_GATEWAY_URL, {
       method: 'POST',
@@ -50,7 +54,7 @@ Se não conseguir determinar o produto, use null.`
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash-lite',
         messages: [
-          { role: 'system', content: 'Você é um classificador de leads para uma corretora de seguros. Responda apenas com JSON válido, sem markdown.' },
+          { role: 'system', content: 'Você é um classificador de leads para uma corretora de seguros. Responda apenas com JSON válido ou null, sem markdown.' },
           { role: 'user', content: prompt },
         ],
         temperature: 0.1,
@@ -65,6 +69,8 @@ Se não conseguir determinar o produto, use null.`
     const data = await response.json()
     const text = data.choices?.[0]?.message?.content?.trim() || ''
     
+    if (text === 'null' || text === 'NULL' || text === '') return null
+
     // Extract JSON from response (handle possible markdown wrapping)
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) return null
@@ -159,16 +165,10 @@ async function autoCreateDeal(
       productId = aiResult.product_id
       productName = (activeProducts || []).find(p => p.id === aiResult.product_id)?.name || null
     } else {
-      // Fallback: default pipeline + first stage
-      const defaultPipeline = allPipelines.find(p => p.is_default) || allPipelines[0]
-      const firstStage = pipelinesWithStages.find(p => p.id === defaultPipeline.id)?.stages[0]
-      if (!firstStage) {
-        console.log('⚠️ No stages found in fallback pipeline')
-        return null
-      }
-      targetPipelineId = defaultPipeline.id
-      targetStageId = firstStage.id
-      console.log('⚠️ Using fallback: default pipeline + first stage')
+      // If AI couldn't classify, we don't auto-create the deal yet.
+      // We wait for the user to provide more context.
+      console.log('⚠️ AI could not classify lead, skipping auto-create deal')
+      return null
     }
 
     // Get target stage details
@@ -621,8 +621,9 @@ async function buildSystemPrompt(params: {
     systemPrompt += `NOVO CONTATO — TRIAGEM INICIAL\n`
     systemPrompt += `Este cliente ainda não tem negociação aberta. Seu objetivo é entender o que ele precisa.\n`
     systemPrompt += `Pergunte de forma natural o que ele está buscando (cotação, sinistro, endosso, cancelamento, segunda via, etc.).\n`
-    systemPrompt += `NÃO tente vender nada ainda. Apenas identifique a necessidade para encaminhamento correto.\n`
-    systemPrompt += `O sistema cuidará automaticamente do cadastro e roteamento.\n`
+    systemPrompt += `Se o cliente pedir uma cotação de forma genérica, pergunte QUAL O TIPO DE SEGURO ou PRODUTO ele deseja (ex: auto, residencial, vida, saúde).\n`
+    systemPrompt += `NÃO tente vender nada ainda. Apenas identifique a necessidade e o produto específico para encaminhamento correto.\n`
+    systemPrompt += `O sistema cuidará automaticamente do cadastro e roteamento para o funil adequado (ex: Seguros, Sinistros) assim que o produto for identificado.\n`
     systemPrompt += `</objective>\n\n`
 
     allowedTools = []
@@ -846,8 +847,9 @@ Deno.serve(async (req) => {
       if (clientId) {
         const { data: deals } = await supabase
           .from('crm_deals')
-          .select('id, title, stage_id, crm_stages(id, name, pipeline_id, position)')
+          .select('id, title, stage_id, status, crm_stages(id, name, pipeline_id, position)')
           .eq('client_id', clientId)
+          .eq('status', 'open')
           .order('created_at', { ascending: false })
           .limit(1)
 
@@ -901,6 +903,7 @@ Deno.serve(async (req) => {
       : `## NOVO CONTATO\nNome (do Chatwoot): ${sender?.name || 'desconhecido'}\nTelefone: ${contactPhone || 'desconhecido'}\nEste contato ainda não possui cadastro. O sistema cuidará automaticamente do cadastro e roteamento.\n`
 
     // 6. Build system prompt
+    // If we just auto-created a deal, we want to use the stage settings of the newly created deal
     const promptResult = await buildSystemPrompt({
       role, userId, clientId,
       deal: currentDeal, stage: currentStage, stageAiSettings,

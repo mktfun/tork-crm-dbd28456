@@ -28,8 +28,12 @@ export function ProductSelect({ value, onValueChange }: ProductSelectProps) {
         {activeProducts.map((product) => (
           <SelectItem key={product.id} value={product.id}>
             <div className="flex items-center gap-2">
-              <Package className="h-3.5 w-3.5 text-muted-foreground" />
-              {product.name}
+              {product.icon ? (
+                <span className="text-sm">{product.icon}</span>
+              ) : (
+                <Package className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+              <span style={{ color: product.color || 'inherit' }}>{product.name}</span>
             </div>
           </SelectItem>
         ))}

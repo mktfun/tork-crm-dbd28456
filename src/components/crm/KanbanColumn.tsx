@@ -67,7 +67,7 @@ export function KanbanColumn({
       layoutId={isDragging ? undefined : `column-${stage.id}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: isDragging ? 0.5 : 1, y: 0 }}
-      className={`flex-shrink-0 w-80 ${isDragging ? 'z-50' : ''}`}
+      className={`flex-shrink-0 w-80 flex flex-col h-full ${isDragging ? 'z-50' : ''}`}
     >
       {/* Column Header - drag handle is the colored area */}
       <AppCard 
@@ -126,7 +126,7 @@ export function KanbanColumn({
       <div
         ref={setDroppableRef}
         className={`
-          min-h-[400px] rounded-xl p-2 transition-all duration-200
+          flex-1 overflow-y-auto rounded-xl p-2 transition-all duration-200
           ${isOver ? 'bg-primary/10 ring-2 ring-dashed ring-primary/30' : 'bg-transparent'}
         `}
       >

@@ -40,6 +40,8 @@ export interface CRMDeal {
   product?: {
     id: string;
     name: string;
+    color?: string;
+    icon?: string;
   };
 }
 
@@ -264,7 +266,7 @@ export function useCRMDeals(pipelineId: string | null = null) {
         .select(`
           *,
           client:clientes(id, name, phone, email),
-          product:crm_products(id, name)
+          product:crm_products(id, name, color, icon)
         `)
         .eq('user_id', user!.id);
 
