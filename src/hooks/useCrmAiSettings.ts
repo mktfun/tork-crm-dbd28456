@@ -32,6 +32,10 @@ export interface UpsertAiSettingParams {
   voice_id?: string | null;
   max_messages_before_human?: number;
   is_active?: boolean;
+  follow_up_enabled?: boolean;
+  follow_up_interval_minutes?: number;
+  follow_up_max_attempts?: number;
+  follow_up_message?: string;
 }
 
 export function useCrmAiSettings(pipelineId: string | null) {
