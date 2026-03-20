@@ -766,6 +766,12 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 2.6 — Resolve AI config from user's global settings
+    if (userId) {
+      const resolved = await resolveUserModel(supabase, userId)
+      initAIConfig(resolved)
+    }
+
     // 3. Analysis session logic (batch mode — kept from v1)
     const isAdmin = role === 'admin'
     if (userId && brokerageId) {
