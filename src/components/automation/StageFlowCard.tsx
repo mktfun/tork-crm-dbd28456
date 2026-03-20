@@ -84,15 +84,18 @@ export function StageFlowCard({
   const [mission, setMission] = useState(currentObjective || '');
   const debouncedMission = useDebounce(mission, 1500);
   const userSelectedRef = useRef(false);
+  const missionFocusedRef = useRef(false);
   
   // Sync expanded state with selection
   useEffect(() => {
     if (isSelected) setIsExpanded(true);
   }, [isSelected]);
   
-  // Sync mission with external data
+  // Sync mission with external data — skip if user is typing
   useEffect(() => {
-    setMission(currentObjective || '');
+    if (!missionFocusedRef.current) {
+      setMission(currentObjective || '');
+    }
   }, [currentObjective]);
   
   // Sync vibe with external data — skip when change came from user click
@@ -245,6 +248,8 @@ export function StageFlowCard({
             <Textarea
               value={mission}
               onChange={(e) => setMission(e.target.value)}
+              onFocus={() => { missionFocusedRef.current = true; }}
+              onBlur={() => { missionFocusedRef.current = false; }}
               placeholder="Ex: Descobrir CNPJ e quantidade de vidas"
               className="min-h-[60px] bg-secondary/50 border-border/50 text-sm resize-none"
               disabled={isSaving}
