@@ -137,6 +137,8 @@ async function autoCreateDeal(
   messageContent: string,
   transcription: string | null,
   extractedText: string | null,
+  brokerageId: number | null,
+  chatwootConversationId: number | null,
 ): Promise<{
   deal: any; stage: any; stageAiSettings: any; autoCreated: boolean; productId: string | null; productName: string | null;
 } | null> {
