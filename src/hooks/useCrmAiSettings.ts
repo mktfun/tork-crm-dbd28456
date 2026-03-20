@@ -100,6 +100,21 @@ export function useCrmAiSettings(pipelineId: string | null) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
+      // Build payload with only defined fields (avoid nullifying others)
+      const allFields = [
+        'ai_name', 'ai_persona', 'ai_objective', 'ai_custom_rules',
+        'voice_id', 'max_messages_before_human', 'is_active',
+        'follow_up_enabled', 'follow_up_interval_minutes',
+        'follow_up_max_attempts', 'follow_up_message',
+      ] as const;
+      
+      const payload: Record<string, any> = {};
+      for (const key of allFields) {
+        if ((params as any)[key] !== undefined) {
+          payload[key] = (params as any)[key];
+        }
+      }
+
       // Verificar se já existe config para este stage
       const { data: existing } = await supabase
         .from('crm_ai_settings')
@@ -108,18 +123,9 @@ export function useCrmAiSettings(pipelineId: string | null) {
         .single();
 
       if (existing) {
-        // Update
         const { data, error } = await supabase
           .from('crm_ai_settings')
-          .update({
-            ai_name: params.ai_name,
-            ai_persona: params.ai_persona,
-            ai_objective: params.ai_objective,
-            ai_custom_rules: params.ai_custom_rules,
-            voice_id: params.voice_id,
-            max_messages_before_human: params.max_messages_before_human,
-            is_active: params.is_active,
-          })
+          .update(payload)
           .eq('id', existing.id)
           .select()
           .single();
@@ -127,19 +133,12 @@ export function useCrmAiSettings(pipelineId: string | null) {
         if (error) throw error;
         return data;
       } else {
-        // Insert
         const { data, error } = await supabase
           .from('crm_ai_settings')
           .insert({
             user_id: user.id,
             stage_id: params.stage_id,
-            ai_name: params.ai_name || 'Assistente Tork',
-            ai_persona: params.ai_persona || 'Consultor profissional, educado e prestativo. Especialista em seguros.',
-            ai_objective: params.ai_objective || 'Qualificar o interesse do cliente e coletar dados básicos para cotação.',
-            ai_custom_rules: params.ai_custom_rules || 'Não prometa valores exatos sem aprovação. Sempre peça CPF para análise.',
-            voice_id: params.voice_id,
-            max_messages_before_human: params.max_messages_before_human || 10,
-            is_active: params.is_active ?? true,
+            ...payload,
           })
           .select()
           .single();
