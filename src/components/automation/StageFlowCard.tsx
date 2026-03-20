@@ -84,6 +84,7 @@ export function StageFlowCard({
   const [mission, setMission] = useState(currentObjective || '');
   const debouncedMission = useDebounce(mission, 1500);
   const userSelectedRef = useRef(false);
+  const missionFocusedRef = useRef(false);
   
   // Sync expanded state with selection
   useEffect(() => {
