@@ -745,12 +745,10 @@ async function buildSystemPrompt(params: {
 }
 
 // ──────────────────────────────────────────────
-// MAIN HANDLER
-// ──────────────────────────────────────────────
-// ──────────────────────────────────────────────
 // BACKGROUND PROCESSOR
 // ──────────────────────────────────────────────
 async function processWebhook(body: any) {
+  try {
     const { conversation, sender, content, attachments } = body
     const assigneeEmail = conversation?.meta?.assignee?.email
     const inboxId = conversation?.inbox_id
@@ -771,4 +769,396 @@ async function processWebhook(body: any) {
         .select('id, brokerage_id')
         .ilike('phone', `%${senderPhone}%`)
         .maybeSingle()
+
+      if (producer) {
+        role = 'admin'
+        if (!brokerageId) brokerageId = producer.brokerage_id
+        console.log('👑 Sender is a producer → admin mode')
+      } else {
+        const { data: brokerage } = await supabase
+          .from('brokerages')
+          .select('id, user_id')
+          .ilike('phone', `%${senderPhone}%`)
+          .maybeSingle()
+
+        if (brokerage) {
+          role = 'admin'
+          if (!brokerageId) brokerageId = brokerage.id
+          if (!userId) userId = brokerage.user_id
+          console.log('👑 Sender is a brokerage owner → admin mode')
+        }
+      }
+    }
+
+    // 2.6 — Resolve AI config from user's global settings
+    if (userId) {
+      const resolved = await resolveUserModel(supabase, userId)
+      initAIConfig(resolved)
+    }
+
+    // 3. Analysis session logic (batch mode — kept from v1)
+    const isAdmin = role === 'admin'
+    if (userId && brokerageId) {
+      const messageContent = (content || '').toLowerCase().trim()
+
+      if (messageContent.includes('analisar')) {
+        const { data: activeSession } = await supabase
+          .from('ai_analysis_sessions')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('status', 'compiling')
+          .maybeSingle()
+
+        if (!activeSession) {
+          console.log('🚀 Creating analysis session for user', userId)
+          await supabase.from('ai_analysis_sessions').insert({
+            user_id: userId, brokerage_id: brokerageId,
+            chatwoot_conversation_id: conversation.id,
+            status: 'compiling', collected_data: [body],
+          })
+          return
+        }
+      }
+
+      const { data: activeSession } = await supabase
+        .from('ai_analysis_sessions')
+        .select('id, collected_data')
+        .eq('user_id', userId)
+        .eq('status', 'compiling')
+        .maybeSingle()
+
+      if (activeSession) {
+        const collectedData = activeSession.collected_data as any[] || []
+        collectedData.push(body)
+        const messageContent2 = (content || '').toLowerCase().trim()
+
+        if (messageContent2.includes('processar')) {
+          await supabase.from('ai_analysis_sessions').update({ status: 'ready_for_processing', collected_data: collectedData }).eq('id', activeSession.id)
+          supabase.functions.invoke('process-analysis-session', { body: { session_id: activeSession.id } }).catch(console.error)
+          return
+        } else {
+          await supabase.from('ai_analysis_sessions').update({ collected_data: collectedData, expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() }).eq('id', activeSession.id)
+          return
+        }
+      }
+    }
+
+    // 4. Process attachments (audio/image/doc)
+    const mediaResult = await processAttachments(attachments)
+    console.log(`📎 Media: type=${mediaResult.messageType}, urls=${mediaResult.attachmentUrls.length}`)
+
+    // 5. Resolve client & deal context
+    let clientId: string | null = null
+    let clientData: { id: string; name: string | null; ai_enabled: boolean | null } | null = null
+    let currentDeal: any = null
+    let currentStage: any = null
+    let stageAiSettings: any = null
+    let autoCreatedDeal = false
+    let autoCreatedProductId: string | null = null
+    let autoCreatedProductName: string | null = null
+
+    const contactPhone = sender?.phone_number
+    const contactEmail = sender?.email
+
+    if (contactPhone || contactEmail) {
+      let clientQuery = supabase.from('clientes').select('id, name, ai_enabled')
+      if (contactPhone) clientQuery = clientQuery.ilike('phone', `%${contactPhone.replace(/\D/g, '')}%`)
+      else if (contactEmail) clientQuery = clientQuery.eq('email', contactEmail)
+
+      const { data: fetchedClient } = await clientQuery.maybeSingle()
+      clientData = fetchedClient
+      clientId = clientData?.id || null
+
+      // Auto-register new client from Chatwoot contact
+      if (!clientId && userId && role !== 'admin') {
+        const newClientName = sender?.name || 'Contato Chatwoot'
+        const newPhone = contactPhone ? contactPhone.replace(/\D/g, '') : ''
+        const newEmail = contactEmail || ''
+
+          // Use upsert to prevent race conditions on simultaneous webhooks
+          const { data: newClient, error: clientErr } = await supabase
+            .from("clientes")
+            .upsert({
+              user_id: userId,
+              name: newClientName,
+              phone: newPhone,
+              email: newEmail,
+              chatwoot_contact_id: sender?.id || null,
+              observations: "Cadastrado automaticamente via Chatwoot",
+            }, { onConflict: "phone" })
+            .select("id, name, ai_enabled")
+            .single()
+
+        if (newClient && !clientErr) {
+          clientData = newClient
+          clientId = newClient.id
+          console.log(`✅ Auto-registered client: "${newClientName}" (${clientId})`)
+        } else {
+          console.warn('⚠️ Failed to auto-register client:', clientErr?.message)
+        }
+      }
+
+      // Guard: ai_enabled do cliente
+      const clientAiEnabled = clientData?.ai_enabled ?? true
+      if (!clientAiEnabled && role !== 'admin') {
+        console.log('🚫 AI disabled for client:', clientId)
+        return
+      }
+
+      if (clientId) {
+        const { data: deals } = await supabase
+          .from('crm_deals')
+          .select('id, title, stage_id, status, crm_stages(id, name, pipeline_id, position)')
+          .eq('client_id', clientId)
+          .eq('status', 'open')
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (deals && deals.length > 0) {
+          currentDeal = deals[0]
+          currentStage = currentDeal.crm_stages
+          console.log(`✅ Deal: ${currentDeal.title} → Stage: ${currentStage?.name}`)
+
+           if (currentStage?.id) {
+            const { data: settings } = await supabase
+              .from('crm_ai_settings')
+              .select('*')
+              .eq('stage_id', currentStage.id)
+              .maybeSingle()
+            stageAiSettings = settings
+          }
+
+          // BLOCO A: Cancel pending follow-ups (client responded!)
+          if (currentDeal?.id) {
+            const { data: cancelledFollowUps } = await supabase
+              .from('ai_follow_ups')
+              .update({ status: 'responded', updated_at: new Date().toISOString() })
+              .eq('deal_id', currentDeal.id)
+              .eq('status', 'pending')
+              .select('id')
+            if (cancelledFollowUps?.length) {
+              console.log(`✅ Cancelled ${cancelledFollowUps.length} pending follow-ups (client responded)`)
+            }
+          }
+        } else if (userId && role !== 'admin') {
+          // Auto-create deal for leads without negotiation (AI-driven classification)
+          const autoResult = await autoCreateDeal(
+            userId, clientId, clientData?.name || sender?.name || null,
+            content || '', mediaResult.transcription, mediaResult.extractedText,
+            brokerageId, conversation?.id || null
+          )
+          if (autoResult) {
+            currentDeal = autoResult.deal
+            currentStage = autoResult.stage
+            stageAiSettings = autoResult.stageAiSettings
+            autoCreatedDeal = true
+            autoCreatedProductId = autoResult.productId
+            autoCreatedProductName = autoResult.productName
+          }
+        }
+      }
+    }
+
+    // 5b. Build client context summary for injection in system prompt
+    const clientContextForPrompt = clientId
+      ? `## CONTEXTO DO CLIENTE (pré-carregado — NÃO pergunte dados que já estão aqui)\nNome cadastrado: ${clientData?.name || sender?.name || 'desconhecido'}\nTelefone: ${contactPhone || 'desconhecido'}\nID interno: ${clientId}\n${currentDeal ? `Última negociação: "${currentDeal.title}" (etapa: ${currentStage?.name})` : 'Nenhuma negociação aberta registrada.'}\n`
+      : `## NOVO CONTATO\nNome (do Chatwoot): ${sender?.name || 'desconhecido'}\nTelefone: ${contactPhone || 'desconhecido'}\nEste contato ainda não possui cadastro. O sistema cuidará automaticamente do cadastro e roteamento.\n`
+
+    // 6. Build system prompt
+    const promptResult = await buildSystemPrompt({
+      role, userId, clientId,
+      deal: currentDeal, stage: currentStage, stageAiSettings,
+      messageContent: content || '',
+      transcription: mediaResult.transcription,
+      extractedText: mediaResult.extractedText,
+    })
+
+    // Inject client context at the start of the system prompt
+    const finalSystemPrompt = clientContextForPrompt
+      ? `${clientContextForPrompt}\n---\n\n${promptResult.systemPrompt}`
+      : promptResult.systemPrompt
+
+    if (!promptResult.aiIsActive && role !== 'admin') {
+      console.log('🚫 AI inactive for this user config')
+      return
+    }
+
+    // 6b. Pre-evaluate objective completion (only for existing deals with objectives, not auto-created)
+    let objectiveResult = { completed: false, previousStageId: null as string | null, previousStageName: null as string | null, newStageId: null as string | null, newStageName: null as string | null }
+    if (currentDeal && !autoCreatedDeal && stageAiSettings?.ai_objective && userId && role !== 'admin') {
+      objectiveResult = await evaluateObjectiveCompletion({
+        deal: currentDeal,
+        stage: currentStage,
+        stageAiSettings,
+        userId,
+        chatwootConversationId: conversation.id,
+        brokerageId,
+      })
+
+      // If stage was completed, update references for payload
+      if (objectiveResult.completed && objectiveResult.newStageId) {
+        const { data: newStageData } = await supabase
+          .from('crm_stages')
+          .select('id, name, pipeline_id, position')
+          .eq('id', objectiveResult.newStageId)
+          .maybeSingle()
+
+        if (newStageData) {
+          currentStage = newStageData
+          currentDeal = { ...currentDeal, stage_id: newStageData.id }
+
+          const { data: newSettings } = await supabase
+            .from('crm_ai_settings')
+            .select('*')
+            .eq('stage_id', newStageData.id)
+            .maybeSingle()
+          stageAiSettings = newSettings
+        }
+      }
+    }
+
+    // 7. Resolve n8n webhook URL
+    let finalN8nUrl = N8N_WEBHOOK_URL
+    if (userId) {
+      const { data: crmSettings } = await supabase.from('crm_settings').select('n8n_webhook_url').eq('user_id', userId).maybeSingle()
+      if (crmSettings?.n8n_webhook_url) finalN8nUrl = crmSettings.n8n_webhook_url.trim()
+    }
+
+    // 8. Build enriched payload and send to n8n
+    if (finalN8nUrl) {
+      const payload = {
+        ...body,
+        derived_data: {
+          crm_user_id: userId,
+          brokerage_id: brokerageId,
+          user_role: role,
+          ai_enabled: aiEnabled,
+          client_id: clientId,
+          deal_id: currentDeal?.id || null,
+          deal_title: currentDeal?.title || null,
+          pipeline_id: currentStage?.pipeline_id || null,
+          stage_id: currentStage?.id || null,
+          stage_name: currentStage?.name || null,
+          next_stage_id: promptResult.nextStageId,
+          next_stage_name: promptResult.nextStageName,
+          ai_is_active: promptResult.aiIsActive,
+          stage_ai_is_active: promptResult.stageAiIsActive,
+          is_active: stageAiSettings?.is_active ?? true,
+          ai_system_prompt: finalSystemPrompt,
+          agent_name: promptResult.agentName,
+          company_name: promptResult.companyName,
+          voice_tone: promptResult.voiceTone,
+          message_type: mediaResult.messageType,
+          original_content: content || null,
+          transcription: mediaResult.transcription,
+          extracted_text: mediaResult.extractedText,
+          attachment_urls: mediaResult.attachmentUrls,
+          allowed_tools: promptResult.allowedTools,
+          knowledge_context: promptResult.knowledgeContext,
+          auto_created_deal: autoCreatedDeal,
+          auto_created_product_id: autoCreatedProductId,
+          auto_created_product_name: autoCreatedProductName,
+          stage_completed: objectiveResult.completed,
+          previous_stage_id: objectiveResult.previousStageId,
+          previous_stage_name: objectiveResult.previousStageName,
+        }
+      }
+
+      console.log('🚀 Forwarding to n8n...', { role, messageType: mediaResult.messageType, hasDeal: !!currentDeal, hasTranscription: !!mediaResult.transcription, hasOCR: !!mediaResult.extractedText })
+
+      const n8nResponse = await fetch(finalN8nUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      console.log(`n8n Response: ${n8nResponse.status}`)
+
+      // BLOCO B: Parse n8n response body
+      let n8nResponseBody: any = null
+      if (n8nResponse.ok) {
+        try { n8nResponseBody = await n8nResponse.json() } catch { /* non-JSON response, ignore */ }
+      }
+
+      // BLOCO C: Create follow-up if needed (idempotent — skip if pending exists)
+      if (currentDeal?.id && userId && role !== 'admin') {
+        const shouldFollowUp = (() => {
+          if (stageAiSettings?.follow_up_enabled) return true
+          if (!n8nResponseBody) return false
+          const agentMessage = n8nResponseBody?.output || n8nResponseBody?.text || n8nResponseBody?.message || ''
+          if (!agentMessage) return false
+          const hasUrl = /https?:\/\//.test(agentMessage)
+          const hasKeywords = /cotação|proposta|orçamento|link|formulário|aguard/i.test(agentMessage)
+          return hasUrl || hasKeywords
+        })()
+
+        if (shouldFollowUp) {
+          const { data: existingFollowUp } = await supabase
+            .from('ai_follow_ups')
+            .select('id')
+            .eq('deal_id', currentDeal.id)
+            .eq('status', 'pending')
+            .maybeSingle()
+
+          if (!existingFollowUp) {
+            const intervalMinutes = stageAiSettings?.follow_up_interval_minutes || 60
+            const { error: followUpError } = await supabase.from('ai_follow_ups').insert({
+              deal_id: currentDeal.id,
+              user_id: userId,
+              chatwoot_conversation_id: conversation.id,
+              brokerage_id: brokerageId || null,
+              trigger_reason: stageAiSettings?.follow_up_enabled ? 'stage_config' : 'heuristic',
+              follow_up_message: stageAiSettings?.follow_up_message || null,
+              max_attempts: stageAiSettings?.follow_up_max_attempts || 3,
+              interval_minutes: intervalMinutes,
+              next_check_at: new Date(Date.now() + intervalMinutes * 60 * 1000).toISOString(),
+              status: 'pending',
+            })
+            if (followUpError) {
+              console.error('⚠️ Failed to create follow-up:', followUpError.message)
+            } else {
+              console.log(`📅 Follow-up created for deal ${currentDeal.id} (reason: ${stageAiSettings?.follow_up_enabled ? 'stage_config' : 'heuristic'}, interval: ${intervalMinutes}min)`)
+            }
+          }
+        }
+      }
+    } else {
+      console.warn('⚠️ No N8N_WEBHOOK_URL configured')
+    }
+
+    console.log('✅ Dispatcher processing complete')
+  } catch (error) {
+    console.error('❌ Background processing error:', error)
+  }
+}
+
+// ──────────────────────────────────────────────
+// MAIN HANDLER — Respond immediately, process in background
+// ──────────────────────────────────────────────
+Deno.serve(async (req) => {
+  try {
+    const body = await req.json()
+    console.log('📥 Dispatcher v2 — Event:', body.event)
+
+    // Quick validation — ignore non-incoming messages
+    if (body.event !== 'message_created' || body.message_type !== 'incoming') {
+      return new Response(JSON.stringify({ message: 'Ignored event' }), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // Fire-and-forget: process in background
+    const processing = processWebhook(body)
+
+    // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(processing)
+    }
+
+    // Return 200 immediately to Chatwoot
+    return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } })
+
+  } catch (error) {
+    console.error('❌ Dispatcher error:', error)
+    return new Response(JSON.stringify({ error: (error as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+  }
+})
 
