@@ -296,11 +296,11 @@ async function evaluateObjectiveCompletion(params: {
 
   // Quick AI evaluation
   try {
-    const evalResp = await fetch(AI_GATEWAY_URL, {
+    const evalResp = await fetch(resolvedAI.url, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: resolvedAI.auth, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: resolvedAI.model,
         messages: [
           { role: 'system', content: 'Você é um avaliador. Responda APENAS "SIM" ou "NAO", sem explicações.' },
           { role: 'user', content: `Dado o objetivo da etapa: "${objective}"\n\nHistórico recente:\n${recentMessages}\n\nO objetivo foi atingido?` }
