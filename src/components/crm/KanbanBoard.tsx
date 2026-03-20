@@ -516,6 +516,7 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
           )}
         </DragOverlay>
       </DndContext>
+    </div>
 
       <NewDealModal
         open={showNewDealModal}
