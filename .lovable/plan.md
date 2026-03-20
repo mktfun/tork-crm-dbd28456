@@ -1,69 +1,69 @@
 
 
-# Plano: Deal aparece sem F5 + etiqueta ao criar automático
+# Plano: Reescrever os 4 System Prompts com técnicas avançadas de humanização
 
-## Bug 1 — Deal não aparece no Kanban sem F5
+## Diagnóstico
 
-O Realtime está configurado corretamente em `useCRMDeals.ts` (linhas 284-308), filtrando por `user_id=eq.${user.id}`. O deal é inserido com o `user_id` correto pelo dispatcher.
+Os prompts atuais em `aiPresets.ts` têm problemas sérios:
 
-**Possível causa**: O Realtime do Supabase exige que a tabela tenha `REPLICA IDENTITY FULL` para que mudanças via service_role (que bypassa RLS) sejam visíveis nos canais filtrados. Sem isso, o payload chega sem os valores das colunas e o filtro `user_id=eq.X` não bate.
+1. **Emojis dentro de tags XML** (🛑, 💼, 📊) — poluem o prompt e confundem a IA
+2. **Instruções genéricas** — "Vá direto ao ponto", "Texto curto" são vagas demais
+3. **Sem técnicas avançadas** — faltam: chain-of-thought interno, few-shot examples, guardrails de alucinação, controle de tom por mensagem, anti-looping, fallback behavior
+4. **Não adaptados por persona** — a estrutura é copy-paste com pequenas variações de adjetivo
+5. **Sem simulação de pensamento** — a IA não tem um `<internal_reasoning>` para decidir o que fazer antes de responder
+6. **Sem regras de contexto WhatsApp** — não há instrução sobre tamanho de mensagem, quebras, tempo de resposta percebido
 
-**Correção**: Adicionar também invalidação periódica mais agressiva como fallback, e garantir que o `clientes` também invalide (pois o auto-register de cliente pode afetar). Além disso, invalidar `crm-deals` junto com `clients` no `useRealtimeClients.ts`.
+## Solução — Prompt Engineering avançado por persona
 
-**Alternativa mais robusta**: Após criar o deal no dispatcher, fazer um fetch direto do Supabase Realtime broadcast para forçar o update. Mas a solução mais simples é uma migration `ALTER TABLE crm_deals REPLICA IDENTITY FULL`.
+Cada persona receberá um prompt completo com estas seções técnicas:
 
-## Bug 2 — Etiqueta não vai pro Chatwoot ao criar deal automático
+```text
+<system_prompt>
+  <identity>          — Quem é, backstory, traços de personalidade únicos
+  <voice>             — Tom exato, vocabulário permitido/proibido, cadência
+  <internal_reasoning>— Chain-of-thought silencioso antes de cada resposta
+  <conversation_flow> — Regras de fluxo (1 pergunta, anti-loop, fallback)
+  <qualification>     — Lógica de qualificação adaptada ao perfil
+  <objection_handling>— Como lidar com objeções (específico por persona)
+  <mission_protocol>  — Protocolo de conclusão com {{missao_ai}}
+  <output_rules>      — Formatação WhatsApp (max chars, quebras, proibições)
+  <few_shot_examples> — 2-3 exemplos de diálogo ideal por persona
+  <guardrails>        — Anti-alucinação, anti-promessa, anti-fuga de contexto
+</system_prompt>
+```
 
-**Causa raiz**: O dispatcher cria o deal (linha 242-254) mas:
-1. **Não inclui `chatwoot_conversation_id`** no insert — esse campo fica `null`
-2. **Não chama `chatwoot-sync`** para aplicar a etiqueta da stage
+### Diferenciação real entre personas
 
-Quando o usuário move manualmente, o `useCRMDeals.ts` (linha 370) chama `chatwoot-sync` com `action: 'update_deal_stage'`, que aplica a label. Mas na criação automática ninguém faz essa chamada.
+| Persona | Diferencial técnico no prompt |
+|---|---|
+| **O Vendedor** | Raciocínio interno focado em qualificação BANT, âncoras de preço, urgência artificial, tom assertivo sem ser rude |
+| **O Amigo** | Espelhamento emocional (mirroring), validação antes de perguntar, transições suaves, vocabulário coloquial calibrado |
+| **O Técnico** | Diagnóstico por eliminação, jargão controlado (adapta ao nível do lead), autoridade via dados, zero opinião pessoal |
+| **O Geral** | Detecção dinâmica de contexto — começa amigável, endurece se o lead é B2B grande, suaviza se é pessoa física insegura |
 
-**Correção no dispatcher**: 
-1. Adicionar `chatwoot_conversation_id: chatwootConversationId` no insert do deal
-2. Após criar o deal, buscar a `chatwoot_label` da stage e aplicar direto na conversa via API do Chatwoot (o dispatcher já tem acesso às credenciais via brokerage)
+### Few-shot examples (novo)
 
-## Mudanças
+Cada persona terá 2-3 exemplos de troca de mensagens dentro de `<examples>` para ancorar o comportamento. Isso é a técnica mais eficaz para controlar tom e formato.
+
+### Internal reasoning (novo)
+
+```xml
+<internal_reasoning>
+Antes de CADA resposta, pense silenciosamente (não escreva isso):
+1. O que o lead acabou de revelar? (dado novo)
+2. O que ainda falta para completar a missão?
+3. Qual a melhor próxima pergunta para avançar sem parecer interrogatório?
+4. O tom da última mensagem dele foi positivo, neutro ou resistente?
+   → Se resistente: valide antes de avançar
+   → Se positivo: avance naturalmente
+</internal_reasoning>
+```
+
+## Arquivo afetado
 
 | Arquivo | Ação |
 |---|---|
-| `supabase/functions/chatwoot-dispatcher/index.ts` | (1) Adicionar `chatwoot_conversation_id` no insert do deal. (2) Após criar deal, aplicar label da stage na conversa do Chatwoot via API direta |
-| Migration SQL | `ALTER TABLE crm_deals REPLICA IDENTITY FULL` para garantir que Realtime funcione com inserts via service_role |
+| `src/components/automation/aiPresets.ts` | Reescrever os 4 `xmlPrompt` com técnicas avançadas. Manter IDs (`proactive`, `supportive_sales`, `technical`, `supportive`), nomes e estrutura `AIPreset` intactos |
 
-## Detalhe — Aplicar label após criar deal
-
-No `autoCreateDeal`, após o insert bem-sucedido (linha 261), buscar `chatwoot_label` da stage e chamar a API do Chatwoot:
-
-```typescript
-// After deal creation, apply stage label to Chatwoot conversation
-if (chatwootConversationId && brokerageId) {
-  const { data: stageLabel } = await supabase
-    .from('crm_stages')
-    .select('chatwoot_label')
-    .eq('id', targetStageId)
-    .single()
-
-  if (stageLabel?.chatwoot_label) {
-    // Get Chatwoot credentials
-    const { data: brokerage } = await supabase
-      .from('brokerages')
-      .select('chatwoot_url, chatwoot_api_key, chatwoot_account_id')
-      .eq('id', brokerageId)
-      .single()
-
-    if (brokerage?.chatwoot_url && brokerage?.chatwoot_api_key) {
-      const url = `${brokerage.chatwoot_url}/api/v1/accounts/${brokerage.chatwoot_account_id}/conversations/${chatwootConversationId}/labels`
-      await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', api_access_token: brokerage.chatwoot_api_key },
-        body: JSON.stringify({ labels: [stageLabel.chatwoot_label] })
-      })
-      console.log('🏷️ Applied label to conversation:', stageLabel.chatwoot_label)
-    }
-  }
-}
-```
-
-Sem mudança de frontend. Apenas dispatcher + 1 migration.
+Sem migration. Sem mudança de backend. Apenas os prompts no frontend (que são injetados no dispatcher e sandbox).
 
