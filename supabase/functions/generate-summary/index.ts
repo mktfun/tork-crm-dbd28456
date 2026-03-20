@@ -74,8 +74,25 @@ Deno.serve(async (req) => {
 
     // Resolve user's configured model and API key
     const resolved = await resolveUserModel(supabase, user.id);
-    const effectiveApiKey = resolved.apiKey || apiKey;
-    if (!effectiveApiKey) {
+    
+    // Determine endpoint based on user's key
+    let aiUrl = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+    let aiAuth = apiKey ? `Bearer ${apiKey}` : '';
+    let aiModel = resolved.model;
+    
+    if (resolved.apiKey && resolved.provider === 'gemini') {
+      aiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+      aiAuth = `Bearer ${resolved.apiKey}`;
+      aiModel = resolved.model.replace('google/', '');
+    } else if (resolved.apiKey && resolved.provider === 'openai') {
+      aiUrl = 'https://api.openai.com/v1/chat/completions';
+      aiAuth = `Bearer ${resolved.apiKey}`;
+      aiModel = resolved.model.replace('openai/', '');
+    } else if (apiKey) {
+      aiAuth = `Bearer ${apiKey}`;
+    }
+    
+    if (!aiAuth) {
       return new Response(
         JSON.stringify({ error: "Nenhuma API Key configurada. Configure na tela de Automação IA ou adicione LOVABLE_API_KEY." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -83,7 +100,7 @@ Deno.serve(async (req) => {
     }
 
     // Call AI
-    const summary = await callAI(effectiveApiKey, context, scope, focus, resolved.model);
+    const summary = await callAI(aiAuth, aiUrl, context, scope, focus, aiModel);
 
     // Save to cache (upsert)
     await supabase.from("ai_summaries").upsert(
