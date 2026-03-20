@@ -36,7 +36,11 @@ jobs:
         VERSION_NUM=$(echo $LATEST_TAG | sed 's/v//')
         
         # Get commits since last tag
-        COMMITS=$(git log $LATEST_TAG..HEAD --oneline --no-merges)
+        if [ "$LATEST_TAG" = "v0.0.0" ]; then
+          COMMITS=$(git log HEAD --oneline --no-merges)
+        else
+          COMMITS=$(git log $LATEST_TAG..HEAD --oneline --no-merges)
+        fi
         
         # Determine version bump based on commit messages
         if echo "$COMMITS" | grep -q "^[a-f0-9]* \(feat\|feature\):"; then
@@ -65,7 +69,11 @@ jobs:
         LATEST_TAG="${{ steps.get_tag.outputs.latest_tag }}"
         
         # Get commits since last tag
-        COMMITS=$(git log $LATEST_TAG..HEAD --pretty=format:"%s" --no-merges)
+        if [ "$LATEST_TAG" = "v0.0.0" ]; then
+          COMMITS=$(git log HEAD --pretty=format:"%s" --no-merges)
+        else
+          COMMITS=$(git log $LATEST_TAG..HEAD --pretty=format:"%s" --no-merges)
+        fi
         
         if [ -z "$COMMITS" ]; then
           echo "No new commits found"
