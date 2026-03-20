@@ -74,8 +74,25 @@ Deno.serve(async (req) => {
 
     // Resolve user's configured model and API key
     const resolved = await resolveUserModel(supabase, user.id);
-    const effectiveApiKey = resolved.apiKey || apiKey;
-    if (!effectiveApiKey) {
+    
+    // Determine endpoint based on user's key
+    let aiUrl = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+    let aiAuth = apiKey ? `Bearer ${apiKey}` : '';
+    let aiModel = resolved.model;
+    
+    if (resolved.apiKey && resolved.provider === 'gemini') {
+      aiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+      aiAuth = `Bearer ${resolved.apiKey}`;
+      aiModel = resolved.model.replace('google/', '');
+    } else if (resolved.apiKey && resolved.provider === 'openai') {
+      aiUrl = 'https://api.openai.com/v1/chat/completions';
+      aiAuth = `Bearer ${resolved.apiKey}`;
+      aiModel = resolved.model.replace('openai/', '');
+    } else if (apiKey) {
+      aiAuth = `Bearer ${apiKey}`;
+    }
+    
+    if (!aiAuth) {
       return new Response(
         JSON.stringify({ error: "Nenhuma API Key configurada. Configure na tela de Automação IA ou adicione LOVABLE_API_KEY." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -83,7 +100,7 @@ Deno.serve(async (req) => {
     }
 
     // Call AI
-    const summary = await callAI(effectiveApiKey, context, scope, focus, resolved.model);
+    const summary = await callAI(aiAuth, aiUrl, context, scope, focus, aiModel);
 
     // Save to cache (upsert)
     await supabase.from("ai_summaries").upsert(
@@ -230,8 +247,8 @@ async function gatherContext(
   return parts.join("\n\n") || "Sem dados disponíveis para análise.";
 }
 
-async function callAI(apiKey: string, context: string, scope: string, focus: string, model: string = "google/gemini-2.5-flash"): Promise<string> {
-  console.log(`[SUMMARY] Using model: ${model}, key prefix: ${apiKey.substring(0, 6)}...`);
+async function callAI(authHeader: string, url: string, context: string, scope: string, focus: string, model: string = "google/gemini-2.5-flash"): Promise<string> {
+  console.log(`[SUMMARY] Using model: ${model}, url: ${url}`);
 
   const scopeLabel = scope === "day" ? "do dia" : scope === "week" ? "da semana" : "do mês";
   const focusLabel =
@@ -250,10 +267,10 @@ REGRAS ABSOLUTAS:
 
   const userPrompt = `Analise os dados ${scopeLabel} com foco ${focusLabel} e gere um resumo executivo:\n\n${context}`;
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const response = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: authHeader,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({

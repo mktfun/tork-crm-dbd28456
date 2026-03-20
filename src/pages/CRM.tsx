@@ -101,7 +101,7 @@ export default function CRM() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 h-[calc(100vh-6rem)] flex flex-col">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -148,7 +148,7 @@ export default function CRM() {
       </motion.div>
 
       {/* Tabs: Pipeline vs Insights */}
-      <Tabs value={activeView} onValueChange={setActiveView}>
+      <Tabs value={activeView} onValueChange={setActiveView} className="flex-1 flex flex-col min-h-0">
         <TabsList>
           <TabsTrigger value="pipeline" className="gap-1.5">
             <Kanban className="h-4 w-4" />
@@ -164,11 +164,12 @@ export default function CRM() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pipeline">
+        <TabsContent value="pipeline" className="flex-1 min-h-0 mt-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
+            className="h-full"
           >
             <KanbanBoard pipelineId={selectedPipelineId} />
           </motion.div>

@@ -18,7 +18,7 @@ interface ProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product?: CRMProduct | null;
-  onSave: (data: { name: string; description?: string; is_active?: boolean }) => Promise<void>;
+  onSave: (data: { name: string; description?: string; color?: string; icon?: string; is_active?: boolean }) => Promise<void>;
 }
 
 export function ProductDialog({ open, onOpenChange, product, onSave }: ProductDialogProps) {
@@ -26,6 +26,8 @@ export function ProductDialog({ open, onOpenChange, product, onSave }: ProductDi
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    color: '#3B82F6',
+    icon: '📦',
     is_active: true
   });
 
@@ -34,6 +36,8 @@ export function ProductDialog({ open, onOpenChange, product, onSave }: ProductDi
       setFormData({
         name: product?.name || '',
         description: product?.description || '',
+        color: product?.color || '#3B82F6',
+        icon: product?.icon || '📦',
         is_active: product?.is_active ?? true
       });
     }
@@ -47,6 +51,8 @@ export function ProductDialog({ open, onOpenChange, product, onSave }: ProductDi
       await onSave({
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
+        color: formData.color,
+        icon: formData.icon,
         ...(product ? { is_active: formData.is_active } : {})
       });
       onOpenChange(false);
@@ -75,6 +81,36 @@ export function ProductDialog({ open, onOpenChange, product, onSave }: ProductDi
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="product-icon">Ícone (Emoji)</Label>
+              <Input
+                id="product-icon"
+                placeholder="Ex: 🚗"
+                value={formData.icon}
+                onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="product-color">Cor</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="product-color"
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  className="w-12 p-1 h-10"
+                />
+                <Input
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  placeholder="#000000"
+                  className="flex-1"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">

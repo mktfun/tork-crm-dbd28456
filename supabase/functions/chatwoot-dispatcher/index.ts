@@ -1,11 +1,42 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { resolveUserModel } from '../_shared/model-resolver.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const N8N_WEBHOOK_URL = Deno.env.get('N8N_WEBHOOK_URL')
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
 const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions'
+
+// Dynamic AI config — resolved per-request after userId is known
+let resolvedAI = {
+  url: AI_GATEWAY_URL,
+  auth: `Bearer ${LOVABLE_API_KEY || ''}`,
+  model: 'google/gemini-2.5-flash-lite',
+}
+
+function initAIConfig(resolved: { model: string; apiKey: string | null; provider: string | null }) {
+  if (resolved.apiKey && resolved.provider === 'gemini') {
+    resolvedAI = {
+      url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+      auth: `Bearer ${resolved.apiKey}`,
+      model: resolved.model.replace('google/', ''),
+    }
+  } else if (resolved.apiKey && resolved.provider === 'openai') {
+    resolvedAI = {
+      url: 'https://api.openai.com/v1/chat/completions',
+      auth: `Bearer ${resolved.apiKey}`,
+      model: resolved.model.replace('openai/', ''),
+    }
+  } else if (LOVABLE_API_KEY) {
+    resolvedAI = {
+      url: AI_GATEWAY_URL,
+      auth: `Bearer ${LOVABLE_API_KEY}`,
+      model: resolved.model || 'google/gemini-2.5-flash-lite',
+    }
+  }
+  console.log(`🔑 AI Config resolved: provider=${resolved.provider}, model=${resolvedAI.model}`)
+}
 
 // ──────────────────────────────────────────────
 // HELPER: AI-driven classification for pipeline, stage, and product
@@ -15,7 +46,7 @@ async function classifyLeadWithAI(
   pipelines: Array<{ id: string; name: string; stages: Array<{ id: string; name: string; position: number }> }>,
   products: Array<{ id: string; name: string }>,
 ): Promise<{ pipeline_id: string; stage_id: string; product_id: string | null } | null> {
-  if (!LOVABLE_API_KEY || !messageContent) return null
+  if (!resolvedAI.auth || !messageContent) return null
 
   try {
     const pipelinesText = pipelines.map(p => {
@@ -27,7 +58,7 @@ async function classifyLeadWithAI(
       ? products.map(p => `- "${p.name}" (id: ${p.id})`).join('\n')
       : '- Nenhum produto cadastrado'
 
-    const prompt = `Dado o contexto da mensagem do cliente e as opções disponíveis, escolha o melhor funil, etapa inicial e produto.
+    const prompt = `Dado o contexto da mensagem do cliente e as opções disponíveis, identifique se é possível determinar com clareza o funil e o produto desejado.
 
 Mensagem: "${messageContent}"
 
@@ -37,20 +68,24 @@ ${pipelinesText}
 Produtos disponíveis:
 ${productsText}
 
-Responda APENAS com JSON: {"pipeline_id":"...","stage_id":"...","product_id":"..." ou null}
-Use a primeira etapa (menor posição) do funil escolhido como stage_id.
-Se não conseguir determinar o produto, use null.`
+Regras rigorosas:
+1. Se o cliente APENAS saudar (ex: "bom dia", "olá") ou pedir uma cotação genérica (ex: "preciso de uma cotação", "quero ver um seguro") SEM especificar o tipo de seguro/produto, você DEVE retornar null.
+2. Se o cliente ESPECIFICAR o tipo de seguro ou produto (ex: "seguro residencial", "seguro auto", "plano de saúde", "seguro de vida"), retorne o JSON com os IDs correspondentes.
+3. ATENÇÃO: Os funis podem ser genéricos (ex: "Seguros", "Vendas", "Sinistros"). Escolha o funil que melhor corresponde à intenção geral (ex: nova cotação vai para "Seguros") e use o product_id para especificar qual é o seguro exato.
+4. O JSON deve ter o formato exato: {"pipeline_id":"...","stage_id":"...","product_id":"..."}
+5. Use a primeira etapa (menor posição) do funil escolhido como stage_id.
+6. Responda APENAS com o JSON válido ou a palavra null. Não inclua markdown (\`\`\`json) nem explicações.`
 
-    const response = await fetch(AI_GATEWAY_URL, {
+    const response = await fetch(resolvedAI.url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': resolvedAI.auth,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
+        model: resolvedAI.model,
         messages: [
-          { role: 'system', content: 'Você é um classificador de leads para uma corretora de seguros. Responda apenas com JSON válido, sem markdown.' },
+          { role: 'system', content: 'Você é um classificador de leads para uma corretora de seguros. Responda apenas com JSON válido ou null, sem markdown.' },
           { role: 'user', content: prompt },
         ],
         temperature: 0.1,
@@ -65,6 +100,8 @@ Se não conseguir determinar o produto, use null.`
     const data = await response.json()
     const text = data.choices?.[0]?.message?.content?.trim() || ''
     
+    if (text === 'null' || text === 'NULL' || text === '') return null
+
     // Extract JSON from response (handle possible markdown wrapping)
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) return null
@@ -100,6 +137,8 @@ async function autoCreateDeal(
   messageContent: string,
   transcription: string | null,
   extractedText: string | null,
+  brokerageId: number | null,
+  chatwootConversationId: number | null,
 ): Promise<{
   deal: any; stage: any; stageAiSettings: any; autoCreated: boolean; productId: string | null; productName: string | null;
 } | null> {
@@ -142,8 +181,38 @@ async function autoCreateDeal(
       stages: (allStages || []).filter(s => s.pipeline_id === p.id).sort((a, b) => a.position - b.position),
     }))
 
-    // Combine message context for classification
-    const fullContext = [messageContent, transcription, extractedText].filter(Boolean).join('\n')
+    // Combine message context for classification — use conversation window when available
+    let fullContext = [messageContent, transcription, extractedText].filter(Boolean).join('\n')
+
+    // Fetch recent Chatwoot messages for better classification context
+    if (brokerageId && chatwootConversationId) {
+      try {
+        const { data: brokerage } = await supabase
+          .from('brokerages')
+          .select('chatwoot_url, chatwoot_token, chatwoot_account_id')
+          .eq('id', brokerageId)
+          .maybeSingle()
+
+        if (brokerage?.chatwoot_url && brokerage?.chatwoot_token && brokerage?.chatwoot_account_id) {
+          const cwUrl = brokerage.chatwoot_url.replace(/\/+$/, '')
+          const messagesResp = await fetch(
+            `${cwUrl}/api/v1/accounts/${brokerage.chatwoot_account_id}/conversations/${chatwootConversationId}/messages`,
+            { headers: { api_access_token: brokerage.chatwoot_token } }
+          )
+          if (messagesResp.ok) {
+            const messagesData = await messagesResp.json()
+            const msgs = (messagesData.payload || []).slice(-10)
+            const conversationHistory = msgs.map((m: any) => `${m.message_type === 0 ? 'Cliente' : 'Agente'}: ${m.content || '[mídia]'}`).join('\n')
+            if (conversationHistory) {
+              fullContext = conversationHistory
+              console.log(`📜 Classification using ${msgs.length} conversation messages`)
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Failed to fetch conversation history for classification:', err)
+      }
+    }
 
     // Try AI classification
     let targetStageId: string
@@ -159,16 +228,10 @@ async function autoCreateDeal(
       productId = aiResult.product_id
       productName = (activeProducts || []).find(p => p.id === aiResult.product_id)?.name || null
     } else {
-      // Fallback: default pipeline + first stage
-      const defaultPipeline = allPipelines.find(p => p.is_default) || allPipelines[0]
-      const firstStage = pipelinesWithStages.find(p => p.id === defaultPipeline.id)?.stages[0]
-      if (!firstStage) {
-        console.log('⚠️ No stages found in fallback pipeline')
-        return null
-      }
-      targetPipelineId = defaultPipeline.id
-      targetStageId = firstStage.id
-      console.log('⚠️ Using fallback: default pipeline + first stage')
+      // If AI couldn't classify, we don't auto-create the deal yet.
+      // We wait for the user to provide more context.
+      console.log('⚠️ AI could not classify lead, skipping auto-create deal')
+      return null
     }
 
     // Get target stage details
@@ -183,9 +246,10 @@ async function autoCreateDeal(
         client_id: clientId,
         stage_id: targetStageId,
         product_id: productId,
+        chatwoot_conversation_id: chatwootConversationId,
         title: dealTitle,
         position: 0,
-        last_sync_source: 'dispatcher',
+        last_sync_source: 'chatwoot',
       })
       .select('id, title, stage_id, product_id')
       .single()
@@ -196,6 +260,44 @@ async function autoCreateDeal(
     }
 
     console.log(`✅ Auto-created deal "${newDeal.title}" in stage "${targetStage.name}"${productName ? ` with product "${productName}"` : ''}`)
+
+    // Apply stage label to Chatwoot conversation
+    if (chatwootConversationId && brokerageId) {
+      try {
+        const { data: stageData } = await supabase
+          .from('crm_stages')
+          .select('chatwoot_label')
+          .eq('id', targetStageId)
+          .single()
+
+        if (stageData?.chatwoot_label) {
+          const { data: brokerage } = await supabase
+            .from('brokerages')
+            .select('chatwoot_url, chatwoot_token, chatwoot_account_id')
+            .eq('id', brokerageId)
+            .single()
+
+          if (brokerage?.chatwoot_url && brokerage?.chatwoot_token && brokerage?.chatwoot_account_id) {
+            const labelUrl = `${brokerage.chatwoot_url}/api/v1/accounts/${brokerage.chatwoot_account_id}/conversations/${chatwootConversationId}/labels`
+            const labelResp = await fetch(labelUrl, {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json', api_access_token: brokerage.chatwoot_token },
+            })
+            const currentLabels = labelResp.ok ? ((await labelResp.json())?.payload || []) : []
+            const newLabels = [...new Set([...currentLabels, stageData.chatwoot_label])]
+
+            await fetch(labelUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', api_access_token: brokerage.chatwoot_token },
+              body: JSON.stringify({ labels: newLabels }),
+            })
+            console.log('🏷️ Applied label to conversation:', stageData.chatwoot_label)
+          }
+        }
+      } catch (labelErr) {
+        console.warn('⚠️ Failed to apply label:', labelErr)
+      }
+    }
 
     // Load AI settings for this stage
     const { data: settings } = await supabase
@@ -232,7 +334,7 @@ async function evaluateObjectiveCompletion(params: {
   const result = { completed: false, previousStageId: null as string | null, previousStageName: null as string | null, newStageId: null as string | null, newStageName: null as string | null }
 
   const objective = params.stageAiSettings?.ai_objective
-  if (!objective || !LOVABLE_API_KEY) return result
+  if (!objective || !resolvedAI.auth) return result
 
   // Fetch last messages from Chatwoot
   let recentMessages = ''
@@ -265,11 +367,11 @@ async function evaluateObjectiveCompletion(params: {
 
   // Quick AI evaluation
   try {
-    const evalResp = await fetch(AI_GATEWAY_URL, {
+    const evalResp = await fetch(resolvedAI.url, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: resolvedAI.auth, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: resolvedAI.model,
         messages: [
           { role: 'system', content: 'Você é um avaliador. Responda APENAS "SIM" ou "NAO", sem explicações.' },
           { role: 'user', content: `Dado o objetivo da etapa: "${objective}"\n\nHistórico recente:\n${recentMessages}\n\nO objetivo foi atingido?` }
@@ -321,7 +423,7 @@ async function evaluateObjectiveCompletion(params: {
           // Move the deal
           const { error: moveError } = await supabase
             .from('crm_deals')
-            .update({ stage_id: targetStageId, last_sync_source: 'dispatcher' })
+            .update({ stage_id: targetStageId, last_sync_source: 'chatwoot' })
             .eq('id', params.deal.id)
 
           if (!moveError) {
@@ -421,7 +523,7 @@ async function processAttachments(attachments: any[] | undefined) {
     attachmentUrls: [] as string[],
   }
 
-  if (!attachments || attachments.length === 0 || !LOVABLE_API_KEY) return result
+  if (!attachments || attachments.length === 0 || !resolvedAI.auth) return result
 
     const processPromises = attachments.map(async (att) => {
       const url = att.data_url || att.url
@@ -436,11 +538,11 @@ async function processAttachments(attachments: any[] | undefined) {
           const audioBuffer = await audioResp.arrayBuffer()
           const base64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)))
 
-          const aiResp = await fetch(AI_GATEWAY_URL, {
+          const aiResp = await fetch(resolvedAI.url, {
             method: "POST",
-            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+            headers: { Authorization: resolvedAI.auth, "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
+              model: resolvedAI.model,
               messages: [
                 { role: "system", content: "Transcreva o áudio a seguir em português brasileiro. Retorne APENAS a transcrição, sem comentários." },
                 { role: "user", content: [
@@ -457,11 +559,11 @@ async function processAttachments(attachments: any[] | undefined) {
           }
 
         } else if (contentType.startsWith("image/") || contentType === "application/pdf") {
-          const aiResp = await fetch(AI_GATEWAY_URL, {
+          const aiResp = await fetch(resolvedAI.url, {
             method: "POST",
-            headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+            headers: { Authorization: resolvedAI.auth, "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
+              model: resolvedAI.model,
               messages: [
                 { role: "system", content: "Extraia TODO o texto visível desta imagem/documento. Retorne o texto extraído de forma organizada, sem comentários adicionais." },
                 { role: "user", content: [
@@ -621,8 +723,9 @@ async function buildSystemPrompt(params: {
     systemPrompt += `NOVO CONTATO — TRIAGEM INICIAL\n`
     systemPrompt += `Este cliente ainda não tem negociação aberta. Seu objetivo é entender o que ele precisa.\n`
     systemPrompt += `Pergunte de forma natural o que ele está buscando (cotação, sinistro, endosso, cancelamento, segunda via, etc.).\n`
-    systemPrompt += `NÃO tente vender nada ainda. Apenas identifique a necessidade para encaminhamento correto.\n`
-    systemPrompt += `O sistema cuidará automaticamente do cadastro e roteamento.\n`
+    systemPrompt += `Se o cliente pedir uma cotação de forma genérica, pergunte QUAL O TIPO DE SEGURO ou PRODUTO ele deseja (ex: auto, residencial, vida, saúde).\n`
+    systemPrompt += `NÃO tente vender nada ainda. Apenas identifique a necessidade e o produto específico para encaminhamento correto.\n`
+    systemPrompt += `O sistema cuidará automaticamente do cadastro e roteamento para o funil adequado (ex: Seguros, Sinistros) assim que o produto for identificado.\n`
     systemPrompt += `</objective>\n\n`
 
     allowedTools = []
@@ -681,18 +784,10 @@ async function buildSystemPrompt(params: {
 }
 
 // ──────────────────────────────────────────────
-// MAIN HANDLER
+// BACKGROUND PROCESSOR
 // ──────────────────────────────────────────────
-Deno.serve(async (req) => {
+async function processWebhook(body: any) {
   try {
-    const body = await req.json()
-    console.log('📥 Dispatcher v2 — Event:', body.event)
-
-    // 1. Validate event
-    if (body.event !== 'message_created' || body.message_type !== 'incoming') {
-      return new Response(JSON.stringify({ message: 'Ignored event' }), { headers: { 'Content-Type': 'application/json' } })
-    }
-
     const { conversation, sender, content, attachments } = body
     const assigneeEmail = conversation?.meta?.assignee?.email
     const inboxId = conversation?.inbox_id
@@ -702,7 +797,7 @@ Deno.serve(async (req) => {
 
     if (!aiEnabled) {
       console.log('🚫 AI disabled for user:', userId)
-      return new Response(JSON.stringify({ message: 'AI disabled for this user' }), { headers: { 'Content-Type': 'application/json' } })
+      return
     }
 
     // 2.5 — Auto-detect producer or brokerage owner as admin by phone
@@ -734,6 +829,12 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 2.6 — Resolve AI config from user's global settings
+    if (userId) {
+      const resolved = await resolveUserModel(supabase, userId)
+      initAIConfig(resolved)
+    }
+
     // 3. Analysis session logic (batch mode — kept from v1)
     const isAdmin = role === 'admin'
     if (userId && brokerageId) {
@@ -754,7 +855,7 @@ Deno.serve(async (req) => {
             chatwoot_conversation_id: conversation.id,
             status: 'compiling', collected_data: [body],
           })
-          return new Response(JSON.stringify({ message: 'Modo de análise iniciado. Envie arquivos e digite "processar" para finalizar.' }), { headers: { 'Content-Type': 'application/json' } })
+          return
         }
       }
 
@@ -773,10 +874,10 @@ Deno.serve(async (req) => {
         if (messageContent2.includes('processar')) {
           await supabase.from('ai_analysis_sessions').update({ status: 'ready_for_processing', collected_data: collectedData }).eq('id', activeSession.id)
           supabase.functions.invoke('process-analysis-session', { body: { session_id: activeSession.id } }).catch(console.error)
-          return new Response(JSON.stringify({ message: 'Análise iniciada. Você será notificado quando terminar.' }), { headers: { 'Content-Type': 'application/json' } })
+          return
         } else {
           await supabase.from('ai_analysis_sessions').update({ collected_data: collectedData, expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() }).eq('id', activeSession.id)
-          return new Response(JSON.stringify({ message: 'Dados recebidos. Envie "processar" quando terminar.' }), { headers: { 'Content-Type': 'application/json' } })
+          return
         }
       }
     }
@@ -840,14 +941,15 @@ Deno.serve(async (req) => {
       const clientAiEnabled = clientData?.ai_enabled ?? true
       if (!clientAiEnabled && role !== 'admin') {
         console.log('🚫 AI disabled for client:', clientId)
-        return new Response(JSON.stringify({ message: 'IA desativada para este cliente, aguardando atendimento humano' }), { headers: { 'Content-Type': 'application/json' } })
+        return
       }
 
       if (clientId) {
         const { data: deals } = await supabase
           .from('crm_deals')
-          .select('id, title, stage_id, crm_stages(id, name, pipeline_id, position)')
+          .select('id, title, stage_id, status, crm_stages(id, name, pipeline_id, position)')
           .eq('client_id', clientId)
+          .eq('status', 'open')
           .order('created_at', { ascending: false })
           .limit(1)
 
@@ -881,7 +983,8 @@ Deno.serve(async (req) => {
           // Auto-create deal for leads without negotiation (AI-driven classification)
           const autoResult = await autoCreateDeal(
             userId, clientId, clientData?.name || sender?.name || null,
-            content || '', mediaResult.transcription, mediaResult.extractedText
+            content || '', mediaResult.transcription, mediaResult.extractedText,
+            brokerageId, conversation?.id || null
           )
           if (autoResult) {
             currentDeal = autoResult.deal
@@ -916,7 +1019,7 @@ Deno.serve(async (req) => {
 
     if (!promptResult.aiIsActive && role !== 'admin') {
       console.log('🚫 AI inactive for this user config')
-      return new Response(JSON.stringify({ message: 'AI inactive' }), { headers: { 'Content-Type': 'application/json' } })
+      return
     }
 
     // 6b. Pre-evaluate objective completion (only for existing deals with objectives, not auto-created)
@@ -933,7 +1036,6 @@ Deno.serve(async (req) => {
 
       // If stage was completed, update references for payload
       if (objectiveResult.completed && objectiveResult.newStageId) {
-        // Reload new stage settings for the prompt
         const { data: newStageData } = await supabase
           .from('crm_stages')
           .select('id, name, pipeline_id, position')
@@ -992,7 +1094,6 @@ Deno.serve(async (req) => {
           attachment_urls: mediaResult.attachmentUrls,
           allowed_tools: promptResult.allowedTools,
           knowledge_context: promptResult.knowledgeContext,
-          // New enriched fields
           auto_created_deal: autoCreatedDeal,
           auto_created_product_id: autoCreatedProductId,
           auto_created_product_name: autoCreatedProductName,
@@ -1030,7 +1131,6 @@ Deno.serve(async (req) => {
         })()
 
         if (shouldFollowUp) {
-          // Check idempotency: don't create if one is already pending
           const { data: existingFollowUp } = await supabase
             .from('ai_follow_ups')
             .select('id')
@@ -1064,6 +1164,35 @@ Deno.serve(async (req) => {
       console.warn('⚠️ No N8N_WEBHOOK_URL configured')
     }
 
+    console.log('✅ Dispatcher processing complete')
+  } catch (error) {
+    console.error('❌ Background processing error:', error)
+  }
+}
+
+// ──────────────────────────────────────────────
+// MAIN HANDLER — Respond immediately, process in background
+// ──────────────────────────────────────────────
+Deno.serve(async (req) => {
+  try {
+    const body = await req.json()
+    console.log('📥 Dispatcher v2 — Event:', body.event)
+
+    // Quick validation — ignore non-incoming messages
+    if (body.event !== 'message_created' || body.message_type !== 'incoming') {
+      return new Response(JSON.stringify({ message: 'Ignored event' }), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // Fire-and-forget: process in background
+    const processing = processWebhook(body)
+
+    // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(processing)
+    }
+
+    // Return 200 immediately to Chatwoot
     return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } })
 
   } catch (error) {
@@ -1071,3 +1200,4 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: (error as Error).message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 })
+

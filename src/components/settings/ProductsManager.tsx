@@ -35,7 +35,7 @@ export function ProductsManager() {
     setDialogOpen(true);
   };
 
-  const handleSave = async (data: { name: string; description?: string; is_active?: boolean }) => {
+  const handleSave = async (data: { name: string; description?: string; color?: string; icon?: string; is_active?: boolean }) => {
     if (editingProduct) {
       await updateProduct.mutateAsync({ id: editingProduct.id, ...data });
     } else {
@@ -92,7 +92,16 @@ export function ProductsManager() {
               <TableBody>
                 {products.map((product) => (
                   <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {product.icon ? (
+                          <span className="text-lg">{product.icon}</span>
+                        ) : (
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span style={{ color: product.color || 'inherit' }}>{product.name}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="hidden sm:table-cell text-muted-foreground text-sm max-w-[200px] truncate">
                       {product.description || '—'}
                     </TableCell>

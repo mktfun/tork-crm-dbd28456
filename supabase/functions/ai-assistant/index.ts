@@ -584,14 +584,14 @@ async function retrieveContext(query: string, supabase: any): Promise<string> {
       return '';
     }
 
-    // Generate embedding using Gemini text-embedding-004
+    // Generate embedding using Gemini text-embedding-005
     const embeddingResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${geminiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-005:embedContent?key=${geminiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'models/text-embedding-004',
+          model: 'models/text-embedding-005',
           content: { parts: [{ text: query }] },
           taskType: 'RETRIEVAL_QUERY',
           outputDimensionality: 768 // Match our vector column size
@@ -1133,20 +1133,6 @@ const TOOLS = [
           confirmed: { type: "boolean", description: "Deve ser true para confirmar a exclusão" }
         },
         required: ["policy_id", "confirmed"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "analyze_client_360",
-      description: "SUPER TOOL: Realiza uma análise completa (360º) de um cliente. Retorna Perfil, Saúde, Risco de Churn, Apólices e Oportunidades em uma única chamada. USE SEMPRE que precisar saber 'tudo' sobre um cliente.",
-      parameters: {
-        type: "object",
-        properties: {
-          client_id: { type: "string", description: "ID do cliente a ser analisado." }
-        },
-        required: ["client_id"]
       }
     }
   },
@@ -2069,18 +2055,38 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      clearTimeout(timeoutId);
-      throw new Error('LOVABLE_API_KEY não configurada');
-    }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Resolve dynamic model from user's global config
-    const userModel = await resolveUserModel(supabase, userId);
-    console.log(`[MODEL] Using model: ${userModel} for user ${userId}`);
+    const resolved = await resolveUserModel(supabase, userId);
+    
+    // Determine AI endpoint and auth based on user's config
+    let aiBaseUrl = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+    let aiAuthHeader = `Bearer ${LOVABLE_API_KEY}`;
+    let aiModelName = resolved.model;
+    
+    if (resolved.apiKey && resolved.provider === 'gemini') {
+      // User has their own Gemini key — call Google's OpenAI-compatible endpoint directly
+      aiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+      aiAuthHeader = `Bearer ${resolved.apiKey}`;
+      // Strip 'google/' prefix for direct Google API
+      aiModelName = resolved.model.replace('google/', '');
+      console.log(`[MODEL] Using user's Gemini key, model: ${aiModelName} for user ${userId}`);
+    } else if (resolved.apiKey && resolved.provider === 'openai') {
+      // User has their own OpenAI key
+      aiBaseUrl = 'https://api.openai.com/v1/chat/completions';
+      aiAuthHeader = `Bearer ${resolved.apiKey}`;
+      aiModelName = resolved.model.replace('openai/', '');
+      console.log(`[MODEL] Using user's OpenAI key, model: ${aiModelName} for user ${userId}`);
+    } else if (LOVABLE_API_KEY) {
+      console.log(`[MODEL] Using Lovable Gateway, model: ${aiModelName} for user ${userId}`);
+    } else {
+      clearTimeout(timeoutId);
+      throw new Error('Nenhuma API key configurada (nem Lovable, nem do usuário)');
+    }
 
     // Process attachments in user messages
     const processedMessages = messages.map((msg: any) => {
@@ -2150,14 +2156,14 @@ serve(async (req) => {
       const maxToolIterations = 10; // FASE GOD MODE: Aumentado para suportar cadeias complexas
 
       // Resolve tool calls first (não é possível streamar durante tool calls)
-      let response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      let response = await fetch(aiBaseUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Authorization': aiAuthHeader,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: userModel,
+          model: aiModelName,
           messages: currentMessages,
           tools: TOOLS,
           tool_choice: 'auto',
@@ -2206,19 +2212,19 @@ serve(async (req) => {
           });
         }
 
-        response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        response = await fetch(aiBaseUrl, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Authorization': aiAuthHeader,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: userModel,
+            model: aiModelName,
             messages: currentMessages,
             tools: TOOLS,
             tool_choice: 'auto',
-            max_tokens: 8192, // FASE P5: Expansão para alta densidade de dados
-            temperature: 0.2, // FASE P5: Concisão técnica e redução de alucinações
+            max_tokens: 8192,
+            temperature: 0.2,
           }),
           signal: controller.signal,
         });
@@ -2232,18 +2238,18 @@ serve(async (req) => {
       // Agora fazemos a chamada final com streaming
       console.log(`[STREAM-MODE] Tool calls resolved, starting final stream...`);
 
-      const streamResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      const streamResponse = await fetch(aiBaseUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Authorization': aiAuthHeader,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: userModel,
+          model: aiModelName,
           messages: currentMessages,
           stream: true,
-          max_tokens: 8192, // FASE P5: Expansão para respostas técnicas longas
-          temperature: 0.2, // FASE P5: Concisão técnica
+          max_tokens: 8192,
+          temperature: 0.2,
         }),
         signal: controller.signal,
       });
@@ -2324,19 +2330,19 @@ serve(async (req) => {
     // ========== NON-STREAMING MODE (original behavior) ==========
     console.log(`[NON-STREAM] Processing request...`);
 
-    let response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    let response = await fetch(aiBaseUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': aiAuthHeader,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: userModel,
+        model: aiModelName,
         messages: aiMessages,
         tools: TOOLS,
         tool_choice: 'auto',
-        max_tokens: 8192, // FASE P5: Alta densidade de dados
-        temperature: 0.2, // FASE P5: Concisão técnica
+        max_tokens: 8192,
+        temperature: 0.2,
       }),
       signal: controller.signal,
     });
@@ -2382,19 +2388,19 @@ serve(async (req) => {
         });
       }
 
-      response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      response = await fetch(aiBaseUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Authorization': aiAuthHeader,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: userModel,
+          model: aiModelName,
           messages: currentMessages,
           tools: TOOLS,
           tool_choice: 'auto',
-          max_tokens: 8192, // FASE P5: Alta densidade de dados
-          temperature: 0.2, // FASE P5: Concisão técnica
+          max_tokens: 8192,
+          temperature: 0.2,
         }),
         signal: controller.signal,
       });

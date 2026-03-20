@@ -20,7 +20,7 @@ const knowledgeBase = [
 ];
 
 async function generateEmbedding(text) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-005:embedContent?key=${GEMINI_API_KEY}`;
   const response = await axios.post(url, {
     model: 'models/text-embedding-004',
     content: { parts: [{ text }] },
