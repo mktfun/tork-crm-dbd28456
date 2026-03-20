@@ -266,7 +266,7 @@ export function useCRMDeals(pipelineId: string | null = null) {
         .select(`
           *,
           client:clientes(id, name, phone, email),
-          product:crm_products(id, name, color, icon)
+          product:crm_products(id, name)
         `)
         .eq('user_id', user!.id);
 
