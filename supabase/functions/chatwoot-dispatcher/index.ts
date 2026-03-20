@@ -246,6 +246,7 @@ async function autoCreateDeal(
         client_id: clientId,
         stage_id: targetStageId,
         product_id: productId,
+        chatwoot_conversation_id: chatwootConversationId,
         title: dealTitle,
         position: 0,
         last_sync_source: 'chatwoot',
@@ -259,6 +260,44 @@ async function autoCreateDeal(
     }
 
     console.log(`✅ Auto-created deal "${newDeal.title}" in stage "${targetStage.name}"${productName ? ` with product "${productName}"` : ''}`)
+
+    // Apply stage label to Chatwoot conversation
+    if (chatwootConversationId && brokerageId) {
+      try {
+        const { data: stageData } = await supabase
+          .from('crm_stages')
+          .select('chatwoot_label')
+          .eq('id', targetStageId)
+          .single()
+
+        if (stageData?.chatwoot_label) {
+          const { data: brokerage } = await supabase
+            .from('brokerages')
+            .select('chatwoot_url, chatwoot_token, chatwoot_account_id')
+            .eq('id', brokerageId)
+            .single()
+
+          if (brokerage?.chatwoot_url && brokerage?.chatwoot_token && brokerage?.chatwoot_account_id) {
+            const labelUrl = `${brokerage.chatwoot_url}/api/v1/accounts/${brokerage.chatwoot_account_id}/conversations/${chatwootConversationId}/labels`
+            const labelResp = await fetch(labelUrl, {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json', api_access_token: brokerage.chatwoot_token },
+            })
+            const currentLabels = labelResp.ok ? ((await labelResp.json())?.payload || []) : []
+            const newLabels = [...new Set([...currentLabels, stageData.chatwoot_label])]
+
+            await fetch(labelUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', api_access_token: brokerage.chatwoot_token },
+              body: JSON.stringify({ labels: newLabels }),
+            })
+            console.log('🏷️ Applied label to conversation:', stageData.chatwoot_label)
+          }
+        }
+      } catch (labelErr) {
+        console.warn('⚠️ Failed to apply label:', labelErr)
+      }
+    }
 
     // Load AI settings for this stage
     const { data: settings } = await supabase

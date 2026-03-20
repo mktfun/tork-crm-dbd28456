@@ -1,0 +1,1 @@
+ALTER TABLE public.crm_deals REPLICA IDENTITY FULL;
