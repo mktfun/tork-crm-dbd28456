@@ -13,6 +13,10 @@ export interface CrmAiSetting {
   voice_id: string | null;
   max_messages_before_human: number;
   is_active: boolean;
+  follow_up_enabled: boolean;
+  follow_up_interval_minutes: number;
+  follow_up_max_attempts: number;
+  follow_up_message: string;
   created_at: string;
   updated_at: string;
 }
@@ -81,6 +85,10 @@ export function useCrmAiSettings(pipelineId: string | null) {
           voice_id: setting?.voice_id || null,
           max_messages_before_human: setting?.max_messages_before_human || 10,
           is_active: setting?.is_active ?? true,
+          follow_up_enabled: setting?.follow_up_enabled ?? false,
+          follow_up_interval_minutes: setting?.follow_up_interval_minutes ?? 60,
+          follow_up_max_attempts: setting?.follow_up_max_attempts ?? 3,
+          follow_up_message: setting?.follow_up_message ?? '',
           created_at: setting?.created_at || '',
           updated_at: setting?.updated_at || '',
           stage_name: stage.name,
