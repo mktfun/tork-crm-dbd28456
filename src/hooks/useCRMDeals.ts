@@ -293,7 +293,6 @@ export function useCRMDeals(pipelineId: string | null = null) {
           event: '*',
           schema: 'public',
           table: 'crm_deals',
-          filter: `user_id=eq.${user.id}`
         },
         (payload) => {
           console.log('CRM Deal change:', payload);

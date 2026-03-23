@@ -126,7 +126,7 @@ export function KanbanColumn({
       <div
         ref={setDroppableRef}
         className={`
-          flex-1 overflow-y-auto rounded-xl p-2 transition-all duration-200
+          flex-1 overflow-y-auto no-scrollbar rounded-xl p-2 transition-all duration-200
           ${isOver ? 'bg-primary/10 ring-2 ring-dashed ring-primary/30' : 'bg-transparent'}
         `}
       >

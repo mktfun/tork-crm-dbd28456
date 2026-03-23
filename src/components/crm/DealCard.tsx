@@ -69,6 +69,12 @@ export function DealCard({ deal, isDragging, onClick, stageColor = '#3B82F6' }: 
         <h4 className="font-medium text-foreground line-clamp-2 flex-1 pr-2">
           {deal.title}
         </h4>
+        {deal.last_sync_source === 'chatwoot' && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-primary/15 text-primary text-[10px] font-semibold shrink-0">
+            <Bot className="h-3 w-3" />
+            IA
+          </span>
+        )}
       </div>
 
       {/* Product Badge */}
