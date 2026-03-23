@@ -768,8 +768,8 @@ async function buildSystemPrompt(params: {
 
   if (!deal) {
     // No deal — triage mode: understand what the client needs
-    const basePerson = globalBaseInstructions || stageAiSettings?.ai_persona || 'Você é um assistente de vendas útil e amigável.'
-    systemPrompt += `<persona>\n${basePerson}\n</persona>\n\n`
+    const basePersonResolved = resolvePersonaPrompt(stageAiSettings?.ai_persona) || (globalBaseInstructions ? `<persona>\n${globalBaseInstructions}\n</persona>` : '<persona>\nVocê é um assistente de vendas útil e amigável.\n</persona>')
+    systemPrompt += basePersonResolved + '\n\n'
     systemPrompt += `<objective>\n`
     systemPrompt += `NOVO CONTATO — TRIAGEM INICIAL\n`
     systemPrompt += `Este cliente ainda não tem negociação aberta. Seu objetivo é entender o que ele precisa.\n`
