@@ -718,15 +718,26 @@ export function ReconciliationPage() {
                                                 )}
                                             </div>
                                         </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="gap-1.5 shrink-0"
-                                            onClick={() => setSelectedBatchId(item.id)}
-                                        >
-                                            <Eye className="w-3.5 h-3.5" />
-                                            Ver Detalhes
-                                        </Button>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="gap-1.5"
+                                                onClick={() => setSelectedBatchId(item.id)}
+                                            >
+                                                <Eye className="w-3.5 h-3.5" />
+                                                Ver Detalhes
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                onClick={() => setDeletingBatchId(item.id)}
+                                                title="Excluir extrato"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 );
                             })}
