@@ -784,8 +784,9 @@ async function buildSystemPrompt(params: {
     // Has deal — stage-specific mode
     stageAiIsActive = stageAiSettings?.is_active ?? false
 
-    if (stageAiSettings?.ai_persona) {
-      systemPrompt += `<persona>\n${stageAiSettings.ai_persona}\n</persona>\n\n`
+    const personaXml = resolvePersonaPrompt(stageAiSettings?.ai_persona)
+    if (personaXml) {
+      systemPrompt += personaXml + '\n\n'
     }
 
     systemPrompt += `<current_context>\n`
