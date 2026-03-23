@@ -440,7 +440,7 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4 flex-1 min-h-0">
+        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 flex-1 min-h-0">
           <SortableContext
             items={stages.map(s => `column-${s.id}`)}
             strategy={horizontalListSortingStrategy}

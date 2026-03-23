@@ -261,6 +261,25 @@ async function autoCreateDeal(
 
     console.log(`✅ Auto-created deal "${newDeal.title}" in stage "${targetStage.name}"${productName ? ` with product "${productName}"` : ''}`)
 
+    // Insert creation event for audit trail
+    const targetPipeline = allPipelines.find(p => p.id === targetStage.pipeline_id)
+    const eventDetails = [
+      'Criado automaticamente pela IA',
+      productName ? `Produto: ${productName}` : null,
+      targetPipeline ? `Funil: ${targetPipeline.name}` : null,
+      `Etapa: ${targetStage.name}`,
+    ].filter(Boolean).join(' | ')
+
+    await supabase.from('crm_deal_events').insert({
+      deal_id: newDeal.id,
+      event_type: 'creation',
+      new_value: eventDetails,
+      source: 'ai_automation',
+      created_by: null,
+    }).then(({ error }) => {
+      if (error) console.warn('⚠️ Failed to insert creation event:', error)
+    })
+
     // Apply stage label to Chatwoot conversation
     if (chatwootConversationId && brokerageId) {
       try {
@@ -980,19 +999,58 @@ async function processWebhook(body: any) {
             }
           }
         } else if (userId && role !== 'admin') {
-          // Auto-create deal for leads without negotiation (AI-driven classification)
-          const autoResult = await autoCreateDeal(
-            userId, clientId, clientData?.name || sender?.name || null,
-            content || '', mediaResult.transcription, mediaResult.extractedText,
-            brokerageId, conversation?.id || null
-          )
-          if (autoResult) {
-            currentDeal = autoResult.deal
-            currentStage = autoResult.stage
-            stageAiSettings = autoResult.stageAiSettings
-            autoCreatedDeal = true
-            autoCreatedProductId = autoResult.productId
-            autoCreatedProductName = autoResult.productName
+          // Check for existing deal by conversation_id to prevent duplicates
+          if (conversation?.id) {
+            const { data: existingByConv } = await supabase
+              .from('crm_deals')
+              .select('id, title, stage_id, status, crm_stages(id, name, pipeline_id, position)')
+              .eq('chatwoot_conversation_id', conversation.id)
+              .limit(1)
+
+            if (existingByConv && existingByConv.length > 0) {
+              currentDeal = existingByConv[0]
+              currentStage = currentDeal.crm_stages
+              console.log(`✅ Found existing deal by conversation_id: ${currentDeal.title}`)
+
+              if (currentStage?.id) {
+                const { data: settings } = await supabase
+                  .from('crm_ai_settings')
+                  .select('*')
+                  .eq('stage_id', currentStage.id)
+                  .maybeSingle()
+                stageAiSettings = settings
+              }
+            } else {
+              // Auto-create deal for leads without negotiation (AI-driven classification)
+              const autoResult = await autoCreateDeal(
+                userId, clientId, clientData?.name || sender?.name || null,
+                content || '', mediaResult.transcription, mediaResult.extractedText,
+                brokerageId, conversation?.id || null
+              )
+              if (autoResult) {
+                currentDeal = autoResult.deal
+                currentStage = autoResult.stage
+                stageAiSettings = autoResult.stageAiSettings
+                autoCreatedDeal = true
+                autoCreatedProductId = autoResult.productId
+                autoCreatedProductName = autoResult.productName
+              }
+            }
+          } else {
+            // No conversation id, fallback to auto-create
+            const autoResult = await autoCreateDeal(
+              userId, clientId, clientData?.name || sender?.name || null,
+              content || '', mediaResult.transcription, mediaResult.extractedText,
+              brokerageId, null
+            )
+            if (autoResult) {
+              currentDeal = autoResult.deal
+              currentStage = autoResult.stage
+              stageAiSettings = autoResult.stageAiSettings
+              autoCreatedDeal = true
+              autoCreatedProductId = autoResult.productId
+              autoCreatedProductName = autoResult.productName
+            }
           }
         }
       }
