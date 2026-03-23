@@ -329,6 +329,37 @@ export function ReconciliationPage() {
     const { data: batchEntries = [], isLoading: isLoadingBatch } = useImportBatchEntries(selectedBatchId);
     const { data: batchAuditLogs = [], isLoading: isLoadingAuditLogs } = useAuditLogByBatch(selectedBatchId);
 
+    const deletingBatch = importHistory.find(h => h.id === deletingBatchId);
+
+    const handleDeleteBatch = async () => {
+        if (!deletingBatchId) return;
+        setIsDeletingBatch(true);
+        try {
+            const { error: entriesErr } = await supabase
+                .from('bank_statement_entries')
+                .delete()
+                .eq('import_batch_id', deletingBatchId);
+            if (entriesErr) throw entriesErr;
+
+            const { error: historyErr } = await supabase
+                .from('bank_import_history')
+                .delete()
+                .eq('id', deletingBatchId);
+            if (historyErr) throw historyErr;
+
+            toast.success('Extrato excluído com sucesso');
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['import-history'] });
+        } catch (err: any) {
+            toast.error('Erro ao excluir extrato: ' + (err.message || 'Erro desconhecido'));
+        } finally {
+            setIsDeletingBatch(false);
+            setDeletingBatchId(null);
+        }
+    };
+
     // Mutations
     const reconcileMutation = useReconcileTransactionDirectly();
     const unreconcileMutation = useUnreconcileTransaction();
