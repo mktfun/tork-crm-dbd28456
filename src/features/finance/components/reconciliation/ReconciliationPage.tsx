@@ -28,6 +28,8 @@ import {
     UserCheck,
     Sparkles,
     UploadCloud,
+    Trash2,
+    Loader2 as Loader2Icon,
 } from 'lucide-react';
 import { DatePickerWithRange } from '@/components/ui/date-picker-with-range';
 import { Input } from '@/components/ui/input';
