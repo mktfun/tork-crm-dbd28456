@@ -82,9 +82,18 @@ export function StageFlowCard({
   const [isExpanded, setIsExpanded] = useState(isSelected);
   const [selectedVibe, setSelectedVibe] = useState<VibeId | null>(inferVibeFromPersona(currentPersona));
   const [mission, setMission] = useState(currentObjective || '');
+  const [followUpInterval, setFollowUpInterval] = useState(aiSetting?.follow_up_interval_minutes ?? 60);
+  const [followUpMaxAttempts, setFollowUpMaxAttempts] = useState(aiSetting?.follow_up_max_attempts ?? 3);
+  const [followUpMessage, setFollowUpMessage] = useState(aiSetting?.follow_up_message ?? '');
+  
   const debouncedMission = useDebounce(mission, 1500);
+  const debouncedInterval = useDebounce(followUpInterval, 1500);
+  const debouncedMaxAttempts = useDebounce(followUpMaxAttempts, 1500);
+  const debouncedFollowUpMessage = useDebounce(followUpMessage, 1500);
+  
   const userSelectedRef = useRef(false);
   const missionFocusedRef = useRef(false);
+  const followUpFocusedRef = useRef(false);
   
   // Sync expanded state with selection
   useEffect(() => {
@@ -97,6 +106,15 @@ export function StageFlowCard({
       setMission(currentObjective || '');
     }
   }, [currentObjective]);
+
+  // Sync follow-up fields with external data — skip if user is typing
+  useEffect(() => {
+    if (!followUpFocusedRef.current) {
+      setFollowUpInterval(aiSetting?.follow_up_interval_minutes ?? 60);
+      setFollowUpMaxAttempts(aiSetting?.follow_up_max_attempts ?? 3);
+      setFollowUpMessage(aiSetting?.follow_up_message ?? '');
+    }
+  }, [aiSetting?.follow_up_interval_minutes, aiSetting?.follow_up_max_attempts, aiSetting?.follow_up_message]);
   
   // Sync vibe with external data — skip when change came from user click
   useEffect(() => {
@@ -111,12 +129,28 @@ export function StageFlowCard({
   // Auto-save mission on debounce
   useEffect(() => {
     if (debouncedMission && debouncedMission !== currentObjective) {
-      onSaveConfig({
-        stage_id: stage.id,
-        ai_objective: debouncedMission,
-      });
+      onSaveConfig({ stage_id: stage.id, ai_objective: debouncedMission });
     }
   }, [debouncedMission]);
+
+  // Auto-save follow-up fields on debounce
+  useEffect(() => {
+    if (debouncedInterval !== (aiSetting?.follow_up_interval_minutes ?? 60)) {
+      onSaveConfig({ stage_id: stage.id, follow_up_interval_minutes: debouncedInterval });
+    }
+  }, [debouncedInterval]);
+
+  useEffect(() => {
+    if (debouncedMaxAttempts !== (aiSetting?.follow_up_max_attempts ?? 3)) {
+      onSaveConfig({ stage_id: stage.id, follow_up_max_attempts: debouncedMaxAttempts });
+    }
+  }, [debouncedMaxAttempts]);
+
+  useEffect(() => {
+    if (debouncedFollowUpMessage !== (aiSetting?.follow_up_message ?? '')) {
+      onSaveConfig({ stage_id: stage.id, follow_up_message: debouncedFollowUpMessage });
+    }
+  }, [debouncedFollowUpMessage]);
   
   const handleVibeChange = useCallback((vibeId: VibeId) => {
     userSelectedRef.current = true;
@@ -284,11 +318,10 @@ export function StageFlowCard({
                     <Input
                       type="number"
                       min={5}
-                      value={aiSetting?.follow_up_interval_minutes ?? 60}
-                      onChange={(e) => onSaveConfig({
-                        stage_id: stage.id,
-                        follow_up_interval_minutes: parseInt(e.target.value) || 60,
-                      })}
+                      value={followUpInterval}
+                      onChange={(e) => setFollowUpInterval(parseInt(e.target.value) || 60)}
+                      onFocus={() => { followUpFocusedRef.current = true; }}
+                      onBlur={() => { followUpFocusedRef.current = false; }}
                       className="h-7 text-xs bg-background/50"
                       disabled={isSaving}
                     />
@@ -299,22 +332,20 @@ export function StageFlowCard({
                       type="number"
                       min={1}
                       max={10}
-                      value={aiSetting?.follow_up_max_attempts ?? 3}
-                      onChange={(e) => onSaveConfig({
-                        stage_id: stage.id,
-                        follow_up_max_attempts: parseInt(e.target.value) || 3,
-                      })}
+                      value={followUpMaxAttempts}
+                      onChange={(e) => setFollowUpMaxAttempts(parseInt(e.target.value) || 3)}
+                      onFocus={() => { followUpFocusedRef.current = true; }}
+                      onBlur={() => { followUpFocusedRef.current = false; }}
                       className="h-7 text-xs bg-background/50"
                       disabled={isSaving}
                     />
                   </div>
                 </div>
                 <Textarea
-                  value={aiSetting?.follow_up_message ?? ''}
-                  onChange={(e) => onSaveConfig({
-                    stage_id: stage.id,
-                    follow_up_message: e.target.value,
-                  })}
+                  value={followUpMessage}
+                  onChange={(e) => setFollowUpMessage(e.target.value)}
+                  onFocus={() => { followUpFocusedRef.current = true; }}
+                  onBlur={() => { followUpFocusedRef.current = false; }}
                   placeholder="Mensagem personalizada (opcional). Padrão: templates automáticos."
                   className="min-h-[40px] text-xs bg-background/50 border-border/50 resize-none"
                   disabled={isSaving}
