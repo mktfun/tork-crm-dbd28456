@@ -633,13 +633,6 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                     <ResizablePanel defaultSize={50} minSize={30}>
                         <div className="flex flex-col h-full">
                             <div className="p-3 border-b border-border bg-muted/30 flex items-center gap-2">
-                                {deleteMode && (
-                                    <Checkbox
-                                        checked={deleteSelectedIds.length === filteredStatement.length && filteredStatement.length > 0}
-                                        onCheckedChange={toggleDeleteAll}
-                                        className="shrink-0"
-                                    />
-                                )}
                                 <Badge variant="secondary" className="text-xs font-semibold">Extrato</Badge>
                                 <div className="relative flex-1">
                                     <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
@@ -650,21 +643,6 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                         onChange={(e) => setBankSearch(e.target.value)}
                                     />
                                 </div>
-                                {deleteMode ? (
-                                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground" onClick={exitDeleteMode}>
-                                        <X className="w-3.5 h-3.5 mr-1" /> Cancelar
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-                                        onClick={() => { setDeleteMode(true); clearSelection(); }}
-                                        title="Excluir entradas"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                )}
                                 <span className="text-xs text-muted-foreground shrink-0">{filteredStatement.length}</span>
                             </div>
                             <div className="flex-1 overflow-auto p-2 space-y-1.5">
@@ -678,24 +656,14 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                     </div>
                                 ) : (
                                     filteredStatement.map(item => (
-                                        <div key={item.id} className="flex items-start gap-2">
-                                            {deleteMode && (
-                                                <Checkbox
-                                                    checked={deleteSelectedIds.includes(item.id)}
-                                                    onCheckedChange={() => toggleDeleteItem(item.id)}
-                                                    className="mt-3.5 shrink-0"
-                                                />
-                                            )}
-                                            <div className="flex-1 min-w-0">
-                                                <EntryCard
-                                                    item={item}
-                                                    selected={!deleteMode && selectedStatementIds.includes(item.id)}
-                                                    suggested={suggestedStatementIds.has(item.id)}
-                                                    onClick={() => deleteMode ? toggleDeleteItem(item.id) : toggleStatement(item.id)}
-                                                    isUnassigned={!item.bank_account_id}
-                                                />
-                                            </div>
-                                        </div>
+                                        <EntryCard
+                                            key={item.id}
+                                            item={item}
+                                            selected={selectedStatementIds.includes(item.id)}
+                                            suggested={suggestedStatementIds.has(item.id)}
+                                            onClick={() => toggleStatement(item.id)}
+                                            isUnassigned={!item.bank_account_id}
+                                        />
                                     ))
                                 )}
                             </div>
