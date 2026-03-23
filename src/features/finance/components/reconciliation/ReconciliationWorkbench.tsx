@@ -230,11 +230,6 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const [showPartialModal, setShowPartialModal] = useState(false);
     const [showUnassigned, setShowUnassigned] = useState(false);
 
-    // Delete mode state
-    const [deleteMode, setDeleteMode] = useState(false);
-    const [deleteSelectedIds, setDeleteSelectedIds] = useState<string[]>([]);
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
     const queryClient = useQueryClient();
 
     // On-demand bank selection modal state
