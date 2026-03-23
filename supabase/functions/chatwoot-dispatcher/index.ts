@@ -261,6 +261,25 @@ async function autoCreateDeal(
 
     console.log(`✅ Auto-created deal "${newDeal.title}" in stage "${targetStage.name}"${productName ? ` with product "${productName}"` : ''}`)
 
+    // Insert creation event for audit trail
+    const targetPipeline = allPipelines.find(p => p.id === targetStage.pipeline_id)
+    const eventDetails = [
+      'Criado automaticamente pela IA',
+      productName ? `Produto: ${productName}` : null,
+      targetPipeline ? `Funil: ${targetPipeline.name}` : null,
+      `Etapa: ${targetStage.name}`,
+    ].filter(Boolean).join(' | ')
+
+    await supabase.from('crm_deal_events').insert({
+      deal_id: newDeal.id,
+      event_type: 'creation',
+      new_value: eventDetails,
+      source: 'ai_automation',
+      created_by: null,
+    }).then(({ error }) => {
+      if (error) console.warn('⚠️ Failed to insert creation event:', error)
+    })
+
     // Apply stage label to Chatwoot conversation
     if (chatwootConversationId && brokerageId) {
       try {
