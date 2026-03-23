@@ -106,6 +106,15 @@ export function StageFlowCard({
       setMission(currentObjective || '');
     }
   }, [currentObjective]);
+
+  // Sync follow-up fields with external data — skip if user is typing
+  useEffect(() => {
+    if (!followUpFocusedRef.current) {
+      setFollowUpInterval(aiSetting?.follow_up_interval_minutes ?? 60);
+      setFollowUpMaxAttempts(aiSetting?.follow_up_max_attempts ?? 3);
+      setFollowUpMessage(aiSetting?.follow_up_message ?? '');
+    }
+  }, [aiSetting?.follow_up_interval_minutes, aiSetting?.follow_up_max_attempts, aiSetting?.follow_up_message]);
   
   // Sync vibe with external data — skip when change came from user click
   useEffect(() => {
@@ -120,12 +129,28 @@ export function StageFlowCard({
   // Auto-save mission on debounce
   useEffect(() => {
     if (debouncedMission && debouncedMission !== currentObjective) {
-      onSaveConfig({
-        stage_id: stage.id,
-        ai_objective: debouncedMission,
-      });
+      onSaveConfig({ stage_id: stage.id, ai_objective: debouncedMission });
     }
   }, [debouncedMission]);
+
+  // Auto-save follow-up fields on debounce
+  useEffect(() => {
+    if (debouncedInterval !== (aiSetting?.follow_up_interval_minutes ?? 60)) {
+      onSaveConfig({ stage_id: stage.id, follow_up_interval_minutes: debouncedInterval });
+    }
+  }, [debouncedInterval]);
+
+  useEffect(() => {
+    if (debouncedMaxAttempts !== (aiSetting?.follow_up_max_attempts ?? 3)) {
+      onSaveConfig({ stage_id: stage.id, follow_up_max_attempts: debouncedMaxAttempts });
+    }
+  }, [debouncedMaxAttempts]);
+
+  useEffect(() => {
+    if (debouncedFollowUpMessage !== (aiSetting?.follow_up_message ?? '')) {
+      onSaveConfig({ stage_id: stage.id, follow_up_message: debouncedFollowUpMessage });
+    }
+  }, [debouncedFollowUpMessage]);
   
   const handleVibeChange = useCallback((vibeId: VibeId) => {
     userSelectedRef.current = true;
