@@ -996,6 +996,8 @@ async function processWebhook(body: any) {
         return
       }
 
+      let clientJustResponded = false
+
       if (clientId) {
         const { data: deals } = await supabase
           .from('crm_deals')
@@ -1020,7 +1022,6 @@ async function processWebhook(body: any) {
           }
 
           // BLOCO A: Cancel pending follow-ups (client responded!)
-          let clientJustResponded = false
           if (currentDeal?.id) {
             const { data: cancelledFollowUps } = await supabase
               .from('ai_follow_ups')
