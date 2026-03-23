@@ -1,36 +1,41 @@
 
 
-# Plano: Botão "Excluir Extrato" no Workbench de Conciliação
+# Plano: Mover "Excluir Extrato" do Workbench para o Histórico de Importações
 
 ## O que
 
-Adicionar um botão "Excluir" no header do painel esquerdo (Extrato) do `ReconciliationWorkbench`. Ao clicar, o workbench entra em "modo de exclusão": checkboxes aparecem ao lado de cada entry do extrato. O usuário seleciona as que quer deletar e confirma com um botão na floating action bar.
+Remover o modo de exclusão do `ReconciliationWorkbench` e adicionar um botão "Excluir" em cada card de importação no Histórico (`ReconciliationPage.tsx`). Ao clicar, abre um `AlertDialog` de confirmação e deleta todas as `bank_statement_entries` daquele `import_batch_id`, além do registro em `bank_import_history`.
 
-## Como
+## Mudanças
 
-### `ReconciliationWorkbench.tsx`
+### 1. `ReconciliationWorkbench.tsx` — Remover modo exclusão
 
-1. **Novo estado**: `deleteMode` (boolean) e `deleteSelectedIds` (string[])
-2. **Botão no header** do painel esquerdo (linha 632): ícone `Trash2`, ao clicar ativa `deleteMode`
-3. **Modo exclusão ativo**:
-   - Cada `EntryCard` ganha um `Checkbox` à esquerda (renderizado condicionalmente)
-   - Checkbox "selecionar todos" no header
-   - A floating action bar muda para exibir: contagem de selecionados + botão "Excluir X entradas" (vermelho) + botão cancelar
-4. **Confirmação**: Dialog de confirmação antes de deletar ("Tem certeza? Esta ação é irreversível")
-5. **Mutation**: `DELETE FROM bank_statement_entries WHERE id IN (...)` via supabase client direto (RLS já permite `Users can delete own statement entries`)
-6. **Pós-delete**: Invalidar queries (`bank-statement-entries`, `pending-reconciliation`, `reconciliation-kpis`, `import-history`), sair do modo exclusão, toast de sucesso
-7. **Importar** `Trash2` e `Checkbox` nos imports do componente
+- Remover estados: `deleteMode`, `deleteSelectedIds`, `showDeleteConfirm`, `isDeleting`
+- Remover funções: `toggleDeleteItem`, `toggleDeleteAll`, `exitDeleteMode`, `handleDeleteConfirm`
+- Remover o botão `Trash2` do header do painel esquerdo
+- Remover checkboxes condicionais dos `EntryCard`
+- Remover o `AlertDialog` de confirmação de exclusão
+- Remover floating bar de exclusão
+- Limpar imports não utilizados (`Trash2`, `Checkbox`, `AlertDialog*` se não usados em outro lugar)
 
-### Detalhes de UX
+### 2. `ReconciliationPage.tsx` — Adicionar exclusão por lote no Histórico
 
-- Botão pequeno `ghost` com ícone `Trash2` no header, tooltip "Excluir entradas"
-- Em modo exclusão, desabilitar a seleção normal (conciliação) para evitar conflito
-- Badge vermelha mostrando quantos estão selecionados
-- Dialog com resumo: "X entradas | Total: R$ Y"
+- Adicionar estado: `deletingBatchId` (string | null) e `isDeleting` (boolean)
+- Em cada card de importação (linha 627-687), adicionar um botão `Trash2` ao lado do "Ver Detalhes"
+- `AlertDialog` de confirmação com resumo: "Excluir X transações importadas em DD/MM/YYYY?"
+- Ao confirmar:
+  1. `DELETE FROM bank_statement_entries WHERE import_batch_id = $batchId`
+  2. `DELETE FROM bank_import_history WHERE id = $batchId`
+  3. Invalidar queries: `bank-statement-entries`, `pending-reconciliation`, `reconciliation-kpis`, `import-history`
+  4. Toast de sucesso
+- Importar `Trash2` e componentes do `AlertDialog`
+
+## Arquivos afetados
 
 | Arquivo | Ação |
 |---|---|
-| `src/features/finance/components/reconciliation/ReconciliationWorkbench.tsx` | Adicionar modo exclusão com checkboxes, floating bar adaptada, dialog de confirmação e mutation de delete |
+| `ReconciliationWorkbench.tsx` | Remover todo o código de delete mode (~100 linhas) |
+| `ReconciliationPage.tsx` | Adicionar botão excluir por lote no histórico + AlertDialog de confirmação |
 
 Sem migration. Sem deploy.
 
