@@ -465,6 +465,37 @@ async function evaluateObjectiveCompletion(params: {
               source: 'dispatcher_auto',
               created_by: params.userId,
             }).catch(() => {})
+
+            // Sync new stage label to Chatwoot conversation
+            if (params.chatwootConversationId && params.brokerageId) {
+              try {
+                const { data: newStageLabel } = await supabase
+                  .from('crm_stages')
+                  .select('chatwoot_label')
+                  .eq('id', targetStageId)
+                  .maybeSingle()
+
+                if (newStageLabel?.chatwoot_label) {
+                  const { data: brokerage } = await supabase
+                    .from('brokerages')
+                    .select('chatwoot_url, chatwoot_token, chatwoot_account_id')
+                    .eq('id', params.brokerageId)
+                    .maybeSingle()
+
+                  if (brokerage?.chatwoot_url && brokerage?.chatwoot_token) {
+                    const labelUrl = `${brokerage.chatwoot_url}/api/v1/accounts/${brokerage.chatwoot_account_id}/conversations/${params.chatwootConversationId}/labels`
+                    await fetch(labelUrl, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', api_access_token: brokerage.chatwoot_token },
+                      body: JSON.stringify({ labels: [newStageLabel.chatwoot_label] }),
+                    })
+                    console.log(`🏷️ Synced label "${newStageLabel.chatwoot_label}" after stage move`)
+                  }
+                }
+              } catch (labelErr) {
+                console.error('⚠️ Failed to sync label after stage move:', labelErr)
+              }
+            }
           } else {
             console.error('❌ Failed to move deal:', moveError)
             result.completed = false
@@ -987,6 +1018,7 @@ async function processWebhook(body: any) {
           }
 
           // BLOCO A: Cancel pending follow-ups (client responded!)
+          let clientJustResponded = false
           if (currentDeal?.id) {
             const { data: cancelledFollowUps } = await supabase
               .from('ai_follow_ups')
@@ -995,6 +1027,7 @@ async function processWebhook(body: any) {
               .eq('status', 'pending')
               .select('id')
             if (cancelledFollowUps?.length) {
+              clientJustResponded = true
               console.log(`✅ Cancelled ${cancelledFollowUps.length} pending follow-ups (client responded)`)
             }
           }
@@ -1176,8 +1209,8 @@ async function processWebhook(body: any) {
         try { n8nResponseBody = await n8nResponse.json() } catch { /* non-JSON response, ignore */ }
       }
 
-      // BLOCO C: Create follow-up if needed (idempotent — skip if pending exists)
-      if (currentDeal?.id && userId && role !== 'admin') {
+      // BLOCO C: Create follow-up if needed (skip if client just responded or pending exists)
+      if (currentDeal?.id && userId && role !== 'admin' && !clientJustResponded) {
         const shouldFollowUp = (() => {
           if (stageAiSettings?.follow_up_enabled) return true
           if (!n8nResponseBody) return false

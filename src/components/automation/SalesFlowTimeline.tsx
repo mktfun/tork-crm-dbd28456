@@ -33,6 +33,10 @@ interface AiSetting {
   ai_custom_rules?: string | null;
   is_active?: boolean | null;
   max_messages_before_human?: number | null;
+  follow_up_enabled?: boolean | null;
+  follow_up_interval_minutes?: number | null;
+  follow_up_max_attempts?: number | null;
+  follow_up_message?: string | null;
 }
 
 interface PipelineDefault {
