@@ -82,9 +82,18 @@ export function StageFlowCard({
   const [isExpanded, setIsExpanded] = useState(isSelected);
   const [selectedVibe, setSelectedVibe] = useState<VibeId | null>(inferVibeFromPersona(currentPersona));
   const [mission, setMission] = useState(currentObjective || '');
+  const [followUpInterval, setFollowUpInterval] = useState(aiSetting?.follow_up_interval_minutes ?? 60);
+  const [followUpMaxAttempts, setFollowUpMaxAttempts] = useState(aiSetting?.follow_up_max_attempts ?? 3);
+  const [followUpMessage, setFollowUpMessage] = useState(aiSetting?.follow_up_message ?? '');
+  
   const debouncedMission = useDebounce(mission, 1500);
+  const debouncedInterval = useDebounce(followUpInterval, 1500);
+  const debouncedMaxAttempts = useDebounce(followUpMaxAttempts, 1500);
+  const debouncedFollowUpMessage = useDebounce(followUpMessage, 1500);
+  
   const userSelectedRef = useRef(false);
   const missionFocusedRef = useRef(false);
+  const followUpFocusedRef = useRef(false);
   
   // Sync expanded state with selection
   useEffect(() => {
