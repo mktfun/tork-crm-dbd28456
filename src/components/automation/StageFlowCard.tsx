@@ -318,11 +318,10 @@ export function StageFlowCard({
                     <Input
                       type="number"
                       min={5}
-                      value={aiSetting?.follow_up_interval_minutes ?? 60}
-                      onChange={(e) => onSaveConfig({
-                        stage_id: stage.id,
-                        follow_up_interval_minutes: parseInt(e.target.value) || 60,
-                      })}
+                      value={followUpInterval}
+                      onChange={(e) => setFollowUpInterval(parseInt(e.target.value) || 60)}
+                      onFocus={() => { followUpFocusedRef.current = true; }}
+                      onBlur={() => { followUpFocusedRef.current = false; }}
                       className="h-7 text-xs bg-background/50"
                       disabled={isSaving}
                     />
@@ -333,22 +332,20 @@ export function StageFlowCard({
                       type="number"
                       min={1}
                       max={10}
-                      value={aiSetting?.follow_up_max_attempts ?? 3}
-                      onChange={(e) => onSaveConfig({
-                        stage_id: stage.id,
-                        follow_up_max_attempts: parseInt(e.target.value) || 3,
-                      })}
+                      value={followUpMaxAttempts}
+                      onChange={(e) => setFollowUpMaxAttempts(parseInt(e.target.value) || 3)}
+                      onFocus={() => { followUpFocusedRef.current = true; }}
+                      onBlur={() => { followUpFocusedRef.current = false; }}
                       className="h-7 text-xs bg-background/50"
                       disabled={isSaving}
                     />
                   </div>
                 </div>
                 <Textarea
-                  value={aiSetting?.follow_up_message ?? ''}
-                  onChange={(e) => onSaveConfig({
-                    stage_id: stage.id,
-                    follow_up_message: e.target.value,
-                  })}
+                  value={followUpMessage}
+                  onChange={(e) => setFollowUpMessage(e.target.value)}
+                  onFocus={() => { followUpFocusedRef.current = true; }}
+                  onBlur={() => { followUpFocusedRef.current = false; }}
                   placeholder="Mensagem personalizada (opcional). Padrão: templates automáticos."
                   className="min-h-[40px] text-xs bg-background/50 border-border/50 resize-none"
                   disabled={isSaving}
