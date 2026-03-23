@@ -256,6 +256,33 @@ async function autoCreateDeal(
       .single()
 
     if (dealError) {
+      // If duplicate key (deal already exists for this conversation), reuse it
+      if (dealError.code === '23505' && chatwootConversationId) {
+        console.log('🔄 Deal already exists for conversation, reusing...')
+        const { data: existingDeal } = await supabase
+          .from('crm_deals')
+          .select('id, title, stage_id, product_id, crm_stages(id, name, pipeline_id, position)')
+          .eq('chatwoot_conversation_id', chatwootConversationId)
+          .limit(1)
+          .maybeSingle()
+
+        if (existingDeal) {
+          const { data: settings } = await supabase
+            .from('crm_ai_settings')
+            .select('*')
+            .eq('stage_id', existingDeal.stage_id)
+            .maybeSingle()
+
+          return {
+            deal: existingDeal,
+            stage: existingDeal.crm_stages,
+            stageAiSettings: settings,
+            autoCreated: false,
+            productId: existingDeal.product_id,
+            productName: null,
+          }
+        }
+      }
       console.error('❌ Failed to auto-create deal:', dealError)
       return null
     }
