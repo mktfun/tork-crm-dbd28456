@@ -510,47 +510,6 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
         setSelectedAggregateId(null);
     };
 
-    // Delete mode handlers
-    const toggleDeleteItem = useCallback((id: string) => {
-        setDeleteSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-    }, []);
-
-    const toggleDeleteAll = useCallback(() => {
-        if (deleteSelectedIds.length === filteredStatement.length) {
-            setDeleteSelectedIds([]);
-        } else {
-            setDeleteSelectedIds(filteredStatement.map(i => i.id));
-        }
-    }, [deleteSelectedIds.length, filteredStatement]);
-
-    const exitDeleteMode = useCallback(() => {
-        setDeleteMode(false);
-        setDeleteSelectedIds([]);
-    }, []);
-
-    const handleDeleteConfirm = async () => {
-        if (deleteSelectedIds.length === 0) return;
-        setIsDeleting(true);
-        try {
-            const { error } = await supabase
-                .from('bank_statement_entries')
-                .delete()
-                .in('id', deleteSelectedIds);
-            if (error) throw error;
-            toast.success(`${deleteSelectedIds.length} entrada${deleteSelectedIds.length > 1 ? 's' : ''} excluída${deleteSelectedIds.length > 1 ? 's' : ''} com sucesso`);
-            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
-            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
-            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
-            queryClient.invalidateQueries({ queryKey: ['import-history'] });
-            exitDeleteMode();
-        } catch (err: any) {
-            toast.error('Erro ao excluir entradas: ' + (err.message || 'Erro desconhecido'));
-        } finally {
-            setIsDeleting(false);
-            setShowDeleteConfirm(false);
-        }
-    };
-
     // Aggregate FIFO handler
     const handleAggregateMatch = () => {
         if (selectedStatementIds.length < 1 || !selectedAggregateId) return;
