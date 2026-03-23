@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolveUserModel } from '../_shared/model-resolver.ts'
+import { resolvePersonaPrompt } from '../_shared/ai-presets.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -255,6 +256,33 @@ async function autoCreateDeal(
       .single()
 
     if (dealError) {
+      // If duplicate key (deal already exists for this conversation), reuse it
+      if (dealError.code === '23505' && chatwootConversationId) {
+        console.log('🔄 Deal already exists for conversation, reusing...')
+        const { data: existingDeal } = await supabase
+          .from('crm_deals')
+          .select('id, title, stage_id, product_id, crm_stages(id, name, pipeline_id, position)')
+          .eq('chatwoot_conversation_id', chatwootConversationId)
+          .limit(1)
+          .maybeSingle()
+
+        if (existingDeal) {
+          const { data: settings } = await supabase
+            .from('crm_ai_settings')
+            .select('*')
+            .eq('stage_id', existingDeal.stage_id)
+            .maybeSingle()
+
+          return {
+            deal: existingDeal,
+            stage: existingDeal.crm_stages,
+            stageAiSettings: settings,
+            autoCreated: false,
+            productId: existingDeal.product_id,
+            productName: null,
+          }
+        }
+      }
       console.error('❌ Failed to auto-create deal:', dealError)
       return null
     }
@@ -767,8 +795,8 @@ async function buildSystemPrompt(params: {
 
   if (!deal) {
     // No deal — triage mode: understand what the client needs
-    const basePerson = globalBaseInstructions || stageAiSettings?.ai_persona || 'Você é um assistente de vendas útil e amigável.'
-    systemPrompt += `<persona>\n${basePerson}\n</persona>\n\n`
+    const basePersonResolved = resolvePersonaPrompt(stageAiSettings?.ai_persona) || (globalBaseInstructions ? `<persona>\n${globalBaseInstructions}\n</persona>` : '<persona>\nVocê é um assistente de vendas útil e amigável.\n</persona>')
+    systemPrompt += basePersonResolved + '\n\n'
     systemPrompt += `<objective>\n`
     systemPrompt += `NOVO CONTATO — TRIAGEM INICIAL\n`
     systemPrompt += `Este cliente ainda não tem negociação aberta. Seu objetivo é entender o que ele precisa.\n`
@@ -783,8 +811,9 @@ async function buildSystemPrompt(params: {
     // Has deal — stage-specific mode
     stageAiIsActive = stageAiSettings?.is_active ?? false
 
-    if (stageAiSettings?.ai_persona) {
-      systemPrompt += `<persona>\n${stageAiSettings.ai_persona}\n</persona>\n\n`
+    const personaXml = resolvePersonaPrompt(stageAiSettings?.ai_persona)
+    if (personaXml) {
+      systemPrompt += personaXml + '\n\n'
     }
 
     systemPrompt += `<current_context>\n`
@@ -994,6 +1023,8 @@ async function processWebhook(body: any) {
         return
       }
 
+      let clientJustResponded = false
+
       if (clientId) {
         const { data: deals } = await supabase
           .from('crm_deals')
@@ -1018,7 +1049,6 @@ async function processWebhook(body: any) {
           }
 
           // BLOCO A: Cancel pending follow-ups (client responded!)
-          let clientJustResponded = false
           if (currentDeal?.id) {
             const { data: cancelledFollowUps } = await supabase
               .from('ai_follow_ups')
