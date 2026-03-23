@@ -1,49 +1,36 @@
 
 
-# Plano: 3 fixes no Dispatcher (Persona, clientJustResponded, Duplicata)
+# Plano: Botão "Excluir Extrato" no Workbench de Conciliação
 
-## Bug 1 — System prompt envia "proactive" ao invés do XML completo
+## O que
 
-**Causa raiz**: Linha 787 faz `<persona>\n${stageAiSettings.ai_persona}\n</persona>` — mas `ai_persona` armazena apenas o ID curto (`'proactive'`, `'supportive_sales'`, etc.). O dispatcher não tem o mapeamento ID → XML prompt completo. Esse mapeamento existe apenas no frontend (`aiPresets.ts`).
+Adicionar um botão "Excluir" no header do painel esquerdo (Extrato) do `ReconciliationWorkbench`. Ao clicar, o workbench entra em "modo de exclusão": checkboxes aparecem ao lado de cada entry do extrato. O usuário seleciona as que quer deletar e confirma com um botão na floating action bar.
 
-**Correção**: Criar um arquivo `supabase/functions/_shared/ai-presets.ts` com o mapeamento dos 4 IDs para os prompts XML completos (copiar os prompts de `src/components/automation/aiPresets.ts`). No `buildSystemPrompt` (linha 786-788), resolver o ID para o prompt completo antes de injetar.
+## Como
 
-Lógica:
-```typescript
-import { resolvePersonaPrompt } from '../_shared/ai-presets.ts'
+### `ReconciliationWorkbench.tsx`
 
-// Linha 786-788 muda de:
-if (stageAiSettings?.ai_persona) {
-  systemPrompt += `<persona>\n${stageAiSettings.ai_persona}\n</persona>\n\n`
-}
+1. **Novo estado**: `deleteMode` (boolean) e `deleteSelectedIds` (string[])
+2. **Botão no header** do painel esquerdo (linha 632): ícone `Trash2`, ao clicar ativa `deleteMode`
+3. **Modo exclusão ativo**:
+   - Cada `EntryCard` ganha um `Checkbox` à esquerda (renderizado condicionalmente)
+   - Checkbox "selecionar todos" no header
+   - A floating action bar muda para exibir: contagem de selecionados + botão "Excluir X entradas" (vermelho) + botão cancelar
+4. **Confirmação**: Dialog de confirmação antes de deletar ("Tem certeza? Esta ação é irreversível")
+5. **Mutation**: `DELETE FROM bank_statement_entries WHERE id IN (...)` via supabase client direto (RLS já permite `Users can delete own statement entries`)
+6. **Pós-delete**: Invalidar queries (`bank-statement-entries`, `pending-reconciliation`, `reconciliation-kpis`, `import-history`), sair do modo exclusão, toast de sucesso
+7. **Importar** `Trash2` e `Checkbox` nos imports do componente
 
-// Para:
-const personaXml = resolvePersonaPrompt(stageAiSettings?.ai_persona)
-if (personaXml) {
-  systemPrompt += personaXml + '\n\n'
-}
-```
+### Detalhes de UX
 
-Também na linha 770 (triage mode), resolver o `ai_persona` se for um ID de preset.
-
-## Bug 2 — `clientJustResponded is not defined` (erro nos logs)
-
-**Causa raiz**: `clientJustResponded` é declarado com `let` na linha 1021, dentro do bloco `if (deals && deals.length > 0)` (escopo do `if`). Quando o deal é encontrado pelo caminho alternativo (conversation_id, linha 1043), a variável nunca é declarada. Na linha 1213 (BLOCO C), ela é referenciada fora do escopo → `ReferenceError`.
-
-**Correção**: Mover a declaração `let clientJustResponded = false` para fora do bloco `if`, antes da busca de deals (~linha 997). Manter a lógica de cancelamento de follow-ups no mesmo lugar, apenas a declaração sobe.
-
-## Bug 3 — Erro 23505 não reutiliza deal existente (plano já aprovado)
-
-**Causa raiz**: No `autoCreateDeal`, quando o insert falha com `23505` (unique constraint), retorna `null` e o dispatcher segue com `hasDeal: false`.
-
-**Correção**: No catch do erro `23505` em `autoCreateDeal`, buscar o deal existente por `chatwoot_conversation_id` e retorná-lo como reutilizado (conforme plano aprovado anteriormente).
-
-## Arquivos afetados
+- Botão pequeno `ghost` com ícone `Trash2` no header, tooltip "Excluir entradas"
+- Em modo exclusão, desabilitar a seleção normal (conciliação) para evitar conflito
+- Badge vermelha mostrando quantos estão selecionados
+- Dialog com resumo: "X entradas | Total: R$ Y"
 
 | Arquivo | Ação |
 |---|---|
-| `supabase/functions/_shared/ai-presets.ts` | **Novo** — mapeamento dos 4 IDs de persona para os prompts XML completos + função `resolvePersonaPrompt(id)` |
-| `supabase/functions/chatwoot-dispatcher/index.ts` | (1) Importar `resolvePersonaPrompt`. (2) Linhas 770 e 786-788: resolver ID para XML. (3) Mover `clientJustResponded` para escopo correto (~linha 997). (4) No `autoCreateDeal`, fallback no erro 23505 para reutilizar deal |
+| `src/features/finance/components/reconciliation/ReconciliationWorkbench.tsx` | Adicionar modo exclusão com checkboxes, floating bar adaptada, dialog de confirmação e mutation de delete |
 
-Deploy do dispatcher necessário. Sem migration.
+Sem migration. Sem deploy.
 
