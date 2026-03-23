@@ -1178,8 +1178,8 @@ async function processWebhook(body: any) {
         try { n8nResponseBody = await n8nResponse.json() } catch { /* non-JSON response, ignore */ }
       }
 
-      // BLOCO C: Create follow-up if needed (idempotent — skip if pending exists)
-      if (currentDeal?.id && userId && role !== 'admin') {
+      // BLOCO C: Create follow-up if needed (skip if client just responded or pending exists)
+      if (currentDeal?.id && userId && role !== 'admin' && !clientJustResponded) {
         const shouldFollowUp = (() => {
           if (stageAiSettings?.follow_up_enabled) return true
           if (!n8nResponseBody) return false
