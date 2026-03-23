@@ -126,7 +126,7 @@ export async function evaluateObjectiveCompletion(
               new_value: result.newStageName,
               source: 'dispatcher_auto',
               created_by: params.userId,
-            }).catch(() => {})
+            })
 
             // Sync new stage label to Chatwoot conversation
             if (params.chatwootConversationId && params.brokerageId) {

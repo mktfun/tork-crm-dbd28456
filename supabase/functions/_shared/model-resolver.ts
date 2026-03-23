@@ -1,4 +1,4 @@
-import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
+import { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 
 const MODEL_GATEWAY_MAP: Record<string, string> = {
   // Gemini
