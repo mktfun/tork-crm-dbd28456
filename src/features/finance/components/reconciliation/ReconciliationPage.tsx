@@ -241,6 +241,9 @@ export function ReconciliationPage() {
     const [selectedBankForBinding, setSelectedBankForBinding] = useState<string>('');
     const [showMatchReview, setShowMatchReview] = useState(false);
     const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+    const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
+    const [isDeletingBatch, setIsDeletingBatch] = useState(false);
+    const queryClient = useQueryClient();
     
     const isConsolidated = !selectedBankAccountId || selectedBankAccountId === 'all';
 
