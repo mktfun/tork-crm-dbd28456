@@ -987,6 +987,7 @@ async function processWebhook(body: any) {
           }
 
           // BLOCO A: Cancel pending follow-ups (client responded!)
+          let clientJustResponded = false
           if (currentDeal?.id) {
             const { data: cancelledFollowUps } = await supabase
               .from('ai_follow_ups')
@@ -995,6 +996,7 @@ async function processWebhook(body: any) {
               .eq('status', 'pending')
               .select('id')
             if (cancelledFollowUps?.length) {
+              clientJustResponded = true
               console.log(`✅ Cancelled ${cancelledFollowUps.length} pending follow-ups (client responded)`)
             }
           }
