@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { User, Phone, Calendar, DollarSign } from 'lucide-react';
+import { User, Phone, Calendar, DollarSign, Bot } from 'lucide-react';
 import { useGlassEffect } from '@/hooks/useGlassEffect';
 import { CRMDeal } from '@/hooks/useCRMDeals';
 import { formatCurrency } from '@/utils/formatCurrency';
