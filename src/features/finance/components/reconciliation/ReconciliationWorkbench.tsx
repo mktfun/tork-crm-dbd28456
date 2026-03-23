@@ -5,15 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import {
     ArrowUpRight, ArrowDownRight, CheckCircle2, AlertTriangle,
-    Plus, X, Zap, Wand2, Loader2, Search, Unlink, Landmark, Building2, Trash2
+    Plus, X, Zap, Wand2, Loader2, Search, Unlink, Landmark, Building2
 } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-    AlertDialog, AlertDialogAction, AlertDialogCancel,
-    AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-    AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
