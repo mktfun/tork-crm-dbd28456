@@ -1261,6 +1261,37 @@ export function ReconciliationPage() {
                 </DialogContent>
             </Dialog>
 
+            {/* Delete Batch Confirmation Dialog */}
+            <AlertDialog open={!!deletingBatchId} onOpenChange={(open) => { if (!open) setDeletingBatchId(null); }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir extrato importado?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {deletingBatch && (
+                                <>
+                                    Você está prestes a excluir <strong>{deletingBatch.total_transactions || 0} transações</strong> importadas
+                                    em <strong>{deletingBatch.imported_at ? format(new Date(deletingBatch.imported_at), 'dd/MM/yyyy HH:mm') : '—'}</strong>,
+                                    totalizando <strong>{formatCurrency(Number(deletingBatch.total_amount) || 0)}</strong>.
+                                    <br /><br />
+                                </>
+                            )}
+                            Esta ação é irreversível e removerá todas as entradas deste lote.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeletingBatch}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteBatch}
+                            disabled={isDeletingBatch}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
+                        >
+                            {isDeletingBatch ? <Loader2Icon className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            {isDeletingBatch ? 'Excluindo...' : 'Confirmar exclusão'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
         </div>
     );
 }
