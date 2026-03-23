@@ -465,6 +465,37 @@ async function evaluateObjectiveCompletion(params: {
               source: 'dispatcher_auto',
               created_by: params.userId,
             }).catch(() => {})
+
+            // Sync new stage label to Chatwoot conversation
+            if (params.chatwootConversationId && params.brokerageId) {
+              try {
+                const { data: newStageLabel } = await supabase
+                  .from('crm_stages')
+                  .select('chatwoot_label')
+                  .eq('id', targetStageId)
+                  .maybeSingle()
+
+                if (newStageLabel?.chatwoot_label) {
+                  const { data: brokerage } = await supabase
+                    .from('brokerages')
+                    .select('chatwoot_url, chatwoot_token, chatwoot_account_id')
+                    .eq('id', params.brokerageId)
+                    .maybeSingle()
+
+                  if (brokerage?.chatwoot_url && brokerage?.chatwoot_token) {
+                    const labelUrl = `${brokerage.chatwoot_url}/api/v1/accounts/${brokerage.chatwoot_account_id}/conversations/${params.chatwootConversationId}/labels`
+                    await fetch(labelUrl, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', api_access_token: brokerage.chatwoot_token },
+                      body: JSON.stringify({ labels: [newStageLabel.chatwoot_label] }),
+                    })
+                    console.log(`🏷️ Synced label "${newStageLabel.chatwoot_label}" after stage move`)
+                  }
+                }
+              } catch (labelErr) {
+                console.error('⚠️ Failed to sync label after stage move:', labelErr)
+              }
+            }
           } else {
             console.error('❌ Failed to move deal:', moveError)
             result.completed = false
