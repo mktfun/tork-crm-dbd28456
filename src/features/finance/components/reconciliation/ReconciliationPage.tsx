@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     GitCompare,
@@ -26,6 +28,8 @@ import {
     UserCheck,
     Sparkles,
     UploadCloud,
+    Trash2,
+    Loader2 as Loader2Icon,
 } from 'lucide-react';
 import { DatePickerWithRange } from '@/components/ui/date-picker-with-range';
 import { Input } from '@/components/ui/input';
@@ -52,6 +56,11 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel,
+    AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+    AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
     Dialog,
     DialogContent,
@@ -232,6 +241,9 @@ export function ReconciliationPage() {
     const [selectedBankForBinding, setSelectedBankForBinding] = useState<string>('');
     const [showMatchReview, setShowMatchReview] = useState(false);
     const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+    const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
+    const [isDeletingBatch, setIsDeletingBatch] = useState(false);
+    const queryClient = useQueryClient();
     
     const isConsolidated = !selectedBankAccountId || selectedBankAccountId === 'all';
 
@@ -316,6 +328,37 @@ export function ReconciliationPage() {
     const { data: importHistory = [], isLoading: isLoadingHistory } = useImportHistory(selectedBankAccountId);
     const { data: batchEntries = [], isLoading: isLoadingBatch } = useImportBatchEntries(selectedBatchId);
     const { data: batchAuditLogs = [], isLoading: isLoadingAuditLogs } = useAuditLogByBatch(selectedBatchId);
+
+    const deletingBatch = importHistory.find(h => h.id === deletingBatchId);
+
+    const handleDeleteBatch = async () => {
+        if (!deletingBatchId) return;
+        setIsDeletingBatch(true);
+        try {
+            const { error: entriesErr } = await supabase
+                .from('bank_statement_entries')
+                .delete()
+                .eq('import_batch_id', deletingBatchId);
+            if (entriesErr) throw entriesErr;
+
+            const { error: historyErr } = await supabase
+                .from('bank_import_history')
+                .delete()
+                .eq('id', deletingBatchId);
+            if (historyErr) throw historyErr;
+
+            toast.success('Extrato excluído com sucesso');
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['import-history'] });
+        } catch (err: any) {
+            toast.error('Erro ao excluir extrato: ' + (err.message || 'Erro desconhecido'));
+        } finally {
+            setIsDeletingBatch(false);
+            setDeletingBatchId(null);
+        }
+    };
 
     // Mutations
     const reconcileMutation = useReconcileTransactionDirectly();
@@ -675,15 +718,26 @@ export function ReconciliationPage() {
                                                 )}
                                             </div>
                                         </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="gap-1.5 shrink-0"
-                                            onClick={() => setSelectedBatchId(item.id)}
-                                        >
-                                            <Eye className="w-3.5 h-3.5" />
-                                            Ver Detalhes
-                                        </Button>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="gap-1.5"
+                                                onClick={() => setSelectedBatchId(item.id)}
+                                            >
+                                                <Eye className="w-3.5 h-3.5" />
+                                                Ver Detalhes
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                onClick={() => setDeletingBatchId(item.id)}
+                                                title="Excluir extrato"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -1206,6 +1260,37 @@ export function ReconciliationPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Delete Batch Confirmation Dialog */}
+            <AlertDialog open={!!deletingBatchId} onOpenChange={(open) => { if (!open) setDeletingBatchId(null); }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir extrato importado?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {deletingBatch && (
+                                <>
+                                    Você está prestes a excluir <strong>{deletingBatch.total_transactions || 0} transações</strong> importadas
+                                    em <strong>{deletingBatch.imported_at ? format(new Date(deletingBatch.imported_at), 'dd/MM/yyyy HH:mm') : '—'}</strong>,
+                                    totalizando <strong>{formatCurrency(Number(deletingBatch.total_amount) || 0)}</strong>.
+                                    <br /><br />
+                                </>
+                            )}
+                            Esta ação é irreversível e removerá todas as entradas deste lote.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeletingBatch}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteBatch}
+                            disabled={isDeletingBatch}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
+                        >
+                            {isDeletingBatch ? <Loader2Icon className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            {isDeletingBatch ? 'Excluindo...' : 'Confirmar exclusão'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
         </div>
     );

@@ -5,15 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import {
     ArrowUpRight, ArrowDownRight, CheckCircle2, AlertTriangle,
-    Plus, X, Zap, Wand2, Loader2, Search, Unlink, Landmark, Building2, Trash2
+    Plus, X, Zap, Wand2, Loader2, Search, Unlink, Landmark, Building2
 } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-    AlertDialog, AlertDialogAction, AlertDialogCancel,
-    AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-    AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -236,11 +230,6 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const [showPartialModal, setShowPartialModal] = useState(false);
     const [showUnassigned, setShowUnassigned] = useState(false);
 
-    // Delete mode state
-    const [deleteMode, setDeleteMode] = useState(false);
-    const [deleteSelectedIds, setDeleteSelectedIds] = useState<string[]>([]);
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
     const queryClient = useQueryClient();
 
     // On-demand bank selection modal state
@@ -521,47 +510,6 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
         setSelectedAggregateId(null);
     };
 
-    // Delete mode handlers
-    const toggleDeleteItem = useCallback((id: string) => {
-        setDeleteSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-    }, []);
-
-    const toggleDeleteAll = useCallback(() => {
-        if (deleteSelectedIds.length === filteredStatement.length) {
-            setDeleteSelectedIds([]);
-        } else {
-            setDeleteSelectedIds(filteredStatement.map(i => i.id));
-        }
-    }, [deleteSelectedIds.length, filteredStatement]);
-
-    const exitDeleteMode = useCallback(() => {
-        setDeleteMode(false);
-        setDeleteSelectedIds([]);
-    }, []);
-
-    const handleDeleteConfirm = async () => {
-        if (deleteSelectedIds.length === 0) return;
-        setIsDeleting(true);
-        try {
-            const { error } = await supabase
-                .from('bank_statement_entries')
-                .delete()
-                .in('id', deleteSelectedIds);
-            if (error) throw error;
-            toast.success(`${deleteSelectedIds.length} entrada${deleteSelectedIds.length > 1 ? 's' : ''} excluída${deleteSelectedIds.length > 1 ? 's' : ''} com sucesso`);
-            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
-            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
-            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
-            queryClient.invalidateQueries({ queryKey: ['import-history'] });
-            exitDeleteMode();
-        } catch (err: any) {
-            toast.error('Erro ao excluir entradas: ' + (err.message || 'Erro desconhecido'));
-        } finally {
-            setIsDeleting(false);
-            setShowDeleteConfirm(false);
-        }
-    };
-
     // Aggregate FIFO handler
     const handleAggregateMatch = () => {
         if (selectedStatementIds.length < 1 || !selectedAggregateId) return;
@@ -685,13 +633,6 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                     <ResizablePanel defaultSize={50} minSize={30}>
                         <div className="flex flex-col h-full">
                             <div className="p-3 border-b border-border bg-muted/30 flex items-center gap-2">
-                                {deleteMode && (
-                                    <Checkbox
-                                        checked={deleteSelectedIds.length === filteredStatement.length && filteredStatement.length > 0}
-                                        onCheckedChange={toggleDeleteAll}
-                                        className="shrink-0"
-                                    />
-                                )}
                                 <Badge variant="secondary" className="text-xs font-semibold">Extrato</Badge>
                                 <div className="relative flex-1">
                                     <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
@@ -702,21 +643,6 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                         onChange={(e) => setBankSearch(e.target.value)}
                                     />
                                 </div>
-                                {deleteMode ? (
-                                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground" onClick={exitDeleteMode}>
-                                        <X className="w-3.5 h-3.5 mr-1" /> Cancelar
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-                                        onClick={() => { setDeleteMode(true); clearSelection(); }}
-                                        title="Excluir entradas"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                )}
                                 <span className="text-xs text-muted-foreground shrink-0">{filteredStatement.length}</span>
                             </div>
                             <div className="flex-1 overflow-auto p-2 space-y-1.5">
@@ -730,24 +656,14 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                     </div>
                                 ) : (
                                     filteredStatement.map(item => (
-                                        <div key={item.id} className="flex items-start gap-2">
-                                            {deleteMode && (
-                                                <Checkbox
-                                                    checked={deleteSelectedIds.includes(item.id)}
-                                                    onCheckedChange={() => toggleDeleteItem(item.id)}
-                                                    className="mt-3.5 shrink-0"
-                                                />
-                                            )}
-                                            <div className="flex-1 min-w-0">
-                                                <EntryCard
-                                                    item={item}
-                                                    selected={!deleteMode && selectedStatementIds.includes(item.id)}
-                                                    suggested={suggestedStatementIds.has(item.id)}
-                                                    onClick={() => deleteMode ? toggleDeleteItem(item.id) : toggleStatement(item.id)}
-                                                    isUnassigned={!item.bank_account_id}
-                                                />
-                                            </div>
-                                        </div>
+                                        <EntryCard
+                                            key={item.id}
+                                            item={item}
+                                            selected={selectedStatementIds.includes(item.id)}
+                                            suggested={suggestedStatementIds.has(item.id)}
+                                            onClick={() => toggleStatement(item.id)}
+                                            isUnassigned={!item.bank_account_id}
+                                        />
                                     ))
                                 )}
                             </div>
@@ -1257,81 +1173,6 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Mode Floating Bar */}
-            <AnimatePresence>
-                {deleteMode && deleteSelectedIds.length > 0 && (
-                    <motion.div
-                        initial={{ y: 80, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: 80, opacity: 0 }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
-                    >
-                        <div className="flex items-center gap-4 px-6 py-3 rounded-2xl border border-destructive/30 bg-card/95 backdrop-blur-xl shadow-2xl">
-                            <div className="flex items-center gap-2 text-sm">
-                                <div className="w-6 h-6 rounded-full bg-destructive text-destructive-foreground text-xs font-bold flex items-center justify-center">
-                                    {deleteSelectedIds.length}
-                                </div>
-                                <span className="text-muted-foreground">selecionada{deleteSelectedIds.length > 1 ? 's' : ''}</span>
-                            </div>
-                            <div className="h-6 w-px bg-border" />
-                            <span className="text-sm font-mono font-bold text-foreground">
-                                {formatCurrency(
-                                    statementItems
-                                        .filter(i => deleteSelectedIds.includes(i.id))
-                                        .reduce((s, i) => s + Math.abs(i.amount), 0)
-                                )}
-                            </span>
-                            <div className="h-6 w-px bg-border" />
-                            <Button
-                                size="sm"
-                                variant="destructive"
-                                className="gap-2 font-semibold"
-                                onClick={() => setShowDeleteConfirm(true)}
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                Excluir {deleteSelectedIds.length}
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-muted-foreground hover:text-foreground"
-                                onClick={exitDeleteMode}
-                            >
-                                <X className="w-4 h-4" />
-                            </Button>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Delete Confirmation Dialog */}
-            <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir entradas do extrato?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Você está prestes a excluir <strong>{deleteSelectedIds.length}</strong> entrada{deleteSelectedIds.length > 1 ? 's' : ''} do extrato,
-                            totalizando <strong>{formatCurrency(
-                                statementItems
-                                    .filter(i => deleteSelectedIds.includes(i.id))
-                                    .reduce((s, i) => s + Math.abs(i.amount), 0)
-                            )}</strong>. Esta ação é irreversível.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleDeleteConfirm}
-                            disabled={isDeleting}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
-                        >
-                            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                            {isDeleting ? 'Excluindo...' : 'Confirmar exclusão'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
 }
