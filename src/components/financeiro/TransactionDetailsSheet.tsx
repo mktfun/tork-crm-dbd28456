@@ -283,9 +283,16 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
             <ScrollArea className="h-[calc(100vh-120px)]">
               <div className="space-y-6 pr-4">
                 {/* Valor em Destaque */}
-                <div className="text-center p-6 rounded-lg bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20">
-                  <p className={`text-3xl font-bold ${isVoid ? 'text-muted-foreground line-through' : 'text-emerald-500'}`}>
-                    {formatCurrency(headerAmount)}
+                <div className={`text-center p-6 rounded-lg bg-gradient-to-br border ${
+                  isExpenseTransaction
+                    ? 'from-red-500/10 to-red-600/5 border-red-500/20'
+                    : 'from-emerald-500/10 to-emerald-600/5 border-emerald-500/20'
+                }`}>
+                  <p className={`text-3xl font-bold ${
+                    isVoid ? 'text-muted-foreground line-through'
+                    : isExpenseTransaction ? 'text-red-500' : 'text-emerald-500'
+                  }`}>
+                    {isExpenseTransaction ? '-' : ''}{formatCurrency(headerAmount)}
                   </p>
                   <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                     {transaction.description}
