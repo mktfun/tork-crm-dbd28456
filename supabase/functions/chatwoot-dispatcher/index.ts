@@ -17,14 +17,13 @@ const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions'
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-// Dynamic AI config — resolved per-request after userId is known
-let resolvedAI = {
-  url: AI_GATEWAY_URL,
-  auth: `Bearer ${LOVABLE_API_KEY || ''}`,
-  model: 'google/gemini-2.5-flash-lite',
-}
-
 function initAIConfig(resolved: { model: string; apiKey: string | null; provider: string | null }) {
+  let resolvedAI = {
+    url: AI_GATEWAY_URL,
+    auth: `Bearer ${LOVABLE_API_KEY || ''}`,
+    model: 'google/gemini-2.5-flash-lite',
+  }
+
   if (resolved.apiKey && resolved.provider === 'gemini') {
     resolvedAI = {
       url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
@@ -45,6 +44,7 @@ function initAIConfig(resolved: { model: string; apiKey: string | null; provider
     }
   }
   console.log(`🔑 AI Config resolved: provider=${resolved.provider}, model=${resolvedAI.model}`)
+  return resolvedAI
 }
 
 async function processAttachments(attachments: any[] | undefined) {
@@ -95,9 +95,14 @@ async function processWebhook(body: any) {
     }
 
     // 2. Resolve AI config from user's global settings
+    let resolvedAI = {
+      url: AI_GATEWAY_URL,
+      auth: `Bearer ${LOVABLE_API_KEY || ''}`,
+      model: 'google/gemini-2.5-flash-lite',
+    }
     if (userId) {
       const resolved = await resolveUserModel(supabase, userId)
-      initAIConfig(resolved)
+      resolvedAI = initAIConfig(resolved)
     }
 
     // 3. Analysis session logic (batch mode — kept from v1)

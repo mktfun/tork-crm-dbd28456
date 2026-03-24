@@ -17,16 +17,24 @@ export async function resolveContext(
   if (assigneeEmail) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('id, brokerage_id, role, ai_enabled')
+      .select('id, role, ai_enabled')
       .eq('email', assigneeEmail)
       .maybeSingle()
 
     if (profile) {
       userId = profile.id
-      brokerageId = profile.brokerage_id
       role = profile.role
       aiEnabled = profile.ai_enabled ?? true
     }
+  }
+
+  if (userId && !brokerageId) {
+    const { data: brok } = await supabase
+      .from('brokerages')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (brok) brokerageId = brok.id
   }
 
   // 2. Fallback to inbox mapping
@@ -105,25 +113,40 @@ export async function resolveContext(
       const newPhone = contactPhone ? contactPhone.replace(/\D/g, '') : ''
       const newEmail = contactEmail || ''
 
-      const { data: newClient, error: clientErr } = await supabase
-        .from("clientes")
-        .upsert({
-          user_id: userId,
-          name: newClientName,
-          phone: newPhone,
-          email: newEmail,
-          chatwoot_contact_id: sender?.id || null,
-          observations: "Cadastrado automaticamente via Chatwoot",
-        }, { onConflict: "phone" })
-        .select("id, name, ai_enabled")
-        .single()
+      // Antes do insert, tentar por chatwoot_contact_id
+      if (sender?.id) {
+        const { data: cwClient } = await supabase
+          .from('clientes')
+          .select('id, name, ai_enabled')
+          .eq('chatwoot_contact_id', sender.id)
+          .maybeSingle()
+        if (cwClient) {
+          clientData = cwClient
+          clientId = cwClient.id
+        }
+      }
 
-      if (newClient && !clientErr) {
-        clientData = newClient
-        clientId = newClient.id
-        console.log(`✅ Auto-registered client: "${newClientName}" (${clientId})`)
-      } else {
-        console.warn('⚠️ Failed to auto-register client:', clientErr?.message)
+      if (!clientId) {
+        const { data: newClient, error: clientErr } = await supabase
+          .from("clientes")
+          .insert({
+            user_id: userId,
+            name: newClientName,
+            phone: newPhone,
+            email: newEmail,
+            chatwoot_contact_id: sender?.id || null,
+            observations: "Cadastrado automaticamente via Chatwoot",
+          })
+          .select("id, name, ai_enabled")
+          .single()
+
+        if (newClient && !clientErr) {
+          clientData = newClient
+          clientId = newClient.id
+          console.log(`✅ Auto-registered client: "${newClientName}" (${clientId})`)
+        } else {
+          console.warn('⚠️ Failed to auto-register client:', clientErr?.message)
+        }
       }
     }
   }
