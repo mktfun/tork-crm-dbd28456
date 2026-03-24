@@ -980,3 +980,70 @@ export async function getPayableReceivableTransactions(
   }));
 }
 
+// ============ DRE AUDIT ============
+
+export interface DreAuditTransaction {
+  id: string;
+  description: string;
+  transaction_date: string;
+  amount: number;
+  origin: string | null;
+  reconciled: boolean;
+}
+
+export async function getDreAuditTransactions(
+  category: string,
+  month: number,
+  year: number
+): Promise<DreAuditTransaction[]> {
+  // First find account IDs matching the category name
+  const { data: accounts, error: accErr } = await supabase
+    .from('financial_accounts')
+    .select('id')
+    .eq('name', category);
+
+  if (accErr) throw accErr;
+  if (!accounts || accounts.length === 0) return [];
+
+  const accountIds = accounts.map(a => a.id);
+
+  // Build date range for the month
+  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+  const endMonth = month === 12 ? 1 : month + 1;
+  const endYear = month === 12 ? year + 1 : year;
+  const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+  // Query ledger entries for those accounts in that month
+  const { data, error } = await supabase
+    .from('financial_ledger')
+    .select(`
+      id,
+      amount,
+      transaction_id,
+      financial_transactions!inner (
+        id,
+        description,
+        transaction_date,
+        related_entity_type,
+        reconciled,
+        is_void,
+        is_confirmed
+      )
+    `)
+    .in('account_id', accountIds)
+    .gte('financial_transactions.transaction_date', startDate)
+    .lt('financial_transactions.transaction_date', endDate)
+    .eq('financial_transactions.is_void', false);
+
+  if (error) throw error;
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    description: row.financial_transactions?.description || '',
+    transaction_date: row.financial_transactions?.transaction_date || '',
+    amount: Math.abs(Number(row.amount) || 0),
+    origin: row.financial_transactions?.related_entity_type || null,
+    reconciled: row.financial_transactions?.reconciled || false,
+  }));
+}
+

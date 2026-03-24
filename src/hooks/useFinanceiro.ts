@@ -959,3 +959,20 @@ export function useReceivablesBySeguradora() {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+/**
+ * Hook para auditoria do DRE - busca transações de uma categoria/mês
+ */
+export function useDreAudit(
+  category: string,
+  month: number,
+  year: number,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: ['dre-audit', category, month, year],
+    queryFn: () => financialService.getDreAuditTransactions(category, month, year),
+    enabled: options?.enabled ?? true,
+    staleTime: 2 * 60 * 1000,
+  });
+}
