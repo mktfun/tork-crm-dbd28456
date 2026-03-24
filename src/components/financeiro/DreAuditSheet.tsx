@@ -21,16 +21,22 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useDreAudit } from '@/hooks/useFinanceiro';
 
 const MONTH_LABELS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-const ORIGIN_MAP: Record<string, string> = {
-  bank_statement: 'Extrato Bancário',
-  policy: 'Comissão de Apólice',
-  legacy_transaction: 'Migração',
-  reversal: 'Estorno',
-  manual: 'Lançamento Manual',
+const ORIGIN_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string }> = {
+  bank_statement: { label: 'Extrato', variant: 'outline', className: 'border-blue-500/40 text-blue-700 dark:text-blue-400 bg-blue-500/10' },
+  policy: { label: 'Apólice', variant: 'outline', className: 'border-emerald-500/40 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10' },
+  legacy_transaction: { label: 'Migração', variant: 'outline', className: 'border-amber-500/40 text-amber-700 dark:text-amber-400 bg-amber-500/10' },
+  reversal: { label: 'Estorno', variant: 'outline', className: 'border-destructive/40 text-destructive bg-destructive/10' },
+  manual: { label: 'Manual', variant: 'outline', className: 'border-muted-foreground/30 text-muted-foreground bg-muted/50' },
 };
 
 function formatCurrency(value: number): string {
@@ -53,6 +59,10 @@ export interface DreAuditTarget {
 interface DreAuditSheetProps {
   target: DreAuditTarget | null;
   onClose: () => void;
+}
+
+function isPolicyLink(origin: string | null, relatedEntityId: string | null): boolean {
+  return !!relatedEntityId && (origin === 'policy' || origin === 'legacy_transaction');
 }
 
 export function DreAuditSheet({ target, onClose }: DreAuditSheetProps) {
@@ -122,7 +132,7 @@ export function DreAuditSheet({ target, onClose }: DreAuditSheetProps) {
             <p className="text-sm text-muted-foreground">Nenhuma transação encontrada para este período.</p>
           </div>
         ) : (
-          <>
+          <TooltipProvider delayDuration={300}>
             <p className="text-xs text-muted-foreground mb-2">{transactions.length} transação(ões)</p>
             <Table>
               <TableHeader>
@@ -135,12 +145,14 @@ export function DreAuditSheet({ target, onClose }: DreAuditSheetProps) {
               </TableHeader>
               <TableBody>
                 {transactions.map((tx) => {
-                  const isPolicy = tx.origin === 'policy' && !!tx.related_entity_id;
-                  return (
+                  const hasLink = isPolicyLink(tx.origin, tx.related_entity_id);
+                  const originInfo = ORIGIN_MAP[tx.origin || 'manual'] || ORIGIN_MAP.manual;
+
+                  const row = (
                     <TableRow
                       key={tx.id}
-                      className={isPolicy ? 'cursor-pointer hover:bg-muted' : ''}
-                      onClick={isPolicy ? () => navigate(`/dashboard/policies/${tx.related_entity_id}`) : undefined}
+                      className={hasLink ? 'cursor-pointer hover:bg-muted/60 transition-colors' : ''}
+                      onClick={hasLink ? () => navigate(`/dashboard/policies/${tx.related_entity_id}`) : undefined}
                     >
                       <TableCell className="text-xs whitespace-nowrap py-2">
                         {format(new Date(tx.transaction_date), 'dd/MM', { locale: ptBR })}
@@ -148,19 +160,32 @@ export function DreAuditSheet({ target, onClose }: DreAuditSheetProps) {
                       <TableCell className="text-xs py-2">
                         <div className="max-w-[200px] truncate flex items-center gap-1" title={tx.description}>
                           {tx.description}
-                          {isPolicy && <ExternalLink className="w-3 h-3 text-muted-foreground shrink-0" />}
+                          {hasLink && <ExternalLink className="w-3 h-3 text-primary/60 shrink-0" />}
                         </div>
                       </TableCell>
                       <TableCell className={`text-xs text-right py-2 font-medium tabular-nums ${isExpense ? 'text-destructive' : 'text-emerald-600'}`}>
                         {isExpense && '-'}{formatCurrency(Math.abs(tx.amount))}
                       </TableCell>
                       <TableCell className="py-2">
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                          {ORIGIN_MAP[tx.origin || 'manual'] || 'Manual'}
+                        <Badge variant={originInfo.variant} className={`text-[10px] px-1.5 py-0 ${originInfo.className}`}>
+                          {originInfo.label}
                         </Badge>
                       </TableCell>
                     </TableRow>
                   );
+
+                  if (hasLink) {
+                    return (
+                      <Tooltip key={tx.id}>
+                        <TooltipTrigger asChild>{row}</TooltipTrigger>
+                        <TooltipContent side="left">
+                          <p className="text-xs">Clique para ver a apólice</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  }
+
+                  return row;
                 })}
               </TableBody>
             </Table>
@@ -172,7 +197,7 @@ export function DreAuditSheet({ target, onClose }: DreAuditSheetProps) {
                 {isExpense && '-'}{formatCurrency(total)}
               </span>
             </div>
-          </>
+          </TooltipProvider>
         )}
       </SheetContent>
     </Sheet>

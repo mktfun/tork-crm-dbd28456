@@ -1029,13 +1029,15 @@ export async function getDreAuditTransactions(
         related_entity_id,
         reconciled,
         is_void,
-        is_confirmed
+        is_confirmed,
+        archived
       )
     `)
     .in('account_id', accountIds)
     .gte('financial_transactions.transaction_date', startDate)
     .lt('financial_transactions.transaction_date', endDate)
-    .eq('financial_transactions.is_void', false);
+    .eq('financial_transactions.is_void', false)
+    .or('archived.is.null,archived.eq.false', { referencedTable: 'financial_transactions' });
 
   if (error) throw error;
 
