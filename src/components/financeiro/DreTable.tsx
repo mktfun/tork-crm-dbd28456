@@ -379,6 +379,7 @@ export function DreTable({ className }: DreTableProps) {
           )}
         </div>
       </AppCard>
+      <DreAuditSheet target={auditTarget} onClose={() => setAuditTarget(null)} />
     </TooltipProvider>
   );
 }
