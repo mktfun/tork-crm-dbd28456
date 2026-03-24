@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { FileSpreadsheet, TrendingUp, TrendingDown, Calculator, ChevronDown, Minimize2, Maximize2 } from 'lucide-react';
+import { DreAuditSheet, DreAuditTarget } from './DreAuditSheet';
 
 import {
   Table,
