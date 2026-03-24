@@ -1,36 +1,33 @@
 
 
-# Plano: Auditoria DRE completa e funcional
+# Plano: Mostrar ramo no modal mesmo sem apólice vinculada
 
-## Problemas identificados
+## Problema
 
-1. **Valores não batem** — a query de auditoria não filtra `archived` (a view DRE usa `COALESCE(ft.archived, false) = false`), incluindo transações arquivadas que inflam o total
-2. **Links de apólice não funcionam** — transações migradas têm `related_entity_type = 'legacy_transaction'` mas possuem `related_entity_id` apontando para a apólice. O código só verifica `origin === 'policy'`, ignorando as migradas
-3. **Descrição crua** — registros legados mostram "Comissão da apólice 19-14201594" ao invés do nome do segurado
+O agendamento salva `ramo_id` diretamente na tabela `appointments`, mas a query em `useSupabaseAppointments.ts` só busca o nome do ramo via o join com `apolices` (`policy:apolices(... ramo:ramos(nome))`). Quando o usuário seleciona um ramo sem vincular uma apólice, o `ramoName` vem `null`.
 
-## Mudanças
+## Mudança
 
-### 1. `src/services/financialService.ts` — corrigir query
+### `src/hooks/useSupabaseAppointments.ts`
 
-- Adicionar filtro `archived`: `.or('archived.is.null,archived.eq.false', { referencedTable: 'financial_transactions' })` para alinhar com a view DRE (`COALESCE(ft.archived, false) = false`)
-- Manter `is_void = false` (ja existe)
-- Resultado: valores da auditoria passam a bater com o DRE
+Adicionar um join direto com `ramos` via o campo `ramo_id` da tabela `appointments`:
 
-### 2. `src/components/financeiro/DreAuditSheet.tsx` — links e UX
+```
+.select(`
+  *,
+  client:clientes(name, phone),
+  policy:apolices(policy_number, ramo:ramos(nome)),
+  direct_ramo:ramos(nome)
+`)
+```
 
-- **Expandir detecção de apólice**: considerar clicável quando `related_entity_id` existe E (`origin === 'policy'` OU `origin === 'legacy_transaction'`), pois ambos referenciam apólices
-- **Badge de origem com cor**: colorir por tipo (verde para apólice, azul para extrato, cinza para manual, amarelo para migração)
-- **Tooltip na linha**: mostrar "Clique para ver a apólice" nas linhas clicáveis
+No mapeamento, priorizar o ramo da apólice e usar o ramo direto como fallback:
 
-### 3. Descrição amigável (opcional, sem query extra)
-
-- Para transações de migração com descrição tipo "Comissão da apólice XXXXX", manter como está (o nome do segurado não está disponível no registro legado sem query adicional)
-- As transações novas já têm formato correto "Cliente (Ramo) - Seguradora"
-
-## Arquivos
+```typescript
+ramoName: apt.policy?.ramo?.nome || apt.direct_ramo?.nome || null,
+```
 
 | Arquivo | Ação |
 |---|---|
-| `src/services/financialService.ts` | Adicionar filtro `archived` na query |
-| `src/components/financeiro/DreAuditSheet.tsx` | Links para apólice em transações legadas, melhorias visuais |
+| `src/hooks/useSupabaseAppointments.ts` | Adicionar join `direct_ramo:ramos(nome)` e fallback no mapeamento |
 
