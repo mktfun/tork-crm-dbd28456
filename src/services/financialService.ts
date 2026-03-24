@@ -989,6 +989,7 @@ export interface DreAuditTransaction {
   amount: number;
   origin: string | null;
   reconciled: boolean;
+  related_entity_id: string | null;
 }
 
 export async function getDreAuditTransactions(
@@ -1025,6 +1026,7 @@ export async function getDreAuditTransactions(
         description,
         transaction_date,
         related_entity_type,
+        related_entity_id,
         reconciled,
         is_void,
         is_confirmed
@@ -1044,6 +1046,7 @@ export async function getDreAuditTransactions(
     amount: Math.abs(Number(row.amount) || 0),
     origin: row.financial_transactions?.related_entity_type || null,
     reconciled: row.financial_transactions?.reconciled || false,
+    related_entity_id: row.financial_transactions?.related_entity_id || null,
   }));
 }
 

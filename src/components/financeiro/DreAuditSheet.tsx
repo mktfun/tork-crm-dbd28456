@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Search, FileText, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, FileText, ExternalLink, Loader2 } from 'lucide-react';
 
 import {
   Sheet,
@@ -55,6 +56,7 @@ interface DreAuditSheetProps {
 }
 
 export function DreAuditSheet({ target, onClose }: DreAuditSheetProps) {
+  const navigate = useNavigate();
   const { data: transactions = [], isLoading } = useDreAudit(
     target?.category ?? '',
     target ? target.monthIndex + 1 : 0,
@@ -132,26 +134,34 @@ export function DreAuditSheet({ target, onClose }: DreAuditSheetProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map((tx) => (
-                  <TableRow key={tx.id}>
-                    <TableCell className="text-xs whitespace-nowrap py-2">
-                      {format(new Date(tx.transaction_date), 'dd/MM', { locale: ptBR })}
-                    </TableCell>
-                    <TableCell className="text-xs py-2">
-                      <div className="max-w-[200px] truncate" title={tx.description}>
-                        {tx.description}
-                      </div>
-                    </TableCell>
-                    <TableCell className={`text-xs text-right py-2 font-medium tabular-nums ${isExpense ? 'text-destructive' : 'text-emerald-600'}`}>
-                      {isExpense && '-'}{formatCurrency(Math.abs(tx.amount))}
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        {ORIGIN_MAP[tx.origin || 'manual'] || 'Manual'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {transactions.map((tx) => {
+                  const isPolicy = tx.origin === 'policy' && !!tx.related_entity_id;
+                  return (
+                    <TableRow
+                      key={tx.id}
+                      className={isPolicy ? 'cursor-pointer hover:bg-muted' : ''}
+                      onClick={isPolicy ? () => navigate(`/dashboard/policies/${tx.related_entity_id}`) : undefined}
+                    >
+                      <TableCell className="text-xs whitespace-nowrap py-2">
+                        {format(new Date(tx.transaction_date), 'dd/MM', { locale: ptBR })}
+                      </TableCell>
+                      <TableCell className="text-xs py-2">
+                        <div className="max-w-[200px] truncate flex items-center gap-1" title={tx.description}>
+                          {tx.description}
+                          {isPolicy && <ExternalLink className="w-3 h-3 text-muted-foreground shrink-0" />}
+                        </div>
+                      </TableCell>
+                      <TableCell className={`text-xs text-right py-2 font-medium tabular-nums ${isExpense ? 'text-destructive' : 'text-emerald-600'}`}>
+                        {isExpense && '-'}{formatCurrency(Math.abs(tx.amount))}
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          {ORIGIN_MAP[tx.origin || 'manual'] || 'Manual'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
 
