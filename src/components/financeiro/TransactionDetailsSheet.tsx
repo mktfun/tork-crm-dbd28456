@@ -561,7 +561,7 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                 <Separator />
                 <div className="space-y-2 text-xs text-muted-foreground">
                   <p><strong>Criado em:</strong> {safeFormatDate(transaction.createdAt, 'dd/MM/yyyy HH:mm')}</p>
-                  <p><strong>Origem:</strong> {transaction.relatedEntityType || 'manual'}</p>
+                  <p><strong>Origem:</strong> {originLabel}</p>
                   <p className="font-mono break-all"><strong>ID:</strong> {transaction.id}</p>
                   {transaction.isVoid && transaction.voidReason && (
                     <p className="text-destructive"><strong>Motivo anulação:</strong> {transaction.voidReason}</p>
