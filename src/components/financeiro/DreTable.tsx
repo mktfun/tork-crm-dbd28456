@@ -222,7 +222,11 @@ export function DreTable({ className }: DreTableProps) {
                         {formatCurrency(row.ytd || 0, true)}
                       </TableCell>
                       {MONTHS.map((month, mIdx) => (
-                        <TableCell key={month} className={`${paddingClass} text-right tabular-nums ${mIdx === currentMonthIndex ? 'bg-primary/5 border-x border-primary/20' : ''}`}>
+                        <TableCell
+                          key={month}
+                          className={`${paddingClass} text-right tabular-nums ${mIdx === currentMonthIndex ? 'bg-primary/5 border-x border-primary/20' : ''} ${row[month] > 0 ? 'cursor-pointer hover:bg-emerald-500/10 transition-colors' : ''}`}
+                          onClick={() => row[month] > 0 && setAuditTarget({ category: row.category, monthIndex: mIdx, year: selectedYear, accountType: 'revenue', expectedValue: row[month] })}
+                        >
                           {row[month] > 0 ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -232,7 +236,7 @@ export function DreTable({ className }: DreTableProps) {
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p className="text-xs font-medium">
-                                  {((row[month] / summary.byMonth[month].revenue) * 100).toFixed(1)}% do mês
+                                  {((row[month] / summary.byMonth[month].revenue) * 100).toFixed(1)}% do mês · Clique para auditar
                                 </p>
                               </TooltipContent>
                             </Tooltip>
