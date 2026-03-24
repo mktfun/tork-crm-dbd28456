@@ -1,41 +1,43 @@
 
 
-# Plano: Mover "Excluir Extrato" do Workbench para o Histórico de Importações
+# Plano: Corrigir exibição de transações no Detalhes
 
-## O que
+## Problemas identificados
 
-Remover o modo de exclusão do `ReconciliationWorkbench` e adicionar um botão "Excluir" em cada card de importação no Histórico (`ReconciliationPage.tsx`). Ao clicar, abre um `AlertDialog` de confirmação e deleta todas as `bank_statement_entries` daquele `import_batch_id`, além do registro em `bank_import_history`.
+1. **Dois movimentos contábeis aparecendo** — o sistema de partidas dobradas mostra "Outras Receitas" + "Contas a Receber" para toda transação. O usuário quer ver UM movimento simplificado: "Entrada no banco" ou "Saída do banco"
+2. **Header de despesa aparece verde/positivo** — linha 268 hardcoda `text-emerald-500` e `bg-emerald-500` para TODAS as transações, mesmo despesas
+3. **Origem crua** — mostra `manual` ou `bank_statement` como texto técnico
 
 ## Mudanças
 
-### 1. `ReconciliationWorkbench.tsx` — Remover modo exclusão
+### `TransactionDetailsSheet.tsx`
 
-- Remover estados: `deleteMode`, `deleteSelectedIds`, `showDeleteConfirm`, `isDeleting`
-- Remover funções: `toggleDeleteItem`, `toggleDeleteAll`, `exitDeleteMode`, `handleDeleteConfirm`
-- Remover o botão `Trash2` do header do painel esquerdo
-- Remover checkboxes condicionais dos `EntryCard`
-- Remover o `AlertDialog` de confirmação de exclusão
-- Remover floating bar de exclusão
-- Limpar imports não utilizados (`Trash2`, `Checkbox`, `AlertDialog*` se não usados em outro lugar)
+**A. Determinar tipo da transação (receita vs despesa)**
+- Derivar `isExpenseTransaction` a partir dos `ledgerEntries`: se existe entry com `accountType === 'expense'`, é despesa
+- Alternativa: se o `amount` do entry de tipo `asset` é negativo, é saída
 
-### 2. `ReconciliationPage.tsx` — Adicionar exclusão por lote no Histórico
+**B. Header dinâmico (valor + cor)**
+- Linha 268: trocar gradiente fixo emerald por condicional:
+  - Receita: `from-emerald-500/10`, `text-emerald-500`
+  - Despesa: `from-red-500/10`, `text-red-500`, valor com prefixo `-`
 
-- Adicionar estado: `deletingBatchId` (string | null) e `isDeleting` (boolean)
-- Em cada card de importação (linha 627-687), adicionar um botão `Trash2` ao lado do "Ver Detalhes"
-- `AlertDialog` de confirmação com resumo: "Excluir X transações importadas em DD/MM/YYYY?"
-- Ao confirmar:
-  1. `DELETE FROM bank_statement_entries WHERE import_batch_id = $batchId`
-  2. `DELETE FROM bank_import_history WHERE id = $batchId`
-  3. Invalidar queries: `bank-statement-entries`, `pending-reconciliation`, `reconciliation-kpis`, `import-history`
-  4. Toast de sucesso
-- Importar `Trash2` e componentes do `AlertDialog`
+**C. Simplificar "Movimentos Contábeis" para visão de caixa**
+- Substituir a listagem de TODOS os ledger entries por uma visão simplificada:
+  - **Uma linha só**: "Receita Bancária" ou "Despesa Bancária" com valor e cor correta
+  - Abaixo, mostrar a conta de origem/destino (ex: "Outras Receitas", "Fornecedores")
+- Opcionalmente manter um toggle "Ver partidas dobradas" para quem quiser o detalhe contábil
 
-## Arquivos afetados
+**D. Origem amigável**
+- Linha 536: mapear `relatedEntityType`:
+  - `bank_statement` → "Extrato Bancário (Conciliação)"
+  - `manual` / null → "Lançamento Manual"
+  - `policy` → "Comissão de Apólice"
+  - `legacy_transaction` → "Migração"
+  - `reversal` → "Estorno"
+
+## Arquivos
 
 | Arquivo | Ação |
 |---|---|
-| `ReconciliationWorkbench.tsx` | Remover todo o código de delete mode (~100 linhas) |
-| `ReconciliationPage.tsx` | Adicionar botão excluir por lote no histórico + AlertDialog de confirmação |
-
-Sem migration. Sem deploy.
+| `TransactionDetailsSheet.tsx` | Cor dinâmica no header, simplificar movimentos, origem amigável |
 
