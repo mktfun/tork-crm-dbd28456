@@ -25,7 +25,8 @@ export function useSupabaseAppointments() {
         .select(`
           *,
           client:clientes(name, phone),
-          policy:apolices(policy_number, ramo:ramos(nome))
+          policy:apolices(policy_number, ramo:ramos(nome)),
+          direct_ramo:ramos(nome)
         `)
         .order('date', { ascending: true });
 
