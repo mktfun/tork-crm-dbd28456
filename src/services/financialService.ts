@@ -989,6 +989,7 @@ export interface DreAuditTransaction {
   amount: number;
   origin: string | null;
   reconciled: boolean;
+  related_entity_id: string | null;
 }
 
 export async function getDreAuditTransactions(
