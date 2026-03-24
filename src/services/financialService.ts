@@ -1046,6 +1046,7 @@ export async function getDreAuditTransactions(
     amount: Math.abs(Number(row.amount) || 0),
     origin: row.financial_transactions?.related_entity_type || null,
     reconciled: row.financial_transactions?.reconciled || false,
+    related_entity_id: row.financial_transactions?.related_entity_id || null,
   }));
 }
 
