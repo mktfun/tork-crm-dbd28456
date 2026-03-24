@@ -25,7 +25,8 @@ export function useSupabaseAppointments() {
         .select(`
           *,
           client:clientes(name, phone),
-          policy:apolices(policy_number, ramo:ramos(nome))
+          policy:apolices(policy_number, ramo:ramos(nome)),
+          direct_ramo:ramos(nome)
         `)
         .order('date', { ascending: true });
 
@@ -40,7 +41,7 @@ export function useSupabaseAppointments() {
         clientName: apt.client?.name || null,
         clientPhone: apt.client?.phone || null,
         policyNumber: apt.policy?.policy_number || null,
-        ramoName: apt.policy?.ramo?.nome || null,
+        ramoName: apt.policy?.ramo?.nome || apt.direct_ramo?.nome || null,
         // Clean up nested objects to avoid confusion
         client: undefined,
         policy: undefined,
