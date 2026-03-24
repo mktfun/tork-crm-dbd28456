@@ -116,6 +116,24 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
     return acc;
   }, 0);
 
+  // Determinar se é despesa ou receita
+  const isExpenseTransaction = entries.some(e => e.accountType === 'expense') ||
+    entries.some(e => e.accountType === 'asset' && e.amount < 0);
+
+  // Encontrar conta bancária (asset) e conta de categoria (revenue/expense)
+  const bankEntry = entries.find(e => e.accountType === 'asset');
+  const categoryEntry = entries.find(e => e.accountType === 'revenue' || e.accountType === 'expense');
+
+  // Mapear origem amigável
+  const originLabel = (() => {
+    const t = transaction?.relatedEntityType;
+    if (t === 'bank_statement') return 'Extrato Bancário (Conciliação)';
+    if (t === 'policy') return 'Comissão de Apólice';
+    if (t === 'legacy_transaction') return 'Migração';
+    if (t === 'reversal') return 'Estorno';
+    return 'Lançamento Manual';
+  })();
+
   // Verificar se é transação sincronizada (não pode ser editada manualmente)
   const isSynchronized = transaction?.relatedEntityType === 'legacy_transaction' ||
     transaction?.relatedEntityType === 'policy';
