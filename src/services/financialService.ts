@@ -1026,6 +1026,7 @@ export async function getDreAuditTransactions(
         description,
         transaction_date,
         related_entity_type,
+        related_entity_id,
         reconciled,
         is_void,
         is_confirmed
