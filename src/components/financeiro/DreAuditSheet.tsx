@@ -56,6 +56,7 @@ interface DreAuditSheetProps {
 }
 
 export function DreAuditSheet({ target, onClose }: DreAuditSheetProps) {
+  const navigate = useNavigate();
   const { data: transactions = [], isLoading } = useDreAudit(
     target?.category ?? '',
     target ? target.monthIndex + 1 : 0,
