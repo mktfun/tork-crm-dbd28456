@@ -41,7 +41,7 @@ export function useSupabaseAppointments() {
         clientName: apt.client?.name || null,
         clientPhone: apt.client?.phone || null,
         policyNumber: apt.policy?.policy_number || null,
-        ramoName: apt.policy?.ramo?.nome || null,
+        ramoName: apt.policy?.ramo?.nome || apt.direct_ramo?.nome || null,
         // Clean up nested objects to avoid confusion
         client: undefined,
         policy: undefined,
