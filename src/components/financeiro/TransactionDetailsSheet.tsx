@@ -447,36 +447,39 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                 <div className="space-y-3">
                   <h4 className="text-sm font-medium flex items-center gap-2">
                     <ArrowUpDown className="w-4 h-4" />
-                    Movimentos Contábeis
+                    Movimento
                   </h4>
-                  <div className="space-y-2">
-                    {transaction.ledgerEntries.map((entry) => {
-                      // Contas de resultado: mostrar valor absoluto, sem sinal negativo
-                      const isResultAccount = entry.accountType === 'revenue' || entry.accountType === 'expense';
-                      const displayAmount = isResultAccount ? Math.abs(entry.amount) : entry.amount;
-                      const isRevenue = entry.accountType === 'revenue';
-                      const isExpense = entry.accountType === 'expense';
 
-                      return (
-                        <div
-                          key={entry.id}
-                          className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={isRevenue ? "default" : isExpense ? "destructive" : entry.amount > 0 ? "default" : "secondary"}
-                              className="text-xs font-mono"
-                            >
-                              {isRevenue ? 'R' : isExpense ? 'D' : entry.amount > 0 ? 'D' : 'C'}
-                            </Badge>
-                            <span className="text-sm">{entry.accountName}</span>
-                          </div>
-                          <span className={`font-medium ${isRevenue ? 'text-emerald-500' : isExpense ? 'text-red-500' : 'text-muted-foreground'}`}>
-                            {isRevenue ? '+' : isExpense ? '-' : ''}{formatCurrency(displayAmount)}
-                          </span>
-                        </div>
-                      );
-                    })}
+                  {/* Visão simplificada de caixa */}
+                  <div className={`p-4 rounded-lg border ${
+                    isExpenseTransaction
+                      ? 'bg-red-500/5 border-red-500/20'
+                      : 'bg-emerald-500/5 border-emerald-500/20'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={isExpenseTransaction ? "destructive" : "default"} className="text-xs">
+                          {isExpenseTransaction ? 'Saída' : 'Entrada'}
+                        </Badge>
+                        <span className="text-sm font-medium">
+                          {bankEntry?.accountName || 'Conta Bancária'}
+                        </span>
+                      </div>
+                      <span className={`font-bold ${isExpenseTransaction ? 'text-red-500' : 'text-emerald-500'}`}>
+                        {isExpenseTransaction ? '-' : '+'}{formatCurrency(headerAmount)}
+                      </span>
+                    </div>
+                    {categoryEntry && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Categoria: {categoryEntry.accountName}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Origem da transação */}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+                    <Info className="w-3 h-3" />
+                    Origem: {originLabel}
                   </div>
                 </div>
 
