@@ -162,7 +162,7 @@ async function processWebhook(body: any) {
       autoCreatedProductId, autoCreatedProductName, clientJustResponded
     } = await resolveDeal(
       supabase, resolvedAI, userId as string, clientId, clientData, sender,
-      content || '', mediaResult, brokerageId, conversation, role
+      content || '', mediaResult, brokerageId, conversation, role || 'user'
     )
 
     // 6. Pre-evaluate objective completion (only for existing deals with objectives, not auto-created)
