@@ -435,6 +435,7 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
   if (!deal) return null;
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:max-w-[600px] w-[90vw] flex flex-col p-0">
         <SheetHeader className="px-6 pt-6 pb-2">
