@@ -65,11 +65,13 @@ export async function resolveContext(
 
   // 3. Auto-detect producer or brokerage owner as admin by phone
   const senderPhone = sender?.phone_number?.replace(/\D/g, '')
-  if (senderPhone && role !== 'admin') {
+  // Normalize: remove country code 55 prefix (Chatwoot sends +5511... but DB stores 11...)
+  const normalizedPhone = senderPhone?.startsWith('55') ? senderPhone.slice(2) : senderPhone
+  if (normalizedPhone && role !== 'admin') {
     const { data: producer } = await supabase
       .from('producers')
       .select('id, brokerage_id')
-      .ilike('phone', `%${senderPhone}%`)
+      .ilike('phone', `%${normalizedPhone}%`)
       .maybeSingle()
 
     if (producer) {
@@ -80,7 +82,7 @@ export async function resolveContext(
       const { data: brokerage } = await supabase
         .from('brokerages')
         .select('id, user_id')
-        .ilike('phone', `%${senderPhone}%`)
+        .ilike('phone', `%${normalizedPhone}%`)
         .maybeSingle()
 
       if (brokerage) {
@@ -100,7 +102,8 @@ export async function resolveContext(
 
   if (contactPhone || contactEmail) {
     let clientQuery = supabase.from('clientes').select('id, name, ai_enabled')
-    if (contactPhone) clientQuery = clientQuery.ilike('phone', `%${contactPhone.replace(/\D/g, '')}%`)
+    const normalizedContactPhone = contactPhone ? contactPhone.replace(/\D/g, '').replace(/^55/, '') : ''
+    if (contactPhone) clientQuery = clientQuery.ilike('phone', `%${normalizedContactPhone}%`)
     else if (contactEmail) clientQuery = clientQuery.eq('email', contactEmail)
     if (userId) clientQuery = clientQuery.eq('user_id', userId)
 
