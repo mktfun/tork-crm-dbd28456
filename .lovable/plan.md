@@ -1,49 +1,58 @@
 
 
-# Plano: Corrigir detecção admin + Limpar RAG do dispatcher
+# Plano: Criar Edge Functions de mídia (extract-document + transcribe-audio)
 
-## Problema 1: Admin não detectado por telefone
+## Diagnóstico
 
-O sender phone do Chatwoot vem como `+5511996242812`. Após `replace(/\D/g, '')` fica `5511996242812`.
+Os logs mostram `hasOCR: false` e `hasTranscription: false` porque as Edge Functions que o dispatcher chama **não existem**:
 
-O telefone do produtor no banco é `11996242812` (sem código de país).
+- `extract-document` → **não existe** (nenhuma pasta em `supabase/functions/`)
+- `transcribe-audio` → **não existe** (idem)
 
-A query faz:
-```sql
-ilike phone '%5511996242812%'
-```
+O `processAttachments` chama `supabase.functions.invoke('extract-document', ...)` e `supabase.functions.invoke('transcribe-audio', ...)`, mas os erros são engolidos silenciosamente pelo `catch`.
 
-Isso procura a string **maior** dentro da **menor** — nunca vai dar match. O `ilike '%5511996242812%'` verifica se `11996242812` **contém** `5511996242812`, mas é o contrário.
+O resultado: PDFs, imagens e áudios são detectados corretamente (log mostra `type=document, urls=1`), mas o conteúdo nunca é extraído.
 
-**Correção**: Inverter a lógica — verificar se o `senderPhone` **contém** o telefone do banco. Ou melhor, normalizar removendo o prefixo `55` do país:
+## Mudanças
 
+### 1. Criar `supabase/functions/extract-document/index.ts`
+
+Recebe `{ fileUrl, fileType }`, baixa o arquivo da URL do Chatwoot, e usa a API do Gemini (via Lovable Gateway ou API key do usuário) para extrair texto:
+
+- **PDF**: Converte para base64 e envia como `inline_data` para o Gemini com prompt de extração
+- **Imagem**: Mesma lógica, envia como `image_url` com base64
+- Retorna `{ text: "conteúdo extraído" }`
+- Usa `LOVABLE_API_KEY` como fallback, ou a API key configurada pelo usuário (Gemini)
+
+### 2. Criar `supabase/functions/transcribe-audio/index.ts`
+
+Recebe `{ audioUrl }`, baixa o áudio da URL do Chatwoot, e usa a API do Gemini para transcrever:
+
+- Converte áudio para base64
+- Envia para Gemini com prompt "Transcreva este áudio em português"
+- Retorna `{ text: "transcrição" }`
+
+### 3. Melhorar logs no `processAttachments` (index.ts)
+
+Adicionar logs mais explícitos para debug:
 ```typescript
-const senderPhone = sender?.phone_number?.replace(/\D/g, '')
-const normalizedPhone = senderPhone?.startsWith('55') ? senderPhone.slice(2) : senderPhone
+console.log('🔍 OCR result:', { hasText: !!data?.text, error: error?.message })
+console.log('🎤 Transcription result:', { hasText: !!data?.text, error: error?.message })
 ```
 
-E usar `normalizedPhone` nas queries de producer e brokerage. Mesma normalização deve ser aplicada na resolução do cliente (step 4).
+## Arquivos
 
-## Problema 2: RAG quebrado no dispatcher (remover)
-
-Conforme definido, o RAG deve viver no n8n, não no dispatcher. A função `fetchKnowledgeContext` está quebrada (parâmetros errados) e deve ser removida.
-
-**Mudanças no `buildPrompt.ts`**:
-- Deletar `fetchKnowledgeContext` (linhas 4-15)
-- Remover chamada no bloco admin (linha ~72): `knowledgeContext = await fetchKnowledgeContext(...)`
-- Remover injeção `<knowledge_base>` no prompt admin (linha ~79)
-- Adicionar `'rag_search'` nos `allowedTools` do admin
-- Atualizar `<capabilities>` do admin para referenciar RAG como ferramenta
-
-## Arquivos afetados
-
-| Arquivo | Mudança |
+| Arquivo | Ação |
 |---|---|
-| `resolveContext.ts` | Normalizar telefone removendo prefixo `55` antes de comparar com producers/brokerages/clientes |
-| `buildPrompt.ts` | Remover `fetchKnowledgeContext`, remover injeção de knowledge_base, adicionar `rag_search` nos allowedTools |
+| `supabase/functions/extract-document/index.ts` | Criar — OCR via Gemini (PDF + imagem) |
+| `supabase/functions/transcribe-audio/index.ts` | Criar — transcrição de áudio via Gemini |
+| `supabase/functions/chatwoot-dispatcher/index.ts` | Melhorar logs do processAttachments |
 
 ## Resultado esperado
 
-- Número `+5511996242812` → normalizado `11996242812` → match com producer → `👑 admin mode`
-- RAG removido do dispatcher, sinalizado como tool para o n8n executar
+1. Admin manda PDF → dispatcher chama `extract-document` → extrai texto → `hasOCR: true`
+2. Admin manda áudio → dispatcher chama `transcribe-audio` → transcreve → `hasTranscription: true`
+3. Texto extraído e transcrição vão no `ai_system_prompt` (já implementado no `buildPrompt.ts`)
+4. Payload chega no n8n com `extracted_text` e `transcription` preenchidos
+5. Agente no n8n usa esses dados + RAG tool para gerar pitch de vendas
 
