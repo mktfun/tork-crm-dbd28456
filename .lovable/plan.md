@@ -1,74 +1,101 @@
 
 
-# Plano: Corrigir Avaliação Prematura de Objetivo
+# Plano: Corrigir System Prompt — Persona + Placeholders
 
-## O que aconteceu
+## O que está errado
 
-1. Davi envia "preciso de um seguro fiança"
-2. Dispatcher cria deal automaticamente no "Novo Lead" (autoCreatedDeal=true)
-3. Chatwoot dispara **dois webhooks** para a mesma mensagem (comum no Chatwoot)
-4. O **segundo webhook** encontra o deal já existente → `autoCreatedDeal=false`
-5. O objetivo do "Novo Lead" é: *"ao identificar o produto e intenção, mande o link..."*
-6. O avaliador vê "seguro fiança" no histórico → responde "SIM"
-7. Deal salta de "Novo Lead" → "Em Contato" **antes do bot responder**
+### Bug 1: Placeholders nunca substituídos
+Os presets em `ai-presets.ts` usam `{{ai_name}}`, `{{company_name}}`, `{{missao_ai}}`, `{{next_stage_name}}`. A função `resolvePersonaPrompt` retorna o template cru. O `buildPrompt.ts` injeta sem substituir. O AI recebe literal `{{missao_ai}}`.
 
-## Causa raiz
+### Bug 2: Sem fallback de persona quando tem deal
+Linha 120-123 de `buildPrompt.ts`:
+```typescript
+const personaXml = resolvePersonaPrompt(stageAiSettings?.ai_persona)
+if (personaXml) {
+  systemPrompt += personaXml + '\n\n'
+}
+```
+Se `ai_persona` não está configurado na etapa, **nenhuma persona é injetada**. O prompt fica só com identity + security rules + context — sem regras de conversa, sem objection handling, sem output rules, sem nada.
 
-O guard `!autoCreatedDeal` no `index.ts` não protege contra o segundo webhook. No primeiro webhook o deal é criado (skip OK). No segundo, o deal já existe no banco, então `autoCreatedDeal=false` e a avaliação roda.
-
-Além disso, o objetivo cadastrado mistura **instrução** ("mande o link") com **critério de conclusão**, o que faz o avaliador interpretar "produto identificado = objetivo cumprido" antes do bot sequer agir.
+No caminho sem deal (triagem), existe fallback para `globalBaseInstructions`. No caminho com deal, não existe.
 
 ## Correções
 
-### 1. `evaluateStageCompletion.ts` — Exigir mínimo de interações do bot
+### 1. `buildPrompt.ts` — Substituir placeholders
+Após resolver a persona, substituir os placeholders pelos valores reais:
+- `{{ai_name}}` → `agentName`
+- `{{company_name}}` → `companyName`
+- `{{missao_ai}}` → `stageAiSettings?.ai_objective || 'Atender o cliente e coletar informações necessárias'`
+- `{{next_stage_name}}` → nome da próxima etapa (já resolvido no código)
 
-Antes de avaliar, contar quantas mensagens do **agente** existem no histórico recente. Se o bot ainda não respondeu naquela etapa, pular a avaliação.
+### 2. `buildPrompt.ts` — Fallback de persona no caminho "has deal"
+Se a etapa não tem `ai_persona`, usar `globalBaseInstructions` como persona. Se nem isso existir, usar um preset default (ex: `supportive` / geral).
+
+### 3. Implementar guards no `evaluateStageCompletion.ts` (plano anteriormente aprovado)
+O plano anterior foi aprovado mas a implementação foi cancelada. Adicionar:
+- Guard de idade do deal (<60s → skip)
+- Guard de mensagens do agente (0 respostas → skip)
+- Prompt melhorado que exige ação do agente, não só intenção do cliente
+
+## Arquivo afetado: `buildPrompt.ts`
+
+Trecho do caminho "has deal" (linhas 116-133) ficará:
 
 ```typescript
-// Após buscar recentMessages, contar respostas do agente
-const agentMessages = msgs.filter((m: any) => m.message_type === 1)
-if (agentMessages.length < 1) {
-  console.log('⏳ Skipping objective eval: bot has not responded yet in this stage')
-  return result
+// Has deal — stage-specific mode
+stageAiIsActive = stageAiSettings?.is_active ?? false
+
+let personaXml = resolvePersonaPrompt(stageAiSettings?.ai_persona)
+// Fallback: use global base instructions or default preset
+if (!personaXml) {
+  personaXml = globalBaseInstructions
+    ? `<persona>\n${globalBaseInstructions}\n</persona>`
+    : resolvePersonaPrompt('supportive') // preset "geral" como fallback
+}
+
+// Resolve next stage name for placeholder substitution
+let resolvedNextStageName = ''
+// (next stage resolution code runs here, moved up)
+
+// Replace placeholders in persona
+if (personaXml) {
+  personaXml = personaXml
+    .replace(/\{\{ai_name\}\}/g, agentName)
+    .replace(/\{\{company_name\}\}/g, companyName)
+    .replace(/\{\{missao_ai\}\}/g, stageAiSettings?.ai_objective || 'Atender o cliente e coletar as informações necessárias para avançar')
+    .replace(/\{\{next_stage_name\}\}/g, resolvedNextStageName)
+  systemPrompt += personaXml + '\n\n'
 }
 ```
 
-### 2. `evaluateStageCompletion.ts` — Proteger deals recém-criados
+Mesma substituição para o caminho sem deal (triagem, linha 104).
 
-Adicionar check de idade do deal. Se criado há menos de 60 segundos, pular avaliação:
+## Arquivo afetado: `evaluateStageCompletion.ts`
 
+Adicionar antes da chamada AI (linha 50):
 ```typescript
+// Guard: skip if deal was created less than 60s ago
 const dealAge = Date.now() - new Date(params.deal.created_at).getTime()
 if (dealAge < 60_000) {
-  console.log('⏳ Skipping objective eval: deal created less than 60s ago')
+  console.log('⏳ Skipping objective eval: deal < 60s old')
+  return result
+}
+
+// Guard: skip if bot hasn't responded yet
+const msgs = (messagesData.payload || []).slice(-6)
+const agentMessages = msgs.filter((m: any) => m.message_type === 1)
+if (agentMessages.length < 1) {
+  console.log('⏳ Skipping objective eval: no agent responses yet')
   return result
 }
 ```
 
-### 3. Melhorar o prompt do avaliador
-
-O prompt atual é muito genérico. Precisa instruir o avaliador a considerar se o **agente já executou** a ação do objetivo, não apenas se o cliente expressou a necessidade:
-
-```typescript
-content: `Dado o objetivo da etapa: "${objective}"
-
-Histórico recente:
-${recentMessages}
-
-O objetivo foi COMPLETAMENTE atingido pelo AGENTE (não apenas pelo cliente ter expressado interesse)?
-Responda "SIM" apenas se o agente já executou a ação descrita no objetivo (ex: enviou link, coletou dados, etc).
-Se o agente ainda não respondeu ou não executou a ação, responda "NAO".`
-```
-
-## Arquivos afetados
-
-| Arquivo | Mudança |
-|---|---|
-| `evaluateStageCompletion.ts` | Guard de idade do deal + contagem de respostas do agente + prompt melhorado |
+Melhorar o prompt do avaliador para exigir ação do agente.
 
 ## Resultado esperado
 
-- Deal criado no "Novo Lead" e **permanece lá** até o bot responder e enviar o link
-- Avaliação só roda após pelo menos 1 resposta do agente na etapa
-- Deals recém-criados (<60s) ficam protegidos contra avaliação prematura
+- Prompt gigante com todas as regras (voice, internal_reasoning, objection_handling, output_rules, etc.) sempre presente
+- Placeholders substituídos por valores reais (nome do agente, empresa, objetivo da etapa)
+- Deals recém-criados não são avaliados prematuramente
+- Bot não pula etapas na primeira mensagem
 
