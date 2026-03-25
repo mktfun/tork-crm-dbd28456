@@ -17,8 +17,17 @@ export async function evaluateObjectiveCompletion(
   const objective = params.stageAiSettings?.ai_objective
   if (!objective || !resolvedAI.auth) return result
 
+  // Guard: skip if deal was created less than 60s ago
+  const dealCreatedAt = params.deal.created_at ? new Date(params.deal.created_at).getTime() : 0
+  const dealAge = Date.now() - dealCreatedAt
+  if (dealAge < 60_000) {
+    console.log(`⏳ Skipping objective eval: deal ${params.deal.id} created ${Math.round(dealAge / 1000)}s ago (< 60s)`)
+    return result
+  }
+
   // Fetch last messages from Chatwoot
   let recentMessages = ''
+  let agentMessageCount = 0
   try {
     if (params.brokerageId) {
       const { data: brokerage } = await supabase
@@ -35,7 +44,8 @@ export async function evaluateObjectiveCompletion(
         )
         if (messagesResp.ok) {
           const messagesData = await messagesResp.json()
-          const msgs = (messagesData.payload || []).slice(-6)
+          const msgs = (messagesData.payload || []).slice(-10)
+          agentMessageCount = msgs.filter((m: any) => m.message_type === 1).length
           recentMessages = msgs.map((m: any) => `${m.message_type === 0 ? 'Cliente' : 'Agente'}: ${m.content || '[mídia]'}`).join('\n')
         }
       }
@@ -46,6 +56,12 @@ export async function evaluateObjectiveCompletion(
 
   if (!recentMessages) return result
 
+  // Guard: skip if bot hasn't responded yet in this conversation
+  if (agentMessageCount < 1) {
+    console.log(`⏳ Skipping objective eval: no agent responses yet for deal ${params.deal.id}`)
+    return result
+  }
+
   // Quick AI evaluation
   try {
     const evalResp = await fetch(resolvedAI.url, {
@@ -54,8 +70,8 @@ export async function evaluateObjectiveCompletion(
       body: JSON.stringify({
         model: resolvedAI.model,
         messages: [
-          { role: 'system', content: 'Você é um avaliador. Responda APENAS "SIM" ou "NAO", sem explicações.' },
-          { role: 'user', content: `Dado o objetivo da etapa: "${objective}"\n\nHistórico recente:\n${recentMessages}\n\nO objetivo foi atingido?` }
+          { role: 'system', content: 'Você é um avaliador de conversas de atendimento. Responda APENAS "SIM" ou "NAO", sem explicações.' },
+          { role: 'user', content: `Dado o objetivo da etapa: "${objective}"\n\nHistórico recente da conversa:\n${recentMessages}\n\nO objetivo foi COMPLETAMENTE atingido pelo AGENTE (não apenas pelo cliente ter expressado interesse)?\nResponda "SIM" apenas se o AGENTE já executou a ação descrita no objetivo (ex: enviou link, coletou os dados, respondeu a dúvida, etc).\nSe o agente ainda não respondeu ou não executou a ação, responda "NAO".` }
         ],
         max_tokens: 5,
         temperature: 0,
