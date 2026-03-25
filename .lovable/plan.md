@@ -1,58 +1,46 @@
 
 
-# Plano: Criar Edge Functions de mídia (extract-document + transcribe-audio)
+# Plano: Evitar que negócios "sumam" ao marcar Ganho/Perda
 
 ## Diagnóstico
 
-Os logs mostram `hasOCR: false` e `hasTranscription: false` porque as Edge Functions que o dispatcher chama **não existem**:
+Os stages de "Perdido" e "Fechado Ganho" existem corretamente no banco (pipeline `7d1e70e0...`). O deal IS sendo movido para o stage correto, mas "desaparece" da visão do usuário por dois motivos:
 
-- `extract-document` → **não existe** (nenhuma pasta em `supabase/functions/`)
-- `transcribe-audio` → **não existe** (idem)
+1. **Coluna off-screen**: O stage "Perdido" é a última coluna (posição 5). Após fechar o modal, o deal sai da coluna atual e vai para a coluna mais à direita, que pode estar fora da área visível (precisa scroll horizontal).
 
-O `processAttachments` chama `supabase.functions.invoke('extract-document', ...)` e `supabase.functions.invoke('transcribe-audio', ...)`, mas os erros são engolidos silenciosamente pelo `catch`.
-
-O resultado: PDFs, imagens e áudios são detectados corretamente (log mostra `type=document, urls=1`), mas o conteúdo nunca é extraído.
+2. **Filtro ativo**: Se o filtro de status estiver em "Abertos", deals em stages de ganho/perda são removidos do `filteredDeals` — o deal desaparece legitimamente do filtro.
 
 ## Mudanças
 
-### 1. Criar `supabase/functions/extract-document/index.ts`
+### 1. `KanbanBoard.tsx` — Auto-scroll para coluna alvo
 
-Recebe `{ fileUrl, fileType }`, baixa o arquivo da URL do Chatwoot, e usa a API do Gemini (via Lovable Gateway ou API key do usuário) para extrair texto:
+Após o modal de deal fechar e o deal ter sido movido para won/lost, fazer scroll automático da área horizontal do kanban até a coluna de destino.
 
-- **PDF**: Converte para base64 e envia como `inline_data` para o Gemini com prompt de extração
-- **Imagem**: Mesma lógica, envia como `image_url` com base64
-- Retorna `{ text: "conteúdo extraído" }`
-- Usa `LOVABLE_API_KEY` como fallback, ou a API key configurada pelo usuário (Gemini)
+- Adicionar um `ref` no container de scroll horizontal
+- Ao detectar que um deal foi movido para won/lost (via state callback), usar `scrollIntoView` na coluna de destino
+- Se o filtro ativo é "Abertos", trocar automaticamente para "Todos" ao marcar ganho/perda
 
-### 2. Criar `supabase/functions/transcribe-audio/index.ts`
+### 2. `DealDetailsModal.tsx` — Callback de stage change
 
-Recebe `{ audioUrl }`, baixa o áudio da URL do Chatwoot, e usa a API do Gemini para transcrever:
+- Adicionar prop `onDealStageChanged?: (dealId: string, newStageId: string) => void`
+- Chamar esse callback em `confirmMarkWon` e `confirmMarkLost` após o update, antes de fechar o modal
+- O KanbanBoard recebe esse callback e usa para scrollar até a coluna correta
 
-- Converte áudio para base64
-- Envia para Gemini com prompt "Transcreva este áudio em português"
-- Retorna `{ text: "transcrição" }`
+### 3. `KanbanBoard.tsx` — Resetar filtro se necessário
 
-### 3. Melhorar logs no `processAttachments` (index.ts)
+- Na callback `onDealStageChanged`, verificar se o `statusFilter` é 'open'
+- Se sim, mudar para 'all' para que o deal permaneça visível
+- Mostrar toast informativo: "Filtro alterado para 'Todos' para exibir o negócio movido"
 
-Adicionar logs mais explícitos para debug:
-```typescript
-console.log('🔍 OCR result:', { hasText: !!data?.text, error: error?.message })
-console.log('🎤 Transcription result:', { hasText: !!data?.text, error: error?.message })
-```
+## Arquivos afetados
 
-## Arquivos
-
-| Arquivo | Ação |
+| Arquivo | Mudança |
 |---|---|
-| `supabase/functions/extract-document/index.ts` | Criar — OCR via Gemini (PDF + imagem) |
-| `supabase/functions/transcribe-audio/index.ts` | Criar — transcrição de áudio via Gemini |
-| `supabase/functions/chatwoot-dispatcher/index.ts` | Melhorar logs do processAttachments |
+| `src/components/crm/KanbanBoard.tsx` | Adicionar ref de scroll, callback de stage change, auto-reset de filtro |
+| `src/components/crm/DealDetailsModal.tsx` | Adicionar prop `onDealStageChanged`, chamar nos confirm de won/lost |
 
 ## Resultado esperado
 
-1. Admin manda PDF → dispatcher chama `extract-document` → extrai texto → `hasOCR: true`
-2. Admin manda áudio → dispatcher chama `transcribe-audio` → transcreve → `hasTranscription: true`
-3. Texto extraído e transcrição vão no `ai_system_prompt` (já implementado no `buildPrompt.ts`)
-4. Payload chega no n8n com `extracted_text` e `transcription` preenchidos
-5. Agente no n8n usa esses dados + RAG tool para gerar pitch de vendas
+- Marcar como Perdido → filtro muda para "Todos" (se necessário) → board scrolla até a coluna "Perdido" → deal visível
+- Marcar como Ganho → mesma lógica → deal visível na coluna "Fechado Ganho"
 
