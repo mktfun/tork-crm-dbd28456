@@ -1,77 +1,64 @@
 
 
-# Plano: Admin Dispatcher Dedicado + Modo Análise com `/analise` e `/start`
+# Plano: Corrigir OCR que crasha com PDFs grandes + melhorar logs
 
-## Resumo
+## Problema raiz
 
-Criar uma edge function dedicada (`admin-dispatcher`) que o `chatwoot-dispatcher` invoca quando detecta `role === 'admin'`. Essa função terá um system prompt completo no estilo do `ai-assistant` (com tools, rules, modos de operação, RAG) e um modo de análise batch melhorado com comandos `/analise` e `/start`.
+O `extract-document` crasha com `RangeError: Maximum call stack size exceeded` na linha 24:
 
-## Arquitetura
-
-```text
-chatwoot-dispatcher (index.ts)
-  ├── role === 'admin' ?
-  │     └── invoca admin-dispatcher (nova edge function)
-  │           ├── Verifica /analise → inicia sessão batch
-  │           ├── Verifica /start → processa sessão batch
-  │           ├── Sessão ativa? → acumula mensagem/anexo
-  │           └── Normal → responde com system prompt admin + tools
-  └── role !== 'admin'
-        └── fluxo sales normal (atual)
+```javascript
+const base64Data = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)))
 ```
+
+O spread `...new Uint8Array(fileBuffer)` tenta passar milhões de bytes como argumentos individuais para `String.fromCharCode`, estourando a stack com arquivos maiores que ~100KB. O PDF de 1MB da screenshot causa esse crash.
 
 ## Mudanças
 
-### 1. Nova Edge Function: `supabase/functions/admin-dispatcher/index.ts`
+### 1. `supabase/functions/extract-document/index.ts` — Corrigir conversão base64
 
-Função dedicada que recebe o payload do dispatcher e:
+Substituir a conversão base64 por uma versão chunked que processa em blocos de 8KB:
 
-- **Batch mode (`/analise`)**: Cria sessão `ai_analysis_sessions` com `expires_at` = 2 min. Responde via Chatwoot: "📥 Modo análise ativado. Envie documentos, áudios e mensagens. Envie `/start` para processar ou aguarde 2 minutos."
-- **Acumulação**: Se sessão ativa, processa anexos (OCR/transcrição) e acumula no `collected_data` com `expires_at` renovado para +2 min
-- **Trigger (`/start` ou expiração)**: Monta um megaprompt com todo o conteúdo acumulado (transcrições, OCRs, textos) e despacha para n8n com o system prompt admin completo
-- **Modo normal** (sem sessão ativa, sem `/analise`): Despacha direto para n8n com system prompt admin + tools
+```typescript
+// ANTES (crasha com arquivos grandes):
+const base64Data = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)))
 
-**System prompt admin** será inspirado no `ai-assistant` e incluirá:
-- `<identity>` com Assistente Tork
-- `<rules>` com prioridades (grounding, autonomia, confirmação de deleção)
-- `<tools_guide>` listando as tools disponíveis no n8n (search_contact, create_contact, create_deal, update_deal_stage, list_pipelines_and_stages, rag_search)
-- `<modos_operacao>` (consultoria pura, agente com dados, híbrido)
-- `<format_instruction>` para formatação WhatsApp-friendly
-- `<CRITICAL_SECURITY_RULES>`
-- Injeção de contexto temporal, KPIs resumidos, e RAG context quando disponível
-- Transcrições e documentos extraídos inline
+// DEPOIS (funciona com qualquer tamanho):
+const bytes = new Uint8Array(fileBuffer)
+let binary = ''
+const chunkSize = 8192
+for (let i = 0; i < bytes.length; i += chunkSize) {
+  binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+}
+const base64Data = btoa(binary)
+```
 
-### 2. Atualizar `chatwoot-dispatcher/index.ts`
+### 2. Adicionar log de tamanho antes da conversão
 
-- Quando `role === 'admin'`, em vez de processar inline, invocar `supabase.functions.invoke('admin-dispatcher', { body: enrichedPayload })`
-- O enrichedPayload inclui: body original + userId, brokerageId, role, resolvedAI, mediaResult
-- Remover a lógica de análise session inline (blocos "analisar"/"processar") que migra para o admin-dispatcher
+Logar o tamanho do arquivo para facilitar debug futuro:
 
-### 3. Atualizar `process-analysis-session/index.ts`
+```typescript
+console.log(`📄 Converting ${(fileBuffer.byteLength / 1024).toFixed(1)}KB to base64...`)
+```
 
-- Melhorar para realmente processar os attachments acumulados (OCR/transcrição) em vez de apenas concatenar texto
-- Montar o system prompt admin completo com todo o conteúdo extraído
-- Enviar para n8n com `derived_data.ai_system_prompt` completo
+### 3. Adicionar limite de 5MB com mensagem clara
 
-### 4. Migração SQL (se necessário)
+Se o arquivo for maior que 5MB, retornar erro informativo em vez de tentar processar:
 
-- Adicionar coluna `session_type` na tabela `ai_analysis_sessions` para distinguir sessões batch admin vs futuras sessões de outros tipos (opcional, pode usar campo existente)
+```typescript
+if (fileBuffer.byteLength > 5 * 1024 * 1024) {
+  return new Response(JSON.stringify({ error: 'Arquivo excede 5MB' }), { status: 400 })
+}
+```
 
-## Detalhes do batch mode
-
-| Comando | Ação |
-|---------|------|
-| `/analise` | Cria sessão batch. Timer de 2 min. Mensagem de confirmação via Chatwoot |
-| Mensagem/anexo durante sessão | Processa mídia (OCR/transcrição), acumula em `collected_data`, renova timer |
-| `/start` | Marca sessão como `ready_for_processing`, processa tudo junto |
-| Expiração (2 min sem mensagem) | `check-followups` ou cron detecta e processa automaticamente |
-
-## Arquivos afetados
+## Arquivo afetado
 
 | Arquivo | Ação |
-|---------|------|
-| `supabase/functions/admin-dispatcher/index.ts` | **Criar** — nova edge function dedicada |
-| `supabase/functions/chatwoot-dispatcher/index.ts` | **Editar** — delegar admin para admin-dispatcher |
-| `supabase/functions/process-analysis-session/index.ts` | **Editar** — melhorar processamento real de mídia |
-| `supabase/functions/chatwoot-dispatcher/modules/buildPrompt.ts` | **Editar** — extrair o system prompt admin para reutilização |
+|---|---|
+| `supabase/functions/extract-document/index.ts` | Corrigir conversão base64, adicionar limite e logs |
+
+## Resultado
+
+- PDFs de 1MB+ serão processados corretamente via OCR
+- O admin-dispatcher receberá o `extractedText` e injetará no system prompt
+- Arquivos acima de 5MB serão rejeitados com mensagem clara
 
