@@ -193,11 +193,12 @@ async function processWebhook(body: any) {
       return
     }
 
-    // 9. Dispatch to n8n
+    // 9. Dispatch to n8n (respond with CURRENT stage prompt first)
+    const objectiveResultPlaceholder = { completed: false, previousStageId: null as string | null, previousStageName: null as string | null, newStageId: null as string | null, newStageName: null as string | null }
     const n8nResponseBody = await dispatchToN8n(supabase, {
       body, userId, brokerageId, role, aiEnabled, clientId, currentDeal, currentStage,
       promptResult, stageAiSettings, finalSystemPrompt, mediaResult, content,
-      autoCreatedDeal, autoCreatedProductId, autoCreatedProductName, objectiveResult,
+      autoCreatedDeal, autoCreatedProductId, autoCreatedProductName, objectiveResult: objectiveResultPlaceholder,
       N8N_WEBHOOK_URL
     })
 
@@ -205,6 +206,21 @@ async function processWebhook(body: any) {
     await manageFollowups(supabase, {
       currentDeal, userId, role, clientJustResponded, stageAiSettings, n8nResponseBody, conversation, brokerageId
     })
+
+    // 11. Post-response: evaluate objective completion and move stage if needed
+    if (currentDeal && !autoCreatedDeal && stageAiSettings?.ai_objective && userId && role !== 'admin') {
+      const objectiveResult = await evaluateObjectiveCompletion(supabase, resolvedAI, {
+        deal: currentDeal,
+        stage: currentStage,
+        stageAiSettings,
+        userId,
+        chatwootConversationId: conversation.id,
+        brokerageId,
+      })
+      if (objectiveResult.completed) {
+        console.log(`🚀 Post-response stage transition: ${objectiveResult.previousStageName} → ${objectiveResult.newStageName}`)
+      }
+    }
 
     console.log('✅ Dispatcher processing complete')
   } catch (error) {
