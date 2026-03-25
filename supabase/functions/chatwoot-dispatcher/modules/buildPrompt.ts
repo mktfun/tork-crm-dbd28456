@@ -55,17 +55,13 @@ export async function buildSystemPrompt(
 
   // ── ADMIN MODE ──
   if (role === 'admin') {
-    const queryForRag = transcription || extractedText || messageContent
-    knowledgeContext = await fetchKnowledgeContext(supabase, queryForRag)
-
     systemPrompt += `<identity>\nVocê é o Assistente Tork, agente interno da corretora ${companyName}.\nTom: ${voiceTone}\n</identity>\n\n`
-    systemPrompt += `<capabilities>\n- Analisar documentos de apólices via OCR\n- Consultar a base de conhecimento (normas SUSEP, produtos, coberturas)\n- Gerar textos profissionais para enviar a clientes\n- Comparar coberturas entre seguradoras\n- Responder perguntas técnicas sobre seguros\n</capabilities>\n\n`
+    systemPrompt += `<capabilities>\n- Analisar documentos de apólices via OCR\n- Buscar na base de conhecimento via ferramenta RAG (normas SUSEP, produtos, coberturas)\n- Gerar textos profissionais e pitch de vendas usando dados do cliente e base de conhecimento\n- Comparar coberturas entre seguradoras\n- Responder perguntas técnicas sobre seguros\n- Analisar documentos e áudios enviados e cruzar com informações da base\n</capabilities>\n\n`
 
     if (transcription) systemPrompt += `<transcription>\n${transcription}\n</transcription>\n\n`
     if (extractedText) systemPrompt += `<extracted_document>\n${extractedText}\n</extracted_document>\n\n`
-    if (knowledgeContext) systemPrompt += `<knowledge_base>\n${knowledgeContext}\n</knowledge_base>\n\n`
 
-    allowedTools = ['search_contact', 'create_contact', 'create_deal', 'update_deal_stage', 'list_pipelines_and_stages']
+    allowedTools = ['search_contact', 'create_contact', 'create_deal', 'update_deal_stage', 'list_pipelines_and_stages', 'rag_search']
 
     return { systemPrompt, knowledgeContext, agentName, companyName, voiceTone, aiIsActive: true, stageAiIsActive: false, nextStageId, nextStageName, allowedTools }
   }
