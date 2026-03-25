@@ -169,41 +169,7 @@ async function processWebhook(body: any) {
       isIncomingMessage
     )
 
-    // 6. Pre-evaluate objective completion (only for existing deals with objectives, not auto-created)
-    let objectiveResult = { completed: false, previousStageId: null as string | null, previousStageName: null as string | null, newStageId: null as string | null, newStageName: null as string | null }
-    if (currentDeal && !autoCreatedDeal && stageAiSettings?.ai_objective && userId && role !== 'admin') {
-      objectiveResult = await evaluateObjectiveCompletion(supabase, resolvedAI, {
-        deal: currentDeal,
-        stage: currentStage,
-        stageAiSettings,
-        userId,
-        chatwootConversationId: conversation.id,
-        brokerageId,
-      })
-
-      // If stage was completed, update references for payload
-      if (objectiveResult.completed && objectiveResult.newStageId) {
-        const { data: newStageData } = await supabase
-          .from('crm_stages')
-          .select('id, name, pipeline_id, position')
-          .eq('id', objectiveResult.newStageId)
-          .maybeSingle()
-
-        if (newStageData) {
-          currentStage = newStageData
-          currentDeal = { ...currentDeal, stage_id: newStageData.id }
-
-          const { data: newSettings } = await supabase
-            .from('crm_ai_settings')
-            .select('*')
-            .eq('stage_id', newStageData.id)
-            .maybeSingle()
-          stageAiSettings = newSettings
-        }
-      }
-    }
-
-    // 7. Build client context summary for injection in system prompt
+    // 6. Build client context summary for injection in system prompt
     const clientContextForPrompt = clientId
       ? `## CONTEXTO DO CLIENTE (pré-carregado — NÃO pergunte dados que já estão aqui)\nNome cadastrado: ${clientData?.name || sender?.name || 'desconhecido'}\nTelefone: ${contactPhone || 'desconhecido'}\nID interno: ${clientId}\n${currentDeal ? `Última negociação: "${currentDeal.title}" (etapa: ${currentStage?.name})` : 'Nenhuma negociação aberta registrada.'}\n`
       : `## NOVO CONTATO\nNome (do Chatwoot): ${sender?.name || 'desconhecido'}\nTelefone: ${contactPhone || 'desconhecido'}\nEste contato ainda não possui cadastro. O sistema cuidará automaticamente do cadastro e roteamento.\n`
@@ -227,11 +193,12 @@ async function processWebhook(body: any) {
       return
     }
 
-    // 9. Dispatch to n8n
+    // 9. Dispatch to n8n (respond with CURRENT stage prompt first)
+    const objectiveResultPlaceholder = { completed: false, previousStageId: null as string | null, previousStageName: null as string | null, newStageId: null as string | null, newStageName: null as string | null }
     const n8nResponseBody = await dispatchToN8n(supabase, {
       body, userId, brokerageId, role, aiEnabled, clientId, currentDeal, currentStage,
       promptResult, stageAiSettings, finalSystemPrompt, mediaResult, content,
-      autoCreatedDeal, autoCreatedProductId, autoCreatedProductName, objectiveResult,
+      autoCreatedDeal, autoCreatedProductId, autoCreatedProductName, objectiveResult: objectiveResultPlaceholder,
       N8N_WEBHOOK_URL
     })
 
@@ -239,6 +206,21 @@ async function processWebhook(body: any) {
     await manageFollowups(supabase, {
       currentDeal, userId, role, clientJustResponded, stageAiSettings, n8nResponseBody, conversation, brokerageId
     })
+
+    // 11. Post-response: evaluate objective completion and move stage if needed
+    if (currentDeal && !autoCreatedDeal && stageAiSettings?.ai_objective && userId && role !== 'admin') {
+      const objectiveResult = await evaluateObjectiveCompletion(supabase, resolvedAI, {
+        deal: currentDeal,
+        stage: currentStage,
+        stageAiSettings,
+        userId,
+        chatwootConversationId: conversation.id,
+        brokerageId,
+      })
+      if (objectiveResult.completed) {
+        console.log(`🚀 Post-response stage transition: ${objectiveResult.previousStageName} → ${objectiveResult.newStageName}`)
+      }
+    }
 
     console.log('✅ Dispatcher processing complete')
   } catch (error) {
