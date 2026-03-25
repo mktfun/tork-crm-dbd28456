@@ -312,7 +312,8 @@ export async function resolveDeal(
   mediaResult: any,
   brokerageId: number | null,
   conversation: any,
-  role: string
+  role: string,
+  isIncomingMessage: boolean = false
 ) {
   let currentDeal = null
   let currentStage = null
