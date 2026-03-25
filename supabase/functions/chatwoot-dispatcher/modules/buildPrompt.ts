@@ -99,9 +99,19 @@ export async function buildSystemPrompt(
   systemPrompt += `3. Responda apenas a assuntos relacionados a seguros, consórcios, planos de saúde ou atendimento da corretora.\n`
   systemPrompt += `</CRITICAL_SECURITY_RULES>\n\n`
 
+  // Helper to replace placeholders in persona prompts
+  const replacePlaceholders = (text: string, resolvedNextName: string) => {
+    return text
+      .replace(/\{\{ai_name\}\}/g, agentName)
+      .replace(/\{\{company_name\}\}/g, companyName)
+      .replace(/\{\{missao_ai\}\}/g, stageAiSettings?.ai_objective || 'Atender o cliente e coletar as informações necessárias para avançar')
+      .replace(/\{\{next_stage_name\}\}/g, resolvedNextName)
+  }
+
   if (!deal) {
     // No deal — triage mode: understand what the client needs
-    const basePersonResolved = resolvePersonaPrompt(stageAiSettings?.ai_persona) || (globalBaseInstructions ? `<persona>\n${globalBaseInstructions}\n</persona>` : '<persona>\nVocê é um assistente de vendas útil e amigável.\n</persona>')
+    let basePersonResolved = resolvePersonaPrompt(stageAiSettings?.ai_persona) || (globalBaseInstructions ? `<persona>\n${globalBaseInstructions}\n</persona>` : resolvePersonaPrompt('supportive') || '<persona>\nVocê é um assistente de vendas útil e amigável.\n</persona>')
+    basePersonResolved = replacePlaceholders(basePersonResolved, '')
     systemPrompt += basePersonResolved + '\n\n'
     systemPrompt += `<objective>\n`
     systemPrompt += `NOVO CONTATO — TRIAGEM INICIAL\n`
@@ -117,22 +127,8 @@ export async function buildSystemPrompt(
     // Has deal — stage-specific mode
     stageAiIsActive = stageAiSettings?.is_active ?? false
 
-    const personaXml = resolvePersonaPrompt(stageAiSettings?.ai_persona)
-    if (personaXml) {
-      systemPrompt += personaXml + '\n\n'
-    }
-
-    systemPrompt += `<current_context>\n`
-    systemPrompt += `NEGÓCIO ATUAL: "${deal.title}"\n`
-    systemPrompt += `ETAPA ATUAL: "${stage?.name}"\n`
-    if (stageAiSettings?.ai_objective) systemPrompt += `OBJETIVO: ${stageAiSettings.ai_objective}\n`
-    systemPrompt += `</current_context>\n\n`
-
-    if (stageAiSettings?.ai_custom_rules) {
-      systemPrompt += `<custom_rules>\n${stageAiSettings.ai_custom_rules}\n</custom_rules>\n\n`
-    }
-
-    // Resolve next stage info (used by dispatcher for auto-progression, NOT by the AI)
+    // Resolve next stage info FIRST (needed for placeholder substitution)
+    let resolvedNextStageName = ''
     if (stage?.pipeline_id && stage?.position !== undefined) {
       const { data: nextStage } = await supabase
         .from('crm_stages')
@@ -146,6 +142,7 @@ export async function buildSystemPrompt(
       if (nextStage) {
         nextStageId = nextStage.id
         nextStageName = nextStage.name
+        resolvedNextStageName = nextStage.name
       }
 
       // Also handle completion action from stage settings
@@ -157,9 +154,39 @@ export async function buildSystemPrompt(
 
           if (action.type === 'move_stage' && action.target_stage_id) {
             nextStageId = action.target_stage_id
+            // Fetch name for the overridden target stage
+            const { data: targetStage } = await supabase
+              .from('crm_stages')
+              .select('name')
+              .eq('id', action.target_stage_id)
+              .maybeSingle()
+            if (targetStage?.name) resolvedNextStageName = targetStage.name
           }
         } catch { /* ignore parse errors */ }
       }
+    }
+
+    // Resolve persona with fallback
+    let personaXml = resolvePersonaPrompt(stageAiSettings?.ai_persona)
+    if (!personaXml) {
+      personaXml = globalBaseInstructions
+        ? `<persona>\n${globalBaseInstructions}\n</persona>`
+        : resolvePersonaPrompt('supportive')
+    }
+
+    if (personaXml) {
+      personaXml = replacePlaceholders(personaXml, resolvedNextStageName)
+      systemPrompt += personaXml + '\n\n'
+    }
+
+    systemPrompt += `<current_context>\n`
+    systemPrompt += `NEGÓCIO ATUAL: "${deal.title}"\n`
+    systemPrompt += `ETAPA ATUAL: "${stage?.name}"\n`
+    if (stageAiSettings?.ai_objective) systemPrompt += `OBJETIVO: ${stageAiSettings.ai_objective}\n`
+    systemPrompt += `</current_context>\n\n`
+
+    if (stageAiSettings?.ai_custom_rules) {
+      systemPrompt += `<custom_rules>\n${stageAiSettings.ai_custom_rules}\n</custom_rules>\n\n`
     }
 
     allowedTools = []
