@@ -102,10 +102,17 @@ export async function resolveContext(
     let clientQuery = supabase.from('clientes').select('id, name, ai_enabled')
     if (contactPhone) clientQuery = clientQuery.ilike('phone', `%${contactPhone.replace(/\D/g, '')}%`)
     else if (contactEmail) clientQuery = clientQuery.eq('email', contactEmail)
+    if (userId) clientQuery = clientQuery.eq('user_id', userId)
 
-    const { data: fetchedClient } = await clientQuery.maybeSingle()
+    const { data: fetchedClient } = await clientQuery.limit(1).maybeSingle()
     clientData = fetchedClient
     clientId = clientData?.id || null
+
+    if (clientId) {
+      console.log(`👤 Client found: ${clientData?.name} (${clientId})`)
+    } else {
+      console.log(`⚠️ No client found for phone=${contactPhone}, email=${contactEmail}`)
+    }
 
     // Auto-register new client from Chatwoot contact
     if (!clientId && userId && role !== 'admin') {

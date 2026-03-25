@@ -387,6 +387,8 @@ export async function resolveDeal(
         autoCreatedProductId = autoCreateResult.productId
         autoCreatedProductName = autoCreateResult.productName
       }
+    } else if (!currentDeal) {
+      console.log(`⚠️ Skipped autoCreateDeal: sender.type=${sender?.type}, clientId=${clientId}`)
     }
 
     if (currentDeal && !stageAiSettings) {
