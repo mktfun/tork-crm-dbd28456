@@ -801,5 +801,62 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
         </Tabs>
       </SheetContent>
     </Sheet>
+
+    {/* Won Dialog - ask value */}
+    <Dialog open={showWonDialog} onOpenChange={setShowWonDialog}>
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-green-600" />
+            Marcar como Ganho
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <Label>Valor do negócio (R$)</Label>
+          <Input
+            type="text"
+            placeholder="0,00"
+            value={wonValue}
+            onChange={(e) => setWonValue(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowWonDialog(false)}>Cancelar</Button>
+          <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={confirmMarkWon}>
+            Confirmar Ganho
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Lost Dialog - ask reason */}
+    <Dialog open={showLostDialog} onOpenChange={setShowLostDialog}>
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <XCircle className="h-5 w-5 text-destructive" />
+            Marcar como Perdido
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <Label>Motivo da perda (opcional)</Label>
+          <Textarea
+            placeholder="Ex: Cliente escolheu outra seguradora, preço alto..."
+            value={lostReason}
+            onChange={(e) => setLostReason(e.target.value)}
+            rows={3}
+            autoFocus
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowLostDialog(false)}>Cancelar</Button>
+          <Button variant="destructive" onClick={confirmMarkLost}>
+            Confirmar Perda
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
