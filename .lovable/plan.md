@@ -1,69 +1,49 @@
 
 
-# Plano: Produtos padrão (Sinistro/Endosso) + Verificar fluxo Admin no Dispatcher
+# Plano: Corrigir detecção admin + Limpar RAG do dispatcher
 
-## 1. Adicionar "Sinistro" e "Endosso" como produtos padrão
+## Problema 1: Admin não detectado por telefone
 
-Atualmente a migration de setup (`20260319185230`) insere 5 produtos padrão:
-- Seguro Auto, Seguro Vida, Seguro Residencial, Consórcio, Fiança Locatícia
+O sender phone do Chatwoot vem como `+5511996242812`. Após `replace(/\D/g, '')` fica `5511996242812`.
 
-Faltam **Sinistro** e **Endosso** que são processos comuns de corretora.
+O telefone do produtor no banco é `11996242812` (sem código de país).
 
-**Mudança**: Nova migration SQL para inserir esses dois produtos para todos os usuários que ainda não os possuem:
-
+A query faz:
 ```sql
-INSERT INTO crm_products (user_id, name, description, is_active)
-SELECT u.user_id, p.name, p.description, true
-FROM (SELECT DISTINCT user_id FROM crm_products) u
-CROSS JOIN (VALUES
-  ('Sinistro', 'Abertura e acompanhamento de sinistros'),
-  ('Endosso', 'Alterações e endossos em apólices vigentes')
-) AS p(name, description)
-WHERE NOT EXISTS (
-  SELECT 1 FROM crm_products cp
-  WHERE cp.user_id = u.user_id AND cp.name = p.name
-);
+ilike phone '%5511996242812%'
 ```
 
-Isso adiciona para usuários existentes. Para novos usuários, a function de onboarding já precisaria ser atualizada — mas como ela vive na migration `20260319185230`, criaremos uma nova migration que garante retrocompatibilidade.
+Isso procura a string **maior** dentro da **menor** — nunca vai dar match. O `ilike '%5511996242812%'` verifica se `11996242812` **contém** `5511996242812`, mas é o contrário.
 
----
+**Correção**: Inverter a lógica — verificar se o `senderPhone` **contém** o telefone do banco. Ou melhor, normalizar removendo o prefixo `55` do país:
 
-## 2. Verificar fluxo Admin no Dispatcher
-
-O fluxo atual quando o admin (produtor/dono da corretora) envia mensagem:
-
-```text
-resolveContext.ts:
-  1. Resolve assignee → userId (do corretor dono da inbox)
-  2. Sender phone match producers/brokerages → role = 'admin'
-  3. Client resolution → SKIPPED (role === 'admin', linha 118)
-
-index.ts:
-  4. aiEnabled check → bypassed para admin (linha 92)
-  5. resolveDeal → SKIPPED (role !== 'admin', no resolveDeal)
-     → currentDeal = null, currentStage = null
-  6. buildPrompt → ADMIN MODE (RAG + capabilities)
-  7. dispatch to n8n → payload com role='admin', sem deal
+```typescript
+const senderPhone = sender?.phone_number?.replace(/\D/g, '')
+const normalizedPhone = senderPhone?.startsWith('55') ? senderPhone.slice(2) : senderPhone
 ```
 
-**Problema potencial identificado**: Na linha 118 do `resolveContext.ts`, quando `role === 'admin'`, o cliente NÃO é auto-registrado. Isso está correto (admin é o dono, não um cliente). Mas o `clientId` fica `null` se o admin não está na tabela `clientes`. O `userId` continua sendo do assignee, o que está correto — o admin está usando a inbox do corretor.
+E usar `normalizedPhone` nas queries de producer e brokerage. Mesma normalização deve ser aplicada na resolução do cliente (step 4).
 
-**Ação**: Nenhuma mudança de código necessária no fluxo admin — a lógica está correta. Porém, recomendo testar no Chatwoot com o número do produtor/corretora para confirmar que:
-- Log mostra `👑 Sender is a producer → admin mode`
-- Payload no n8n tem `role: 'admin'`
-- Não tenta criar deal nem auto-registrar como cliente
+## Problema 2: RAG quebrado no dispatcher (remover)
 
----
+Conforme definido, o RAG deve viver no n8n, não no dispatcher. A função `fetchKnowledgeContext` está quebrada (parâmetros errados) e deve ser removida.
+
+**Mudanças no `buildPrompt.ts`**:
+- Deletar `fetchKnowledgeContext` (linhas 4-15)
+- Remover chamada no bloco admin (linha ~72): `knowledgeContext = await fetchKnowledgeContext(...)`
+- Remover injeção `<knowledge_base>` no prompt admin (linha ~79)
+- Adicionar `'rag_search'` nos `allowedTools` do admin
+- Atualizar `<capabilities>` do admin para referenciar RAG como ferramenta
 
 ## Arquivos afetados
 
 | Arquivo | Mudança |
 |---|---|
-| Nova migration SQL | Inserir Sinistro e Endosso para todos os usuários existentes |
+| `resolveContext.ts` | Normalizar telefone removendo prefixo `55` antes de comparar com producers/brokerages/clientes |
+| `buildPrompt.ts` | Remover `fetchKnowledgeContext`, remover injeção de knowledge_base, adicionar `rag_search` nos allowedTools |
 
 ## Resultado esperado
 
-- Todos os usuários passam a ter "Sinistro" e "Endosso" na lista de produtos
-- Fluxo admin no dispatcher confirmado como correto (sem mudança de código)
+- Número `+5511996242812` → normalizado `11996242812` → match com producer → `👑 admin mode`
+- RAG removido do dispatcher, sinalizado como tool para o n8n executar
 
