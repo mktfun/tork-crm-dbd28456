@@ -1,19 +1,6 @@
 import { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { resolvePersonaPrompt } from '../../_shared/ai-presets.ts'
 
-export async function fetchKnowledgeContext(supabase: SupabaseClient, query: string): Promise<string | null> {
-  try {
-    const { data, error } = await supabase.rpc('match_knowledge', {
-      query_text: query,
-      match_count: 5,
-    })
-    if (error || !data || data.length === 0) return null
-    return data.map((d: any) => d.content).join('\n---\n')
-  } catch {
-    return null
-  }
-}
-
 export async function buildSystemPrompt(
   supabase: SupabaseClient,
   params: {
