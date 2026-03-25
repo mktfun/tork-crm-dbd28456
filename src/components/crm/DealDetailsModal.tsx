@@ -12,6 +12,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -108,6 +115,12 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
   const [newNote, setNewNote] = useState('');
   const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [addingNote, setAddingNote] = useState(false);
+
+  // Win/Loss dialog state
+  const [showWonDialog, setShowWonDialog] = useState(false);
+  const [showLostDialog, setShowLostDialog] = useState(false);
+  const [wonValue, setWonValue] = useState('');
+  const [lostReason, setLostReason] = useState('');
 
   useEffect(() => {
     if (user && open) {
@@ -336,12 +349,20 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
   const wonStage = stages.find(s => s.chatwoot_label?.toLowerCase().includes('ganho'));
   const lostStage = stages.find(s => s.chatwoot_label?.toLowerCase().includes('perdido'));
 
-  const handleMarkWon = async () => {
+  const handleMarkWon = () => {
+    if (!deal || !wonStage) return;
+    setWonValue(deal.value ? String(deal.value) : '');
+    setShowWonDialog(true);
+  };
+
+  const confirmMarkWon = async () => {
     if (!deal || !wonStage) return;
     try {
-      await updateDeal.mutateAsync({ id: deal.id, stage_id: wonStage.id });
+      const value = wonValue ? parseFloat(wonValue.replace(/[^\d.,]/g, '').replace(',', '.')) : deal.value;
+      await updateDeal.mutateAsync({ id: deal.id, stage_id: wonStage.id, value: value || 0 });
       await emitDealEvent('status_change', currentStage?.name || 'Aberto', wonStage.name);
       toast.success('Negócio marcado como Ganho!');
+      setShowWonDialog(false);
       onOpenChange(false);
     } catch (error) {
       console.error('Error marking deal as won:', error);
@@ -349,12 +370,22 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
     }
   };
 
-  const handleMarkLost = async () => {
+  const handleMarkLost = () => {
+    if (!deal || !lostStage) return;
+    setLostReason('');
+    setShowLostDialog(true);
+  };
+
+  const confirmMarkLost = async () => {
     if (!deal || !lostStage) return;
     try {
       await updateDeal.mutateAsync({ id: deal.id, stage_id: lostStage.id });
       await emitDealEvent('status_change', currentStage?.name || 'Aberto', lostStage.name);
+      if (lostReason.trim()) {
+        await emitDealEvent('loss_reason', null, lostReason.trim());
+      }
       toast.success('Negócio marcado como Perdido.');
+      setShowLostDialog(false);
       onOpenChange(false);
     } catch (error) {
       console.error('Error marking deal as lost:', error);
