@@ -107,51 +107,14 @@ async function processWebhook(body: any) {
       resolvedAI = initAIConfig(resolved)
     }
 
-    // 3. Analysis session logic (batch mode — kept from v1)
-    const isAdmin = role === 'admin'
-    if (userId && brokerageId) {
-      const messageContent = (content || '').toLowerCase().trim()
-
-      if (messageContent.includes('analisar')) {
-        const { data: activeSession } = await supabase
-          .from('ai_analysis_sessions')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('status', 'compiling')
-          .maybeSingle()
-
-        if (!activeSession) {
-          console.log('🚀 Creating analysis session for user', userId)
-          await supabase.from('ai_analysis_sessions').insert({
-            user_id: userId, brokerage_id: brokerageId,
-            chatwoot_conversation_id: conversation.id,
-            status: 'compiling', collected_data: [body],
-          })
-          return
-        }
-      }
-
-      const { data: activeSession } = await supabase
-        .from('ai_analysis_sessions')
-        .select('id, collected_data')
-        .eq('user_id', userId)
-        .eq('status', 'compiling')
-        .maybeSingle()
-
-      if (activeSession) {
-        const collectedData = activeSession.collected_data as any[] || []
-        collectedData.push(body)
-        const messageContent2 = (content || '').toLowerCase().trim()
-
-        if (messageContent2.includes('processar')) {
-          await supabase.from('ai_analysis_sessions').update({ status: 'ready_for_processing', collected_data: collectedData }).eq('id', activeSession.id)
-          supabase.functions.invoke('process-analysis-session', { body: { session_id: activeSession.id } }).catch(console.error)
-          return
-        } else {
-          await supabase.from('ai_analysis_sessions').update({ collected_data: collectedData, expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() }).eq('id', activeSession.id)
-          return
-        }
-      }
+    // 3. Admin delegation — route to admin-dispatcher
+    if (role === 'admin' && userId && brokerageId) {
+      console.log('👑 Admin detected, delegating to admin-dispatcher...')
+      const mediaResult = await processAttachments(attachments)
+      supabase.functions.invoke('admin-dispatcher', {
+        body: { body, userId, brokerageId, role, mediaResult }
+      }).catch((err: any) => console.error('❌ Admin dispatcher invocation failed:', err))
+      return
     }
 
     // 4. Process attachments (audio/image/doc)
