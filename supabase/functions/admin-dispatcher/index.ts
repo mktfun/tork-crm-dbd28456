@@ -333,7 +333,7 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
   // Build a synthetic body for n8n with batch context
   const batchBody = {
     ...originalBody,
-    content: `[ANÁLISE BATCH] ${allTexts.length} mensagens, ${allTranscriptions.length} áudios, ${allExtractedTexts.length} documentos processados.`,
+    content: `Analise todo o conteúdo dos documentos, áudios e mensagens que enviei.`,
   }
 
   await dispatchAdminToN8n({
@@ -341,7 +341,7 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
     userId,
     brokerageId,
     systemPrompt,
-    mediaResult: { messageType: 'batch_analysis', attachmentUrls: [] },
+    mediaResult: { messageType: 'text', attachmentUrls: [] },
     content: batchBody.content,
     config,
   })
