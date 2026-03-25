@@ -18,9 +18,12 @@ export async function classifyLeadWithAI(
       ? products.map(p => `- "${p.name}" (id: ${p.id})`).join('\n')
       : '- Nenhum produto cadastrado'
 
-    const prompt = `Dado o contexto da mensagem do cliente e as opções disponíveis, identifique se é possível determinar com clareza o funil e o produto desejado.
+    const prompt = `Analise o histórico da conversa abaixo e identifique se o cliente já informou qual produto ou serviço ele deseja.
 
-Mensagem: "${messageContent}"
+Histórico da Conversa:
+"""
+${messageContent}
+"""
 
 Funis disponíveis:
 ${pipelinesText}
@@ -29,10 +32,10 @@ Produtos disponíveis:
 ${productsText}
 
 Regras rigorosas:
-1. Se o cliente APENAS saudar (ex: "bom dia", "olá") ou pedir uma cotação genérica (ex: "preciso de uma cotação", "quero ver um seguro") SEM especificar o tipo de seguro/produto, você DEVE retornar null.
-2. Se o cliente ESPECIFICAR o tipo de seguro ou produto (ex: "seguro residencial", "seguro auto", "plano de saúde", "seguro de vida"), retorne o JSON com os IDs correspondentes.
-3. ATENÇÃO: Os funis podem ser genéricos (ex: "Seguros", "Vendas", "Sinistros"). Escolha o funil que melhor corresponde à intenção geral (ex: nova cotação vai para "Seguros") e use o product_id para especificar qual é o seguro exato.
-4. O JSON deve ter o formato exato: {"pipeline_id":"...","stage_id":"...","product_id":"..."}
+1. Se o cliente APENAS saudar (ex: "bom dia", "olá") ou pedir uma cotação genérica SEM especificar o tipo de seguro/produto, retorne a palavra null.
+2. Se o cliente ESPECIFICAR o tipo de seguro ou produto (ex: "seguro residencial", "seguro auto", "seguro fiança", "plano de saúde"), retorne um JSON com os IDs correspondentes.
+3. Se o produto específico não estiver na lista de Produtos disponíveis, retorne o JSON com o pipeline_id correto, stage_id correto e product_id como null.
+4. O JSON deve ter o formato exato: {"pipeline_id":"...","stage_id":"...","product_id":"..."} (product_id pode ser null).
 5. Use a primeira etapa (menor posição) do funil escolhido como stage_id.
 6. Responda APENAS com o JSON válido ou a palavra null. Não inclua markdown (\`\`\`json) nem explicações.`
 
