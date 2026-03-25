@@ -4877,6 +4877,10 @@ export type Database = {
       }
       settle_due_commissions: { Args: never; Returns: string }
       settle_due_commissions_v2: { Args: never; Returns: string }
+      setup_default_crm_for_user: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       suggest_reconciliation_matches: {
