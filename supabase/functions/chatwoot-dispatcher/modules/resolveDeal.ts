@@ -312,7 +312,8 @@ export async function resolveDeal(
   mediaResult: any,
   brokerageId: number | null,
   conversation: any,
-  role: string
+  role: string,
+  isIncomingMessage: boolean = false
 ) {
   let currentDeal = null
   let currentStage = null
@@ -337,7 +338,7 @@ export async function resolveDeal(
         : currentDeal.crm_stages
       console.log(`💼 Found open deal: ${currentDeal.title} (Stage: ${currentStage?.name})`)
 
-      if (sender?.type === 'contact') {
+      if (isIncomingMessage) {
         clientJustResponded = true
         const { error: fuError } = await supabase
           .from('ai_follow_ups')
@@ -364,7 +365,7 @@ export async function resolveDeal(
       }
     }
 
-    if (!currentDeal && sender?.type === 'contact' && clientId) {
+    if (!currentDeal && isIncomingMessage && clientId) {
       console.log('🤖 No open deal found. Attempting AI classification for auto-create...')
       const autoCreateResult = await autoCreateDeal(
         supabase,
@@ -388,7 +389,7 @@ export async function resolveDeal(
         autoCreatedProductName = autoCreateResult.productName
       }
     } else if (!currentDeal) {
-      console.log(`⚠️ Skipped autoCreateDeal: sender.type=${sender?.type}, clientId=${clientId}`)
+      console.log(`⚠️ Skipped autoCreateDeal: isIncoming=${isIncomingMessage}, clientId=${clientId}`)
     }
 
     if (currentDeal && !stageAiSettings) {

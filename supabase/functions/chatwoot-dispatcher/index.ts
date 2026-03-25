@@ -156,13 +156,17 @@ async function processWebhook(body: any) {
     const mediaResult = await processAttachments(attachments)
     console.log(`📎 Media: type=${mediaResult.messageType}, urls=${mediaResult.attachmentUrls.length}`)
 
-    // 5. Resolve Deal
+    // 5. Resolve Deal (isIncomingMessage = true since index.ts already filters for incoming)
+    const isIncomingMessage = true
+    console.log(`🔍 Webhook shape: message_type=${body.message_type}, sender.type=${sender?.type}, clientId=${clientId}, conversation=${conversation?.id}`)
+
     let {
       currentDeal, currentStage, stageAiSettings, autoCreatedDeal,
       autoCreatedProductId, autoCreatedProductName, clientJustResponded
     } = await resolveDeal(
       supabase, resolvedAI, userId as string, clientId, clientData, sender,
-      content || '', mediaResult, brokerageId, conversation, role || 'user'
+      content || '', mediaResult, brokerageId, conversation, role || 'user',
+      isIncomingMessage
     )
 
     // 6. Pre-evaluate objective completion (only for existing deals with objectives, not auto-created)
