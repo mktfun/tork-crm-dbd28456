@@ -21,7 +21,23 @@ Deno.serve(async (req) => {
     }
 
     const fileBuffer = await fileResponse.arrayBuffer()
-    const base64Data = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)))
+
+    // Limite de 5MB
+    if (fileBuffer.byteLength > 5 * 1024 * 1024) {
+      console.error(`❌ Arquivo excede 5MB: ${(fileBuffer.byteLength / 1024 / 1024).toFixed(1)}MB`)
+      return new Response(JSON.stringify({ error: 'Arquivo excede o limite de 5MB' }), { status: 400 })
+    }
+
+    console.log(`📄 Converting ${(fileBuffer.byteLength / 1024).toFixed(1)}KB to base64...`)
+
+    // Conversão chunked para evitar stack overflow em arquivos grandes
+    const bytes = new Uint8Array(fileBuffer)
+    let binary = ''
+    const chunkSize = 8192
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+    }
+    const base64Data = btoa(binary)
 
     // Determine MIME type
     let mimeType = fileType || 'application/pdf'
