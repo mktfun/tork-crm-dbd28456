@@ -59,6 +59,7 @@ interface DealDetailsModalProps {
   deal: CRMDeal | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onDealStageChanged?: (dealId: string, newStageId: string) => void;
 }
 
 interface ChatTorkConfig {
@@ -93,7 +94,7 @@ interface TimelineItem {
   event?: DealEvent;
 }
 
-export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalProps) {
+export function DealDetailsModal({ deal, open, onOpenChange, onDealStageChanged }: DealDetailsModalProps) {
   const { user } = useAuth();
   const { updateDeal, deleteDeal } = useCRMDeals();
   const { stages: allStages } = useCRMStages();
@@ -362,6 +363,7 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
       await updateDeal.mutateAsync({ id: deal.id, stage_id: wonStage.id, value: value || 0 });
       await emitDealEvent('status_change', currentStage?.name || 'Aberto', wonStage.name);
       toast.success('Negócio marcado como Ganho!');
+      onDealStageChanged?.(deal.id, wonStage.id);
       setShowWonDialog(false);
       onOpenChange(false);
     } catch (error) {
@@ -385,6 +387,7 @@ export function DealDetailsModal({ deal, open, onOpenChange }: DealDetailsModalP
         await emitDealEvent('loss_reason', null, lostReason.trim());
       }
       toast.success('Negócio marcado como Perdido.');
+      onDealStageChanged?.(deal.id, lostStage.id);
       setShowLostDialog(false);
       onOpenChange(false);
     } catch (error) {

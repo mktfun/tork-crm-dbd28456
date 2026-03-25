@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   DndContext,
@@ -332,6 +332,23 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
     }
   };
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleDealStageChanged = useCallback((dealId: string, newStageId: string) => {
+    // Auto-reset filter if it would hide the deal
+    if (statusFilter === 'open') {
+      setStatusFilter('all');
+      toast.info('Filtro alterado para "Todos" para exibir o negócio movido.');
+    }
+    // Auto-scroll to target column
+    setTimeout(() => {
+      const targetCol = document.getElementById(`kanban-column-${newStageId}`);
+      if (targetCol) {
+        targetCol.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }, 300);
+  }, [statusFilter]);
+
   const hasActiveFilters = statusFilter !== 'all' || dateFrom || dateTo;
 
   if (stagesLoading || dealsLoading) {
@@ -440,7 +457,7 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 flex-1 min-h-0">
+        <div ref={scrollContainerRef} className="flex gap-4 overflow-x-auto no-scrollbar pb-4 flex-1 min-h-0">
           <SortableContext
             items={stages.map(s => `column-${s.id}`)}
             strategy={horizontalListSortingStrategy}
@@ -528,6 +545,7 @@ export function KanbanBoard({ pipelineId }: KanbanBoardProps) {
         deal={selectedDeal}
         open={!!selectedDeal}
         onOpenChange={(open) => !open && setSelectedDeal(null)}
+        onDealStageChanged={handleDealStageChanged}
       />
 
       <NewStageModal

@@ -67,6 +67,7 @@ export function KanbanColumn({
       layoutId={isDragging ? undefined : `column-${stage.id}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: isDragging ? 0.5 : 1, y: 0 }}
+      id={`kanban-column-${stage.id}`}
       className={`flex-shrink-0 w-80 flex flex-col h-full ${isDragging ? 'z-50' : ''}`}
     >
       {/* Column Header - drag handle is the colored area */}
