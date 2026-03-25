@@ -161,7 +161,7 @@ async function processWebhook(body: any) {
       currentDeal, currentStage, stageAiSettings, autoCreatedDeal,
       autoCreatedProductId, autoCreatedProductName, clientJustResponded
     } = await resolveDeal(
-      supabase, resolvedAI, userId!, clientId, clientData, sender,
+      supabase, resolvedAI, userId as string, clientId, clientData, sender,
       content || '', mediaResult, brokerageId, conversation, role
     )
 

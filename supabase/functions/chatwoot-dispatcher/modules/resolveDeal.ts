@@ -302,7 +302,7 @@ export async function resolveDeal(
   supabase: SupabaseClient,
   resolvedAI: any,
   userId: string,
-  clientId: string,
+  clientId: string | null,
   clientData: any,
   sender: any,
   content: string,
@@ -329,7 +329,9 @@ export async function resolveDeal(
 
     if (deals && deals.length > 0) {
       currentDeal = deals[0]
-      currentStage = currentDeal.crm_stages
+      currentStage = Array.isArray(currentDeal.crm_stages) 
+        ? currentDeal.crm_stages[0] 
+        : currentDeal.crm_stages
       console.log(`💼 Found open deal: ${currentDeal.title} (Stage: ${currentStage?.name})`)
 
       if (sender?.type === 'contact') {
@@ -352,7 +354,9 @@ export async function resolveDeal(
 
       if (cwDeals && cwDeals.length > 0) {
         currentDeal = cwDeals[0]
-        currentStage = currentDeal.crm_stages
+        currentStage = Array.isArray(currentDeal.crm_stages) 
+          ? currentDeal.crm_stages[0] 
+          : currentDeal.crm_stages
         console.log(`💼 Found deal by conversation ID: ${currentDeal.title}`)
       }
     }

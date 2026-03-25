@@ -1,5 +1,3 @@
-import { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
-
 const MODEL_GATEWAY_MAP: Record<string, string> = {
   // Gemini
   'gemini-3.1-pro': 'google/gemini-3.1-pro',
@@ -23,7 +21,7 @@ export interface ResolvedModel {
  * Falls back to google/gemini-2.5-flash if not configured or unsupported.
  */
 export async function resolveUserModel(
-  supabase: SupabaseClient,
+  supabase: any,
   userId: string
 ): Promise<ResolvedModel> {
   try {
