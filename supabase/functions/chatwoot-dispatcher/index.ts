@@ -63,12 +63,14 @@ async function processAttachments(attachments: any[] | undefined) {
       result.messageType = 'audio'
       try {
         const { data, error } = await supabase.functions.invoke('transcribe-audio', { body: { audioUrl: att.data_url } })
+        console.log('🎤 Transcription result:', { hasText: !!data?.text, error: error?.message, chars: data?.text?.length })
         if (!error && data?.text) result.transcription = data.text
       } catch (err) { console.error('⚠️ Audio transcription failed:', err) }
     } else if (isImage || isPdf) {
       result.messageType = isImage ? 'image' : 'document'
       try {
         const { data, error } = await supabase.functions.invoke('extract-document', { body: { fileUrl: att.data_url, fileType: att.file_type } })
+        console.log('🔍 OCR result:', { hasText: !!data?.text, error: error?.message, chars: data?.text?.length })
         if (!error && data?.text) result.extractedText = data.text
       } catch (err) { console.error('⚠️ Document extraction failed:', err) }
     }
