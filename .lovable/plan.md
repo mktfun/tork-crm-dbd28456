@@ -1,69 +1,47 @@
 
 
-# Plano: Deploy + Bateria de Testes do Dispatcher
+# Plano: Limpar Clientes de Teste e Dados Relacionados
 
-## Status do Código
+## Dados encontrados
 
-Todas as correções estão aplicadas no código atual:
-- `resolveContext.ts`: `brokerage_id` removido do select de profiles, resolução via tabela `brokerages`, upsert trocado por insert com fallback por `chatwoot_contact_id`
-- `resolveDeal.ts`: `.eq('status', 'open')` removido, guard clause `clientId` antes de autoCreateDeal, fix array `crm_stages`
-- `model-resolver.ts`: `SupabaseClient` trocado por `any`
-- `index.ts`: `role || 'user'` no fallback, `resolvedAI` local ao `processWebhook`
+5 clientes de teste + 1 deal vinculado + 1 follow-up + 2 deal events.
 
-## Passo 1: Deploy
+## Ordem de exclusão (respeitando dependências)
 
-Fazer deploy das Edge Functions afetadas:
-- `chatwoot-dispatcher` (principal)
+Executar via migration/insert tool na seguinte ordem:
 
-## Passo 2: Bateria de Testes (3 cenários)
+### 1. Deletar follow-up
+```sql
+DELETE FROM ai_follow_ups WHERE deal_id = 'f78723c2-10db-4d27-824a-4f74b7bca98a';
+```
 
-### Cenário 1: Saudação genérica — contato NOVO (telefone inexistente)
-Payload simulando "Bom dia!" de um contato com telefone novo, inbox_id mapeado.
+### 2. Deletar deal events
+```sql
+DELETE FROM crm_deal_events WHERE deal_id = 'f78723c2-10db-4d27-824a-4f74b7bca98a';
+```
 
-**Validações**:
-- resolveContext resolve userId e brokerageId (via profiles + brokerages)
-- Auto-registro do cliente funciona (insert direto, sem upsert)
-- clientId retornado nao-null
-- AI classifica como null (saudação) → nenhum deal criado
-- dispatchToN8n com hasDeal: false
-- Nenhum deal órfão no banco
+### 3. Deletar deal
+```sql
+DELETE FROM crm_deals WHERE id = 'f78723c2-10db-4d27-824a-4f74b7bca98a';
+```
 
-### Cenário 2: Mensagem com intenção — "Quero cotação de seguro auto"
-Mesmo contato ou contato novo com mensagem específica.
+### 4. Deletar os 5 clientes
+```sql
+DELETE FROM clientes WHERE id IN (
+  '9ddf2cb8-bc71-42e7-afa5-e48e617cff83',
+  '94d2eb3b-90fa-41f8-a999-387c2f297790',
+  'e26e5a1c-b05f-40a6-baf5-3b552226988c',
+  '87a09688-f433-4337-bd82-58b74240a872',
+  '9e20213c-bc48-4e1a-a440-01b5bec0a17e'
+);
+```
 
-**Validações**:
-- Auto-registro funciona (se contato novo)
-- clientId preenchido
-- AI classifica pipeline + produto corretos
-- Deal criado COM client_id preenchido (nao null)
-- Label aplicada no Chatwoot
-- Follow-up criado se configurado
-- Nenhum deal órfão
+## Registros removidos
 
-### Cenário 3: Mensagem outgoing
-Payload com message_type = "outgoing".
-
-**Validações**:
-- Retorna `{ message: "Ignored event" }` imediatamente
-- Nenhum processamento executado
-
-### Cenário 4 (bonus): Contato já existente com deal aberto
-Validar que `resolveDeal` encontra o deal existente (sem `.eq('status','open')`) e nao duplica.
-
-## Passo 3: Verificação de Dados
-
-Após os testes, queries no banco para:
-- Confirmar clientes auto-registrados (novos registros em `clientes`)
-- Confirmar deals criados com `client_id` preenchido
-- Confirmar ausência de deals órfãos (`client_id IS NULL`)
-- Verificar follow-ups válidos
-
-## Passo 4: Relatório Final
-
-Relatório consolidado com os 4 cenários, fluxo passo-a-passo, bugs encontrados (se houver) e status de cada validação.
-
-## Arquivos envolvidos no deploy
-| Função | Motivo |
+| Tabela | Quantidade |
 |---|---|
-| `chatwoot-dispatcher` | Todas as correções de resolveContext, resolveDeal, index |
+| ai_follow_ups | 1 |
+| crm_deal_events | 2 |
+| crm_deals | 1 |
+| clientes | 5 (Teste Cenario2b, Teste Cenario2, Teste Cenario1, jj, Davi) |
 
