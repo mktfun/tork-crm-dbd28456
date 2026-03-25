@@ -1,44 +1,42 @@
 
 
-# Plano: Comando `/help` no Admin Dispatcher
+# Plano: Batch dispatch como mensagem normal
 
-## Resumo
+## Problema
 
-Adicionar o comando `/help` no `admin-dispatcher` que responde via Chatwoot com a lista de todos os comandos disponíveis, incluindo os que existem fora do dispatcher (`/reset`, `/relatorio`).
+O `processBatchSession` envia para n8n com `message_type: 'batch_analysis'`, que o n8n não reconhece. O n8n retorna 200 mas não processa/responde. O conteúdo extraído já está no system prompt — só precisa despachar como uma mensagem normal para o n8n tratar igual.
 
-## Mudanças
+## Mudança
 
-### 1. `supabase/functions/admin-dispatcher/index.ts`
+### `supabase/functions/admin-dispatcher/index.ts` — `processBatchSession`
 
-Adicionar um bloco antes do check de `/analise` (antes da linha 369) que intercepta `/help`:
+Alterar o dispatch do batch para usar `message_type: 'text'` em vez de `'batch_analysis'`, e colocar um `content` descritivo que instrua a IA a analisar o conteúdo acumulado (que já está no system prompt via `<batch_analysis_content>`):
 
 ```typescript
-if (contentLower === '/help') {
-  if (conversationId && brokerageId) {
-    await sendChatwootMessage(brokerageId, conversationId,
-      `🤖 *Comandos disponíveis:*\n\n` +
-      `📥 /analise — Inicia modo de análise batch. Envie múltiplos docs, áudios e mensagens. Tudo será acumulado.\n\n` +
-      `▶️ /start — Processa todos os itens acumulados no modo análise.\n\n` +
-      `🔄 /reset — Limpa o histórico de conversa com o assistente.\n\n` +
-      `📊 /relatorio — Gera conteúdo para Instagram, Email e Blog com base nos dados da corretora.\n\n` +
-      `💬 Qualquer outra mensagem será respondida normalmente pelo assistente.`
-    )
-  }
-  return new Response(JSON.stringify({ success: true, mode: 'help' }), { headers: { 'Content-Type': 'application/json' } })
-}
+// ANTES:
+mediaResult: { messageType: 'batch_analysis', attachmentUrls: [] },
+content: batchBody.content,
+
+// DEPOIS:
+mediaResult: { messageType: 'text', attachmentUrls: [] },
+content: 'Analise todo o conteúdo acumulado que está no contexto.',
 ```
 
-### 2. `/reset` — Limpar histórico de conversa
+Também ajustar o `batchBody.content` para ser uma mensagem simples:
 
-Adicionar handler para `/reset` que limpa o histórico da conversa no Chatwoot (ou no contexto que o n8n mantém). Responde com confirmação.
+```typescript
+// ANTES:
+content: `[ANÁLISE BATCH] ${allTexts.length} mensagens, ...`
 
-### 3. `/relatorio` — Gerar conteúdo para redes sociais
+// DEPOIS:  
+content: `Analise todo o conteúdo dos documentos, áudios e mensagens que enviei.`
+```
 
-Adicionar handler para `/relatorio` que despacha para o n8n com um system prompt específico pedindo geração de conteúdo para Instagram, Email marketing e Blog, usando dados do CRM e base de conhecimento.
+Isso faz o n8n tratar exatamente como uma mensagem normal do admin, usando o system prompt (que já contém todo o conteúdo extraído dentro da tag `<batch_analysis_content>`).
 
-## Arquivos afetados
+## Arquivo afetado
 
 | Arquivo | Ação |
 |---|---|
-| `supabase/functions/admin-dispatcher/index.ts` | Adicionar handlers para `/help`, `/reset` e `/relatorio` |
+| `supabase/functions/admin-dispatcher/index.ts` | Alterar `processBatchSession` — message_type para 'text' |
 
