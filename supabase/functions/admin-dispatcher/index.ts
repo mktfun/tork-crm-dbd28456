@@ -365,7 +365,71 @@ Deno.serve(async (req) => {
     const contentLower = content.toLowerCase()
     const conversationId = body?.conversation?.id
 
-    // ─── 1. Check for /analise command ───
+    // ─── 1. Check for /help command ───
+    if (contentLower === '/help') {
+      if (conversationId && brokerageId) {
+        await sendChatwootMessage(brokerageId, conversationId,
+          `🤖 *Comandos disponíveis:*\n\n` +
+          `📥 /analise — Inicia modo de análise batch. Envie múltiplos docs, áudios e mensagens. Tudo será acumulado.\n\n` +
+          `▶️ /start — Processa todos os itens acumulados no modo análise.\n\n` +
+          `🔄 /reset — Limpa o histórico de conversa com o assistente.\n\n` +
+          `📊 /relatorio — Gera conteúdo para Instagram, Email e Blog com base nos dados da corretora.\n\n` +
+          `💬 Qualquer outra mensagem será respondida normalmente pelo assistente.`
+        )
+      }
+      console.log('📋 Help command served')
+      return new Response(JSON.stringify({ success: true, mode: 'help' }), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // ─── 2. Check for /reset command ───
+    if (contentLower === '/reset') {
+      // Clear any active batch session
+      await supabase.from('ai_analysis_sessions').update({ status: 'cancelled' }).eq('user_id', userId).eq('status', 'compiling')
+
+      // Dispatch to n8n with reset action so it clears conversation memory
+      const n8nUrl = await resolveN8nUrl(userId)
+      if (n8nUrl) {
+        try {
+          await fetch(n8nUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...body, derived_data: { crm_user_id: userId, brokerage_id: brokerageId, user_role: 'admin', action: 'reset_history' } }),
+          })
+        } catch (err) { console.error('⚠️ Reset dispatch failed:', err) }
+      }
+
+      if (conversationId && brokerageId) {
+        await sendChatwootMessage(brokerageId, conversationId, '🔄 Histórico limpo. Pode começar uma nova conversa.')
+      }
+      console.log('🔄 Reset command executed for admin', userId)
+      return new Response(JSON.stringify({ success: true, mode: 'reset' }), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // ─── 3. Check for /relatorio command ───
+    if (contentLower === '/relatorio') {
+      const config = await fetchGlobalConfig(userId)
+      const reportPrompt = buildAdminSystemPrompt({ ...config }) +
+        `\n<task>\nO admin solicitou a geração de conteúdo para marketing. Gere:\n\n` +
+        `1. **Post Instagram**: Texto curto e impactante (até 300 caracteres) com emojis e hashtags relevantes sobre seguros.\n` +
+        `2. **Email Marketing**: Assunto + corpo do email profissional para nutrição de leads.\n` +
+        `3. **Post Blog**: Artigo curto (3 parágrafos) educativo sobre seguros para o blog da corretora.\n\n` +
+        `Use dados da base de conhecimento (rag_search) para fundamentar o conteúdo. Adapte ao tom da ${config.companyName}.\n</task>`
+
+      await dispatchAdminToN8n({
+        body: { ...body, content: '[RELATÓRIO] Geração de conteúdo para Instagram, Email e Blog' },
+        userId, brokerageId, systemPrompt: reportPrompt,
+        mediaResult: { messageType: 'report_request', attachmentUrls: [] },
+        content: '/relatorio', config,
+      })
+
+      if (conversationId && brokerageId) {
+        await sendChatwootMessage(brokerageId, conversationId, '📊 Gerando conteúdo para Instagram, Email e Blog... Aguarde.')
+      }
+      console.log('📊 Report command dispatched for admin', userId)
+      return new Response(JSON.stringify({ success: true, mode: 'report' }), { headers: { 'Content-Type': 'application/json' } })
+    }
+
+    // ─── 4. Check for /analise command ───
     if (contentLower === '/analise') {
       // Check if already has active session
       const { data: existing } = await supabase
