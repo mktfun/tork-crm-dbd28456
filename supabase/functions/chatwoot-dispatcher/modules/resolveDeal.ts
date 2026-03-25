@@ -324,7 +324,6 @@ export async function resolveDeal(
       .from('crm_deals')
       .select('id, title, stage_id, product_id, crm_stages(id, name, pipeline_id, position)')
       .eq('client_id', clientId)
-      .eq('status', 'open')
       .order('updated_at', { ascending: false })
       .limit(1)
 
@@ -358,7 +357,7 @@ export async function resolveDeal(
       }
     }
 
-    if (!currentDeal && sender?.type === 'contact') {
+    if (!currentDeal && sender?.type === 'contact' && clientId) {
       console.log('🤖 No open deal found. Attempting AI classification for auto-create...')
       const autoCreateResult = await autoCreateDeal(
         supabase,
