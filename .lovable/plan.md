@@ -1,46 +1,29 @@
 
 
-# Plano: Evitar que negócios "sumam" ao marcar Ganho/Perda
+# Plano: Silenciar sync desnecessário e melhorar logs
 
-## Diagnóstico
+## Problema
 
-Os stages de "Perdido" e "Fechado Ganho" existem corretamente no banco (pipeline `7d1e70e0...`). O deal IS sendo movido para o stage correto, mas "desaparece" da visão do usuário por dois motivos:
+Quando um deal não tem conversa no Chatwoot (`chatwoot_conversation_id` é null), o frontend mesmo assim tenta sincronizar via `chatwoot-sync`, que retorna 404 com a mensagem "Nenhuma conversa ativa encontrada". Isso gera:
+1. Toast de erro desnecessário para o usuário
+2. Erro no console que parece bug de build
 
-1. **Coluna off-screen**: O stage "Perdido" é a última coluna (posição 5). Após fechar o modal, o deal sai da coluna atual e vai para a coluna mais à direita, que pode estar fora da área visível (precisa scroll horizontal).
+## Mudança
 
-2. **Filtro ativo**: Se o filtro de status estiver em "Abertos", deals em stages de ganho/perda são removidos do `filteredDeals` — o deal desaparece legitimamente do filtro.
+### `src/hooks/useCRMDeals.ts`
 
-## Mudanças
+Adicionar guards antes de cada chamada ao `chatwoot-sync` para verificar se o deal tem `chatwoot_conversation_id`:
 
-### 1. `KanbanBoard.tsx` — Auto-scroll para coluna alvo
+1. **`updateDeal.onSuccess`** (linha ~366): Guard no sync de stage change — só sincroniza se `data.chatwoot_conversation_id` existe
+2. **`updateDeal.onSuccess`** (linha ~386): Guard no sync de attributes — já checa `client_id`, adicionar check de `chatwoot_conversation_id`
+3. **`moveDeal.onSuccess`** (linha ~471): Guard no sync de stage via drag — só sincroniza se `data.chatwoot_conversation_id` existe
+4. **`deleteDeal.onSuccess`** (linha ~417): Guard no sync de delete — adicionar check de `chatwoot_conversation_id` do deal deletado
 
-Após o modal de deal fechar e o deal ter sido movido para won/lost, fazer scroll automático da área horizontal do kanban até a coluna de destino.
+Para os casos sem conversa, logar silenciosamente: `console.log('⏭️ Sem conversa Tork vinculada, sync ignorado')`
 
-- Adicionar um `ref` no container de scroll horizontal
-- Ao detectar que um deal foi movido para won/lost (via state callback), usar `scrollIntoView` na coluna de destino
-- Se o filtro ativo é "Abertos", trocar automaticamente para "Todos" ao marcar ganho/perda
+## Resultado
 
-### 2. `DealDetailsModal.tsx` — Callback de stage change
-
-- Adicionar prop `onDealStageChanged?: (dealId: string, newStageId: string) => void`
-- Chamar esse callback em `confirmMarkWon` e `confirmMarkLost` após o update, antes de fechar o modal
-- O KanbanBoard recebe esse callback e usa para scrollar até a coluna correta
-
-### 3. `KanbanBoard.tsx` — Resetar filtro se necessário
-
-- Na callback `onDealStageChanged`, verificar se o `statusFilter` é 'open'
-- Se sim, mudar para 'all' para que o deal permaneça visível
-- Mostrar toast informativo: "Filtro alterado para 'Todos' para exibir o negócio movido"
-
-## Arquivos afetados
-
-| Arquivo | Mudança |
-|---|---|
-| `src/components/crm/KanbanBoard.tsx` | Adicionar ref de scroll, callback de stage change, auto-reset de filtro |
-| `src/components/crm/DealDetailsModal.tsx` | Adicionar prop `onDealStageChanged`, chamar nos confirm de won/lost |
-
-## Resultado esperado
-
-- Marcar como Perdido → filtro muda para "Todos" (se necessário) → board scrolla até a coluna "Perdido" → deal visível
-- Marcar como Ganho → mesma lógica → deal visível na coluna "Fechado Ganho"
+- Deals sem conversa no Chatwoot não geram mais erros visuais nem toasts de falha
+- Deals COM conversa continuam sincronizando normalmente
+- Log limpo e informativo no console
 
