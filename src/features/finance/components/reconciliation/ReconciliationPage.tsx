@@ -243,6 +243,9 @@ export function ReconciliationPage() {
     const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
     const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
     const [isDeletingBatch, setIsDeletingBatch] = useState(false);
+    // State for bulk bank selection in consolidated mode
+    const [showBulkBankModal, setShowBulkBankModal] = useState(false);
+    const [selectedBulkBank, setSelectedBulkBank] = useState<string>('');
     const queryClient = useQueryClient();
     
     const isConsolidated = !selectedBankAccountId || selectedBankAccountId === 'all';
@@ -395,10 +398,24 @@ export function ReconciliationPage() {
     const handleBatchReconcile = async () => {
         if (selectedIds.length === 0) return;
 
-        // Use bulk RPC if available, falling back to individual calls
-        const bankId = !isConsolidated ? selectedBankAccountId : undefined;
+        if (isConsolidated) {
+            // In consolidated mode, force bank selection first
+            setSelectedBulkBank('');
+            setShowBulkBankModal(true);
+            return;
+        }
+
         bulkReconcileMutation.mutate(
-            { transactionIds: selectedIds, bankAccountId: bankId || undefined },
+            { transactionIds: selectedIds, bankAccountId: selectedBankAccountId || undefined },
+            { onSuccess: () => setSelectedIds([]) }
+        );
+    };
+
+    const handleBulkBankConfirm = () => {
+        if (!selectedBulkBank || selectedIds.length === 0) return;
+        setShowBulkBankModal(false);
+        bulkReconcileMutation.mutate(
+            { transactionIds: selectedIds, bankAccountId: selectedBulkBank },
             { onSuccess: () => setSelectedIds([]) }
         );
     };
@@ -1051,6 +1068,42 @@ export function ReconciliationPage() {
                             disabled={!selectedBankForBinding || reconcileMutation.isPending}
                         >
                             {reconcileMutation.isPending ? 'Conciliando...' : 'Vincular e Conciliar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Dialog: Seleção de Banco para Conciliação em Massa (Consolidado) */}
+            <Dialog open={showBulkBankModal} onOpenChange={setShowBulkBankModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Landmark className="w-5 h-5 text-primary" />
+                            Selecionar Banco de Destino
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <p className="text-sm text-muted-foreground">
+                            Você está no modo consolidado. Selecione o banco para atribuir as {selectedIds.length} transações selecionadas:
+                        </p>
+                        <Select value={selectedBulkBank} onValueChange={setSelectedBulkBank}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione o banco..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {(bankAccounts?.accounts || []).filter(b => b.isActive).map(bank => (
+                                    <SelectItem key={bank.id} value={bank.id}>{bank.bankName}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowBulkBankModal(false)}>Cancelar</Button>
+                        <Button
+                            onClick={handleBulkBankConfirm}
+                            disabled={!selectedBulkBank || bulkReconcileMutation.isPending}
+                        >
+                            {bulkReconcileMutation.isPending ? 'Conciliando...' : 'Confirmar e Conciliar'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
