@@ -1,59 +1,47 @@
 
 
-# Plano: Corrigir KPI "Recebido" — valor errado e título estático
+# Plano: KPI "Recebido" não reflete conciliações — coluna errada
 
-## Problemas
+## Problema
 
-### 1. Título "Recebido no Mês" fixo
-Quando o período selecionado é de 3 meses (ex: 01 dez – 31 mar), o KPI continua dizendo "no Mês". Deveria dizer "no Período".
+Existem **duas colunas** na tabela `financial_transactions`: `reconciled` e `is_reconciled`. Elas deveriam estar sincronizadas mas não estão.
 
-### 2. Valor R$71k vs R$111k no banco — contagem errada de parciais
-A RPC `get_financial_summary` soma `total_amount` apenas de transações com `reconciled=true`. Mas após uma conciliação parcial (FIFO), a transação fica com `reconciled=false` e `paid_amount=400` de `total_amount=800`. Resultado: **nenhum centavo da parcial é contado no "Recebido"**, mesmo que R$400 já tenham sido efetivamente recebidos.
+- `get_financial_summary` (KPIs) verifica `COALESCE(t.reconciled, false)` 
+- `reconcile_transactions` (match manual com extrato) seta apenas `is_reconciled = TRUE` — **nunca seta `reconciled`**
+- `reconcile_transaction_partial` (ambas assinaturas, 3 e 4 args) seta apenas `is_reconciled` — **nunca seta `reconciled`**
+- `manual_reconcile_transaction` seta `reconciled = TRUE` — OK
+- `reconcile_insurance_aggregate_fifo` seta ambos — OK
 
-A RPC do banco (`get_bank_transactions`) não filtra por `reconciled` — por isso mostra R$111k (tudo que tem banco atribuído).
+Resultado: toda conciliação feita via match manual ou parcial fica com `is_reconciled=true` mas `reconciled=false/null`. O KPI ignora essas transações.
 
 ## Mudanças
 
-### 1. Título dinâmico — `FinanceiroERP.tsx`
+### 1. Migration SQL — corrigir RPCs + dados existentes
 
-Passar `startDate` e `endDate` para `KpiSection`, detectar se o período é maior que 1 mês e usar "no Período" / "do Período" nos títulos dos KPIs.
-
-### 2. RPC `get_financial_summary` — incluir parciais
-
-Trocar a lógica de soma de receita/despesa de:
+**a) Dados existentes**: sincronizar todos os registros onde `is_reconciled=true` mas `reconciled` é falso/null:
 
 ```sql
--- ANTES: só conta totalmente reconciliado
-SUM(CASE WHEN type IN ('revenue',...) THEN total_amount END)
-WHERE reconciled=true
+UPDATE financial_transactions 
+SET reconciled = true 
+WHERE is_reconciled = true 
+  AND COALESCE(reconciled, false) = false;
 ```
 
-Para:
+**b) `reconcile_transactions`**: adicionar `reconciled = TRUE` no UPDATE (linha 303 da migration original).
 
-```sql
--- DEPOIS: conta paid_amount de parciais + total_amount de reconciliados
-SUM(CASE WHEN type IN ('revenue',...) 
-    THEN CASE 
-      WHEN reconciled=true THEN total_amount
-      WHEN COALESCE(paid_amount,0) > 0 THEN paid_amount
-      ELSE 0 
-    END
-END)
-WHERE (reconciled=true OR COALESCE(paid_amount,0) > 0)
-```
+**c) `reconcile_transaction_partial` (4 args)**: adicionar `reconciled = (v_new_paid >= v_sys_amount)` no UPDATE.
 
-Isso garante que baixas parciais de R$200 contra um recebível de R$800 sejam contabilizadas como R$200 no "Recebido", sem esperar a baixa total.
+**d) `reconcile_transaction_partial` (3 args)**: idem.
 
 ## Arquivos afetados
 
 | Arquivo | Ação |
 |---|---|
-| `src/pages/FinanceiroERP.tsx` | Títulos dinâmicos "no Mês" vs "no Período" |
-| Nova migration SQL | Recriar `get_financial_summary` com soma de `paid_amount` para parciais |
+| Nova migration SQL | Fix data + recriar 3 RPCs com `reconciled` sincronizado |
 
 ## Resultado
 
-- KPIs dizem "no Período" quando range > 1 mês
-- "Recebido" reflete o dinheiro efetivamente baixado, incluindo parciais
-- Valor alinha com o que aparece no dashboard do banco
+- Dados existentes corrigidos imediatamente
+- Todas as futuras conciliações mantêm `reconciled` e `is_reconciled` em sincronia
+- KPI "Recebido" passa a refletir corretamente todas as conciliações
 
