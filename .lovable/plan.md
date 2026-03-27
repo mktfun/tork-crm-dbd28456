@@ -1,52 +1,59 @@
 
 
-# Plano: Fix FIFO parcial que some com recebíveis
+# Plano: Corrigir KPI "Recebido" — valor errado e título estático
 
-## Problema
+## Problemas
 
-Ao conciliar 2 entradas de extrato (R$200 cada) contra 1 recebível de R$800 da Sura:
+### 1. Título "Recebido no Mês" fixo
+Quando o período selecionado é de 3 meses (ex: 01 dez – 31 mar), o KPI continua dizendo "no Mês". Deveria dizer "no Período".
 
-1. **1ª chamada** (R$200): Encontra o recebível de R$800, aplica R$200 → `paid_amount=200`, `status='partial'`, **atribui `bank_account_id`**
-2. **2ª chamada** (R$200): O filtro na linha 205 tem `AND bank_account_id IS NULL`. Como a 1ª chamada já atribuiu o banco, o recebível **não aparece mais**. A RPC retorna `reconciled_count=0` silenciosamente, mas marca o extrato como "matched" mesmo sem conciliar nada.
-3. **Resultado**: Recebível fica com R$200 pago de R$800, mas desaparece da tela consolidada. O extrato fica falsamente marcado como conciliado.
+### 2. Valor R$71k vs R$111k no banco — contagem errada de parciais
+A RPC `get_financial_summary` soma `total_amount` apenas de transações com `reconciled=true`. Mas após uma conciliação parcial (FIFO), a transação fica com `reconciled=false` e `paid_amount=400` de `total_amount=800`. Resultado: **nenhum centavo da parcial é contado no "Recebido"**, mesmo que R$400 já tenham sido efetivamente recebidos.
 
-## Causa raiz (SQL)
+A RPC do banco (`get_bank_transactions`) não filtra por `reconciled` — por isso mostra R$111k (tudo que tem banco atribuído).
+
+## Mudanças
+
+### 1. Título dinâmico — `FinanceiroERP.tsx`
+
+Passar `startDate` e `endDate` para `KpiSection`, detectar se o período é maior que 1 mês e usar "no Período" / "do Período" nos títulos dos KPIs.
+
+### 2. RPC `get_financial_summary` — incluir parciais
+
+Trocar a lógica de soma de receita/despesa de:
 
 ```sql
--- Linha 205 da RPC reconcile_insurance_aggregate_fifo:
-AND bank_account_id IS NULL  -- ❌ Exclui parciais que já receberam banco
+-- ANTES: só conta totalmente reconciliado
+SUM(CASE WHEN type IN ('revenue',...) THEN total_amount END)
+WHERE reconciled=true
 ```
 
-## Mudança
+Para:
 
-### Migration SQL — recriar `reconcile_insurance_aggregate_fifo`
-
-Duas alterações:
-
-1. **Filtro do FOR loop**: trocar `AND bank_account_id IS NULL` por:
 ```sql
-AND (bank_account_id IS NULL OR bank_account_id = v_final_bank_id)
-AND is_reconciled = false
+-- DEPOIS: conta paid_amount de parciais + total_amount de reconciliados
+SUM(CASE WHEN type IN ('revenue',...) 
+    THEN CASE 
+      WHEN reconciled=true THEN total_amount
+      WHEN COALESCE(paid_amount,0) > 0 THEN paid_amount
+      ELSE 0 
+    END
+END)
+WHERE (reconciled=true OR COALESCE(paid_amount,0) > 0)
 ```
-Isso permite que a 2ª chamada encontre o mesmo recebível parcialmente pago (já atribuído ao mesmo banco).
 
-2. **Guard contra falso "matched"**: antes de atualizar `bank_statement_entries`, verificar:
-```sql
-IF v_reconciled_count = 0 THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Nenhum recebível pendente encontrado para esta seguradora.');
-END IF;
-```
-Impede que entradas de extrato sejam marcadas como conciliadas sem ter processado nada.
+Isso garante que baixas parciais de R$200 contra um recebível de R$800 sejam contabilizadas como R$200 no "Recebido", sem esperar a baixa total.
 
-## Arquivo afetado
+## Arquivos afetados
 
 | Arquivo | Ação |
 |---|---|
-| Nova migration SQL | Recriar `reconcile_insurance_aggregate_fifo` com filtro corrigido e guard |
+| `src/pages/FinanceiroERP.tsx` | Títulos dinâmicos "no Mês" vs "no Período" |
+| Nova migration SQL | Recriar `get_financial_summary` com soma de `paid_amount` para parciais |
 
 ## Resultado
 
-- Múltiplas entradas de extrato podem dar baixa parcial no mesmo recebível
-- Recebível permanece visível até ser totalmente pago (`is_reconciled = true`)
-- Entradas de extrato não são falsamente marcadas como conciliadas quando nada foi processado
+- KPIs dizem "no Período" quando range > 1 mês
+- "Recebido" reflete o dinheiro efetivamente baixado, incluindo parciais
+- Valor alinha com o que aparece no dashboard do banco
 
