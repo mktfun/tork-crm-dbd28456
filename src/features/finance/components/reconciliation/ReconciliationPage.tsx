@@ -1091,8 +1091,8 @@ export function ReconciliationPage() {
                                 <SelectValue placeholder="Selecione o banco..." />
                             </SelectTrigger>
                             <SelectContent>
-                                {(bankAccounts?.accounts || []).filter(b => b.is_active).map(bank => (
-                                    <SelectItem key={bank.id} value={bank.id}>{bank.bank_name}</SelectItem>
+                                {(bankAccounts?.accounts || []).filter(b => b.isActive).map(bank => (
+                                    <SelectItem key={bank.id} value={bank.id}>{bank.bankName}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
