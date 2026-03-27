@@ -77,10 +77,18 @@ function KpiSection({ startDate, endDate }: KpiSectionProps) {
   const current = summary?.current;
   const previous = summary?.previous;
 
+  // Detect if period is longer than ~35 days to use "no Período" instead of "no Mês"
+  const periodDays = Math.abs(
+    (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const periodLabel = periodDays > 35 ? 'no Período' : 'no Mês';
+  const periodLabelDo = periodDays > 35 ? 'do Período' : 'do Mês';
+  const periodLabelEste = periodDays > 35 ? 'no Período' : 'este Mês';
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <GlassKpiCard
-        title="Recebido no Mês"
+        title={`Recebido ${periodLabel}`}
         value={formatCurrency(current?.totalIncome ?? 0)}
         icon={TrendingUp}
         iconClassName="text-emerald-400 drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]"
@@ -89,7 +97,7 @@ function KpiSection({ startDate, endDate }: KpiSectionProps) {
         onClick={() => navigate('/dashboard/financeiro?tab=transacoes&type=revenue')}
       />
       <GlassKpiCard
-        title="Despesas do Mês"
+        title={`Despesas ${periodLabelDo}`}
         value={formatCurrency(current?.totalExpense ?? 0)}
         icon={TrendingDown}
         iconClassName="text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.4)]"
@@ -98,7 +106,7 @@ function KpiSection({ startDate, endDate }: KpiSectionProps) {
         onClick={() => navigate('/dashboard/financeiro?tab=transacoes&type=expense')}
       />
       <GlassKpiCard
-        title="Vencendo este Mês"
+        title={`Vencendo ${periodLabelEste}`}
         value={formatCurrency(current?.pendingIncome ?? 0)}
         icon={CalendarClock}
         iconClassName="text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]"
