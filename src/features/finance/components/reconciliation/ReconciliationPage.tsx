@@ -243,6 +243,9 @@ export function ReconciliationPage() {
     const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
     const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
     const [isDeletingBatch, setIsDeletingBatch] = useState(false);
+    // State for bulk bank selection in consolidated mode
+    const [showBulkBankModal, setShowBulkBankModal] = useState(false);
+    const [selectedBulkBank, setSelectedBulkBank] = useState<string>('');
     const queryClient = useQueryClient();
     
     const isConsolidated = !selectedBankAccountId || selectedBankAccountId === 'all';
@@ -395,10 +398,24 @@ export function ReconciliationPage() {
     const handleBatchReconcile = async () => {
         if (selectedIds.length === 0) return;
 
-        // Use bulk RPC if available, falling back to individual calls
-        const bankId = !isConsolidated ? selectedBankAccountId : undefined;
+        if (isConsolidated) {
+            // In consolidated mode, force bank selection first
+            setSelectedBulkBank('');
+            setShowBulkBankModal(true);
+            return;
+        }
+
         bulkReconcileMutation.mutate(
-            { transactionIds: selectedIds, bankAccountId: bankId || undefined },
+            { transactionIds: selectedIds, bankAccountId: selectedBankAccountId || undefined },
+            { onSuccess: () => setSelectedIds([]) }
+        );
+    };
+
+    const handleBulkBankConfirm = () => {
+        if (!selectedBulkBank || selectedIds.length === 0) return;
+        setShowBulkBankModal(false);
+        bulkReconcileMutation.mutate(
+            { transactionIds: selectedIds, bankAccountId: selectedBulkBank },
             { onSuccess: () => setSelectedIds([]) }
         );
     };
