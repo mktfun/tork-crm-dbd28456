@@ -5,19 +5,20 @@ import { toast } from 'sonner';
 interface ReconcileAggregateParams {
   statementEntryId: string;
   insuranceCompanyId: string;
+  targetBankId?: string | null;
 }
 
 export function useReconcileAggregate() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ statementEntryId, insuranceCompanyId }: ReconcileAggregateParams) => {
+    mutationFn: async ({ statementEntryId, insuranceCompanyId, targetBankId }: ReconcileAggregateParams) => {
       const { data, error } = await (supabase.rpc as any)(
         'reconcile_insurance_aggregate_fifo',
         {
           p_statement_entry_id: statementEntryId,
           p_insurance_company_id: insuranceCompanyId,
-          p_target_bank_id: null,
+          p_target_bank_id: targetBankId || null,
         }
       );
 
