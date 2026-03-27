@@ -1,27 +1,52 @@
 
 
-# Plano: KPI "Recebido" não atualiza após conciliação
+# Plano: Fix FIFO parcial que some com recebíveis
 
 ## Problema
 
-O KPI "Recebido no Mês" usa a query key `['financial-summary', startDate, endDate]`, mas todos os hooks de conciliação (`useReconcileManual`, `useReconcileAggregate`, etc.) invalidam `['dashboard-financial-kpis']` — **nunca invalidam `['financial-summary']`**. Resultado: o cache fica stale e o KPI não reflete as conciliações recentes.
+Ao conciliar 2 entradas de extrato (R$200 cada) contra 1 recebível de R$800 da Sura:
 
-Os dados no banco estão corretos (32 transações reconciliadas em março = R$12.612,05). É puramente um bug de cache.
+1. **1ª chamada** (R$200): Encontra o recebível de R$800, aplica R$200 → `paid_amount=200`, `status='partial'`, **atribui `bank_account_id`**
+2. **2ª chamada** (R$200): O filtro na linha 205 tem `AND bank_account_id IS NULL`. Como a 1ª chamada já atribuiu o banco, o recebível **não aparece mais**. A RPC retorna `reconciled_count=0` silenciosamente, mas marca o extrato como "matched" mesmo sem conciliar nada.
+3. **Resultado**: Recebível fica com R$200 pago de R$800, mas desaparece da tela consolidada. O extrato fica falsamente marcado como conciliado.
+
+## Causa raiz (SQL)
+
+```sql
+-- Linha 205 da RPC reconcile_insurance_aggregate_fifo:
+AND bank_account_id IS NULL  -- ❌ Exclui parciais que já receberam banco
+```
 
 ## Mudança
 
-### `src/features/finance/api/useReconciliation.ts` e `src/features/finance/api/useReconcileAggregate.ts`
+### Migration SQL — recriar `reconcile_insurance_aggregate_fifo`
 
-Adicionar `queryClient.invalidateQueries({ queryKey: ['financial-summary'] })` em todos os blocos `onSuccess` dos mutations de conciliação (há ~4 locais em `useReconciliation.ts` e 1 em `useReconcileAggregate.ts`).
+Duas alterações:
 
-## Arquivos afetados
+1. **Filtro do FOR loop**: trocar `AND bank_account_id IS NULL` por:
+```sql
+AND (bank_account_id IS NULL OR bank_account_id = v_final_bank_id)
+AND is_reconciled = false
+```
+Isso permite que a 2ª chamada encontre o mesmo recebível parcialmente pago (já atribuído ao mesmo banco).
+
+2. **Guard contra falso "matched"**: antes de atualizar `bank_statement_entries`, verificar:
+```sql
+IF v_reconciled_count = 0 THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Nenhum recebível pendente encontrado para esta seguradora.');
+END IF;
+```
+Impede que entradas de extrato sejam marcadas como conciliadas sem ter processado nada.
+
+## Arquivo afetado
 
 | Arquivo | Ação |
 |---|---|
-| `src/features/finance/api/useReconciliation.ts` | Adicionar invalidação de `financial-summary` nos onSuccess |
-| `src/features/finance/api/useReconcileAggregate.ts` | Adicionar invalidação de `financial-summary` no onSuccess |
+| Nova migration SQL | Recriar `reconcile_insurance_aggregate_fifo` com filtro corrigido e guard |
 
 ## Resultado
 
-Após qualquer conciliação, o KPI "Recebido no Mês" (e todos os outros KPIs do resumo financeiro) serão automaticamente re-buscados do servidor com dados atualizados.
+- Múltiplas entradas de extrato podem dar baixa parcial no mesmo recebível
+- Recebível permanece visível até ser totalmente pago (`is_reconciled = true`)
+- Entradas de extrato não são falsamente marcadas como conciliadas quando nada foi processado
 
