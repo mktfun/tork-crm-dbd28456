@@ -49,7 +49,9 @@ export default function ClientDetails() {
 
   const handleSaveChanges = async () => {
     if (client && editedClient) {
-      updateClient({ id: client.id, ...editedClient });
+      // Filter out read-only fields before sending to Supabase
+      const { id: _id, createdAt: _ca, updatedAt: _ua, aiEnabled: _ai, userId: _uid, ...editableFields } = editedClient as any;
+      updateClient({ id: client.id, ...editableFields });
       setClient(editedClient);
       setIsEditing(false);
     }

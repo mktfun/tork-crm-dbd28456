@@ -47,10 +47,8 @@ export function NewClientModal() {
     }
   });
 
-  const onSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault();
+  const onSubmit = async (data: ClientFormData) => {
     try {
-      const data = form.getValues();
       // Clean up empty string values to undefined for optional fields
       const cleanedData = {
         ...data,
@@ -196,7 +194,7 @@ export function NewClientModal() {
                 ) : (
                   <Button 
                     type="button"
-                    onClick={onSubmit}
+                    onClick={form.handleSubmit(onSubmit)}
                     className="bg-green-600 hover:bg-green-700 text-white"
                     disabled={form.formState.isSubmitting}
                   >
