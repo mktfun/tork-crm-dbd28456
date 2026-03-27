@@ -1,47 +1,57 @@
 
+# Plano: Dados do DRE e Transações não refletem conciliações
 
-# Plano: KPI "Recebido" não reflete conciliações — coluna errada
+## Diagnóstico
 
-## Problema
+O sistema tem **duas tabelas financeiras separadas** que nunca se conversam:
 
-Existem **duas colunas** na tabela `financial_transactions`: `reconciled` e `is_reconciled`. Elas deveriam estar sincronizadas mas não estão.
+1. **`financial_transactions`** (sistema novo/ERP) — é onde a conciliação acontece, onde `reconciled`, `paid_amount`, `bank_account_id` são atualizados. O KPI "Recebido" lê daqui via `get_financial_summary`.
 
-- `get_financial_summary` (KPIs) verifica `COALESCE(t.reconciled, false)` 
-- `reconcile_transactions` (match manual com extrato) seta apenas `is_reconciled = TRUE` — **nunca seta `reconciled`**
-- `reconcile_transaction_partial` (ambas assinaturas, 3 e 4 args) seta apenas `is_reconciled` — **nunca seta `reconciled`**
-- `manual_reconcile_transaction` seta `reconciled = TRUE` — OK
-- `reconcile_insurance_aggregate_fifo` seta ambos — OK
+2. **`transactions`** (sistema legado/faturamento) — é de onde o DRE e a tela de transações do Reports lêem. A conciliação **nunca toca esta tabela**.
 
-Resultado: toda conciliação feita via match manual ou parcial fica com `is_reconciled=true` mas `reconciled=false/null`. O KPI ignora essas transações.
+### O que cada componente lê:
 
-## Mudanças
+| Componente | Tabela fonte | Funciona? |
+|---|---|---|
+| KPI "Recebido" (`FinanceiroERP`) | `financial_transactions` via `get_financial_summary` | ✅ Sim |
+| Tela Transações (`TransacoesTab`) | `financial_transactions` via `get_revenue_transactions` | ✅ Sim (usa `reconciled`) |
+| DRE Compacto (Reports) | `transactions` via `useSupabaseReports` | ❌ Nunca atualiza |
+| KPIs do Reports (totalGanhos) | `transactions` filtrado por `status=PAGO` | ❌ Nunca atualiza |
 
-### 1. Migration SQL — corrigir RPCs + dados existentes
-
-**a) Dados existentes**: sincronizar todos os registros onde `is_reconciled=true` mas `reconciled` é falso/null:
-
-```sql
-UPDATE financial_transactions 
-SET reconciled = true 
-WHERE is_reconciled = true 
-  AND COALESCE(reconciled, false) = false;
+O `DreCompactoBar` recebe `totalGanhos` e `totalPerdas` do hook `useSupabaseReports`, que faz:
+```typescript
+totalGanhos = transactions.filter(t => t.nature === 'RECEITA' && (t.status === 'PAGO' || t.status === 'REALIZADO'))
 ```
 
-**b) `reconcile_transactions`**: adicionar `reconciled = TRUE` no UPDATE (linha 303 da migration original).
+A tabela `transactions` nunca é atualizada pela conciliação — ela é o sistema antigo de comissões.
 
-**c) `reconcile_transaction_partial` (4 args)**: adicionar `reconciled = (v_new_paid >= v_sys_amount)` no UPDATE.
+## Solução
 
-**d) `reconcile_transaction_partial` (3 args)**: idem.
+Trocar a fonte de dados do DRE e KPIs financeiros do Reports para usar `financial_transactions` via `get_financial_summary` (a mesma RPC que já funciona nos KPIs do FinanceiroERP).
+
+### Mudanças
+
+**1. `src/hooks/useSupabaseReports.ts`** — Adicionar chamada ao `get_financial_summary` e expor os totais corretos:
+
+- Importar `useFinancialSummary` do `useFinanceiro`
+- Substituir o cálculo manual de `totalGanhos`/`totalPerdas` (que lê de `transactions`) pelos valores do summary (`current.totalIncome`, `current.totalExpense`)
+- Manter os dados de `transactions` para listagem/detalhes, mas KPIs financeiros vêm do summary
+
+**2. `src/hooks/useFilteredDataForReports.ts`** — Propagar os novos totais:
+
+- Usar `totalGanhos` e `totalPerdas` do summary em vez do cálculo local sobre `transacoesRaw`
+
+**3. `src/components/reports/DreCompactoBar.tsx`** — Sem mudanças (já recebe props, basta que os valores corretos cheguem)
 
 ## Arquivos afetados
 
 | Arquivo | Ação |
 |---|---|
-| Nova migration SQL | Fix data + recriar 3 RPCs com `reconciled` sincronizado |
+| `src/hooks/useSupabaseReports.ts` | Chamar `get_financial_summary` para KPIs em vez de somar `transactions` |
+| `src/hooks/useFilteredDataForReports.ts` | Usar totais do summary |
 
 ## Resultado
 
-- Dados existentes corrigidos imediatamente
-- Todas as futuras conciliações mantêm `reconciled` e `is_reconciled` em sincronia
-- KPI "Recebido" passa a refletir corretamente todas as conciliações
-
+- DRE Compacto mostra valores reais baseados em conciliações
+- KPIs do Reports (totalGanhos/totalPerdas) alinham com os KPIs do FinanceiroERP
+- Tudo lê da mesma fonte de verdade (`financial_transactions`)
