@@ -235,6 +235,8 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     // On-demand bank selection modal state
     const [showBankModal, setShowBankModal] = useState(false);
     const [selectedBankForMatch, setSelectedBankForMatch] = useState('');
+    // Context: what action triggered the bank modal
+    const [bankModalContext, setBankModalContext] = useState<'reconcile' | 'aggregate'>('reconcile');
 
     // Aggregate FIFO state
     const [selectedAggregateId, setSelectedAggregateId] = useState<string | null>(null);
