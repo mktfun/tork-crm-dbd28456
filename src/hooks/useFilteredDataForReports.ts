@@ -70,30 +70,11 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
     return transacoesRaw.filter((t: any) => t.status === 'PAGO' || t.status === 'REALIZADO');
   }, [transacoesRaw, filtros.onlyConciled]);
 
-  // Recalcular KPIs com a inteligência "Projetado vs Conciliado"
-  const { totalGanhos, totalPerdas, saldoLiquido } = useMemo(() => {
-    // MODO DESPESAS: Despesas SEMPRE são o que já foi faturado e pago no mês.
-    const perdas = (transacoesRaw || [])
-      .filter((t: any) => t.nature === 'DESPESA' && (t.status === 'PAGO' || t.status === 'REALIZADO'))
-      .reduce((acc: number, t: any) => acc + (t.amount || 0), 0);
-
-    let ganhos = 0;
-
-    if (filtros.onlyConciled) {
-      // MODO CAIXA CONCILIADO (Dinheiro Real): Somente Transações Recebidas 
-      ganhos = (transacoesRaw || [])
-        .filter((t: any) => t.nature === 'RECEITA' && (t.status === 'PAGO' || t.status === 'REALIZADO'))
-        .reduce((acc: number, t: any) => acc + (t.amount || 0), 0);
-    } else {
-      // MODO PROJEÇÃO BÁSICO: Soma do potencial das Apólices Vendidas no Período
-      ganhos = apolicesFiltradas.reduce((acc, p) => {
-        const comissaoApolice = p.commissionValue || (p.premiumValue * (p.commissionRate || 0) / 100) || 0;
-        return acc + comissaoApolice;
-      }, 0);
-    }
-
-    return { totalGanhos: ganhos, totalPerdas: perdas, saldoLiquido: ganhos - perdas };
-  }, [transacoesRaw, apolicesFiltradas, filtros.onlyConciled]);
+  // KPIs financeiros vêm diretamente do hook (que usa get_financial_summary RPC)
+  // Isso garante que os valores reflitam conciliações de financial_transactions
+  const totalGanhos = totalGanhosRaw;
+  const totalPerdas = totalPerdasRaw;
+  const saldoLiquido = saldoLiquidoRaw;
 
   // 🛡️ GUARD: Verificar se TODOS os dados críticos estão prontos
   const isDataReady = Boolean(
