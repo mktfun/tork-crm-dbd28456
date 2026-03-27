@@ -523,7 +523,8 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
         setShowAggregateModal(true);
     };
 
-    const handleAggregateConfirm = async () => {
+    // Execute aggregate FIFO with a known bank
+    const executeAggregateWithBank = async (targetBankId: string) => {
         if (selectedStatementIds.length < 1 || !selectedAggregateId) return;
         for (const stmtId of selectedStatementIds) {
             try {
@@ -531,6 +532,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                 await reconcileAggregate.mutateAsync({
                     statementEntryId: stmtId,
                     insuranceCompanyId: selectedAggregateId,
+                    targetBankId,
                 });
                 // Audit log for aggregate FIFO
                 try {
@@ -538,7 +540,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                         user_id: (await supabase.auth.getUser()).data.user?.id,
                         action_type: 'fifo',
                         statement_entry_id: stmtId,
-                        bank_account_id: entry?.bank_account_id || null,
+                        bank_account_id: targetBankId,
                         amount: entry?.amount ? Math.abs(entry.amount) : 0,
                         operator_name: operatorName.trim() || 'Sistema',
                         details: { insurance_company_id: selectedAggregateId, method: 'aggregate_fifo' },
@@ -549,6 +551,23 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
         setShowAggregateModal(false);
         setSelectedStatementIds([]);
         setSelectedAggregateId(null);
+    };
+
+    const handleAggregateConfirm = async () => {
+        if (selectedStatementIds.length < 1 || !selectedAggregateId) return;
+
+        // Determine target bank
+        const targetBankId = getTargetBankId();
+        if (!targetBankId) {
+            // No bank assigned — ask user
+            setShowAggregateModal(false);
+            setSelectedBankForMatch('');
+            setBankModalContext('aggregate');
+            setShowBankModal(true);
+            return;
+        }
+
+        await executeAggregateWithBank(targetBankId);
     };
 
     const toggleAggregate = useCallback((id: string) => {
