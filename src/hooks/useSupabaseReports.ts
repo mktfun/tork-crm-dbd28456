@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
 import { transformPolicyData, transformClientData, transformTransactionData } from '@/utils/dataTransformers';
+import { getFinancialSummary } from '@/services/financialService';
 
 interface FiltrosGlobais {
   intervalo: DateRange | undefined;
@@ -198,8 +199,23 @@ export function useSupabaseReports(filtros: FiltrosGlobais) {
     }
   });
 
+  // Query para resumo financeiro via RPC (fonte de verdade: financial_transactions)
+  const { data: financialSummary, isLoading: summaryLoading } = useQuery({
+    queryKey: ['reports-financial-summary', filtros.intervalo],
+    queryFn: async () => {
+      if (!filtros.intervalo?.from || !filtros.intervalo?.to) return null;
+      const startDate = format(filtros.intervalo.from, 'yyyy-MM-dd');
+      const endDate = format(filtros.intervalo.to, 'yyyy-MM-dd');
+      console.log('🔍 Buscando resumo financeiro via RPC:', { startDate, endDate });
+      const result = await getFinancialSummary({ startDate, endDate });
+      console.log('✅ Resumo financeiro:', result.current);
+      return result.current;
+    },
+    enabled: Boolean(filtros.intervalo?.from && filtros.intervalo?.to)
+  });
+
   // Estados de loading combinados
-  const isLoading = apolicesLoading || transacoesLoading || metadadosLoading;
+  const isLoading = apolicesLoading || transacoesLoading || metadadosLoading || summaryLoading;
 
   // Extrair clientes únicos das apólices carregadas
   const clientes = apolicesData?.map(apolice => apolice.clientes).filter(Boolean) || [];
@@ -207,15 +223,9 @@ export function useSupabaseReports(filtros: FiltrosGlobais) {
     index === self.findIndex(c => c.id === cliente.id)
   ).map(transformClientData);
 
-  // Calcular KPIs financeiros a partir das transações
-  const totalGanhos = (transacoesData || [])
-    .filter(t => t.nature === 'RECEITA' && (t.status === 'PAGO' || t.status === 'REALIZADO'))
-    .reduce((acc, t) => acc + (t.amount || 0), 0);
-
-  const totalPerdas = (transacoesData || [])
-    .filter(t => t.nature === 'DESPESA' && (t.status === 'PAGO' || t.status === 'REALIZADO'))
-    .reduce((acc, t) => acc + (t.amount || 0), 0);
-
+  // KPIs financeiros da RPC (fonte de verdade: financial_transactions com conciliações)
+  const totalGanhos = financialSummary?.totalIncome || 0;
+  const totalPerdas = financialSummary?.totalExpense || 0;
   const saldoLiquido = totalGanhos - totalPerdas;
 
   return {
