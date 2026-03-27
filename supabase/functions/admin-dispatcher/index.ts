@@ -260,15 +260,17 @@ async function dispatchAdminToN8n(params: {
     }
   }
 
-  console.log('🚀 Admin dispatch to n8n...')
+  console.log(`🚀 Admin dispatch to n8n: ${n8nUrl}`)
+  console.log(`📦 Payload summary: conversationId=${body?.conversation?.id}, message_type=${payload.derived_data.message_type}, content_length=${(content || '').length}, prompt_length=${systemPrompt.length}`)
   try {
     const resp = await fetch(n8nUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    console.log(`n8n Response: ${resp.status}`)
-    return resp.ok ? await resp.json().catch(() => null) : null
+    const respText = await resp.text()
+    console.log(`📥 n8n Response (${resp.status}): ${respText.substring(0, 500)}`)
+    return resp.ok ? (() => { try { return JSON.parse(respText) } catch { return null } })() : null
   } catch (err) {
     console.error('❌ Failed to send admin payload to n8n:', err)
     return null
@@ -324,11 +326,20 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
     accumulatedContent += `## Documentos Extraídos (OCR):\n${allExtractedTexts.map((t, i) => `[Doc ${i + 1}]:\n${t}`).join('\n\n')}\n\n`
   }
 
+  console.log(`📊 Batch content: ${allTexts.length} texts, ${allTranscriptions.length} audios, ${allExtractedTexts.length} docs`)
+  console.log(`📊 Accumulated content length: ${accumulatedContent.length} chars`)
+
+  if (allTexts.length === 0 && allTranscriptions.length === 0 && allExtractedTexts.length === 0) {
+    console.warn('⚠️ Batch session is EMPTY — no content accumulated')
+  }
+
   const config = await fetchGlobalConfig(userId)
   const systemPrompt = buildAdminSystemPrompt({
     ...config,
     accumulatedContent: accumulatedContent || undefined,
   })
+
+  console.log(`📊 System prompt length: ${systemPrompt.length} chars`)
 
   // Build a synthetic body for n8n with batch context
   const batchBody = {

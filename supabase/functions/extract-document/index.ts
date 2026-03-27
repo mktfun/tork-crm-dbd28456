@@ -1,7 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
+const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY')
 const AI_GATEWAY_URL = 'https://ai.gateway.lovable.dev/v1/chat/completions'
+const GOOGLE_AI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
 
 Deno.serve(async (req) => {
   try {
@@ -75,23 +77,77 @@ Deno.serve(async (req) => {
       }
     ]
 
-    const aiResponse = await fetch(AI_GATEWAY_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages,
-        max_tokens: 8192,
-      }),
-    })
+    // Try Lovable gateway first, fallback to Google AI directly
+    let aiResponse: Response
 
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text()
-      console.error(`❌ AI extraction failed: ${aiResponse.status} — ${errText}`)
-      return new Response(JSON.stringify({ error: `AI extraction failed: ${aiResponse.status}` }), { status: 500 })
+    if (LOVABLE_API_KEY) {
+      console.log('🔑 Trying Lovable AI Gateway...')
+      aiResponse = await fetch(AI_GATEWAY_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages,
+          max_tokens: 8192,
+        }),
+      })
+
+      if (!aiResponse.ok) {
+        const errText = await aiResponse.text()
+        console.warn(`⚠️ Lovable gateway failed (${aiResponse.status}): ${errText.substring(0, 200)}`)
+
+        // Fallback to Google AI directly
+        if (GOOGLE_AI_API_KEY) {
+          console.log('🔑 Falling back to Google AI direct...')
+          aiResponse = await fetch(GOOGLE_AI_URL, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${GOOGLE_AI_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gemini-2.5-flash',
+              messages,
+              max_tokens: 8192,
+            }),
+          })
+
+          if (!aiResponse.ok) {
+            const errText2 = await aiResponse.text()
+            console.error(`❌ Google AI also failed (${aiResponse.status}): ${errText2.substring(0, 200)}`)
+            return new Response(JSON.stringify({ error: `AI extraction failed: ${aiResponse.status}` }), { status: 500 })
+          }
+        } else {
+          console.error('❌ No GOOGLE_AI_API_KEY for fallback')
+          return new Response(JSON.stringify({ error: `AI extraction failed: ${aiResponse.status}` }), { status: 500 })
+        }
+      }
+    } else if (GOOGLE_AI_API_KEY) {
+      console.log('🔑 Using Google AI direct (no Lovable key)...')
+      aiResponse = await fetch(GOOGLE_AI_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GOOGLE_AI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gemini-2.5-flash',
+          messages,
+          max_tokens: 8192,
+        }),
+      })
+
+      if (!aiResponse.ok) {
+        const errText = await aiResponse.text()
+        console.error(`❌ Google AI failed (${aiResponse.status}): ${errText.substring(0, 200)}`)
+        return new Response(JSON.stringify({ error: `AI extraction failed: ${aiResponse.status}` }), { status: 500 })
+      }
+    } else {
+      console.error('❌ No AI API keys configured')
+      return new Response(JSON.stringify({ error: 'No AI API keys configured' }), { status: 500 })
     }
 
     const aiData = await aiResponse.json()
