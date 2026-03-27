@@ -47,10 +47,8 @@ export function NewClientModal() {
     }
   });
 
-  const onSubmit = async (e?: React.FormEvent) => {
-    e?.preventDefault();
+  const onSubmit = async (data: ClientFormData) => {
     try {
-      const data = form.getValues();
       // Clean up empty string values to undefined for optional fields
       const cleanedData = {
         ...data,

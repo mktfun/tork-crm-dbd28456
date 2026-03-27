@@ -144,12 +144,12 @@ export function mapClientToSupabase(data: any) {
     userId: 'user_id'
   };
 
-  // Aplica o mapeamento apenas para campos que existem nos dados
+  // Only include fields that are explicitly mapped (whitelist)
   Object.keys(data).forEach(key => {
-    const mappedKey = fieldMappings[key] || key;
+    if (!(key in fieldMappings)) return;
+    const mappedKey = fieldMappings[key];
     const value = data[key];
     
-    // Só inclui o campo se tiver valor (não vazio)
     if (value !== '' && value !== null && value !== undefined) {
       mapped[mappedKey] = value;
     }
@@ -183,8 +183,10 @@ export function mapPolicyToSupabase(data: any) {
     pdfAttachedData: 'pdf_attached_data'
   };
 
+  // Only include fields that are explicitly mapped (whitelist)
   Object.keys(data).forEach(key => {
-    const mappedKey = fieldMappings[key] || key;
+    if (!(key in fieldMappings)) return;
+    const mappedKey = fieldMappings[key];
     const value = data[key];
     
     if (value !== '' && value !== null && value !== undefined) {
