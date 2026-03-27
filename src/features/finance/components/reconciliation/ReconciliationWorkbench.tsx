@@ -432,6 +432,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
         if (!targetBankId) {
             // Both sides unassigned -> ask user which bank
             setSelectedBankForMatch('');
+            setBankModalContext('reconcile');
             setShowBankModal(true);
             return;
         }
@@ -442,7 +443,11 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const handleBankModalConfirm = async () => {
         if (!selectedBankForMatch) return;
         setShowBankModal(false);
-        await executeReconcile(selectedBankForMatch);
+        if (bankModalContext === 'aggregate') {
+            await executeAggregateWithBank(selectedBankForMatch);
+        } else {
+            await executeReconcile(selectedBankForMatch);
+        }
     };
 
     const handlePartialReconcile = async (amount: number) => {
