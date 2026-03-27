@@ -1,48 +1,49 @@
 
-Plano: confirmar para onde o batch está sendo enviado e blindar o debug do n8n
 
-Diagnóstico já confirmado
-- O `admin-dispatcher` realmente está fazendo `fetch()` e recebendo `200`.
-- A URL resolvida para esse usuário hoje é:
-  `https://n8n.tork.services/webhook/corretora1`
-- O batch já está sendo enviado como mensagem normal (`message_type: 'text'`), então o problema não parece mais ser o tipo da mensagem.
-- Há outro problema separado no OCR: o `extract-document` está falhando com `401 Invalid API key format`, então PDFs podem não estar entrando no contexto mesmo quando o batch dispara.
+# Plano: Corrigir criação e edição de clientes
 
-O que vou implementar
-1. Melhorar o log do `admin-dispatcher`
-- Logar explicitamente a URL final usada no dispatch do admin.
-- Logar um resumo do payload enviado no batch:
-  - `conversationId`
-  - `original_content`
-  - `message_type`
-  - quantidade de textos/áudios/documentos acumulados
-- Logar também um trecho do corpo da resposta do n8n, não só o status `200`.
+## Problemas identificados
 
-2. Ajustar o `processBatchSession` para ficar rastreável
-- Adicionar logs antes do envio com:
-  - tamanho do `systemPrompt`
-  - tamanho do `accumulatedContent`
-  - contagem de itens acumulados
-- Se o batch estiver vazio, logar isso claramente para não parecer que “sumiu”.
+### 1. MaskedInput incompatível com React 18 + react-hook-form
+O `react-input-mask` usa um pattern `children-as-function` que conflita com React 18. Quando o `react-hook-form` passa `{...field}` (que inclui `ref`, `onChange`, `value`), o `InputMask` tenta gerenciar esses mesmos props internamente, causando inputs que não respondem ou comportam erraticamente.
 
-3. Validar consistência da URL do n8n
-- Garantir no plano de implementação que o dispatch use e mostre sempre a URL resolvida de `crm_settings` antes do fallback para o secret global.
-- Assim fica fácil verificar se você está olhando a execução do workflow certo no n8n.
+### 2. Edição no ClientDetails envia campos inválidos ao Supabase
+O `handleSaveChanges` faz `updateClient({ id: client.id, ...editedClient })`. O `editedClient` é o objeto `Client` completo, que contém campos como `createdAt`, `ai_enabled`, `id` (duplicado). O `mapClientToSupabase` usa fallback `fieldMappings[key] || key` — campos não mapeados (como `createdAt`, `ai_enabled`) passam direto com nomes camelCase, causando erro no Supabase (colunas não existem).
 
-4. Corrigir o OCR separado do fluxo batch
-- Ajustar `extract-document` para usar uma chave válida no formato esperado.
-- Sem isso, o batch pode até chegar ao n8n, mas vai chegar sem o texto do PDF, só com o contexto textual/manual.
+### 3. Validação CPF/submit sem validação formal
+O `onSubmit` do `NewClientModal` chama `form.getValues()` diretamente sem `form.handleSubmit()`, então a validação do Zod nunca roda. Campos inválidos passam sem erro visível.
 
-Como isso resolve
-- Se a fila do n8n continuar “vazia”, os novos logs vão mostrar exatamente qual webhook foi chamado e com qual resumo de payload.
-- Se a URL estiver errada ou apontando para outro workflow, isso vai aparecer imediatamente.
-- Se o webhook estiver respondendo `200` sem gerar execução visível, o corpo da resposta também vai ajudar a identificar se é um endpoint errado, proxy, teste ou workflow diferente.
-- Em paralelo, o OCR corrigido garante que o conteúdo do PDF realmente entre no prompt do batch.
+## Mudanças
 
-Arquivos envolvidos
-- `supabase/functions/admin-dispatcher/index.ts`
-- `supabase/functions/extract-document/index.ts`
+### 1. Substituir `react-input-mask` por input com formatação manual
+Reescrever `MaskedInput` para não depender de `react-input-mask`. Usar formatação manual nos campos CPF, CNPJ e telefone com `onChange` que aplica máscara programaticamente. Isso elimina a incompatibilidade com React 18.
 
-Observação importante
-- Pelo estado atual, o sinal mais forte não é “o batch não foi enviado”, e sim “foi enviado para uma URL que responde 200 mas não é a execução que você está observando”.
-- Hoje a URL ativa do usuário no banco é `https://n8n.tork.services/webhook/corretora1`, então eu focaria o ajuste em deixar isso explícito nos logs e corrigir o OCR junto.
+### 2. Filtrar campos no `mapClientToSupabase`
+Mudar o mapper para só incluir campos conhecidos (whitelist), ignorando qualquer campo que não esteja no `fieldMappings`. Isso previne enviar `createdAt`, `ai_enabled`, `id` etc. ao Supabase.
+
+```
+// ANTES (passa campos desconhecidos):
+const mappedKey = fieldMappings[key] || key;
+
+// DEPOIS (ignora campos desconhecidos):
+if (!(key in fieldMappings)) return;
+const mappedKey = fieldMappings[key];
+```
+
+### 3. Corrigir submit do NewClientModal
+Usar `form.handleSubmit(onSubmit)` no botão Salvar para que a validação Zod rode antes do submit. Atualmente `onSubmit` é chamado diretamente sem validação.
+
+### 4. Corrigir edição no ClientDetails
+Filtrar o `editedClient` antes de enviar ao `updateClient`, removendo campos read-only (`id`, `createdAt`).
+
+## Arquivos afetados
+
+| Arquivo | Ação |
+|---|---|
+| `src/components/ui/masked-input.tsx` | Reescrever sem `react-input-mask` |
+| `src/utils/dataMappers.ts` | Whitelist de campos no mapper |
+| `src/components/clients/NewClientModal.tsx` | Usar `handleSubmit` do react-hook-form |
+| `src/pages/ClientDetails.tsx` | Filtrar campos antes do update |
+| `src/components/clients/ClientPersonalInfo.tsx` | Adaptar ao novo MaskedInput |
+| `src/components/clients/form-tabs/PersonalDataTab.tsx` | Adaptar ao novo MaskedInput |
+
