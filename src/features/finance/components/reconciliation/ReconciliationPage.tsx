@@ -1073,6 +1073,42 @@ export function ReconciliationPage() {
                 </DialogContent>
             </Dialog>
 
+            {/* Dialog: Seleção de Banco para Conciliação em Massa (Consolidado) */}
+            <Dialog open={showBulkBankModal} onOpenChange={setShowBulkBankModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Landmark className="w-5 h-5 text-primary" />
+                            Selecionar Banco de Destino
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <p className="text-sm text-muted-foreground">
+                            Você está no modo consolidado. Selecione o banco para atribuir as {selectedIds.length} transações selecionadas:
+                        </p>
+                        <Select value={selectedBulkBank} onValueChange={setSelectedBulkBank}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione o banco..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {(bankAccounts || []).filter(b => b.is_active).map(bank => (
+                                    <SelectItem key={bank.id} value={bank.id}>{bank.bank_name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowBulkBankModal(false)}>Cancelar</Button>
+                        <Button
+                            onClick={handleBulkBankConfirm}
+                            disabled={!selectedBulkBank || bulkReconcileMutation.isPending}
+                        >
+                            {bulkReconcileMutation.isPending ? 'Conciliando...' : 'Confirmar e Conciliar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Import Dialog - Lazy Import (No Bank Required) */}
             <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
                 <DialogContent className="sm:max-w-md">
