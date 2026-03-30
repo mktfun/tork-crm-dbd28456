@@ -1,57 +1,42 @@
 
-# Plano: Dados do DRE e Transações não refletem conciliações
 
-## Diagnóstico
+# Plano: Fix telefone null no payload do n8n
 
-O sistema tem **duas tabelas financeiras separadas** que nunca se conversam:
+## Problema
 
-1. **`financial_transactions`** (sistema novo/ERP) — é onde a conciliação acontece, onde `reconciled`, `paid_amount`, `bank_account_id` são atualizados. O KPI "Recebido" lê daqui via `get_financial_summary`.
+O payload que chega no n8n tem `telefone: null` porque nenhum dos dispatchers (client nem admin) inclui o telefone do contato no `derived_data`. O telefone existe no body do Chatwoot como `body.sender.phone_number` (nested), mas o n8n provavelmente mapeia campos de `derived_data` — e lá não tem nenhum campo de telefone.
 
-2. **`transactions`** (sistema legado/faturamento) — é de onde o DRE e a tela de transações do Reports lêem. A conciliação **nunca toca esta tabela**.
-
-### O que cada componente lê:
-
-| Componente | Tabela fonte | Funciona? |
-|---|---|---|
-| KPI "Recebido" (`FinanceiroERP`) | `financial_transactions` via `get_financial_summary` | ✅ Sim |
-| Tela Transações (`TransacoesTab`) | `financial_transactions` via `get_revenue_transactions` | ✅ Sim (usa `reconciled`) |
-| DRE Compacto (Reports) | `transactions` via `useSupabaseReports` | ❌ Nunca atualiza |
-| KPIs do Reports (totalGanhos) | `transactions` filtrado por `status=PAGO` | ❌ Nunca atualiza |
-
-O `DreCompactoBar` recebe `totalGanhos` e `totalPerdas` do hook `useSupabaseReports`, que faz:
-```typescript
-totalGanhos = transactions.filter(t => t.nature === 'RECEITA' && (t.status === 'PAGO' || t.status === 'REALIZADO'))
-```
-
-A tabela `transactions` nunca é atualizada pela conciliação — ela é o sistema antigo de comissões.
+Além disso, o payload mostra `tipo: "outgoing"` — o que significa que o n8n pode estar recebendo a resposta do bot em vez da mensagem do cliente, ou o mapeamento do n8n está errado.
 
 ## Solução
 
-Trocar a fonte de dados do DRE e KPIs financeiros do Reports para usar `financial_transactions` via `get_financial_summary` (a mesma RPC que já funciona nos KPIs do FinanceiroERP).
+Adicionar campos explícitos de telefone e dados do contato no `derived_data` de ambos os dispatchers:
 
-### Mudanças
+### 1. `supabase/functions/chatwoot-dispatcher/modules/dispatchToN8n.ts`
 
-**1. `src/hooks/useSupabaseReports.ts`** — Adicionar chamada ao `get_financial_summary` e expor os totais corretos:
+Adicionar no `derived_data`:
+```typescript
+contact_phone: body?.sender?.phone_number || null,
+contact_name: body?.sender?.name || null,
+contact_email: body?.sender?.email || null,
+conversation_id: body?.conversation?.id || null,
+```
 
-- Importar `useFinancialSummary` do `useFinanceiro`
-- Substituir o cálculo manual de `totalGanhos`/`totalPerdas` (que lê de `transactions`) pelos valores do summary (`current.totalIncome`, `current.totalExpense`)
-- Manter os dados de `transactions` para listagem/detalhes, mas KPIs financeiros vêm do summary
+### 2. `supabase/functions/admin-dispatcher/index.ts` (função `dispatchAdminToN8n`)
 
-**2. `src/hooks/useFilteredDataForReports.ts`** — Propagar os novos totais:
+Adicionar no `derived_data` (linha ~244-261):
+```typescript
+contact_phone: body?.sender?.phone_number || null,
+contact_name: body?.sender?.name || null,
+contact_email: body?.sender?.email || null,
+conversation_id: body?.conversation?.id || null,
+```
 
-- Usar `totalGanhos` e `totalPerdas` do summary em vez do cálculo local sobre `transacoesRaw`
-
-**3. `src/components/reports/DreCompactoBar.tsx`** — Sem mudanças (já recebe props, basta que os valores corretos cheguem)
-
-## Arquivos afetados
-
-| Arquivo | Ação |
-|---|---|
-| `src/hooks/useSupabaseReports.ts` | Chamar `get_financial_summary` para KPIs em vez de somar `transactions` |
-| `src/hooks/useFilteredDataForReports.ts` | Usar totais do summary |
+### 3. Deploy ambas as edge functions
 
 ## Resultado
 
-- DRE Compacto mostra valores reais baseados em conciliações
-- KPIs do Reports (totalGanhos/totalPerdas) alinham com os KPIs do FinanceiroERP
-- Tudo lê da mesma fonte de verdade (`financial_transactions`)
+- O n8n recebe `derived_data.contact_phone` com o telefone do contato
+- Basta mapear `derived_data.contact_phone` no n8n em vez de `sender.phone_number`
+- Dados do contato ficam explícitos e fáceis de acessar no workflow
+
