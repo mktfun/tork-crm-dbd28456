@@ -257,6 +257,10 @@ async function dispatchAdminToN8n(params: {
       extracted_text: mediaResult?.extractedText || null,
       attachment_urls: mediaResult?.attachmentUrls || [],
       allowed_tools: ['search_contact', 'create_contact', 'create_deal', 'update_deal_stage', 'list_pipelines_and_stages', 'rag_search'],
+      contact_phone: body?.sender?.phone_number || null,
+      contact_name: body?.sender?.name || null,
+      contact_email: body?.sender?.email || null,
+      conversation_id: body?.conversation?.id || null,
     }
   }
 
