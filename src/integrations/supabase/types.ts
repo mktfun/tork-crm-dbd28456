@@ -4131,10 +4131,10 @@ export type Database = {
           p_start_date: string
         }
         Returns: {
-          balance: number
           expense: number
           income: number
-          period: string
+          net: number
+          period_key: string
         }[]
       }
       get_cash_flow_with_projection: {
