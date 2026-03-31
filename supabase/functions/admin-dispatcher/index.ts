@@ -413,9 +413,7 @@ Deno.serve(async (req) => {
         } catch (err) { console.error('⚠️ Reset dispatch failed:', err) }
       }
 
-      if (conversationId && brokerageId) {
-        await sendChatwootMessage(brokerageId, conversationId, '🔄 Histórico limpo. Pode começar uma nova conversa.')
-      }
+      // n8n handles the user-facing response
       console.log('🔄 Reset command executed for admin', userId)
       return new Response(JSON.stringify({ success: true, mode: 'reset' }), { headers: { 'Content-Type': 'application/json' } })
     }
