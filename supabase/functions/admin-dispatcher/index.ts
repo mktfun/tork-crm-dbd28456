@@ -435,9 +435,7 @@ Deno.serve(async (req) => {
         content, config,
       })
 
-      if (conversationId && brokerageId) {
-        await sendChatwootMessage(brokerageId, conversationId, '📊 Gerando conteúdo para Instagram, Email e Blog... Aguarde.')
-      }
+      // n8n handles the user-facing response
       console.log('📊 Report command dispatched for admin', userId)
       return new Response(JSON.stringify({ success: true, mode: 'report' }), { headers: { 'Content-Type': 'application/json' } })
     }
