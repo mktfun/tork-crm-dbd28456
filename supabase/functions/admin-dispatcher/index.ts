@@ -431,10 +431,10 @@ Deno.serve(async (req) => {
         `Use dados da base de conhecimento (rag_search) para fundamentar o conteúdo. Adapte ao tom da ${config.companyName}.\n</task>`
 
       await dispatchAdminToN8n({
-        body: { ...body, content: '[RELATÓRIO] Geração de conteúdo para Instagram, Email e Blog' },
+        body,
         userId, brokerageId, systemPrompt: reportPrompt,
         mediaResult: { messageType: 'report_request', attachmentUrls: [] },
-        content: '/relatorio', config,
+        content, config,
       })
 
       if (conversationId && brokerageId) {
