@@ -1,86 +1,42 @@
 
 
-# Plano: KPIs e gráficos não contabilizam conciliações de outros períodos
+# Plano: Fix telefone null no payload do n8n
 
 ## Problema
 
-Todas as RPCs financeiras filtram por `transaction_date` (data original da transação). Quando uma transação de outubro é conciliada em janeiro, ela **não aparece** no período jan-mar porque o `transaction_date` é outubro.
+O payload que chega no n8n tem `telefone: null` porque nenhum dos dispatchers (client nem admin) inclui o telefone do contato no `derived_data`. O telefone existe no body do Chatwoot como `body.sender.phone_number` (nested), mas o n8n provavelmente mapeia campos de `derived_data` — e lá não tem nenhum campo de telefone.
 
-A coluna `reconciled_at` já existe na tabela `financial_transactions` mas nunca é usada para filtrar.
+Além disso, o payload mostra `tipo: "outgoing"` — o que significa que o n8n pode estar recebendo a resposta do bot em vez da mensagem do cliente, ou o mapeamento do n8n está errado.
 
-### Lógica correta (regime de caixa)
+## Solução
 
-Para itens **efetivados** (reconciled=true ou paid_amount>0), o filtro de data deveria usar `reconciled_at` (quando o dinheiro entrou), não `transaction_date` (quando a transação foi criada).
+Adicionar campos explícitos de telefone e dados do contato no `derived_data` de ambos os dispatchers:
 
-Para itens **pendentes**, continua usando `due_date` ou `transaction_date`.
+### 1. `supabase/functions/chatwoot-dispatcher/modules/dispatchToN8n.ts`
 
-## RPCs afetadas (3 mudanças)
-
-### 1. `get_financial_summary` — KPIs principais
-
-**Linha 34 atual:**
-```sql
-AND t.transaction_date BETWEEN p_start_date AND p_end_date
+Adicionar no `derived_data`:
+```typescript
+contact_phone: body?.sender?.phone_number || null,
+contact_name: body?.sender?.name || null,
+contact_email: body?.sender?.email || null,
+conversation_id: body?.conversation?.id || null,
 ```
 
-**Corrigir para:**
-```sql
-AND COALESCE(t.reconciled_at::date, t.transaction_date) BETWEEN p_start_date AND p_end_date
+### 2. `supabase/functions/admin-dispatcher/index.ts` (função `dispatchAdminToN8n`)
+
+Adicionar no `derived_data` (linha ~244-261):
+```typescript
+contact_phone: body?.sender?.phone_number || null,
+contact_name: body?.sender?.name || null,
+contact_email: body?.sender?.email || null,
+conversation_id: body?.conversation?.id || null,
 ```
 
-Isso faz: se tem `reconciled_at`, usa essa data; senão, fallback para `transaction_date`.
-
-Aplicar nas queries de current income/expense (linha 34) e previous income/expense (linha 67).
-
-### 2. `get_cash_flow_data` — Gráfico "Evolução do Faturamento"
-
-**Linha 183-185 atual:**
-```sql
-TO_CHAR(ft.transaction_date, ...) AS period_key
-...
-AND ft.transaction_date BETWEEN p_start_date AND p_end_date
-```
-
-**Corrigir para:**
-```sql
-TO_CHAR(COALESCE(ft.reconciled_at::date, ft.transaction_date), ...) AS period_key
-...
-AND COALESCE(ft.reconciled_at::date, ft.transaction_date) BETWEEN p_start_date AND p_end_date
-```
-
-### 3. `get_revenue_transactions` — Lista de receitas na aba Transações
-
-**Linhas 85-86 atual:**
-```sql
-AND (p_start_date IS NULL OR ft.transaction_date >= p_start_date)
-AND (p_end_date IS NULL OR ft.transaction_date <= p_end_date)
-```
-
-**Corrigir para:**
-```sql
-AND (p_start_date IS NULL OR COALESCE(ft.reconciled_at::date, ft.transaction_date) >= p_start_date)
-AND (p_end_date IS NULL OR COALESCE(ft.reconciled_at::date, ft.transaction_date) <= p_end_date)
-```
-
-## Verificação prévia
-
-Antes de aplicar, confirmar que `reconciled_at` está sendo populado nas conciliações. Query de validação:
-```sql
-SELECT COUNT(*) as total, COUNT(reconciled_at) as with_date 
-FROM financial_transactions WHERE reconciled = true
-```
-
-Se `reconciled_at` estiver NULL em transações reconciliadas, será necessário um fix de dados adicional para popular o campo retroativamente (usando `created_at` ou `updated_at` como fallback).
-
-## Arquivo
-
-| Arquivo | Ação |
-|---|---|
-| Nova migration SQL | Recriar as 3 RPCs com filtro por `COALESCE(reconciled_at::date, transaction_date)` |
+### 3. Deploy ambas as edge functions
 
 ## Resultado
 
-- Transações conciliadas aparecem no período em que foram efetivadas, não no período original
-- KPIs, gráfico e lista de transações todos alinhados
-- Pendentes continuam filtrados por data de vencimento (sem mudança)
+- O n8n recebe `derived_data.contact_phone` com o telefone do contato
+- Basta mapear `derived_data.contact_phone` no n8n em vez de `sender.phone_number`
+- Dados do contato ficam explícitos e fáceis de acessar no workflow
 
