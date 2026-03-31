@@ -1,20 +1,30 @@
 
 
-# Plano: Dispatcher não deve alterar mensagens
+# Plano: Remover mensagens duplicadas do admin-dispatcher
 
 ## Problema
 
-No `/relatorio` (linha 434), o dispatcher sobrescreve `body.content` com `'[RELATÓRIO] Geração de conteúdo para Instagram, Email e Blog'` antes de enviar ao n8n. O dispatcher deveria apenas orquestrar — nunca alterar o conteúdo da mensagem original.
+O admin-dispatcher envia mensagens hardcoded via `sendChatwootMessage` para cada comando:
+- `/reset` → linha 417: envia "🔄 Histórico limpo. Pode começar uma nova conversa."
+- `/relatorio` → linha 441: envia "📊 Gerando conteúdo para Instagram, Email e Blog... Aguarde."
+
+Mas o n8n **também** envia suas próprias mensagens de confirmação ("Memória resetada.", etc). Resultado: mensagens duplicadas no chat.
+
+O dispatcher deveria **apenas orquestrar** — despachar pro n8n e pronto. Quem responde ao usuário é o n8n.
 
 ## Solução
 
-No handler do `/relatorio`, manter `body` intacto ao despachar para o n8n. O system prompt já contém a `<task>` com as instruções de geração de conteúdo — não precisa alterar o `content`.
+Remover as chamadas `sendChatwootMessage` dos handlers `/reset` e `/relatorio` no `admin-dispatcher/index.ts`.
 
 ### Arquivo: `supabase/functions/admin-dispatcher/index.ts`
 
-**Linha 434**: Trocar `body: { ...body, content: '[RELATÓRIO] Geração de conteúdo para Instagram, Email e Blog' }` por simplesmente `body` (sem spread/override).
+- **Linha 416-418** (`/reset`): Remover o bloco `if (conversationId && brokerageId) { await sendChatwootMessage(...) }`
+- **Linha 440-442** (`/relatorio`): Remover o bloco `if (conversationId && brokerageId) { await sendChatwootMessage(...) }`
 
-**Linha 437**: Trocar `content: '/relatorio'` por `content` (variável original, que já é `/relatorio`).
+O n8n continua recebendo o dispatch normalmente e cuida de enviar a resposta pro usuário.
 
-Resultado: o n8n recebe a mensagem original sem modificação. O comportamento do relatório continua funcionando porque as instruções estão no `systemPrompt`, não no `content`.
+## Resultado
+
+- `/reset` → dispatcher despacha pro n8n → n8n envia "Memória resetada." (1 mensagem só)
+- `/relatorio` → dispatcher despacha pro n8n → n8n envia o PDF (sem mensagem extra)
 
