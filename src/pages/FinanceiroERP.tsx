@@ -178,7 +178,7 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
 
 // ============ DRE TAB ============
 
-function DreTab() {
+function DreTab({ startDate, endDate }: { startDate: string; endDate: string }) {
   return (
     <div className="space-y-6">
       <div>
@@ -187,7 +187,7 @@ function DreTab() {
           Demonstrativo de Resultado do Exercício - visão consolidada de receitas e despesas
         </p>
       </div>
-      <DreTable />
+      <DreTable startDate={startDate} endDate={endDate} />
     </div>
   );
 }
@@ -303,7 +303,7 @@ export default function FinanceiroERP() {
         </TabsContent>
 
         <TabsContent value="dre">
-          <DreTab />
+          <DreTab startDate={startDate} endDate={endDate} />
         </TabsContent>
 
         <TabsContent value="conciliacao">

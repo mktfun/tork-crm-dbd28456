@@ -200,10 +200,10 @@ export function useFinancialSummary(startDate: string, endDate: string) {
 /**
  * Hook para buscar dados do DRE (Demonstrativo de Resultado)
  */
-export function useDreData(year?: number) {
+export function useDreData(year?: number, startDate?: string, endDate?: string) {
   return useQuery({
-    queryKey: ['dre-data', year],
-    queryFn: () => financialService.getDreData(year)
+    queryKey: ['dre-data', year, startDate, endDate],
+    queryFn: () => financialService.getDreData(year, startDate, endDate)
   });
 }
 

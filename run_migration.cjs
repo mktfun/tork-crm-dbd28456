@@ -5,7 +5,13 @@ const dns = require('dns');
 // Forçar IPv4
 dns.setDefaultResultOrder('ipv4first');
 
-const sql = fs.readFileSync('supabase/migrations/20260210100000_accounting_abstraction_layer.sql', 'utf8');
+const filePath = process.argv[2];
+if (!filePath) {
+  console.error('ERROR: É necessário passar o caminho do arquivo SQL como argumento.');
+  process.exit(1);
+}
+
+const sql = fs.readFileSync(filePath, 'utf8');
 
 const client = new Client({
     host: 'db.jaouwhckqqnaxqyfvgyq.supabase.co',
@@ -22,9 +28,9 @@ async function run() {
         await client.connect();
         console.log('Conectado ao banco.');
         await client.query(sql);
-        console.log('SUCCESS: Migration executada com sucesso!');
+        console.log(`SUCCESS: Migration ${filePath} executada com sucesso!`);
     } catch (e) {
-        console.error('ERROR:', e.message);
+        console.error('ERROR:', e);
     } finally {
         await client.end();
     }
