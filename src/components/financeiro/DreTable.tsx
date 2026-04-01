@@ -206,16 +206,17 @@ export function DreTable({ className }: DreTableProps) {
                 <TableBody>
                   {/* SEÇÃO DE RECEITAS */}
                   <TableRow className="bg-emerald-500/15 hover:bg-emerald-500/20 border-border">
-                    <TableCell colSpan={15} className={`font-bold text-emerald-600 dark:text-emerald-400 pl-6 ${paddingClass} ${stickyColClass} bg-card`}>
+                    <TableCell className={`font-bold text-emerald-700 dark:text-emerald-400 pl-6 ${paddingClass} ${stickyColClass} bg-emerald-50 dark:bg-emerald-950 min-w-[200px]`}>
                       <div className="flex items-center gap-2">
                         <TrendingUp className="w-4 h-4" />
                         (+) RECEITAS
                       </div>
                     </TableCell>
+                    <TableCell colSpan={14} className="bg-emerald-500/5"></TableCell>
                   </TableRow>
                   {revenueRows.map((row, idx) => (
                     <TableRow key={`rev-${idx}`} className={`hover:bg-muted/50 border-border transition-colors ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}>
-                      <TableCell className={`${paddingClass} pl-6 text-muted-foreground font-medium ${stickyColClass} transition-colors ${idx % 2 === 0 ? 'bg-card' : 'bg-card/50'}`}>
+                      <TableCell className={`${paddingClass} pl-6 text-muted-foreground font-medium ${stickyColClass} bg-card min-w-[200px]`}>
                         <div className="truncate max-w-[180px]" title={row.category}>{row.category}</div>
                       </TableCell>
                       <TableCell className={`${paddingClass} text-right tabular-nums bg-primary/5 font-medium border-r border-border/50`}>
@@ -252,7 +253,7 @@ export function DreTable({ className }: DreTableProps) {
                   ))}
                   {/* Subtotal Receitas */}
                   <TableRow className="bg-emerald-500/15 border-t-2 border-emerald-500/20 hover:bg-emerald-500/20 sticky bottom-0 z-10 shadow-sm font-medium">
-                    <TableCell className={`${paddingClass} font-bold text-emerald-700 dark:text-emerald-300 pl-6 ${stickyColClass} bg-card`}>
+                    <TableCell className={`${paddingClass} font-bold text-emerald-800 dark:text-emerald-300 pl-6 ${stickyColClass} bg-emerald-50 dark:bg-emerald-950 min-w-[200px]`}>
                       = Total Receitas
                     </TableCell>
                     <TableCell className={`${paddingClass} text-right text-emerald-700 dark:text-emerald-300 tabular-nums bg-emerald-500/15 border-r border-emerald-500/30`}>
@@ -275,16 +276,17 @@ export function DreTable({ className }: DreTableProps) {
 
                   {/* SEÇÃO DE DESPESAS */}
                   <TableRow className="bg-rose-500/15 hover:bg-rose-500/20 border-border">
-                    <TableCell colSpan={15} className={`font-bold text-rose-600 dark:text-rose-400 pl-6 ${paddingClass} ${stickyColClass} bg-card`}>
+                    <TableCell className={`font-bold text-rose-700 dark:text-rose-400 pl-6 ${paddingClass} ${stickyColClass} bg-rose-50 dark:bg-rose-950 min-w-[200px]`}>
                       <div className="flex items-center gap-2">
                         <TrendingDown className="w-4 h-4" />
                         (-) DESPESAS
                       </div>
                     </TableCell>
+                    <TableCell colSpan={14} className="bg-rose-500/5"></TableCell>
                   </TableRow>
                   {expenseRows.map((row, idx) => (
                     <TableRow key={`exp-${idx}`} className={`hover:bg-muted/50 border-border transition-colors ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}>
-                      <TableCell className={`${paddingClass} pl-6 text-muted-foreground font-medium ${stickyColClass} transition-colors ${idx % 2 === 0 ? 'bg-card' : 'bg-card/50'}`}>
+                      <TableCell className={`${paddingClass} pl-6 text-muted-foreground font-medium ${stickyColClass} bg-card min-w-[200px]`}>
                         <div className="truncate max-w-[180px]" title={row.category}>{row.category}</div>
                       </TableCell>
                       <TableCell className={`${paddingClass} text-right tabular-nums bg-primary/5 font-medium border-r border-border/50`}>
@@ -321,7 +323,7 @@ export function DreTable({ className }: DreTableProps) {
                   ))}
                   {/* Subtotal Despesas */}
                   <TableRow className="bg-rose-500/15 border-t-2 border-rose-500/20 hover:bg-rose-500/20 font-medium">
-                    <TableCell className={`${paddingClass} font-bold text-rose-700 dark:text-rose-300 pl-6 ${stickyColClass} bg-card`}>
+                    <TableCell className={`${paddingClass} font-bold text-rose-800 dark:text-rose-300 pl-6 ${stickyColClass} bg-rose-50 dark:bg-rose-950 min-w-[200px]`}>
                       = Total Despesas
                     </TableCell>
                     <TableCell className={`${paddingClass} text-right text-rose-700 dark:text-rose-300 tabular-nums bg-rose-500/15 border-r border-rose-500/30`}>
@@ -344,7 +346,7 @@ export function DreTable({ className }: DreTableProps) {
 
                   {/* RESULTADO LÍQUIDO */}
                   <TableRow className={`border-t-4 shadow-md ${summary.netResult >= 0 ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-rose-500/20 border-rose-500/40'}`}>
-                    <TableCell className={`${paddingClass} font-black text-lg pl-6 ${stickyColClass} ${summary.netResult >= 0 ? 'bg-emerald-500/20' : 'bg-rose-500/20'} bg-card`}>
+                    <TableCell className={`${paddingClass} font-black text-lg pl-6 ${stickyColClass} ${summary.netResult >= 0 ? 'bg-emerald-100 dark:bg-emerald-950' : 'bg-rose-100 dark:bg-rose-950'} min-w-[200px]`}>
                       <div className="flex items-center gap-2">
                         <Calculator className="w-5 h-5" />
                         RESULTADO
