@@ -2023,7 +2023,8 @@ serve(async (req) => {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  // FASE GOD MODE e CONSULTORIA: Workflows agents levam tempo. Timeout subido para 120s.
+  const timeoutId = setTimeout(() => controller.abort(), 120000);
   const requestStartTime = Date.now();
   const requestId = crypto.randomUUID().slice(0, 8);
 
@@ -2435,7 +2436,7 @@ serve(async (req) => {
     if (error instanceof Error && error.name === 'AbortError') {
       return new Response(
         JSON.stringify({
-          error: 'Timeout de 30 segundos. Tente uma pergunta mais simples.',
+          error: 'Timeout de 120 segundos excedido (análise complexa demais ou API lenta).',
           code: 'TIMEOUT_ERROR',
           requestId
         }),
