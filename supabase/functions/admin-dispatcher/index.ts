@@ -349,13 +349,17 @@ async function dispatchAdminToN8n(params: {
 
   const payload = {
     ...body,
+    is_active: true, // Forçar na raiz pro n8n achar fácil
+    system_prompt: systemPrompt, // Exportar direto na raiz
     derived_data: {
       crm_user_id: userId,
       brokerage_id: brokerageId,
       user_role: 'admin',
       ai_enabled: true,
       ai_is_active: true,
+      is_active: true, // Duplicar sem prefixo para compatibilidade
       ai_system_prompt: systemPrompt,
+      system_prompt: systemPrompt,
       agent_name: config.agentName,
       company_name: config.companyName,
       voice_tone: config.voiceTone,
