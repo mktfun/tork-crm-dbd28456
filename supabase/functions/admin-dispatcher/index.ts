@@ -429,9 +429,10 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
     accumulatedContent: accumulatedContent || undefined,
   })
 
-  console.log(`📊 Consultant System prompt length: ${systemPrompt.length} chars`)
-
   console.log(`🧠 Invoking internal ai-assistant for local execution...`);
+  if (conversationId && brokerageId) {
+     await sendChatwootMessage(brokerageId, conversationId, `🧠 Iniciando Cérebro Consultivo (aguardando AI local)...`);
+  }
   
   try {
     const aiResponse = await supabase.functions.invoke('ai-assistant', {
@@ -449,24 +450,36 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
 
     if (aiResponse.error) {
       console.error('❌ ai-assistant invocation failed:', aiResponse.error);
+      if (conversationId && brokerageId) {
+         const errStr = typeof aiResponse.error === 'object' ? JSON.stringify(aiResponse.error) : String(aiResponse.error);
+         await sendChatwootMessage(brokerageId, conversationId, `❌ Falha na IA Local:\n${errStr}\nVerifique os logs da ai-assistant.`);
+      }
     } else {
       const generatedPitch = aiResponse.data?.message || 'Nenhuma resposta válida gerada pela IA.';
       console.log(`✅ Local AI pitch generated: ${generatedPitch.length} chars`);
+      
+      if (conversationId && brokerageId) {
+         await sendChatwootMessage(brokerageId, conversationId, `✅ Análise concluída! (${generatedPitch.length} caracteres). Enviando para o N8N formatar...`);
+      }
 
       // 5. Dispatch the FINAL RESULT to n8n as a simple forwarder pipe
+      // Fallback to ai_admin_message if ai_consultant_forwarding is not mapped by the user in N8N.
       await dispatchAdminToN8n({
         body: originalBody,
         userId,
         brokerageId,
-        systemPrompt: "Você é um formatador de WhatsApp. Sua única missão é receber a análise pronta de Seguros no bloco do usuário, garantir a formatação limpa (usando asteriscos e emojis) e enviar o texto para o usuário sem cortar nem resumir as informações do consultor.",
+        systemPrompt: "Você é um revisor de mensagens. Pegue a análise de Seguros que o usuário passou e APENAS formate-a de forma impecável para o WhatsApp (mantendo negritos fortes em Asteriscos e espaçamento) e envie de volta. Não adicione nem tire informações.",
         mediaResult: { messageType: 'text', attachmentUrls: [] },
-        content: `AQUI ESTÁ A ANÁLISE PRONTA DO CONSULTOR MESTRE:\n\n${generatedPitch}\n\n[FIM DA ANÁLISE]`,
+        content: `AQUI ESTÁ A ANÁLISE PRONTA:\n\n${generatedPitch}`,
         config,
-        actionOverride: 'ai_consultant_forwarding'
+        actionOverride: 'ai_admin_message' // Usa a via normal que o N8N já mapeia
       });
     }
   } catch (err) {
     console.error('❌ Unexpected error calling internal AI:', err);
+    if (conversationId && brokerageId) {
+       await sendChatwootMessage(brokerageId, conversationId, `❌ Erro crítico no Edge Runtime: ${String(err)}`);
+    }
   }
 
   // Mark session as completed
