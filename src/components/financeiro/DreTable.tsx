@@ -89,15 +89,13 @@ function EmptyDreState() {
 
 interface DreTableProps {
   className?: string;
-  startDate?: string;
-  endDate?: string;
 }
 
-export function DreTable({ className, startDate, endDate }: DreTableProps) {
+export function DreTable({ className }: DreTableProps) {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [compactMode, setCompactMode] = useState(false);
   const [auditTarget, setAuditTarget] = useState<DreAuditTarget | null>(null);
-  const { data: rows = [], isLoading } = useDreData(selectedYear, startDate, endDate);
+  const { data: rows = [], isLoading } = useDreData(selectedYear, undefined, undefined);
 
   const currentMonthIndex = new Date().getFullYear() === selectedYear ? new Date().getMonth() : -1;
 
