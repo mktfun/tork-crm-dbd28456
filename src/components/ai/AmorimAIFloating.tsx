@@ -41,7 +41,7 @@ const MIN_WIDTH = 350;
 const MIN_HEIGHT = 450;
 const MAX_WIDTH = 1000;
 const MAX_HEIGHT_RATIO = 0.9;
-const MAX_INPUT_CHARS = 1000;
+const MAX_INPUT_CHARS = 4000;
 
 export function AmorimAIFloating() {
   const [isOpen, setIsOpen] = useState(false);
