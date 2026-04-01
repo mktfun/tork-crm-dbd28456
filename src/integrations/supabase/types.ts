@@ -4131,10 +4131,10 @@ export type Database = {
           p_start_date: string
         }
         Returns: {
+          balance: number
           expense: number
           income: number
-          net: number
-          period_key: string
+          period: string
         }[]
       }
       get_cash_flow_with_projection: {
@@ -4229,26 +4229,51 @@ export type Database = {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: Json
       }
-      get_dre_data: {
-        Args: { p_year?: number }
-        Returns: {
-          abr: number
-          account_type: string
-          ago: number
-          category: string
-          dez: number
-          fev: number
-          jan: number
-          jul: number
-          jun: number
-          mai: number
-          mar: number
-          nov: number
-          out: number
-          set: number
-          total: number
-        }[]
-      }
+      get_dre_data:
+        | {
+            Args: { p_year?: number }
+            Returns: {
+              abr: number
+              account_type: string
+              ago: number
+              category: string
+              dez: number
+              fev: number
+              jan: number
+              jul: number
+              jun: number
+              mai: number
+              mar: number
+              nov: number
+              out: number
+              set: number
+              total: number
+            }[]
+          }
+        | {
+            Args: {
+              p_end_date?: string
+              p_start_date?: string
+              p_year?: number
+            }
+            Returns: {
+              abr: number
+              account_type: string
+              ago: number
+              category: string
+              dez: number
+              fev: number
+              jan: number
+              jul: number
+              jun: number
+              mai: number
+              mar: number
+              nov: number
+              out: number
+              set: number
+              total: number
+            }[]
+          }
       get_empresas_com_metricas: {
         Args: { p_corretora_id: string }
         Returns: {
