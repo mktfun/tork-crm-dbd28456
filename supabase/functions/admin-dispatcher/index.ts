@@ -404,86 +404,32 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
   }
 
   const config = await fetchGlobalConfig(userId)
-  const sniperSystemPrompt = `Você é um Especialista em Análise Técnica de Apólices de Seguros da corretora ${config.companyName}.
-Sua função é analisar os dados das apólices/documentos fornecidos e devolver um Diagnóstico Técnico para o corretor.
-
-REGRAS ABSOLUTAS:
-1. ZERO EMOJIS. Resposta limpa e técnica.
-2. NUNCA narre seu raciocínio ("Minha tarefa é...", "Vou analisar..."). Entregue apenas o output.
-3. NÃO invente nomes, valores, seguradoras ou coberturas que não estão nos dados fornecidos.
-4. Não fabrique cotações concorrentes. Analise apenas o que está aqui.
-5. Use seu RAG interno (rag_search) para identificar riscos e lacunas nas coberturas com base em normas SUSEP e condições gerais.
-
-FORMATO OBRIGATÓRIO DA RESPOSTA:
-*Apólice:* [número]
-*Seguradora:* [nome]
-*Segurado(a):* [nome exato do documento]
-*Condutor(a)/Mutuário(a):* [nome, se disponível]
-*Vigência:* [data início] a [data fim]
-
-*Falhas / Pontos Cegos:*
-- [item baseado na análise técnica do documento e RAG]
-
-*O que o Corretor Deve Fazer:*
-- [ação concreta]`
-
-  console.log(`🧠 Invoking internal ai-assistant (native mode)...`);
-  // Status operacional — direto no Chatwoot é OK (não é resposta da IA)
-  if (conversationId && brokerageId) {
-     await sendChatwootMessage(brokerageId, conversationId, `Analisando apólices... aguarde.`);
-  }
   
+  // No lugar de chamar o ai-assistant internamente, construímos o prompt do admin completo
+  // informando o conteúdo acumulado, para que o AGENTE N8N faça o trabalho.
+  const systemPrompt = buildAdminSystemPrompt({
+    ...config,
+    accumulatedContent: accumulatedContent,
+  })
+
+  const requestContent = `Realize a análise integrada dos documentos e mensagens que foram acumulados no modo batch.`
 
   try {
-    const aiAssistantUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-assistant`;
-    
-    const rawAiResponse = await fetch(aiAssistantUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        userId,
-        conversationId,
-        stream: false,
-        system_override: sniperSystemPrompt,
-        messages: [{
-          role: 'user',
-          content: `Analise os seguintes documentos extraídos via OCR:\n\n${accumulatedContent || 'Nenhum documento anexado.'}`
-        }]
-      })
-    });
-
-    if (!rawAiResponse.ok) {
-      const errorStr = await rawAiResponse.text();
-      console.error('❌ ai-assistant invocation failed:', errorStr);
-      // Apenas log + status direto no Chatwoot — não é resposta de IA, é erro operacional
-      if (conversationId && brokerageId) {
-         await sendChatwootMessage(brokerageId, conversationId, `Falha na analise (HTTP ${rawAiResponse.status}). Tente novamente.`);
-      }
-    } else {
-      const aiData = await rawAiResponse.json();
-      const generatedPitch = aiData?.message || 'Nenhuma resposta válida gerada pela IA.';
-      console.log(`✅ Local AI analysis generated: ${generatedPitch.length} chars`);
-
-      // Resposta final da IA → SOMENTE via N8N
-      const overrideBody = { ...originalBody, content: generatedPitch };
-      await dispatchAdminToN8n({
-        body: overrideBody,
-        userId,
-        brokerageId,
-        systemPrompt: 'Encaminhe a mensagem do usuário exatamente como recebida, sem alterar nada.',
-        mediaResult: { messageType: 'text', attachmentUrls: [] },
-        content: generatedPitch,
-        config,
-        actionOverride: 'ai_admin_message'
-      });
-    }
+    await dispatchAdminToN8n({
+      body: originalBody || {},
+      userId,
+      brokerageId,
+      systemPrompt,
+      mediaResult: { messageType: 'batch_processing', attachmentUrls: [] },
+      content: requestContent,
+      config,
+      actionOverride: 'ai_admin_message'
+    })
+    console.log(`✅ Batch system prompt and content dispatched to N8N`);
   } catch (err) {
-    console.error('❌ Unexpected error calling internal AI:', err);
+    console.error('❌ Unexpected error calling N8N dispatch:', err);
     if (conversationId && brokerageId) {
-       await sendChatwootMessage(brokerageId, conversationId, `❌ Erro crítico no Edge Runtime: ${String(err)}`);
+       await sendChatwootMessage(brokerageId, conversationId, `❌ Erro crítico enviando lote para N8N: ${String(err)}`);
     }
   }
 
