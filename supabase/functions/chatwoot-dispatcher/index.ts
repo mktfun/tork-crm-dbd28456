@@ -107,13 +107,10 @@ async function processWebhook(body: any) {
       resolvedAI = initAIConfig(resolved)
     }
 
-    // 3. Admin delegation — route to admin-dispatcher
+    // 3. Admin delegation — route directly to ai-assistant without n8n
     if (role === 'admin' && userId && brokerageId) {
-      console.log('👑 Admin detected, delegating to admin-dispatcher...')
-      const mediaResult = await processAttachments(attachments)
-      supabase.functions.invoke('admin-dispatcher', {
-        body: { body, userId, brokerageId, role, mediaResult }
-      }).catch((err: any) => console.error('❌ Admin dispatcher invocation failed:', err))
+      const { processAdminLogic } = await import('./modules/processAdminLogic.ts')
+      await processAdminLogic(supabase, body, userId, brokerageId, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
       return
     }
 
