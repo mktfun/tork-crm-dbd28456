@@ -54,15 +54,50 @@ async function processAttachments(attachments: any[], userId: string) {
     } else if (isImage || isPdf) {
       let extractedText = null;
 
+      // ─── Para PDFs/imagens vindas do Chatwoot, fazer upload temporário no Supabase Storage
+      // pois extract-quote-data só sabe ler URLs do bucket quote-uploads
+      let supabaseFileUrl = att.data_url;
+      let tempPath: string | null = null;
+      try {
+        console.log(`📌 Baixando arquivo do Chatwoot para reupload: ${att.data_url}`);
+        const fileResp = await fetch(att.data_url);
+        if (fileResp.ok) {
+          const fileBlob = await fileResp.blob();
+          const ext = isPdf ? 'pdf' : (att.data_url.split('.').pop()?.split('?')[0] || 'jpg');
+          tempPath = `temp-batch/${userId}/${Date.now()}.${ext}`;
+          const { error: uploadErr } = await supabase.storage
+            .from('quote-uploads')
+            .upload(tempPath, fileBlob, { contentType: att.file_type || 'application/pdf', upsert: true });
+          if (!uploadErr) {
+            const { data: publicUrlData } = supabase.storage.from('quote-uploads').getPublicUrl(tempPath);
+            supabaseFileUrl = publicUrlData.publicUrl;
+            console.log(`✅ Arquivo reupado para Storage: ${supabaseFileUrl}`);
+          } else {
+            console.warn('⚠️ Falha no reupload, usando URL original do Chatwoot (OCR estruturado pode falhar):', uploadErr.message);
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Erro no reupload do arquivo:', err);
+      }
+
       try {
         console.log(`📄 Tentando OCR Estruturado na apólice (extract-quote-data)...`);
-        const { data, error } = await supabase.functions.invoke('extract-quote-data', { 
-          body: { fileUrl: att.data_url, userId } 
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/extract-quote-data`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileUrl: supabaseFileUrl, userId })
         });
-        
-        if (!error && data?.success && data?.data) {
-           console.log(`✅ OCR Estruturado concluído com sucesso!`);
-           extractedText = `DADOS ESTRUTURADOS DA APÓLICE:\n${JSON.stringify(data.data, null, 2)}`;
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data?.success && data?.data) {
+            console.log(`✅ OCR Estruturado concluído!`);
+            // Limpar arquivo temporário do bucket após OCR
+            if (tempPath) {
+              await supabase.storage.from('quote-uploads').remove([tempPath]).catch(() => {});
+            }
+            extractedText = `DADOS ESTRUTURADOS DA APÓLICE (JSON):\n${JSON.stringify(data.data, null, 2)}`;
+          }
         }
       } catch (err) { console.error('⚠️ OCR Estruturado failed, fallback...', err); }
 
@@ -369,14 +404,36 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
   }
 
   const config = await fetchGlobalConfig(userId)
-  // O sistema não vai mais dar overwrite. Vai repassar e forçar o RAG internamente a ler os dados.
-  const nativeAiContent = `Aqui estão os documentos extraídos para sua análise:\n\n${accumulatedContent || 'Nenhum documento anexado.'}\n\nINSTRUÇÕES OBRIGATÓRIAS (Sniper Consultant):\n1. Faça a sua análise técnica genial que você costuma fazer nesta apólice considerando nosso RAG.\n2. ZERO EMOJIS.\n3. NUNCA conte o que você vai fazer ("Minha tarefa é...").\n4. NÃO invente nomes, dados ou cotações que não estão aqui.\n5. Seja objetivo pra eu preencher meu CRM. Entregue exatamente esse formato estrutural na resposta:\n\nApólice: [Descrever]\nSeguradora: [Descrever]\nSegurado(a): [Descrever]\nCondutor(a): [Descrever]\nVigência: [Data a Data]\n\n[FALHAS ENCONTRADAS na Apólice]\n- ...\n- ...\n\n[O QUE O CORRETOR PRECISA FAZER]\n- ...\n`
+  const sniperSystemPrompt = `Você é um Especialista em Análise Técnica de Apólices de Seguros da corretora ${config.companyName}.
+Sua função é analisar os dados das apólices/documentos fornecidos e devolver um Diagnóstico Técnico para o corretor.
 
-  console.log(`🧠 Invoking internal ai-assistant for local execution...`);
+REGRAS ABSOLUTAS:
+1. ZERO EMOJIS. Resposta limpa e técnica.
+2. NUNCA narre seu raciocínio ("Minha tarefa é...", "Vou analisar..."). Entregue apenas o output.
+3. NÃO invente nomes, valores, seguradoras ou coberturas que não estão nos dados fornecidos.
+4. Não fabrique cotações concorrentes. Analise apenas o que está aqui.
+5. Use seu RAG interno (rag_search) para identificar riscos e lacunas nas coberturas com base em normas SUSEP e condições gerais.
+
+FORMATO OBRIGATÓRIO DA RESPOSTA:
+*Apólice:* [número]
+*Seguradora:* [nome]
+*Segurado(a):* [nome exato do documento]
+*Condutor(a)/Mutuário(a):* [nome, se disponível]
+*Vigência:* [data início] a [data fim]
+
+*Falhas / Pontos Cegos:*
+- [item baseado na análise técnica do documento e RAG]
+
+*O que o Corretor Deve Fazer:*
+- [ação concreta]`
+
+  console.log(`🧠 Invoking internal ai-assistant (native mode)...`);
+  // Status operacional — direto no Chatwoot é OK (não é resposta da IA)
   if (conversationId && brokerageId) {
-     await sendChatwootMessage(brokerageId, conversationId, `🧠 Iniciando Cérebro Consultivo (aguardando AI local)...`);
+     await sendChatwootMessage(brokerageId, conversationId, `Analisando apólices... aguarde.`);
   }
   
+
   try {
     const aiAssistantUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-assistant`;
     
@@ -390,11 +447,10 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
         userId,
         conversationId,
         stream: false,
-        // NÃO enviamos system_override para forçar a AI a rodar seu próprio buildSystemPrompt
+        system_override: sniperSystemPrompt,
         messages: [{
           role: 'user',
-          content: nativeAiContent
-
+          content: `Analise os seguintes documentos extraídos via OCR:\n\n${accumulatedContent || 'Nenhum documento anexado.'}`
         }]
       })
     });
@@ -402,31 +458,26 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
     if (!rawAiResponse.ok) {
       const errorStr = await rawAiResponse.text();
       console.error('❌ ai-assistant invocation failed:', errorStr);
+      // Apenas log + status direto no Chatwoot — não é resposta de IA, é erro operacional
       if (conversationId && brokerageId) {
-         await sendChatwootMessage(brokerageId, conversationId, `❌ Falha na IA Local HTTP ${rawAiResponse.status}:\n${errorStr.substring(0, 300)}`);
+         await sendChatwootMessage(brokerageId, conversationId, `Falha na analise (HTTP ${rawAiResponse.status}). Tente novamente.`);
       }
     } else {
       const aiData = await rawAiResponse.json();
       const generatedPitch = aiData?.message || 'Nenhuma resposta válida gerada pela IA.';
-      console.log(`✅ Local AI pitch generated: ${generatedPitch.length} chars`);
-      
-      if (conversationId && brokerageId) {
-         await sendChatwootMessage(brokerageId, conversationId, `✅ Análise concluída! (${generatedPitch.length} caracteres). Enviando para o N8N formatar...`);
-      }
+      console.log(`✅ Local AI analysis generated: ${generatedPitch.length} chars`);
 
-      // 5. Dispatch the FINAL RESULT to n8n as a simple forwarder pipe
-      // Sobrescrevendo o `content` do root do JSON para enganar o n8n fazendo ele pensar que isso é a msg do usuário
-      const overrideBody = { ...originalBody, content: `AQUI ESTÁ A ANÁLISE PRONTA:\n\n${generatedPitch}` };
-
+      // Resposta final da IA → SOMENTE via N8N
+      const overrideBody = { ...originalBody, content: generatedPitch };
       await dispatchAdminToN8n({
         body: overrideBody,
         userId,
         brokerageId,
-        systemPrompt: "Você é um revisor de mensagens. Pegue a análise de Seguros que o usuário passou e APENAS formate-a de forma impecável e limpa para envio. Mantenha os negritos em asteriscos (*), mas NÃO utilize Emojis. Não adicione nem tire informações essenciais.",
+        systemPrompt: 'Encaminhe a mensagem do usuário exatamente como recebida, sem alterar nada.',
         mediaResult: { messageType: 'text', attachmentUrls: [] },
-        content: `AQUI ESTÁ A ANÁLISE PRONTA:\n\n${generatedPitch}`,
+        content: generatedPitch,
         config,
-        actionOverride: 'ai_admin_message' // Usa a via normal que o N8N já mapeia
+        actionOverride: 'ai_admin_message'
       });
     }
   } catch (err) {
