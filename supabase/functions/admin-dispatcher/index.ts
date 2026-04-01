@@ -34,7 +34,7 @@ async function sendChatwootMessage(brokerageId: number, conversationId: number, 
 }
 
 // ─── Process attachments (OCR / transcription) ───
-async function processAttachments(attachments: any[]) {
+async function processAttachments(attachments: any[], userId: string) {
   const result = { transcriptions: [] as string[], extractedTexts: [] as string[], attachmentUrls: [] as string[] }
   if (!attachments || attachments.length === 0) return result
 
@@ -52,10 +52,33 @@ async function processAttachments(attachments: any[]) {
         if (!error && data?.text) result.transcriptions.push(data.text)
       } catch (err) { console.error('⚠️ Audio transcription failed:', err) }
     } else if (isImage || isPdf) {
+      let extractedText = null;
+
       try {
-        const { data, error } = await supabase.functions.invoke('extract-document', { body: { fileUrl: att.data_url, fileType: att.file_type } })
-        if (!error && data?.text) result.extractedTexts.push(data.text)
-      } catch (err) { console.error('⚠️ Document extraction failed:', err) }
+        console.log(`📄 Tentando OCR Estruturado na apólice (extract-quote-data)...`);
+        const { data, error } = await supabase.functions.invoke('extract-quote-data', { 
+          body: { fileUrl: att.data_url, userId } 
+        });
+        
+        if (!error && data?.success && data?.data) {
+           console.log(`✅ OCR Estruturado concluído com sucesso!`);
+           extractedText = `DADOS ESTRUTURADOS DA APÓLICE:\n${JSON.stringify(data.data, null, 2)}`;
+        }
+      } catch (err) { console.error('⚠️ OCR Estruturado failed, fallback...', err); }
+
+      // Fallback para extrator gemini raw se o OCR estruturado falhar
+      if (!extractedText) {
+        console.log(`📄 Fallback para OCR Genérico (extract-document)...`);
+        try {
+          const { data, error } = await supabase.functions.invoke('extract-document', { body: { fileUrl: att.data_url, fileType: att.file_type } })
+          if (!error && data?.text) {
+             console.log(`✅ OCR Genérico concluído.`);
+             extractedText = data.text;
+          }
+        } catch (err) { console.error('⚠️ Document generic extraction failed:', err) }
+      }
+
+      if (extractedText) result.extractedTexts.push(extractedText);
     }
   }
   return result
@@ -463,12 +486,14 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
       }
 
       // 5. Dispatch the FINAL RESULT to n8n as a simple forwarder pipe
-      // Fallback to ai_admin_message if ai_consultant_forwarding is not mapped by the user in N8N.
+      // Sobrescrevendo o `content` do root do JSON para enganar o n8n fazendo ele pensar que isso é a msg do usuário
+      const overrideBody = { ...originalBody, content: `AQUI ESTÁ A ANÁLISE PRONTA:\n\n${generatedPitch}` };
+
       await dispatchAdminToN8n({
-        body: originalBody,
+        body: overrideBody,
         userId,
         brokerageId,
-        systemPrompt: "Você é um revisor de mensagens. Pegue a análise de Seguros que o usuário passou e APENAS formate-a de forma impecável para o WhatsApp (mantendo negritos fortes em Asteriscos e espaçamento) e envie de volta. Não adicione nem tire informações.",
+        systemPrompt: "Você é um revisor de mensagens. Pegue a análise de Seguros que o usuário passou e APENAS formate-a de forma impecável para o WhatsApp (mantendo negritos fortes em Asteriscos e espaçamento e emojis) e envie de volta. Não adicione nem tire informações e NUNCA invente nada que não esteja ali.",
         mediaResult: { messageType: 'text', attachmentUrls: [] },
         content: `AQUI ESTÁ A ANÁLISE PRONTA:\n\n${generatedPitch}`,
         config,
@@ -635,7 +660,10 @@ Deno.serve(async (req) => {
 
       // Process attachments if present
       if (body?.attachments && body.attachments.length > 0) {
-        const processed = await processAttachments(body.attachments)
+        if (conversationId && brokerageId) {
+          await sendChatwootMessage(brokerageId, conversationId, `OCR: Lendo extração da apólice...`);
+        }
+        const processed = await processAttachments(body.attachments, userId)
         entry._processed_transcriptions = processed.transcriptions
         entry._processed_extracted_texts = processed.extractedTexts
         entry._attachment_urls = processed.attachmentUrls

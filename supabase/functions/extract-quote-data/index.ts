@@ -423,17 +423,29 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Obter usuário autenticado
+    // Obter usuário autenticado ou permitir Service Role Request
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
     
-    if (userError || !user) {
-      throw new Error('Usuário não autenticado');
-    }
+    // Ler o body antecipadamente para extrair fileUrl e userId (útil no modo de serviço)
+    const reqBody = await req.json();
+    const { fileUrl, userId: bodyUserId } = reqBody;
 
-    const { fileUrl } = await req.json();
     if (!fileUrl) {
       throw new Error('fileUrl é obrigatório');
+    }
+
+    let userId = '';
+
+    if (token === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') && bodyUserId) {
+      // Background execution via internal invoke
+      userId = bodyUserId;
+    } else {
+      // Normal browser execution
+      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+      if (userError || !user) {
+        throw new Error('Usuário não autenticado');
+      }
+      userId = user.id;
     }
 
     console.log('📄 Processando PDF:', fileUrl);
@@ -442,14 +454,14 @@ serve(async (req) => {
     const pdfBase64 = await downloadPdfAsBase64(supabaseAdmin, fileUrl);
 
     // 2. Buscar contexto do DB
-    const dbContext = await fetchDatabaseContext(supabaseAdmin, user.id);
+    const dbContext = await fetchDatabaseContext(supabaseAdmin, userId);
     console.log(`✅ Contexto: ${dbContext.clients.length} clientes, ${dbContext.companies.length} seguradoras, ${dbContext.ramos.length} ramos`);
 
     // 3. Extrair dados com Gemini
     const rawData = await extractDataWithGemini(pdfBase64, dbContext, GOOGLE_AI_API_KEY);
 
     // 4. Processar dados (lógica de negócio)
-    const processedData = await processExtractedData(rawData, dbContext, supabaseAdmin, user.id);
+    const processedData = await processExtractedData(rawData, dbContext, supabaseAdmin, userId);
 
     // 5. Persistir PDF no bucket privado 'policy-docs' e remover temporário
     try {
@@ -463,7 +475,7 @@ serve(async (req) => {
       const byteArray = new Uint8Array(byteNumbers);
       const pdfBlob = new Blob([byteArray], { type: 'application/pdf' });
 
-      const destPath = `${user.id}/${Date.now()}-${originalFileName}`;
+      const destPath = `${userId}/${Date.now()}-${originalFileName}`;
 
       const { error: uploadErr } = await supabaseAdmin.storage
         .from('policy-docs')
