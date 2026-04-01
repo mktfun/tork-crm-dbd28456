@@ -219,89 +219,7 @@ ${extractedTexts.map((t, i) => `[Documento ${i + 1}]:\n${t}`).join('\n\n')}
   return prompt
 }
 
-// ─── Build consultant system prompt (Spec 021) ───
-function buildConsultantSystemPrompt(params: {
-  agentName: string
-  companyName: string
-  voiceTone: string
-  accumulatedContent?: string
-  globalBaseInstructions?: string | null
-}) {
-  const { agentName, companyName, voiceTone, accumulatedContent, globalBaseInstructions } = params
-  const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-
-  let prompt = ''
-
-  prompt += `<identity>
-Você é um Especialista em Seguros de Alto Padrão e Consultor Estratégico da corretora ${companyName}, focado nos ramos de Automóvel, Residencial, Vida e Saúde/Benefícios. 
-Seu papel NÃO é falar diretamente com o cliente final, mas sim atuar como o "Cérebro Analítico" nos bastidores, municiando o Consultor Humano com a melhor análise e o melhor pitch de vendas possível.
-Seu objetivo final é analisar os dados de uma apólice atual (ou uma nova demanda) e gerar um pitch de vendas consultivo e comparativo, traduzindo o "segurês" e os jargões técnicos para uma linguagem simples, empática e comercialmente matadora.
-Nome operacional: ${agentName}
-Tom: ${voiceTone}
-Data atual: ${now}
-</identity>
-
-<profiling>
-A personalização do pitch que você vai entregar para o consultor usar é fundamental. Sempre adapte os argumentos com base no perfil do segurado (deduza pelo contexto ou texto extraído):
-- Se for um "Pai de Família (aprox. 40 anos)": Foque no apelo emocional. Argumentos sobre cuidado, suporte, proteção familiar e sucessão patrimonial.
-- Se for um "Jovem Empresário ou Profissional Autônomo": Foque na eficiência. Argumentos sobre previsibilidade de custos, agilidade e proteção do negócio/renda.
-</profiling>
-
-<tools_guide>
-Você tem acesso a ferramentas do sistema interno. Use-as para extrair e cruzar os dados antes de gerar sua resposta:
-1. Buscar_Cotacoes_Atuais: Use para buscar as 3 opções de orçamentos mais baratas ou de melhor custo-benefício disponíveis.
-2. Consultar_Rank_Seguradoras: Use para buscar a nota de preferência/volume de cada seguradora das cotações, baseando seu argumento de qualidade.
-(A extração OCR dos documentos já foi realizada e os dados brutos estão no final deste prompt.)
-</tools_guide>
-
-<analysis_procedure>
-Siga esta ordem lógica RIGOROSAMENTE ao formular o pitch para o consultor:
-
-1. Quebra-Gelo Educativo: Inicie o pitch orientando o consultor a usar esta frase exata:
-   "Muitas vezes, com a correria do dia a dia, acabamos mantendo apólices antigas que não acompanham nossas mudanças de vida, deixando lacunas na sua proteção atual..."
-
-2. A Busca por Falhas (Desconstrução): Analise a apólice atual do cliente buscando ativamente por 3 brechas fatais: 
-   a) Exclusões ocultas ou sem destaque.
-   b) Exclusão de cobertura essencial (ex: sem cobertura para fumaça, falta de franquia compatível, etc).
-   c) Desalinhamento com o padrão de vida atual.
-
-3. Análise de Orçamentos (Rank vs Preço): Ao comparar as cotações (use a tool Buscar_Cotacoes_Atuais), aplique a regra matemática de negócio:
-   - Se a Seguradora de Rank Maior for até R$ 500,00 a R$ 1.000,00 mais cara que a de menor rank, Venda o Custo-Benefício! Destaque a qualidade e o respaldo no atendimento.
-   - Se a de Rank Maior for também a mais barata, o pitch deve ser de "oportunidade imperdível".
-
-4. Aplicação de SPIN Selling (Microcompromissos): Não vomite o preço de uma vez. O pitch deve sugerir a seguinte pergunta de implicação:
-   - "Como esses desafios te afetam financeiramente ou emocionalmente? Você já pensou sobre quais seriam as consequências se algo inesperado acontecesse e você não estivesse devidamente segurado?"
-   - Condução para o sim: "Imagine como seria ter uma cobertura mais abrangente que garantisse maior segurança para você e sua família. Isso faz sentido para você?"
-
-5. Gatilho da Perda e Fechamento: Finalize transformando cobertura de "despesa" para "investimento". Sugira a Cartada Final EXATA:
-   - "Dentre as opções e benefícios que apresentei, qual parece ser a melhor para o seu momento atual? Se você optar por garantir essa proteção hoje, quando gostaria que a sua nova cobertura entrasse em vigor?"
-</analysis_procedure>
-
-<objections_and_exceptions>
-- O Cenário "Seguro Imbatível": Se a atual for excepcionalmente boa e mais barata, seja honesto. Use EXATAMENTE: "Sua apólice de [Ramo] está excelente. Mas percebi que podemos agregar ainda mais segurança para você com um seguro [Ramo Complementar]..."
-- A Objeção "Tá Caro": Aplique Down-Selling. Eduque sobre o custo a longo prazo e sugira retirada de coberturas não essenciais para adequar ao orçamento sem perder proteção vital.
-- Follow-up de Vácuo: Se o consultor precisar reengajar amanhã, forneça EXATAMENTE a mensagem: "Olá! Sei que a rotina é corrida. Para facilitar, preparei um resumo das principais coberturas e condições que conversamos... Fique à vontade para ler com atenção e, caso queira retomar ou tirar alguma dúvida, estou à disposição!"
-</objections_and_exceptions>
-
-<strict_restrictions>
-- NUNCA sugira ou estruture oferta que configure "Venda Casada".
-- NUNCA utilize jargões técnicos ("prêmio", "sinistralidade", "franquia dedutível") sem traduzi-los.
-- NUNCA ataque agressivamente a concorrência nem faça o cliente se sentir enganado. Foque nas falhas do contrato real.
-- NUNCA invente ou garanta coberturas que as ferramentas não retornaram oficialmente.
-</strict_restrictions>
-
-`
-  if (globalBaseInstructions) {
-    prompt += `<custom_base_instructions>\n${globalBaseInstructions}\n</custom_base_instructions>\n\n`
-  }
-
-  if (accumulatedContent) {
-    prompt += `<batch_analysis_content>\nO admin enviou apólices ou documentos para análise através do OCR:\n\n${accumulatedContent}\n</batch_analysis_content>\n\n`
-  }
-  
-  return prompt
-}
-
+// REMOVIDO: buildConsultantSystemPrompt foi expirado na Spec 024 a pedido do usuário, que prefere a Inteligência Nativa.
 // ─── Resolve n8n URL ───
 async function resolveN8nUrl(userId: string | null): Promise<string | null> {
   if (userId) {
@@ -451,10 +369,8 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
   }
 
   const config = await fetchGlobalConfig(userId)
-  const systemPrompt = buildConsultantSystemPrompt({
-    ...config,
-    accumulatedContent: accumulatedContent || undefined,
-  })
+  // O sistema não vai mais dar overwrite. Vai repassar e forçar o RAG internamente a ler os dados.
+  const nativeAiContent = `Aqui estão os documentos extraídos para sua análise:\n\n${accumulatedContent || 'Nenhum documento anexado.'}\n\nINSTRUÇÕES OBRIGATÓRIAS (Sniper Consultant):\n1. Faça a sua análise técnica genial que você costuma fazer nesta apólice considerando nosso RAG.\n2. ZERO EMOJIS.\n3. NUNCA conte o que você vai fazer ("Minha tarefa é...").\n4. NÃO invente nomes, dados ou cotações que não estão aqui.\n5. Seja objetivo pra eu preencher meu CRM. Entregue exatamente esse formato estrutural na resposta:\n\nApólice: [Descrever]\nSeguradora: [Descrever]\nSegurado(a): [Descrever]\nCondutor(a): [Descrever]\nVigência: [Data a Data]\n\n[FALHAS ENCONTRADAS na Apólice]\n- ...\n- ...\n\n[O QUE O CORRETOR PRECISA FAZER]\n- ...\n`
 
   console.log(`🧠 Invoking internal ai-assistant for local execution...`);
   if (conversationId && brokerageId) {
@@ -474,10 +390,11 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
         userId,
         conversationId,
         stream: false,
-        system_override: systemPrompt,
+        // NÃO enviamos system_override para forçar a AI a rodar seu próprio buildSystemPrompt
         messages: [{
           role: 'user',
-          content: `Analise as apólices e documentos extraídos seguindo estritamente as suas diretrizes avançadas de Backoffice. Gere o pitch consultivo completo e pesquise os dados necessários (use suas ferramentas de buscar apólices ou CRM caso precise cruzar os dados, ou baseie-se exclusivamente nos OCRs fornecidos no prompt).`
+          content: nativeAiContent
+
         }]
       })
     });
@@ -505,7 +422,7 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
         body: overrideBody,
         userId,
         brokerageId,
-        systemPrompt: "Você é um revisor de mensagens. Pegue a análise de Seguros que o usuário passou e APENAS formate-a de forma impecável para o WhatsApp (mantendo negritos fortes em Asteriscos e espaçamento e emojis) e envie de volta. Não adicione nem tire informações e NUNCA invente nada que não esteja ali.",
+        systemPrompt: "Você é um revisor de mensagens. Pegue a análise de Seguros que o usuário passou e APENAS formate-a de forma impecável e limpa para envio. Mantenha os negritos em asteriscos (*), mas NÃO utilize Emojis. Não adicione nem tire informações essenciais.",
         mediaResult: { messageType: 'text', attachmentUrls: [] },
         content: `AQUI ESTÁ A ANÁLISE PRONTA:\n\n${generatedPitch}`,
         config,

@@ -438,9 +438,6 @@ export function useAIConversations() {
           break;
         }
         
-        // === WATCHDOG: Atualizar timestamp de atividade ===
-        lastActivityTime = Date.now();
-        
         const rawChunk = decoder.decode(value, { stream: true });
         console.log('[SSE-FRONT] Bruto recebido:', rawChunk.slice(0, 200));
         textBuffer += rawChunk;
@@ -491,9 +488,15 @@ export function useAIConversations() {
             
             const deltaContent = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (deltaContent) {
-              // Saneamento de caracteres para tabelas Markdown (FASE P3.7)
-              // Remove espaços acidentais no início de linhas que começam com '|'
-              const sanitizedContent = deltaContent.replace(/^\s+\|/gm, '|');
+              // Colapsar whitespace excessivo (3+ espaços → 1 espaço)
+              const sanitizedContent = deltaContent
+                .replace(/^\s+\|/gm, '|')
+                .replace(/ {3,}/g, ' ');
+              
+              // Só contar como atividade real se tiver conteúdo visível (evita whitespace flooding do watchdog)
+              if (sanitizedContent.trim().length > 0) {
+                lastActivityTime = Date.now();
+              }
               
               fullContent += sanitizedContent;
               accumulatedContent = fullContent; // Track for partial preservation
