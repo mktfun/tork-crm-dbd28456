@@ -462,8 +462,15 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
   }
   
   try {
-    const aiResponse = await supabase.functions.invoke('ai-assistant', {
-      body: {
+    const aiAssistantUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-assistant`;
+    
+    const rawAiResponse = await fetch(aiAssistantUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
         userId,
         conversationId,
         stream: false,
@@ -472,17 +479,18 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
           role: 'user',
           content: `Analise as apólices e documentos extraídos seguindo estritamente as suas diretrizes avançadas de Backoffice. Gere o pitch consultivo completo e pesquise os dados necessários (use suas ferramentas de buscar apólices ou CRM caso precise cruzar os dados, ou baseie-se exclusivamente nos OCRs fornecidos no prompt).`
         }]
-      }
+      })
     });
 
-    if (aiResponse.error) {
-      console.error('❌ ai-assistant invocation failed:', aiResponse.error);
+    if (!rawAiResponse.ok) {
+      const errorStr = await rawAiResponse.text();
+      console.error('❌ ai-assistant invocation failed:', errorStr);
       if (conversationId && brokerageId) {
-         const errStr = typeof aiResponse.error === 'object' ? JSON.stringify(aiResponse.error) : String(aiResponse.error);
-         await sendChatwootMessage(brokerageId, conversationId, `❌ Falha na IA Local:\n${errStr}\nVerifique os logs da ai-assistant.`);
+         await sendChatwootMessage(brokerageId, conversationId, `❌ Falha na IA Local HTTP ${rawAiResponse.status}:\n${errorStr.substring(0, 300)}`);
       }
     } else {
-      const generatedPitch = aiResponse.data?.message || 'Nenhuma resposta válida gerada pela IA.';
+      const aiData = await rawAiResponse.json();
+      const generatedPitch = aiData?.message || 'Nenhuma resposta válida gerada pela IA.';
       console.log(`✅ Local AI pitch generated: ${generatedPitch.length} chars`);
       
       if (conversationId && brokerageId) {
