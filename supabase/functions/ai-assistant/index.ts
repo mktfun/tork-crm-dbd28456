@@ -2029,9 +2029,9 @@ serve(async (req) => {
 
   try {
     const rawBody = await req.text();
-    const { messages, userId, conversationId, stream = false } = JSON.parse(rawBody);
+    const { messages, userId, conversationId, stream = false, system_override } = JSON.parse(rawBody);
 
-    logger.info('Request parsed', { requestId, userId, stream, conversationId });
+    logger.info('Request parsed', { requestId, userId, stream, conversationId, hasSystemOverride: !!system_override });
 
     // Rate Limiting
     const identifier = userId || req.headers.get("x-forwarded-for") || 'anon';
@@ -2133,8 +2133,11 @@ serve(async (req) => {
     const lastUserText = typeof lastUserMessage === 'string' ? lastUserMessage : 
                         (Array.isArray(lastUserMessage) ? lastUserMessage.find((p: any) => p.type === 'text')?.text || '' : '');
 
-    // Build System Prompt with RAG context
-    const systemPrompt = await buildSystemPrompt(supabase, userId, lastUserText);
+    // Build System Prompt with RAG context or use Override
+    let systemPrompt = system_override;
+    if (!systemPrompt) {
+      systemPrompt = await buildSystemPrompt(supabase, userId, lastUserText);
+    }
     logger.debug('System prompt built', {
       length: systemPrompt.length,
       hasRAG: systemPrompt.includes('<conhecimento_especializado>'),

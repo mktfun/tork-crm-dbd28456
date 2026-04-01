@@ -431,23 +431,43 @@ async function processBatchSession(sessionId: string, userId: string, brokerageI
 
   console.log(`📊 Consultant System prompt length: ${systemPrompt.length} chars`)
 
-  // Build a synthetic body for n8n with batch context
-  const batchBody = {
-    ...originalBody,
-    content: `Analise as apólices e documentos fornecidos seguindo o procedimento estrito de Backoffice. Gere o pitch final.`,
-  }
+  console.log(`🧠 Invoking internal ai-assistant for local execution...`);
+  
+  try {
+    const aiResponse = await supabase.functions.invoke('ai-assistant', {
+      body: {
+        userId,
+        conversationId,
+        stream: false,
+        system_override: systemPrompt,
+        messages: [{
+          role: 'user',
+          content: `Analise as apólices e documentos extraídos seguindo estritamente as suas diretrizes avançadas de Backoffice. Gere o pitch consultivo completo e pesquise os dados necessários (use suas ferramentas de buscar apólices ou CRM caso precise cruzar os dados, ou baseie-se exclusivamente nos OCRs fornecidos no prompt).`
+        }]
+      }
+    });
 
-  await dispatchAdminToN8n({
-    body: batchBody,
-    userId,
-    brokerageId,
-    systemPrompt,
-    mediaResult: { messageType: 'text', attachmentUrls: [] },
-    content: batchBody.content,
-    config,
-    actionOverride: 'ai_consultant_pitch',
-    extraTools: ['Buscar_Cotacoes_Atuais', 'Consultar_Rank_Seguradoras']
-  })
+    if (aiResponse.error) {
+      console.error('❌ ai-assistant invocation failed:', aiResponse.error);
+    } else {
+      const generatedPitch = aiResponse.data?.message || 'Nenhuma resposta válida gerada pela IA.';
+      console.log(`✅ Local AI pitch generated: ${generatedPitch.length} chars`);
+
+      // 5. Dispatch the FINAL RESULT to n8n as a simple forwarder pipe
+      await dispatchAdminToN8n({
+        body: originalBody,
+        userId,
+        brokerageId,
+        systemPrompt: "Você é um formatador de WhatsApp. Sua única missão é receber a análise pronta de Seguros no bloco do usuário, garantir a formatação limpa (usando asteriscos e emojis) e enviar o texto para o usuário sem cortar nem resumir as informações do consultor.",
+        mediaResult: { messageType: 'text', attachmentUrls: [] },
+        content: `AQUI ESTÁ A ANÁLISE PRONTA DO CONSULTOR MESTRE:\n\n${generatedPitch}\n\n[FIM DA ANÁLISE]`,
+        config,
+        actionOverride: 'ai_consultant_forwarding'
+      });
+    }
+  } catch (err) {
+    console.error('❌ Unexpected error calling internal AI:', err);
+  }
 
   // Mark session as completed
   await supabase.from('ai_analysis_sessions').update({ status: 'completed' }).eq('id', sessionId)
