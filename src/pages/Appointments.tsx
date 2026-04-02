@@ -82,10 +82,11 @@ export default function Appointments() {
   const [modalInitialDate, setModalInitialDate] = useState<Date | undefined>();
   const [filtroLista, setFiltroLista] = useState('Todos');
   const [buscaLista, setBuscaLista] = useState('');
+  const [calendarDateRange, setCalendarDateRange] = useState<{ startDate: string; endDate: string } | undefined>(undefined);
   const calendarRef = useRef<FullCalendar>(null);
 
-  const { appointments } = useAppointments();
-  const { weeklyStats, isLoadingStats, updateAppointment, isUpdating } = useSupabaseAppointments();
+  const { appointments } = useAppointments(calendarDateRange);
+  const { weeklyStats, isLoadingStats, updateAppointment, isUpdating } = useSupabaseAppointments(calendarDateRange);
   const { toast } = useToast();
 
   const eventsParaCalendario = useMemo(() => {
@@ -162,6 +163,15 @@ export default function Appointments() {
       if (api) {
         setTituloAtual(api.view.title);
         setDataDeReferencia(api.getDate());
+        // Capture the visible date range from FullCalendar and pass to hook
+        const start = api.view.activeStart;
+        const end = api.view.activeEnd;
+        if (start && end) {
+          setCalendarDateRange({
+            startDate: start.toISOString().split('T')[0],
+            endDate: end.toISOString().split('T')[0],
+          });
+        }
       }
     }, 100);
   };

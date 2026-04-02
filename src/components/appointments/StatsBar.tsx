@@ -45,7 +45,7 @@ export function StatsBar({ weeklyStats, isLoading }: StatsBarProps) {
 
   const stats = [
     {
-      title: 'Total do Mês',
+      title: 'Total do Período',
       value: weeklyStats.total,
       subtitle: 'agendamentos',
       icon: Calendar,
@@ -71,7 +71,7 @@ export function StatsBar({ weeklyStats, isLoading }: StatsBarProps) {
     {
       title: 'Cancelados',
       value: weeklyStats.cancelados,
-      subtitle: 'este mês',
+      subtitle: 'no período',
       icon: XCircle,
       iconBg: 'bg-destructive/10',
       iconColor: 'text-destructive',
