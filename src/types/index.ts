@@ -95,6 +95,8 @@ export interface Task {
   policyId?: string;   // Link para uma apólice
   taskType: 'Follow-up' | 'Pós-venda' | 'Documentação' | 'Renovação' | 'Sinistro' | 'Administrativa';
   createdAt: string;
+  google_task_id?: string;
+  google_synced_at?: string;
 }
 
 export interface TransactionType {
@@ -155,6 +157,8 @@ export interface Appointment {
   time: string;
   status: 'Pendente' | 'Realizado';
   createdAt: string;
+  google_event_id?: string;
+  google_synced_at?: string;
 }
 
 export interface Company {

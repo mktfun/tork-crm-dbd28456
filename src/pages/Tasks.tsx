@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { format } from 'date-fns';
-import { CalendarIcon, Plus, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { CalendarIcon, Plus, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Link as LinkIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useFilteredTasks } from '@/hooks/useFilteredTasks';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
@@ -243,10 +243,15 @@ export default function Tasks() {
                       <TableCell>
                         <div className="space-y-1">
                           <div className={cn(
-                            "font-medium",
+                            "font-medium flex items-center gap-2",
                             task.status === 'Concluída' && "line-through text-muted-foreground"
                           )}>
                             {task.title}
+                            {task.google_task_id && (
+                              <div title="Sincronizado com Google Tasks">
+                                <LinkIcon className="h-3 w-3 text-emerald-500" />
+                              </div>
+                            )}
                           </div>
                           {task.description && (
                             <div className="text-sm text-muted-foreground">

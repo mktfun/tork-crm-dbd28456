@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, User, FileText, CheckCircle, X, Repeat, Shield, Phone } from 'lucide-react';
+import { Calendar, Clock, User, FileText, CheckCircle, X, Repeat, Shield, Phone, Link as LinkIcon } from 'lucide-react';
 import { useSupabaseAppointments } from '@/hooks/useSupabaseAppointments';
 import { useClients } from '@/hooks/useAppData';
 import { useToast } from '@/hooks/use-toast';
@@ -204,6 +204,12 @@ export function AppointmentDetailsModal({ appointment, open, onOpenChange }: App
                 ) : (
                   <Badge variant="outline">
                     Único
+                  </Badge>
+                )}
+                {appointment.google_event_id && (
+                  <Badge variant="secondary" className="flex items-center gap-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                    <LinkIcon className="h-3 w-3" />
+                    Sincronizado
                   </Badge>
                 )}
               </div>

@@ -12,7 +12,8 @@ export function SettingsLayout() {
     { id: '/dashboard/settings/brokerages', label: <span className="flex items-center gap-2"><Building className="w-4 h-4" /> Corretoras</span> },
     { id: '/dashboard/settings/producers', label: <span className="flex items-center gap-2"><Users className="w-4 h-4" /> Produtores</span> },
     { id: '/dashboard/settings/companies', label: <span className="flex items-center gap-2"><Shield className="w-4 h-4" /> Seguradoras</span> },
-    { id: '/dashboard/settings/ramos', label: <span className="flex items-center gap-2"><Tag className="w-4 h-4" /> Ramos</span> }
+    { id: '/dashboard/settings/ramos', label: <span className="flex items-center gap-2"><Tag className="w-4 h-4" /> Ramos</span> },
+    { id: '/dashboard/settings/integrations', label: <span className="flex items-center gap-2"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m10 13 2.5-2.5"/><path d="M14 21v-3.5c0-1 .4-2 1.1-2.8.4-.3.9-.6 1.4-.8C18 14.3 19 13.2 19 12v-1.5c0-1.8-1.5-3.3-3.3-3.3h-1.5c-1.2 0-2.3 1-2.8 2.5-.2.5-.5 1-.8 1.4-.8.7-1.8 1.1-2.8 1.1H5.3C3.5 12 2 13.5 2 15.3V17c0 1.2 1 2.3 2.5 2.8.5.2 1 .5 1.4.8.7.8 1.1 1.8 1.1 2.8V21"/><path d="M6 5.5A2.5 2.5 0 0 1 8.5 3h7A2.5 2.5 0 0 1 18 5.5v0A2.5 2.5 0 0 1 15.5 8h-7A2.5 2.5 0 0 1 6 5.5v0Z"/></svg> Integrações</span> }
   ];
 
   const getActiveTabFromPath = () => {
