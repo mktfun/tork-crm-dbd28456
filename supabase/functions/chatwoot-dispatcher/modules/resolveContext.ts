@@ -84,6 +84,7 @@ export async function resolveContext(
         .from('brokerages')
         .select('id, user_id')
         .ilike('phone', `%${normalizedPhone}%`)
+        .limit(1)
         .maybeSingle()
 
       if (brokerage) {
