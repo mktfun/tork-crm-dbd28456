@@ -1,46 +1,51 @@
 
 
-# Plano: Corrigir admin detection para Joaci Barros + limpar historico
+# Plano: Fix apólices importadas sem agendamento de renovação
 
-## Problema
+## Diagnóstico (com prova real do banco)
 
-Existem **2 produtores** com o mesmo telefone `11947645967` no banco:
-- `joacir filho` (brokerage 8, email: assessorbmf@gmail.com)
-- `Joaci Barros` (brokerage 11 — JJ&Amorim)
+**Dados encontrados:**
+- 268 apólices importadas jan-mar com `automatic_renewal=true` → TODAS têm agendamento criado (trigger funciona)
+- 34 apólices importadas jan-mar com `automatic_renewal=false` e status `Ativa` → 18 dessas vencem em 2027+ e **NÃO têm agendamento**
+- 4 apólices com `automatic_renewal=true` mas status `Orçamento` → trigger ignora (correto)
 
-O `resolveContext.ts` usa `.maybeSingle()` na query de producers por telefone. Quando retorna 2+ rows, o Supabase retorna **erro** em vez de dados — então a deteccao de admin **nunca funciona** para esse numero.
+**Causa raiz:** No `policyImportService.ts` (linha 1531), o import define `automatic_renewal: !isOrcamento`. Apólices importadas como Orçamento recebem `automatic_renewal=false`. Quando depois são ativadas via `ativarEAnexarPdf`, o update (linha 360-366) muda o status para `Ativa` mas **NÃO seta `automatic_renewal=true`**. O trigger `handle_policy_renewal_schedule` exige AMBOS `status='Ativa' AND automatic_renewal=true`, então nunca cria o agendamento.
 
-Quanto ao historico: nao existe nenhum registro em `admin_chat_history` para esse telefone, entao nao ha nada para limpar.
+## Solução (2 partes)
 
-## Solucao
+### 1. Fix no código: `ativarEAnexarPdf` deve setar `automatic_renewal=true`
 
-### 1. Remover o produtor duplicado (via SQL insert tool)
+**Arquivo:** `src/hooks/useSupabasePolicies.ts`, linhas 360-366
 
-O produtor `joacir filho` (id: `86d040a4-a7b5-468b-a711-89b2a19261d5`, brokerage 8) parece ser um cadastro duplicado. Deletar ele para que reste apenas `Joaci Barros` (brokerage 11).
-
-```sql
-DELETE FROM producers WHERE id = '86d040a4-a7b5-468b-a711-89b2a19261d5';
-```
-
-### 2. Tornar o resolveContext mais robusto (codigo)
-
-Trocar `.maybeSingle()` por `.limit(1).maybeSingle()` na query de producers por telefone no `resolveContext.ts` (linha 74). Assim, mesmo que existam duplicatas futuras, pega o primeiro resultado sem erro.
+Adicionar `automatic_renewal: true` no update quando o status muda de "Aguardando Apólice" para "Ativa":
 
 ```typescript
-// Linha 71-75: adicionar .limit(1) antes de .maybeSingle()
-const { data: producer } = await supabase
-  .from('producers')
-  .select('id, brokerage_id')
-  .ilike('phone', `%${normalizedPhone}%`)
-  .limit(1)
-  .maybeSingle()
+const { error } = await supabase
+  .from('apolices')
+  .update({
+    status: newStatus,
+    pdf_attached_name: file.name,
+    pdf_attached_data: pdfBase64,
+    ...(newStatus === 'Ativa' ? { automatic_renewal: true } : {})
+  })
 ```
 
-### 3. Deploy do chatwoot-dispatcher
+### 2. Corrigir dados existentes via migration
+
+Executar SQL que:
+1. Atualiza as 34 apólices ativas com `automatic_renewal=false` para `true` — o trigger `AFTER UPDATE` vai disparar automaticamente e criar os agendamentos de renovação que faltam
+2. Isso é seguro porque o trigger já tem lógica de "upsert" (não duplica se já existir agendamento para o mesmo ciclo/ano)
+
+```sql
+UPDATE apolices 
+SET automatic_renewal = true, updated_at = now()
+WHERE status = 'Ativa' 
+  AND automatic_renewal = false;
+```
 
 ## Resultado
 
-- Joaci Barros (11947645967) sera detectado como admin automaticamente pelo bot
-- Sem risco de quebra futura por duplicatas de telefone
-- Historico limpo (ja esta vazio)
+- As 18+ apólices ativas sem agendamento terão seus agendamentos criados automaticamente pelo trigger
+- Futuras ativações de orçamentos criarão agendamento corretamente
+- Zero mudança no frontend — tudo é backend/trigger
 
