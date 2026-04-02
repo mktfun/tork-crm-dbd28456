@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_chat_history: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          phone_number: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          phone_number: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          phone_number?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_analysis_sessions: {
         Row: {
           brokerage_id: number

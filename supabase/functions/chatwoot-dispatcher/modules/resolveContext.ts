@@ -72,6 +72,7 @@ export async function resolveContext(
       .from('producers')
       .select('id, brokerage_id')
       .ilike('phone', `%${normalizedPhone}%`)
+      .limit(1)
       .maybeSingle()
 
     if (producer) {
