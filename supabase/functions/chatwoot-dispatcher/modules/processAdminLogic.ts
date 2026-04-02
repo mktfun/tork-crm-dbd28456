@@ -139,9 +139,11 @@ async function executeAIAssistant(
     
   const history = (historyData || []).reverse().map(row => ({ role: row.role, content: row.content }))
   
-  history.push({ role: 'user', content: finalContent })
+  const whatsappFormatInstruction = `\n\n[INSTRUÇÕES CRÍTICAS DE FORMATAÇÃO WHATSAPP]:\n1. É ESTRITAMENTE PROIBIDO usar tabelas Markdown (| Coluna | Valor |). O WhatsApp não as renderiza corretamente. Use APENAS listas simples (com hífens, marcadores e emojis).\n2. É PROIBIDO usar títulos com hashtags (Ex: ### Título). Use Formatação WhatsApp: *Negrito* ou _Itálico_ para destacar seções.\n3. Escreva parágrafos muito curtos e dinâmicos para facilitar a leitura na tela do celular.`
   
-  // Save user msg to history
+  history.push({ role: 'user', content: finalContent + whatsappFormatInstruction })
+  
+  // Save user msg to history (sem as instruções para não sujar o histórico futuro)
   await supabase.from('admin_chat_history').insert({
     user_id: userId,
     phone_number: phone,
@@ -164,12 +166,15 @@ async function executeAIAssistant(
     if (!aiResp.ok) {
       const errTxt = await aiResp.text()
       console.error('❌ ai-assistant failed:', errTxt)
-      await sendChatwootMessage(supabase, brokerageId, conversationId, `🤖 Desculpe, ocoru um erro ao consultar o cérebro AI:\nHTTP ${aiResp.status}`)
+      await sendChatwootMessage(supabase, brokerageId, conversationId, `🤖 Desculpe, ocorreu um erro ao consultar o cérebro AI:\nHTTP ${aiResp.status}`)
       return
     }
 
     const data = await aiResp.json()
-    const answer = data.message || "Sem resposta válida da IA."
+    let answer = data.message || "Sem resposta válida da IA."
+
+    // Limpa a tag <thinking> da resposta para não aparecer no WhatsApp do usuário
+    answer = answer.replace(/<thinking>[\s\S]*?<\/thinking>\n?/gi, '').trim()
 
     // Save assistant response
     await supabase.from('admin_chat_history').insert({
