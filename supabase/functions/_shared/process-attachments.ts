@@ -1,3 +1,4 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 
 export async function processAttachments(

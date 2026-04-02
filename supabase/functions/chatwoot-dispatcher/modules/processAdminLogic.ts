@@ -1,6 +1,6 @@
 import { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
-import { processAttachments } from '../_shared/process-attachments.ts'
-import { sendChatwootMessage } from '../_shared/chatwoot.ts'
+import { processAttachments } from '../../_shared/process-attachments.ts'
+import { sendChatwootMessage } from '../../_shared/chatwoot.ts'
 
 export async function processAdminLogic(
   supabase: SupabaseClient,
