@@ -1,6 +1,7 @@
 import { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { processAttachments } from '../../_shared/process-attachments.ts'
 import { sendChatwootMessage } from '../../_shared/chatwoot.ts'
+import { formatForWhatsApp } from '../../_shared/whatsapp-formatter.ts'
 
 export async function processAdminLogic(
   supabase: SupabaseClient,
@@ -139,7 +140,7 @@ async function executeAIAssistant(
     
   const history = (historyData || []).reverse().map(row => ({ role: row.role, content: row.content }))
   
-  const whatsappFormatInstruction = `\n\n[INSTRUÇÕES CRÍTICAS DE FORMATAÇÃO WHATSAPP]:\n1. É ESTRITAMENTE PROIBIDO usar tabelas Markdown (| Coluna | Valor |). O WhatsApp não as renderiza corretamente. Use APENAS listas simples (com hífens, marcadores e emojis).\n2. É PROIBIDO usar títulos com hashtags (Ex: ### Título). Use Formatação WhatsApp: *Negrito* ou _Itálico_ para destacar seções.\n3. Escreva parágrafos muito curtos e dinâmicos para facilitar a leitura na tela do celular.`
+  const whatsappFormatInstruction = `\n\n[MODO WHATSAPP ATIVADO]\nVocê está respondendo via WhatsApp. Siga estas regras ABSOLUTAS:\n✅ Títulos: *Título em Negrito* (asterisco simples, linha isolada)\n✅ Listas: use • como marcador. Jamais - ou *.\n✅ Negrito: *palavra* (simples). Jamais **.\n✅ Itálico: _palavra_ (underscore). Jamais *.\n✅ Linha em branco entre cada seção.\n⛔ NUNCA tabelas com | pipes |\n⛔ NUNCA ### ## # para títulos\n⛔ NUNCA ** para negrito\n⛔ NUNCA blocos de código com \`\`\`\nA resposta deve ser clara, prática e bonita no celular.`
   
   history.push({ role: 'user', content: finalContent + whatsappFormatInstruction })
   
@@ -173,8 +174,8 @@ async function executeAIAssistant(
     const data = await aiResp.json()
     let answer = data.message || "Sem resposta válida da IA."
 
-    // Limpa a tag <thinking> da resposta para não aparecer no WhatsApp do usuário
-    answer = answer.replace(/<thinking>[\s\S]*?<\/thinking>\n?/gi, '').trim()
+    // Aplica pipeline determinístico de tradução Markdown -> WhatsApp nativo
+    answer = formatForWhatsApp(answer)
 
     // Save assistant response
     await supabase.from('admin_chat_history').insert({
