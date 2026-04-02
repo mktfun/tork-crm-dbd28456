@@ -64,21 +64,21 @@ export default function IntegrationSettings() {
 
   const handleConnectGoogle = async () => {
     try {
-      // In a real scenario, this would redirect to Google OAuth consent screen.
-      // E.g., window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?...`;
+      setIsLoading(true);
+      const { data, error } = await supabase.functions.invoke('google-auth-url');
+      
+      if (error) throw error;
+      if (!data?.url) throw new Error("No URL returned");
 
-      // For now, simulate connecting or notify user they need to configure Google Cloud.
-      toast({
-        title: "Funcionalidade em desenvolvimento",
-        description:
-          "É necessário configurar o Client ID e Client Secret do Google Cloud primeiro.",
-      });
+      window.location.href = data.url;
     } catch (error) {
+      console.error('Error getting auth URL:', error);
       toast({
-        title: "Erro ao conectar",
-        description: "Tente novamente mais tarde.",
-        variant: "destructive",
+        title: 'Erro ao conectar',
+        description: 'Verifique se as credenciais do Google foram configuradas no Supabase.',
+        variant: 'destructive',
       });
+      setIsLoading(false);
     }
   };
 
