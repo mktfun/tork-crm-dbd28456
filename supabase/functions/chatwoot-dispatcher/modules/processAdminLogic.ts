@@ -18,6 +18,11 @@ export async function processAdminLogic(
   const lowerContent = cleanContent.toLowerCase()
   const phone = sender?.phone_number || 'unknown'
 
+  // 0. Avisa que está baixando anexos pesados para evitar que o usuário perca paciência e digite /start
+  if (attachments && attachments.length > 0) {
+    await sendChatwootMessage(supabase, brokerageId, conversation.id, `⏳ Recebendo arquivo... Aguarde a leitura (pode levar 15 segundos).`)
+  }
+
   // 1. Process attachments (audio/image/doc)
   const mediaResult = await processAttachments(supabase, attachments || [], userId, SUPABASE_URL)
 
@@ -139,8 +144,7 @@ async function executeAIAssistant(
     .limit(10)
     
   const history = (historyData || []).reverse().map(row => ({ role: row.role, content: row.content }))
-  
-  const whatsappFormatInstruction = `\n\n[MODO WHATSAPP ATIVADO]\nVocê está respondendo via WhatsApp. Siga estas regras ABSOLUTAS:\n✅ Títulos: *Título em Negrito* (asterisco simples, linha isolada)\n✅ Listas: use • como marcador. Jamais - ou *.\n✅ Negrito: *palavra* (simples). Jamais **.\n✅ Itálico: _palavra_ (underscore). Jamais *.\n✅ Linha em branco entre cada seção.\n⛔ NUNCA tabelas com | pipes |\n⛔ NUNCA ### ## # para títulos\n⛔ NUNCA ** para negrito\n⛔ NUNCA blocos de código com \`\`\`\nA resposta deve ser clara, prática e bonita no celular.`
+  const whatsappFormatInstruction = `\n\n[MODO WHATSAPP ATIVADO]\nVocê está respondendo via WhatsApp. Siga estas regras ABSOLUTAS:\n✅ Título: *Título Negrito* (asterisco)\n✅ Listas: use • como marcador.\n✅ Destaque/Aviso: use blockquotes com "> " no começo da linha. Fica ótimo no WhatsApp!\n✅ Negrito: *texto*\n✅ Itálico: _texto_\n⛔ NUNCA use tabelas (| pipes |). Converta em listas.\n⛔ NUNCA use ### ou **.\n⛔ Parágrafos curtos, pule linhas.\nA resposta deve ser perfeita para ler no celular.`
   
   history.push({ role: 'user', content: finalContent + whatsappFormatInstruction })
   

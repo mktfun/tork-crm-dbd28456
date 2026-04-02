@@ -59,8 +59,9 @@ export function formatForWhatsApp(rawText: string): string {
   text = text.replace(/\[x\]/gi, '✅');
   text = text.replace(/\[ \]/g, '☐');
 
-  // ─── Etapa 10: Blockquotes > texto → texto em itálico ────────────────────
-  text = text.replace(/^>\s?(.+)$/gm, '_$1_');
+  // ─── Etapa 10: Blockquotes > texto ─────────────────────────────────────────
+  // REMOVIDO: O WhatsApp Web e Mobile SUPORTAM nativamente blockquotes `> texto` gerando uma linha cinza.
+  // Vamos manter o `>` intocado para que renderize o blockquote bonito pedido pelo usuário.
 
   // ─── Etapa 11: Separadores --- → espaço duplo ────────────────────────────
   text = text.replace(/^-{3,}$/gm, '');
