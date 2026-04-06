@@ -7,6 +7,7 @@ export async function dispatchToN8n(
     userId: string | null,
     brokerageId: number | null,
     role: string | null,
+    senderRole: string | null,
     aiEnabled: boolean,
     clientId: string | null,
     currentDeal: any,
@@ -24,7 +25,7 @@ export async function dispatchToN8n(
   }
 ) {
   const {
-    body, userId, brokerageId, role, aiEnabled, clientId, currentDeal, currentStage,
+    body, userId, brokerageId, role, senderRole, aiEnabled, clientId, currentDeal, currentStage,
     promptResult, stageAiSettings, finalSystemPrompt, mediaResult, content,
     autoCreatedDeal, autoCreatedProductId, autoCreatedProductName, objectiveResult,
     N8N_WEBHOOK_URL
@@ -47,6 +48,7 @@ export async function dispatchToN8n(
       crm_user_id: userId,
       brokerage_id: brokerageId,
       user_role: role,
+      sender_role: senderRole,
       ai_enabled: aiEnabled,
       client_id: clientId,
       deal_id: currentDeal?.id || null,

@@ -1,73 +1,99 @@
-# Welcome to your Lovable project
+# 🪐 Antigravity Config Kit
 
-## Project info
+> **Pacote portável de configurações, skills e workflows para Google Antigravity (Gemini Code Assist).**
+> Clone este repo e importe em qualquer workspace para obter workflows de Vibe Coding, skills de Design 2026, e regras de orquestração prontas.
 
-**URL**: https://lovable.dev/projects/2d4b7d0f-4ad1-4368-b149-771bcf01be6f
+---
 
-## How can I edit this code?
+## 🚀 Como Usar
 
-There are several ways of editing your application.
+### Opção 1: Copiar para seu projeto (Recomendado)
+```bash
+# Clone este repo
+git clone https://github.com/davi-449/antigravity-config.git
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/2d4b7d0f-4ad1-4368-b149-771bcf01be6f) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Copie as pastas para o seu projeto
+cp -r antigravity-config/.agent/ meu-projeto/.agent/
+cp -r antigravity-config/.antigravity/ meu-projeto/.antigravity/
 ```
 
-**Edit a file directly in GitHub**
+### Opção 2: Referenciar como submódulo Git
+```bash
+cd meu-projeto
+git submodule add https://github.com/davi-449/antigravity-config.git .agent-config
+# Depois crie symlinks ou copie manualmente
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Opção 3: Pedir ao Antigravity
+Abra o Antigravity no seu workspace e peça:
+> "Importe as skills e workflows do repo https://github.com/davi-449/antigravity-config e configure este projeto"
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 📂 Estrutura
 
-## What technologies are used for this project?
+```
+antigravity-config/
+├── .agent/                          # Configurações do agente
+│   ├── skills/                      # Skills especializadas
+│   │   └── ux-ui-architect-2026/    # Design System 2026
+│   │       └── SKILL.md             # Skill principal
+│   └── workflows/                   # Slash-commands (/vibe-*)
+│       ├── vibe-proposal.md         # /vibe-proposal — Planejamento
+│       ├── vibe-apply.md            # /vibe-apply — Implementação
+│       └── vibe-archive.md          # /vibe-archive — Arquivamento
+├── .antigravity/                    # Regras do Antigravity IDE
+│   └── rules.md                     # Regras de orquestração
+├── templates/                       # Templates reutilizáveis
+│   ├── spec-template/               # Template de spec vazia
+│   │   ├── proposal.md
+│   │   ├── design.md
+│   │   └── tasks.md
+│   └── project-scaffold.md          # Guia de setup para projetos novos
+├── .gitignore
+└── README.md
+```
 
-This project is built with:
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🧩 O que está incluído
 
-## How can I deploy this project?
+### Skills
+| Skill | Descrição |
+|-------|-----------|
+| `ux-ui-architect-2026` | Apple Liquid Glass, Maximalismo Tátil, WCAG 2.2, Engenharia de Conversão, Motion Design |
 
-Simply open [Lovable](https://lovable.dev/projects/2d4b7d0f-4ad1-4368-b149-771bcf01be6f) and click on Share -> Publish.
+### Workflows
+| Comando | Fase | Descrição |
+|---------|------|-----------|
+| `/vibe-proposal` | Planejamento | Research (RPI-R), requisitos, BDD scenarios, design doc |
+| `/vibe-apply` | Implementação | Execução guiada + Quality Gate UX/UI 2026 |
+| `/vibe-archive` | Arquivamento | Move specs finalizadas para archive |
 
-## Can I connect a custom domain to my Lovable project?
+### Metodologias Integradas
+- **RPI** (Research → Plan → Implement) — em todos os workflows criativos
+- **BDD** (Behavior Driven Design) — cenários Given/When/Then obrigatórios
+- **Quality Gate 2026** — checklist visual obrigatório antes de commit
 
-Yes, you can!
+### Rules
+- Regras de orquestração Vibe Coding
+- Arquitetura de pastas Feature-Sliced Design
+- Padrões de Frontend, Backend (Supabase), e Qualidade de Código
+- Commits semânticos (Conventional Commits)
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## 📋 Versão
+
+| Campo | Valor |
+|-------|-------|
+| Versão | 1.0.0 |
+| Autor | DaviCode |
+| Última atualização | 2026-04-06 |
+| Compatível com | Google Antigravity, Cursor, Windsurf, VS Code + Gemini |
+
+---
+
+## 📄 Licença
+
+MIT — Use, modifique e distribua livremente.

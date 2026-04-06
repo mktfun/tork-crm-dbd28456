@@ -10,7 +10,8 @@ export async function resolveContext(
 
   let userId: string | null = null
   let brokerageId: number | null = null
-  let role: string | null = null
+  let crmUserRole: string | null = null
+  let senderRole: string | null = null
   let aiEnabled = true
 
   // 1. Resolve user from assignee email
@@ -23,7 +24,7 @@ export async function resolveContext(
 
     if (profile) {
       userId = profile.id
-      role = profile.role
+      crmUserRole = profile.role
       aiEnabled = profile.ai_enabled ?? true
     }
   }
@@ -57,17 +58,18 @@ export async function resolveContext(
         .maybeSingle()
 
       if (profile) {
-        role = profile.role
+        crmUserRole = profile.role
         aiEnabled = profile.ai_enabled ?? true
       }
     }
   }
 
   // 3. Auto-detect producer or brokerage owner as admin by phone
-  const senderPhone = sender?.phone_number?.replace(/\D/g, '')
+  const senderPhoneTrimmed = sender?.phone_number?.replace(/\D/g, '') || ''
   // Normalize: remove country code 55 prefix (Chatwoot sends +5511... but DB stores 11...)
-  const normalizedPhone = senderPhone?.startsWith('55') ? senderPhone.slice(2) : senderPhone
-  if (normalizedPhone && role !== 'admin') {
+  const normalizedPhone = senderPhoneTrimmed.startsWith('55') ? senderPhoneTrimmed.slice(2) : senderPhoneTrimmed
+  
+  if (normalizedPhone.length >= 10 && senderRole !== 'admin') {
     const { data: producer } = await supabase
       .from('producers')
       .select('id, brokerage_id')
@@ -76,7 +78,7 @@ export async function resolveContext(
       .maybeSingle()
 
     if (producer) {
-      role = 'admin'
+      senderRole = 'admin'
       if (!brokerageId) brokerageId = producer.brokerage_id
       console.log('👑 Sender is a producer → admin mode')
     } else {
@@ -88,7 +90,7 @@ export async function resolveContext(
         .maybeSingle()
 
       if (brokerage) {
-        role = 'admin'
+        senderRole = 'admin'
         if (!brokerageId) brokerageId = brokerage.id
         if (!userId) userId = brokerage.user_id
         console.log('👑 Sender is a brokerage owner → admin mode')
@@ -120,7 +122,7 @@ export async function resolveContext(
     }
 
     // Auto-register new client from Chatwoot contact
-    if (!clientId && userId && role !== 'admin') {
+    if (!clientId && userId && senderRole !== 'admin') {
       const newClientName = sender?.name || 'Contato Chatwoot'
       const newPhone = contactPhone ? contactPhone.replace(/\D/g, '') : ''
       const newEmail = contactEmail || ''
@@ -168,7 +170,8 @@ export async function resolveContext(
   return {
     userId,
     brokerageId,
-    role,
+    role: crmUserRole,
+    senderRole,
     aiEnabled,
     clientId,
     clientData,

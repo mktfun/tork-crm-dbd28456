@@ -84,14 +84,14 @@ async function processWebhook(body: any) {
 
     // 1. Resolve Context (User, Brokerage, Client, Role, Flags)
     const context = await resolveContext(supabase, body)
-    const { userId, brokerageId, role, aiEnabled, clientId, clientData, clientAiEnabled, contactPhone, contactEmail } = context
+    const { userId, brokerageId, role: crmUserRole, senderRole, aiEnabled, clientId, clientData, clientAiEnabled, contactPhone, contactEmail } = context
 
     if (!aiEnabled) {
       console.log('🚫 AI disabled for user:', userId)
       return
     }
 
-    if (!clientAiEnabled && role !== 'admin') {
+    if (!clientAiEnabled && senderRole !== 'admin') {
       console.log('🚫 AI disabled for client:', clientId)
       return
     }
@@ -108,7 +108,7 @@ async function processWebhook(body: any) {
     }
 
     // 3. Admin delegation — route directly to ai-assistant without n8n
-    if (role === 'admin' && userId && brokerageId) {
+    if (senderRole === 'admin' && userId && brokerageId) {
       const { processAdminLogic } = await import('./modules/processAdminLogic.ts')
       await processAdminLogic(supabase, body, userId, brokerageId, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
       return
@@ -127,7 +127,7 @@ async function processWebhook(body: any) {
       autoCreatedProductId, autoCreatedProductName, clientJustResponded
     } = await resolveDeal(
       supabase, resolvedAI, userId as string, clientId, clientData, sender,
-      content || '', mediaResult, brokerageId, conversation, role || 'user',
+      content || '', mediaResult, brokerageId, conversation, crmUserRole || 'user',
       isIncomingMessage
     )
 
@@ -138,7 +138,7 @@ async function processWebhook(body: any) {
 
     // 8. Build system prompt
     const promptResult = await buildSystemPrompt(supabase, {
-      role, userId, clientId,
+      role: senderRole, userId, clientId,
       deal: currentDeal, stage: currentStage, stageAiSettings,
       messageContent: content || '',
       transcription: mediaResult.transcription,
@@ -150,7 +150,7 @@ async function processWebhook(body: any) {
       ? `${clientContextForPrompt}\n---\n\n${promptResult.systemPrompt}`
       : promptResult.systemPrompt
 
-    if (!promptResult.aiIsActive && role !== 'admin') {
+    if (!promptResult.aiIsActive && senderRole !== 'admin') {
       console.log('🚫 AI inactive for this user config')
       return
     }
@@ -158,7 +158,7 @@ async function processWebhook(body: any) {
     // 9. Dispatch to n8n (respond with CURRENT stage prompt first)
     const objectiveResultPlaceholder = { completed: false, previousStageId: null as string | null, previousStageName: null as string | null, newStageId: null as string | null, newStageName: null as string | null }
     const n8nResponseBody = await dispatchToN8n(supabase, {
-      body, userId, brokerageId, role, aiEnabled, clientId, currentDeal, currentStage,
+      body, userId, brokerageId, role: crmUserRole, senderRole, aiEnabled, clientId, currentDeal, currentStage,
       promptResult, stageAiSettings, finalSystemPrompt, mediaResult, content,
       autoCreatedDeal, autoCreatedProductId, autoCreatedProductName, objectiveResult: objectiveResultPlaceholder,
       N8N_WEBHOOK_URL
@@ -166,11 +166,11 @@ async function processWebhook(body: any) {
 
     // 10. Manage Followups
     await manageFollowups(supabase, {
-      currentDeal, userId, role, clientJustResponded, stageAiSettings, n8nResponseBody, conversation, brokerageId
+      currentDeal, userId, role: crmUserRole, senderRole, clientJustResponded, stageAiSettings, n8nResponseBody, conversation, brokerageId
     })
 
     // 11. Post-response: evaluate objective completion and move stage if needed
-    if (currentDeal && !autoCreatedDeal && stageAiSettings?.ai_objective && userId && role !== 'admin') {
+    if (currentDeal && !autoCreatedDeal && stageAiSettings?.ai_objective && userId && senderRole !== 'admin') {
       const objectiveResult = await evaluateObjectiveCompletion(supabase, resolvedAI, {
         deal: currentDeal,
         stage: currentStage,

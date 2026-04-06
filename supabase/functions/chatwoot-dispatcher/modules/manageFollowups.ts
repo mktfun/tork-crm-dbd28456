@@ -3,9 +3,10 @@ import { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 export async function manageFollowups(
   supabase: SupabaseClient,
   params: {
-    currentDeal: any,
+    currentDeal: any | null,
     userId: string | null,
     role: string | null,
+    senderRole: string | null,
     clientJustResponded: boolean,
     stageAiSettings: any,
     n8nResponseBody: any,
@@ -13,7 +14,7 @@ export async function manageFollowups(
     brokerageId: number | null
   }
 ) {
-  const { currentDeal, userId, role, clientJustResponded, stageAiSettings, n8nResponseBody, conversation, brokerageId } = params
+  const { currentDeal, userId, role, senderRole, clientJustResponded, stageAiSettings, n8nResponseBody, conversation, brokerageId } = params
 
   if (currentDeal?.id && userId && role !== 'admin' && !clientJustResponded) {
     const shouldFollowUp = (() => {
