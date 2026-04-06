@@ -70,29 +70,37 @@ export async function resolveContext(
   const normalizedPhone = senderPhoneTrimmed.startsWith('55') ? senderPhoneTrimmed.slice(2) : senderPhoneTrimmed
   
   if (normalizedPhone.length >= 10 && senderRole !== 'admin') {
-    const { data: producer } = await supabase
+    const normalizedSender = normalizedPhone.slice(-10)
+    
+    const { data: producers } = await supabase
       .from('producers')
-      .select('id, brokerage_id')
-      .ilike('phone', `%${normalizedPhone}%`)
-      .limit(1)
-      .maybeSingle()
+      .select('id, brokerage_id, phone')
+      .not('phone', 'is', null)
 
-    if (producer) {
+    const matchedProducer = producers?.find((p: any) => {
+      const pNorm = (p.phone || '').replace(/\D/g, '').replace(/^55/, '').slice(-10)
+      return pNorm.length >= 10 && pNorm === normalizedSender
+    })
+
+    if (matchedProducer) {
       senderRole = 'admin'
-      if (!brokerageId) brokerageId = producer.brokerage_id
+      if (!brokerageId) brokerageId = matchedProducer.brokerage_id
       console.log('👑 Sender is a producer → admin mode')
     } else {
-      const { data: brokerage } = await supabase
+      const { data: brokerages } = await supabase
         .from('brokerages')
-        .select('id, user_id')
-        .ilike('phone', `%${normalizedPhone}%`)
-        .limit(1)
-        .maybeSingle()
+        .select('id, user_id, phone')
+        .not('phone', 'is', null)
 
-      if (brokerage) {
+      const matchedBrokerage = brokerages?.find((b: any) => {
+        const bNorm = (b.phone || '').replace(/\D/g, '').replace(/^55/, '').slice(-10)
+        return bNorm.length >= 10 && bNorm === normalizedSender
+      })
+
+      if (matchedBrokerage) {
         senderRole = 'admin'
-        if (!brokerageId) brokerageId = brokerage.id
-        if (!userId) userId = brokerage.user_id
+        if (!brokerageId) brokerageId = matchedBrokerage.id
+        if (!userId) userId = matchedBrokerage.user_id
         console.log('👑 Sender is a brokerage owner → admin mode')
       }
     }
@@ -105,13 +113,29 @@ export async function resolveContext(
   const contactEmail = sender?.email
 
   if (contactPhone || contactEmail) {
-    let clientQuery = supabase.from('clientes').select('id, name, ai_enabled')
-    const normalizedContactPhone = contactPhone ? contactPhone.replace(/\D/g, '').replace(/^55/, '') : ''
-    if (contactPhone) clientQuery = clientQuery.ilike('phone', `%${normalizedContactPhone}%`)
-    else if (contactEmail) clientQuery = clientQuery.eq('email', contactEmail)
-    if (userId) clientQuery = clientQuery.eq('user_id', userId)
+    let fetchedClient: any = null
+    
+    if (contactPhone) {
+      const normalizedContactPhone = contactPhone.replace(/\D/g, '').replace(/^55/, '').slice(-10)
+      
+      let clientQuery = supabase.from('clientes').select('id, name, ai_enabled, phone').not('phone', 'is', null)
+      if (userId) clientQuery = clientQuery.eq('user_id', userId)
+      
+      const { data: allClients } = await clientQuery
+      
+      fetchedClient = allClients?.find((c: any) => {
+        const cNorm = (c.phone || '').replace(/\D/g, '').replace(/^55/, '').slice(-10)
+        return cNorm.length >= 10 && cNorm === normalizedContactPhone
+      })
+    }
+    
+    if (!fetchedClient && contactEmail) {
+      let emailQuery = supabase.from('clientes').select('id, name, ai_enabled').eq('email', contactEmail)
+      if (userId) emailQuery = emailQuery.eq('user_id', userId)
+      const { data: clientByEmail } = await emailQuery.limit(1).maybeSingle()
+      fetchedClient = clientByEmail
+    }
 
-    const { data: fetchedClient } = await clientQuery.limit(1).maybeSingle()
     clientData = fetchedClient
     clientId = clientData?.id || null
 
