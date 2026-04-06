@@ -1,5 +1,15 @@
 import { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 
+// Normaliza formato brasileiro ignorando o 9º Dígito Móvel.
+// Transforma e.g. "11979699832" em "1179699832" para cruzamentos infalíveis.
+const normalizeTo10Digits = (phoneStr: string) => {
+  const digits = (phoneStr || '').replace(/\D/g, '').replace(/^55/, '')
+  if (digits.length === 11 && digits[2] === '9') {
+    return digits.slice(0, 2) + digits.slice(3)
+  }
+  return digits.slice(-10)
+}
+
 export async function resolveContext(
   supabase: SupabaseClient,
   body: any
@@ -64,13 +74,35 @@ export async function resolveContext(
     }
   }
 
+  // 2.5. Fallback to account mapping se não houver inbox_id mapeado
+  if (!brokerageId && (body.account?.id || conversation?.account_id)) {
+    const accountId = body.account?.id || conversation?.account_id
+    const { data: brokAccount } = await supabase
+      .from('brokerages')
+      .select('id, user_id')
+      .eq('chatwoot_account_id', accountId)
+      .maybeSingle()
+
+    if (brokAccount) {
+      brokerageId = brokAccount.id
+      if (!userId) {
+        userId = brokAccount.user_id
+        const { data: profile } = await supabase.from('profiles').select('role, ai_enabled').eq('id', userId).maybeSingle()
+        if (profile) {
+          crmUserRole = profile.role
+          aiEnabled = profile.ai_enabled ?? true
+        }
+      }
+    }
+  }
+
   // 3. Auto-detect producer or brokerage owner as admin by phone
   const senderPhoneTrimmed = sender?.phone_number?.replace(/\D/g, '') || ''
   // Normalize: remove country code 55 prefix (Chatwoot sends +5511... but DB stores 11...)
   const normalizedPhone = senderPhoneTrimmed.startsWith('55') ? senderPhoneTrimmed.slice(2) : senderPhoneTrimmed
   
   if (normalizedPhone.length >= 10 && senderRole !== 'admin') {
-    const normalizedSender = normalizedPhone.slice(-11)
+    const normalizedSender = normalizeTo10Digits(normalizedPhone)
     
     // NUNCA promover para admin se não soubermos a qual brokerage a conversa pertence
     if (brokerageId) {
@@ -81,8 +113,8 @@ export async function resolveContext(
         .not('phone', 'is', null)
 
       const matchedProducer = producers?.find((p: any) => {
-        const pNorm = (p.phone || '').replace(/\D/g, '').replace(/^55/, '').slice(-11)
-        return pNorm.length >= 10 && pNorm === normalizedSender
+        const pNorm = normalizeTo10Digits(p.phone)
+        return pNorm.length === 10 && pNorm === normalizedSender
       })
 
       if (matchedProducer) {
@@ -96,8 +128,8 @@ export async function resolveContext(
           .not('phone', 'is', null)
 
         const matchedBrokerage = brokerages?.find((b: any) => {
-          const bNorm = (b.phone || '').replace(/\D/g, '').replace(/^55/, '').slice(-11)
-          return bNorm.length >= 10 && bNorm === normalizedSender
+          const bNorm = normalizeTo10Digits(b.phone)
+          return bNorm.length === 10 && bNorm === normalizedSender
         })
 
         if (matchedBrokerage) {
@@ -119,7 +151,7 @@ export async function resolveContext(
     let fetchedClient: any = null
     
     if (contactPhone) {
-      const normalizedContactPhone = contactPhone.replace(/\D/g, '').replace(/^55/, '').slice(-10)
+      const normalizedContactPhone = normalizeTo10Digits(contactPhone)
       
       let clientQuery = supabase.from('clientes').select('id, name, ai_enabled, phone').not('phone', 'is', null)
       if (userId) clientQuery = clientQuery.eq('user_id', userId)
@@ -127,8 +159,8 @@ export async function resolveContext(
       const { data: allClients } = await clientQuery
       
       fetchedClient = allClients?.find((c: any) => {
-        const cNorm = (c.phone || '').replace(/\D/g, '').replace(/^55/, '').slice(-10)
-        return cNorm.length >= 10 && cNorm === normalizedContactPhone
+        const cNorm = normalizeTo10Digits(c.phone)
+        return cNorm.length === 10 && cNorm === normalizedContactPhone
       })
     }
     
