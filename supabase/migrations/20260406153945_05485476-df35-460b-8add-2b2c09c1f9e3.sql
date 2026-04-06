@@ -1,0 +1,1 @@
+DELETE FROM admin_chat_history WHERE phone_number LIKE '%956076123%';
