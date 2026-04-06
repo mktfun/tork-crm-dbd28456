@@ -1,12 +1,12 @@
 # Tasks 032: Google Calendar + Google Tasks Integration
 
 ## Fase 0 — Setup Google Cloud
-- [ ] Criar Projeto no Google Cloud Console
-- [ ] Habilitar Google Calendar API
-- [ ] Habilitar Google Tasks API
-- [ ] Criar credenciais OAuth 2.0 (Client ID + Client Secret)
-- [ ] Configurar redirect URI para Edge Function callback
-- [ ] Salvar Client ID e Client Secret nos secrets do Supabase
+- [x] Criar Projeto no Google Cloud Console
+- [x] Habilitar Google Calendar API
+- [x] Habilitar Google Tasks API
+- [x] Criar credenciais OAuth 2.0 (Client ID + Client Secret)
+- [x] Configurar redirect URI para Edge Function callback
+- [x] Salvar Client ID e Client Secret nos secrets do Supabase
 
 ## Fase 1 — Backend (Banco de Dados)
 - [x] Criar tabela `google_sync_tokens` com migration
@@ -17,10 +17,11 @@
 
 ## Fase 2 — Backend (Edge Functions)
 - [x] Criar `google-auth-callback` — troca code por tokens e salva
+- [x] Criar `google-auth-url` — gera URL OAuth com secrets do servidor
 - [x] Criar módulo `_shared/google-auth.ts` — helper para refresh de tokens
 - [x] Criar `google-sync` — lógica de push/pull para Calendar e Tasks
 - [x] Criar `google-sync-immediate` — trigger manual (wrapper do sync)
-- [ ] Configurar Cron Job no Supabase para `google-sync` a cada 15 min
+- [ ] Configurar Cron Job no Supabase para `google-sync` a cada 15 min (ação manual no dashboard Supabase)
 - [ ] Testar full sync com conta de teste
 
 ## Fase 3 — Frontend

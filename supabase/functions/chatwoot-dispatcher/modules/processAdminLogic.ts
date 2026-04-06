@@ -144,9 +144,10 @@ async function executeAIAssistant(
     .limit(10)
     
   const history = (historyData || []).reverse().map(row => ({ role: row.role, content: row.content }))
-  const whatsappFormatInstruction = `\n\n[MODO WHATSAPP ATIVADO]\nVocê está respondendo via WhatsApp. Siga estas regras ABSOLUTAS:\n✅ Título: *Título Negrito* (asterisco)\n✅ Listas: use • como marcador.\n✅ Destaque/Aviso: use blockquotes com "> " no começo da linha. Fica ótimo no WhatsApp!\n✅ Negrito: *texto*\n✅ Itálico: _texto_\n⛔ NUNCA use tabelas (| pipes |). Converta em listas.\n⛔ NUNCA use ### ou **.\n⛔ Parágrafos curtos, pule linhas.\nA resposta deve ser perfeita para ler no celular.`
+  const whatsappFormatInstruction = `Você está interagindo com o usuário administrador do sistema através do WhatsApp. Regras de formatação:\n✅ Título: cite de forma direta.\n✅ Listas: use • como marcador.\n✅ Destaque/Aviso: use blockquotes com "> " no começo da linha.\n✅ Negrito: *texto*\n✅ Itálico: _texto_\n⛔ NUNCA use tabelas (| pipes |). Converta em listas.\n⛔ NUNCA use ### ou **.\n⛔ Parágrafos curtos, pule linhas.\nA resposta deve ser perfeita para ler no celular.`
   
-  history.push({ role: 'user', content: finalContent + whatsappFormatInstruction })
+  history.unshift({ role: 'system', content: whatsappFormatInstruction })
+  history.push({ role: 'user', content: finalContent })
   
   // Save user msg to history (sem as instruções para não sujar o histórico futuro)
   await supabase.from('admin_chat_history').insert({

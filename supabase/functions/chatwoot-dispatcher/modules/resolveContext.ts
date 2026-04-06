@@ -70,38 +70,41 @@ export async function resolveContext(
   const normalizedPhone = senderPhoneTrimmed.startsWith('55') ? senderPhoneTrimmed.slice(2) : senderPhoneTrimmed
   
   if (normalizedPhone.length >= 10 && senderRole !== 'admin') {
-    const normalizedSender = normalizedPhone.slice(-10)
+    const normalizedSender = normalizedPhone.slice(-11)
     
-    const { data: producers } = await supabase
-      .from('producers')
-      .select('id, brokerage_id, phone')
-      .not('phone', 'is', null)
-
-    const matchedProducer = producers?.find((p: any) => {
-      const pNorm = (p.phone || '').replace(/\D/g, '').replace(/^55/, '').slice(-10)
-      return pNorm.length >= 10 && pNorm === normalizedSender
-    })
-
-    if (matchedProducer) {
-      senderRole = 'admin'
-      if (!brokerageId) brokerageId = matchedProducer.brokerage_id
-      console.log('👑 Sender is a producer → admin mode')
-    } else {
-      const { data: brokerages } = await supabase
-        .from('brokerages')
-        .select('id, user_id, phone')
+    // NUNCA promover para admin se não soubermos a qual brokerage a conversa pertence
+    if (brokerageId) {
+      const { data: producers } = await supabase
+        .from('producers')
+        .select('id, brokerage_id, phone')
+        .eq('brokerage_id', brokerageId)
         .not('phone', 'is', null)
 
-      const matchedBrokerage = brokerages?.find((b: any) => {
-        const bNorm = (b.phone || '').replace(/\D/g, '').replace(/^55/, '').slice(-10)
-        return bNorm.length >= 10 && bNorm === normalizedSender
+      const matchedProducer = producers?.find((p: any) => {
+        const pNorm = (p.phone || '').replace(/\D/g, '').replace(/^55/, '').slice(-11)
+        return pNorm.length >= 10 && pNorm === normalizedSender
       })
 
-      if (matchedBrokerage) {
+      if (matchedProducer) {
         senderRole = 'admin'
-        if (!brokerageId) brokerageId = matchedBrokerage.id
-        if (!userId) userId = matchedBrokerage.user_id
-        console.log('👑 Sender is a brokerage owner → admin mode')
+        console.log('👑 Sender is a producer → admin mode')
+      } else {
+        const { data: brokerages } = await supabase
+          .from('brokerages')
+          .select('id, user_id, phone')
+          .eq('id', brokerageId)
+          .not('phone', 'is', null)
+
+        const matchedBrokerage = brokerages?.find((b: any) => {
+          const bNorm = (b.phone || '').replace(/\D/g, '').replace(/^55/, '').slice(-11)
+          return bNorm.length >= 10 && bNorm === normalizedSender
+        })
+
+        if (matchedBrokerage) {
+          senderRole = 'admin'
+          if (!userId) userId = matchedBrokerage.user_id
+          console.log('👑 Sender is a brokerage owner → admin mode')
+        }
       }
     }
   }
