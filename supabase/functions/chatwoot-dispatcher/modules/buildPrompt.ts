@@ -7,6 +7,7 @@ export async function buildSystemPrompt(
     role: string | null,
     userId: string | null,
     clientId: string | null,
+    brokerageId?: number | null,
     deal: any,
     stage: any,
     stageAiSettings: any,
@@ -15,7 +16,7 @@ export async function buildSystemPrompt(
     extractedText: string | null,
   }
 ) {
-  const { role, userId, clientId, deal, stage, stageAiSettings, messageContent, transcription, extractedText } = params
+  const { role, userId, clientId, brokerageId, deal, stage, stageAiSettings, messageContent, transcription, extractedText } = params
 
   let systemPrompt = ''
   let knowledgeContext: string | null = null
@@ -168,6 +169,22 @@ export async function buildSystemPrompt(
     }
 
     allowedTools = []
+  }
+
+  // ─── SDR RAG: inject owner feedbacks into sales prompt ───
+  if (brokerageId) {
+    const { data: sdrFeedbacks } = await supabase
+      .from('ai_feedbacks')
+      .select('feedback_text')
+      .eq('brokerage_id', brokerageId)
+      .eq('type', 'sdr')
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (sdrFeedbacks && sdrFeedbacks.length > 0) {
+      const items = sdrFeedbacks.map((f: any) => `• ${f.feedback_text}`).join('\n')
+      systemPrompt += `\n<owner_guidelines>\n[DIRETRIZES DO RESPONSÁVEL DA CORRETORA — PRIORIDADE MÁXIMA]\n${items}\n</owner_guidelines>\n\n`
+    }
   }
 
   return { systemPrompt, knowledgeContext, agentName, companyName, voiceTone, aiIsActive, stageAiIsActive, nextStageId, nextStageName, allowedTools }

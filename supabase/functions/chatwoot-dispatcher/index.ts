@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { resolveUserModel } from '../_shared/model-resolver.ts'
+import { sendChatwootMessage } from '../_shared/chatwoot.ts'
 
 import { resolveContext } from './modules/resolveContext.ts'
 import { resolveDeal } from './modules/resolveDeal.ts'
@@ -84,7 +85,10 @@ async function processWebhook(body: any) {
 
     // 1. Resolve Context (User, Brokerage, Client, Role, Flags)
     const context = await resolveContext(supabase, body)
-    const { userId, brokerageId, role: crmUserRole, senderRole, aiEnabled, clientId, clientData, clientAiEnabled, contactPhone, contactEmail } = context
+    let { userId, brokerageId, role: crmUserRole, senderRole, aiEnabled, clientId, clientData, clientAiEnabled, contactPhone, contactEmail } = context
+    const phone = sender?.phone_number || 'unknown'
+    const cleanContent = (content || '').trim()
+    const lowerContent = cleanContent.toLowerCase()
 
     if (!aiEnabled) {
       console.log('🚫 AI disabled for user:', userId)
@@ -105,6 +109,53 @@ async function processWebhook(body: any) {
     if (userId) {
       const resolved = await resolveUserModel(supabase, userId)
       resolvedAI = initAIConfig(resolved)
+    }
+
+    // ═══ 2.5 Test Mode Interceptor ═══
+    if (senderRole === 'admin' && userId && brokerageId) {
+      // Check for existing test session
+      const { data: testSession } = await supabase
+        .from('admin_test_sessions')
+        .select('id, status')
+        .eq('user_id', userId)
+        .eq('phone', phone)
+        .maybeSingle()
+
+      if (lowerContent === '/teste') {
+        if (!testSession) {
+          // START test mode
+          await supabase.from('admin_test_sessions').insert({
+            user_id: userId, brokerage_id: brokerageId, phone, status: 'active'
+          })
+          await sendChatwootMessage(supabase, brokerageId, conversation.id,
+            '🧪 *Modo Teste SDR ativado!*\n\nA partir de agora, suas mensagens serão respondidas pelo bot de vendas (SDR) como se você fosse um cliente.\n\nDigite /teste novamente para sair e avaliar o atendimento.')
+          return
+        } else if (testSession.status === 'active') {
+          // END test mode → ask for feedback
+          await supabase.from('admin_test_sessions').update({ status: 'feedback_pending' }).eq('id', testSession.id)
+          await sendChatwootMessage(supabase, brokerageId, conversation.id,
+            '✅ *Teste finalizado!*\n\nO que achou do atendimento do SDR? Onde ele pode melhorar?\n\n_Envie sua avaliação na próxima mensagem._')
+          return
+        }
+      }
+
+      if (testSession?.status === 'feedback_pending') {
+        // Capture feedback and save to ai_feedbacks
+        await supabase.from('ai_feedbacks').insert({
+          brokerage_id: brokerageId, type: 'sdr', feedback_text: cleanContent
+        })
+        await supabase.from('admin_test_sessions').delete().eq('id', testSession.id)
+        await sendChatwootMessage(supabase, brokerageId, conversation.id,
+          '🙏 *Obrigado pelo feedback!*\n\nSuas observações serão aplicadas automaticamente nas próximas interações do SDR com seus clientes.')
+        return
+      }
+
+      if (testSession?.status === 'active') {
+        // PASSTHROUGH: admin is in test mode → force client flow
+        console.log('🧪 Admin in test mode → routing as client/SDR')
+        senderRole = null
+        // Fall through to SDR pipeline below...
+      }
     }
 
     // 3. Admin delegation — route directly to ai-assistant without n8n
@@ -138,7 +189,7 @@ async function processWebhook(body: any) {
 
     // 8. Build system prompt
     const promptResult = await buildSystemPrompt(supabase, {
-      role: senderRole, userId, clientId,
+      role: senderRole, userId, clientId, brokerageId,
       deal: currentDeal, stage: currentStage, stageAiSettings,
       messageContent: content || '',
       transcription: mediaResult.transcription,

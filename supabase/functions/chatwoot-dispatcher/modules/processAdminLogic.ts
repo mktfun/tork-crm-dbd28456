@@ -32,7 +32,9 @@ export async function processAdminLogic(
       `🤖 *Comandos disponíveis:*\n\n` +
       `📥 /analise — Inicia modo de análise batch. Envie múltiplos docs, áudios e mensagens. Tudo será acumulado.\n\n` +
       `▶️ /start — Processa todos os itens acumulados no modo análise.\n\n` +
-      `🔄 /reset — Limpa o histórico de conversa com o assistente.\n` +
+      `🔄 /reset — Limpa o histórico de conversa com o assistente.\n\n` +
+      `🧪 /teste — Ativa/desativa modo teste SDR (simula ser cliente).\n\n` +
+      `📝 /feedback <msg> — Ensina ao Mentor IA como melhorar análises e respostas.\n\n` +
       `💬 Qualquer outra mensagem será respondida normalmente pelo Assistente Tork nativo.`
     )
     return
@@ -42,6 +44,22 @@ export async function processAdminLogic(
     await supabase.from('admin_chat_history').delete().eq('user_id', userId).eq('phone_number', phone)
     await supabase.from('ai_analysis_sessions').update({ status: 'cancelled' }).eq('user_id', userId).eq('status', 'compiling')
     await sendChatwootMessage(supabase, brokerageId, conversation.id, `🔄 Memória local apagada para este número e sessões canceladas.`)
+    return
+  }
+
+  // ─── /feedback <msg> — Diretrizes do Mentor IA ───
+  if (lowerContent.startsWith('/feedback ')) {
+    const feedbackText = cleanContent.slice('/feedback '.length).trim()
+    if (feedbackText.length > 0) {
+      await supabase.from('ai_feedbacks').insert({
+        brokerage_id: brokerageId, type: 'mentor', feedback_text: feedbackText
+      })
+      await sendChatwootMessage(supabase, brokerageId, conversation.id,
+        `📝 *Feedback registrado!*\n\n_"${feedbackText}"_\n\nO Mentor IA considerará isso nas próximas análises e respostas.`)
+    } else {
+      await sendChatwootMessage(supabase, brokerageId, conversation.id,
+        `⚠️ Use: /feedback <sua observação>\nEx: /feedback Ao analisar apólices, destaque o valor da franquia primeiro.`)
+    }
     return
   }
 
@@ -143,10 +161,25 @@ async function executeAIAssistant(
     .order('created_at', { ascending: false })
     .limit(10)
     
-  const history = (historyData || []).reverse().map(row => ({ role: row.role, content: row.content }))
+  const history = (historyData || []).reverse().map((row: any) => ({ role: row.role, content: row.content }))
   const whatsappFormatInstruction = `Você está interagindo com o usuário administrador do sistema através do WhatsApp. Regras de formatação:\n✅ Título: cite de forma direta.\n✅ Listas: use • como marcador.\n✅ Destaque/Aviso: use blockquotes com "> " no começo da linha.\n✅ Negrito: *texto*\n✅ Itálico: _texto_\n⛔ NUNCA use tabelas (| pipes |). Converta em listas.\n⛔ NUNCA use ### ou **.\n⛔ Parágrafos curtos, pule linhas.\nA resposta deve ser perfeita para ler no celular.`
   
-  history.unshift({ role: 'system', content: whatsappFormatInstruction })
+  // ─── Mentor RAG: inject owner feedbacks ───
+  const { data: mentorFeedbacks } = await supabase
+    .from('ai_feedbacks')
+    .select('feedback_text')
+    .eq('brokerage_id', brokerageId)
+    .eq('type', 'mentor')
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  let mentorRagBlock = ''
+  if (mentorFeedbacks && mentorFeedbacks.length > 0) {
+    const items = mentorFeedbacks.map((f: any) => `• ${f.feedback_text}`).join('\n')
+    mentorRagBlock = `\n\n[DIRETRIZES DO RESPONSÁVEL — SIGA RIGOROSAMENTE]\n${items}`
+  }
+
+  history.unshift({ role: 'system', content: whatsappFormatInstruction + mentorRagBlock })
   history.push({ role: 'user', content: finalContent })
   
   // Save user msg to history (sem as instruções para não sujar o histórico futuro)
