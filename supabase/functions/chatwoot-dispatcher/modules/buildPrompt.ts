@@ -14,9 +14,11 @@ export async function buildSystemPrompt(
     messageContent: string,
     transcription: string | null,
     extractedText: string | null,
+    autoCreatedDeal?: boolean,
+    autoCreatedProductName?: string | null,
   }
 ) {
-  const { role, userId, clientId, brokerageId, deal, stage, stageAiSettings, messageContent, transcription, extractedText } = params
+  const { role, userId, clientId, brokerageId, deal, stage, stageAiSettings, messageContent, transcription, extractedText, autoCreatedDeal, autoCreatedProductName } = params
 
   let systemPrompt = ''
   let knowledgeContext: string | null = null
@@ -179,11 +181,27 @@ export async function buildSystemPrompt(
     if (stageAiSettings?.ai_objective) systemPrompt += `OBJETIVO: ${stageAiSettings.ai_objective}\n`
     systemPrompt += `</current_context>\n\n`
 
+    if (stageAiSettings?.ai_objective) {
+      if (autoCreatedDeal) {
+        systemPrompt += `<objective>\n`
+        systemPrompt += `🚨 ATENDIMENTO RECÉM-CRIADO COM SUCESSO! 🚨\n`
+        systemPrompt += `O robô do sistema acabou de criar uma ficha/negociação para este cliente com o produto: ${autoCreatedProductName || 'solicitado'}.\n`
+        systemPrompt += `VOCÊ DEVE IGNORAR perguntas triviais de qualificação ou saudação se o cliente já deu as informações nesta mensagem. Avance imediatamente e EXECUTE o objetivo definido abaixo, sem enrolação.\n\n`
+        systemPrompt += `OBJETIVO DA ETAPA ATUAL:\n`
+        systemPrompt += `${replacePlaceholders(stageAiSettings.ai_objective, resolvedNextStageName)}\n`
+        systemPrompt += `</objective>\n\n`
+
+        if (!allowedTools.includes("get_client_quote_status")) {
+          allowedTools.push("get_client_quote_status") // Force allow tool to confirm status if needed
+        }
+      } else {
+        systemPrompt += `<objective>\n${replacePlaceholders(stageAiSettings.ai_objective, resolvedNextStageName)}\n</objective>\n\n`
+      }
+    }
+
     if (stageAiSettings?.ai_custom_rules) {
       systemPrompt += `<custom_rules>\n${stageAiSettings.ai_custom_rules}\n</custom_rules>\n\n`
     }
-
-    allowedTools = []
   }
 
   // ─── SDR RAG: inject owner feedbacks into sales prompt ───

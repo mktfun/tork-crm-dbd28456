@@ -250,7 +250,7 @@ async function processWebhook(body: any) {
       autoCreatedProductId, autoCreatedProductName, clientJustResponded
     } = await resolveDeal(
       supabase, resolvedAI, userId as string, clientId, clientData, sender,
-      content || '', mediaResult, brokerageId, conversation, crmUserRole || 'user',
+      content || '', mediaResult, brokerageId, conversation, senderRole || 'client',
       isIncomingMessage
     )
 
@@ -266,6 +266,8 @@ async function processWebhook(body: any) {
       messageContent: content || '',
       transcription: mediaResult.transcription,
       extractedText: mediaResult.extractedText,
+      autoCreatedDeal,
+      autoCreatedProductName,
     })
 
     // Inject client context at the start of the system prompt
