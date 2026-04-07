@@ -112,6 +112,7 @@ export function AutomationConfigTab() {
   const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
   const [testingElevenLabs, setTestingElevenLabs] = useState(false);
   const [adminAlertPhone, setAdminAlertPhone] = useState("");
+  const [activeTab, setActiveTab] = useState<'ai' | 'rules' | 'integrations'>('ai');
 
   const [settings, setSettings] = useState<AutomationSettings>({
     chatwoot_url: "",
@@ -439,21 +440,55 @@ export function AutomationConfigTab() {
   const models = MODEL_OPTIONS[aiProvider] || [];
 
   return (
-    <div className="space-y-6 pb-24">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Settings className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <h2 className="font-semibold text-base text-foreground">
-            Configurações de Automação
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Credenciais e integrações do sistema
-          </p>
+    <div className="space-y-6 pb-24 relative">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Settings className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-base text-foreground">
+              Configurações de Automação
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Credenciais e integrações
+            </p>
+          </div>
         </div>
       </div>
+
+      <div className="flex flex-col md:flex-row gap-6 items-start">
+        {/* Sidebar Nav */}
+        <div className="w-full md:w-56 shrink-0 flex flex-row md:flex-col gap-1 overflow-x-auto pb-2 md:pb-0 sticky top-24">
+          <Button 
+            variant={activeTab === 'ai' ? 'secondary' : 'ghost'} 
+            className={`justify-start ${activeTab === 'ai' ? 'bg-secondary/60 font-semibold' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('ai')}
+          >
+            <Brain className="h-4 w-4 mr-2" /> IA & Síntese
+          </Button>
+          <Button 
+            variant={activeTab === 'rules' ? 'secondary' : 'ghost'} 
+            className={`justify-start ${activeTab === 'rules' ? 'bg-secondary/60 font-semibold' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('rules')}
+          >
+            <Shield className="h-4 w-4 mr-2" /> Regras SDR
+          </Button>
+          <Button 
+            variant={activeTab === 'integrations' ? 'secondary' : 'ghost'} 
+            className={`justify-start ${activeTab === 'integrations' ? 'bg-secondary/60 font-semibold' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('integrations')}
+          >
+            <Zap className="h-4 w-4 mr-2" /> Integrações
+          </Button>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 space-y-6 min-w-0 w-full animate-in fade-in duration-300">
+          
+          {/* ── AI SECTION ── */}
+          {activeTab === 'ai' && (
+            <div className="space-y-6 animate-in slide-in-from-bottom-2 fade-in duration-300">
 
       {/* ── Card 0: Motor de IA ── */}
       <Card>
@@ -637,6 +672,13 @@ export function AutomationConfigTab() {
           </div>
         </CardContent>
       </Card>
+      
+      </div>
+      )}
+
+      {/* ── RULES SECTION ── */}
+      {activeTab === 'rules' && (
+        <div className="space-y-6 animate-in slide-in-from-bottom-2 fade-in duration-300">
 
       {/* ── Card 0.6: Alertas do SDR ── */}
       <Card>
@@ -679,6 +721,36 @@ export function AutomationConfigTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Card 4: Mapeamento de Inboxes (moved from bottom) ── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+              <Users className="h-5 w-5 text-purple-400" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base">Mapeamento de Inboxes</CardTitle>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">Roteamento</Badge>
+              </div>
+              <CardDescription>
+                Determine quem herda os leads de cada caixa de entrada
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <InboxAgentMapping />
+        </CardContent>
+      </Card>
+
+      </div>
+      )}
+
+      {/* ── INTEGRATIONS SECTION ── */}
+      {activeTab === 'integrations' && (
+        <div className="space-y-6 animate-in slide-in-from-bottom-2 fade-in duration-300">
 
       {/* ── Card 1: Chat Tork (Chatwoot) ── */}
       <Card>
@@ -907,28 +979,11 @@ export function AutomationConfigTab() {
         </CardContent>
       </Card>
 
-      {/* ── Card 4: Mapeamento de Inboxes ── */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
-              <Users className="h-5 w-5 text-purple-400" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-base">Mapeamento de Inboxes</CardTitle>
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0">Roteamento</Badge>
-              </div>
-              <CardDescription>
-                Determine quem herda os leads de cada caixa de entrada
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <InboxAgentMapping />
-        </CardContent>
-      </Card>
+      </div>
+      )}
+
+        </div>
+      </div>
 
       {/* ── Sticky Save Bar — Glassmorphism ── */}
       <div className="sticky bottom-0 z-10 -mx-1 px-1 py-4 bg-background/60 backdrop-blur-xl border-t border-border/50">
