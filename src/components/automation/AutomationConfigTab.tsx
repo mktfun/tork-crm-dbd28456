@@ -38,7 +38,8 @@ import {
   Zap,
   Shield,
   Users,
-  Mic
+  Mic,
+  Info
 } from "lucide-react";
 import { InboxAgentMapping } from "@/components/settings/InboxAgentMapping";
 
