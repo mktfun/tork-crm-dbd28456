@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { scanAndMaskPII, logSecurityEvent } from './modules/security/dlpMasker.ts'
 import { resolveUserModel } from '../_shared/model-resolver.ts'
 import { sendChatwootMessage } from '../_shared/chatwoot.ts'
 
@@ -9,6 +10,12 @@ import { evaluateObjectiveCompletion } from './modules/evaluateStageCompletion.t
 import { buildSystemPrompt } from './modules/buildPrompt.ts'
 import { dispatchToN8n } from './modules/dispatchToN8n.ts'
 import { manageFollowups } from './modules/manageFollowups.ts'
+import { runAgentLoop } from './modules/agentLoop.ts'
+import { unmaskPII } from './modules/security/dlpMasker.ts'
+
+import { enqueueMessage, checkDebounce, acquireLock, releaseLock, updateQueueStatus } from './modules/messageQueue.ts'
+import { getHistory, saveHistory } from './modules/conversationHistory.ts'
+import { getElevenLabsConfig, synthesizeAudio } from './modules/audioSynthesis.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -87,20 +94,66 @@ async function processWebhook(body: any) {
     const context = await resolveContext(supabase, body)
     let { userId, brokerageId, role: crmUserRole, senderRole, aiEnabled, clientId, clientData, clientAiEnabled, contactPhone, contactEmail } = context
     const phone = sender?.phone_number || 'unknown'
-    const cleanContent = (content || '').trim()
+    const rawCleanContent = (content || '').trim()
+    const { maskedText, hasSensitiveData, replacements: dlpReplacements } = scanAndMaskPII(rawCleanContent)
+    // Usar o texto mascarado para todo o processamento de LLM
+    const cleanContent = maskedText
     const lowerContent = cleanContent.toLowerCase()
+
+    // ── 1.5 Message Queue & Debounce Setup ──
+    const messageTypeStr = attachments?.length ? (attachments[0]?.file_type?.startsWith('audio/') ? 'audio' : 'media') : 'text'
+    const queueEntry = await enqueueMessage(supabase, {
+      brokerageId: context.brokerageId || 0,
+      conversationId: conversation.id,
+      chatwootMessageId: body.id,
+      contactPhone,
+      content: rawCleanContent,
+      messageType: messageTypeStr
+    })
+
+    const queueId = queueEntry.id
+
+    if (hasSensitiveData) {
+      await logSecurityEvent(supabase, {
+        userId, brokerageId, chatwootConversationId: conversation?.id,
+        eventType: 'pii_masked',
+        originalTextEncrypted: 'DLP_INTERCEPTED',
+        severity: 'high'
+      })
+      console.log('🚨 DLP Intercepted PII in incoming message!')
+    }
 
     if (!aiEnabled) {
       console.log('🚫 AI disabled for user:', userId)
+      await updateQueueStatus(supabase, queueId, 'skipped')
       return
     }
 
     if (!clientAiEnabled && senderRole !== 'admin') {
       console.log('🚫 AI disabled for client:', clientId)
+      await updateQueueStatus(supabase, queueId, 'skipped')
       return
     }
 
-    // 2. Resolve AI config from user's global settings
+    // ── 1.6 Debounce Check (Encavalamento) ──
+    const debounce = await checkDebounce(supabase, conversation.id, queueId, queueEntry.created_at)
+    if (!debounce.isLatest) {
+      await updateQueueStatus(supabase, queueId, 'skipped', { errorMessage: 'Encavalamento: uma mensagem mais nova existe.' })
+      return
+    }
+
+    // ── 1.7 Acquire Lock ──
+    const lock = await acquireLock(supabase, conversation.id, queueId)
+    if (!lock.acquired) {
+      console.warn(`🔒 Lock acquisition failed for conv ${conversation.id}. Aborting queue ${queueId}.`)
+      await updateQueueStatus(supabase, queueId, 'failed', { errorMessage: 'Lock indisponível' })
+      return
+    }
+
+    await updateQueueStatus(supabase, queueId, 'processing')
+
+    try {
+      // 2. Resolve AI config from user's global settings
     let resolvedAI = {
       url: AI_GATEWAY_URL,
       auth: `Bearer ${LOVABLE_API_KEY || ''}`,
@@ -206,13 +259,59 @@ async function processWebhook(body: any) {
       return
     }
 
-    // 9. Dispatch to n8n (respond with CURRENT stage prompt first)
+    // 8.5 Load Conversation History (Isolated)
+    const history = brokerageId ? await getHistory(supabase, { conversationId: conversation.id, brokerageId, limit: 15 }) : []
+
+    // 9. Run AI Edge Agent Loop locally (Tool Calling & Generation)
+    const generatedRawMessage = await runAgentLoop(
+      supabase,
+      finalSystemPrompt,
+      lowerContent, // This is the masked clean prompt
+      brokerageId || 0,
+      resolvedAI,
+      history
+    )
+
+    // 10. Unmask PII before sending the message out to the client
+    const unmaskedFinalMessage = unmaskPII(generatedRawMessage, dlpReplacements)
+
+    // 10.5 Audio Synthesis
+    let audioUrl: string | null = null
+    try {
+      if (mediaResult.messageType === 'audio' && brokerageId) {
+        const elevenConfig = await getElevenLabsConfig(supabase, brokerageId, stageAiSettings?.voice_id)
+        audioUrl = await synthesizeAudio(supabase, unmaskedFinalMessage, elevenConfig, brokerageId, conversation.id)
+      }
+    } catch (audioErr) {
+      console.error('Audio generation failed, falling back to text:', audioErr)
+    }
+
+    // 10.6 Save Chat History
+    if (brokerageId) {
+      // Save User Message
+      await saveHistory(supabase, {
+        conversationId: conversation.id, brokerageId, contactPhone, clientId,
+        role: 'user', content: rawCleanContent || '[Media]', messageType: mediaResult.messageType,
+        chatwootMessageId: body.id, queueMessageId: queueId
+      })
+      // Save Assistant Response
+      await saveHistory(supabase, {
+        conversationId: conversation.id, brokerageId, contactPhone, clientId,
+        role: 'assistant', content: unmaskedFinalMessage, messageType: audioUrl ? 'audio' : 'text',
+        audioUrl, queueMessageId: queueId
+      })
+    }
+
+    // 11. Dispatch to n8n (now acting primarily as a router/webhook sender for WhatsApp, or it can read final_ai_message)
     const objectiveResultPlaceholder = { completed: false, previousStageId: null as string | null, previousStageName: null as string | null, newStageId: null as string | null, newStageName: null as string | null }
     const n8nResponseBody = await dispatchToN8n(supabase, {
       body, userId, brokerageId, role: crmUserRole, senderRole, aiEnabled, clientId, currentDeal, currentStage,
       promptResult, stageAiSettings, finalSystemPrompt, mediaResult, content,
       autoCreatedDeal, autoCreatedProductId, autoCreatedProductName, objectiveResult: objectiveResultPlaceholder,
-      N8N_WEBHOOK_URL
+      N8N_WEBHOOK_URL,
+      finalAiMessage: unmaskedFinalMessage, // Added final message for direct N8N delivery
+      audioUrl: audioUrl, // Audio URL for ElevenLabs
+      queueMessageId: queueId // Track dispatcher status
     })
 
     // 10. Manage Followups
@@ -235,7 +334,14 @@ async function processWebhook(body: any) {
       }
     }
 
+    await updateQueueStatus(supabase, queueId, 'completed', { audioUrl: audioUrl || undefined })
     console.log('✅ Dispatcher processing complete')
+
+    } finally {
+      // ── 12. Relase Lock no matter what ──
+      await releaseLock(supabase, conversation.id)
+    }
+
   } catch (error) {
     console.error('❌ Background processing error:', error)
   }

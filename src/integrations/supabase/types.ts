@@ -44,6 +44,33 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_test_sessions: {
+        Row: {
+          brokerage_id: number
+          created_at: string
+          id: number
+          phone: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          brokerage_id: number
+          created_at?: string
+          id?: never
+          phone: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          brokerage_id?: number
+          created_at?: string
+          id?: never
+          phone?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_analysis_sessions: {
         Row: {
           brokerage_id: number
@@ -109,6 +136,30 @@ export type Database = {
           title?: string | null
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      ai_feedbacks: {
+        Row: {
+          brokerage_id: number
+          created_at: string
+          feedback_text: string
+          id: number
+          type: string
+        }
+        Insert: {
+          brokerage_id: number
+          created_at?: string
+          feedback_text: string
+          id?: never
+          type: string
+        }
+        Update: {
+          brokerage_id?: number
+          created_at?: string
+          feedback_text?: string
+          id?: never
+          type?: string
         }
         Relationships: []
       }
@@ -979,6 +1030,9 @@ export type Database = {
           chatwoot_url: string | null
           cnpj: string | null
           created_at: string
+          elevenlabs_api_key: string | null
+          elevenlabs_model_id: string | null
+          elevenlabs_voice_id: string | null
           financial_settings: Json | null
           id: number
           logo_url: string | null
@@ -1005,6 +1059,9 @@ export type Database = {
           chatwoot_url?: string | null
           cnpj?: string | null
           created_at?: string
+          elevenlabs_api_key?: string | null
+          elevenlabs_model_id?: string | null
+          elevenlabs_voice_id?: string | null
           financial_settings?: Json | null
           id?: never
           logo_url?: string | null
@@ -1031,6 +1088,9 @@ export type Database = {
           chatwoot_url?: string | null
           cnpj?: string | null
           created_at?: string
+          elevenlabs_api_key?: string | null
+          elevenlabs_model_id?: string | null
+          elevenlabs_voice_id?: string | null
           financial_settings?: Json | null
           id?: never
           logo_url?: string | null
@@ -1465,6 +1525,50 @@ export type Database = {
           voice_tone?: string | null
         }
         Relationships: []
+      }
+      crm_ai_security_events: {
+        Row: {
+          brokerage_id: number | null
+          chatwoot_conversation_id: number | null
+          created_at: string | null
+          event_type: Database["public"]["Enums"]["crm_ai_security_event_type"]
+          id: string
+          metadata: Json | null
+          original_text_encrypted: string | null
+          severity: string | null
+          user_id: string | null
+        }
+        Insert: {
+          brokerage_id?: number | null
+          chatwoot_conversation_id?: number | null
+          created_at?: string | null
+          event_type: Database["public"]["Enums"]["crm_ai_security_event_type"]
+          id?: string
+          metadata?: Json | null
+          original_text_encrypted?: string | null
+          severity?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          brokerage_id?: number | null
+          chatwoot_conversation_id?: number | null
+          created_at?: string | null
+          event_type?: Database["public"]["Enums"]["crm_ai_security_event_type"]
+          id?: string
+          metadata?: Json | null
+          original_text_encrypted?: string | null
+          severity?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_ai_security_events_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       crm_ai_settings: {
         Row: {
@@ -2906,6 +3010,162 @@ export type Database = {
             columns: ["system_transaction_id"]
             isOneToOne: false
             referencedRelation: "financial_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_chat_history: {
+        Row: {
+          audio_url: string | null
+          brokerage_id: number
+          chatwoot_message_id: number | null
+          client_id: string | null
+          contact_phone: string | null
+          content: string
+          conversation_id: number
+          created_at: string | null
+          id: string
+          message_type: string | null
+          queue_message_id: string | null
+          role: string
+        }
+        Insert: {
+          audio_url?: string | null
+          brokerage_id: number
+          chatwoot_message_id?: number | null
+          client_id?: string | null
+          contact_phone?: string | null
+          content: string
+          conversation_id: number
+          created_at?: string | null
+          id?: string
+          message_type?: string | null
+          queue_message_id?: string | null
+          role: string
+        }
+        Update: {
+          audio_url?: string | null
+          brokerage_id?: number
+          chatwoot_message_id?: number | null
+          client_id?: string | null
+          contact_phone?: string | null
+          content?: string
+          conversation_id?: number
+          created_at?: string | null
+          id?: string
+          message_type?: string | null
+          queue_message_id?: string | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_chat_history_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_chat_history_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_chat_history_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_chat_history_queue_message_id_fkey"
+            columns: ["queue_message_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_message_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_conversation_locks: {
+        Row: {
+          conversation_id: number
+          expires_at: string
+          locked_at: string
+          locked_by_queue_id: string | null
+        }
+        Insert: {
+          conversation_id: number
+          expires_at?: string
+          locked_at?: string
+          locked_by_queue_id?: string | null
+        }
+        Update: {
+          conversation_id?: number
+          expires_at?: string
+          locked_at?: string
+          locked_by_queue_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_conversation_locks_locked_by_queue_id_fkey"
+            columns: ["locked_by_queue_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_message_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_message_queue: {
+        Row: {
+          audio_url: string | null
+          brokerage_id: number
+          chatwoot_message_id: number
+          contact_phone: string | null
+          content: string | null
+          conversation_id: number
+          created_at: string | null
+          error_message: string | null
+          id: string
+          message_type: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          brokerage_id: number
+          chatwoot_message_id: number
+          contact_phone?: string | null
+          content?: string | null
+          conversation_id: number
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_type?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          brokerage_id?: number
+          chatwoot_message_id?: number
+          contact_phone?: string | null
+          content?: string | null
+          conversation_id?: number
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_type?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_message_queue_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
             referencedColumns: ["id"]
           },
         ]
@@ -5026,6 +5286,11 @@ export type Database = {
       }
     }
     Enums: {
+      crm_ai_security_event_type:
+        | "pii_masked"
+        | "jailbreak_attempt"
+        | "unauthorized_access"
+        | "tool_rejection"
       financial_account_status: "active" | "archived"
       financial_account_type:
         | "asset"
@@ -5175,6 +5440,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      crm_ai_security_event_type: [
+        "pii_masked",
+        "jailbreak_attempt",
+        "unauthorized_access",
+        "tool_rejection",
+      ],
       financial_account_status: ["active", "archived"],
       financial_account_type: [
         "asset",

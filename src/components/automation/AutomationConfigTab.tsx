@@ -37,8 +37,8 @@ import {
   Brain,
   Zap,
   Shield,
-  Info,
   Users,
+  Mic
 } from "lucide-react";
 import { InboxAgentMapping } from "@/components/settings/InboxAgentMapping";
 
@@ -99,11 +99,17 @@ export function AutomationConfigTab() {
   const [testInboxId, setTestInboxId] = useState("");
   const [testContactId, setTestContactId] = useState("");
 
-  // AI Engine state
   const [aiProvider, setAiProvider] = useState("gemini");
   const [aiModel, setAiModel] = useState("gemini-2.0-flash");
   const [aiApiKey, setAiApiKey] = useState("");
   const [globalConfigId, setGlobalConfigId] = useState<string | null>(null);
+
+  // ElevenLabs state
+  const [elevenLabsApiKey, setElevenLabsApiKey] = useState("");
+  const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState("");
+  const [elevenLabsModelId, setElevenLabsModelId] = useState("eleven_multilingual_v2");
+  const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
+  const [testingElevenLabs, setTestingElevenLabs] = useState(false);
 
   const [settings, setSettings] = useState<AutomationSettings>({
     chatwoot_url: "",
@@ -134,7 +140,7 @@ export function AutomationConfigTab() {
       const [brokerageRes, crmRes, globalRes] = await Promise.all([
         supabase
           .from("brokerages")
-          .select("id, chatwoot_url, chatwoot_token, chatwoot_account_id, updated_at")
+          .select("id, chatwoot_url, chatwoot_token, chatwoot_account_id, updated_at, elevenlabs_api_key, elevenlabs_voice_id, elevenlabs_model_id")
           .eq("user_id", user?.id ?? "")
           .maybeSingle(),
         supabase
@@ -174,6 +180,12 @@ export function AutomationConfigTab() {
         setAiModel((global as any).ai_model || "gemini-2.0-flash");
         setAiApiKey((global as any).api_key || "");
       }
+
+      if (brok) {
+        setElevenLabsApiKey(brok.elevenlabs_api_key || "");
+        setElevenLabsVoiceId(brok.elevenlabs_voice_id || "");
+        setElevenLabsModelId(brok.elevenlabs_model_id || "eleven_multilingual_v2");
+      }
     } catch (error) {
       console.error("Error fetching settings:", error);
       toast.error("Erro ao carregar configurações");
@@ -189,7 +201,6 @@ export function AutomationConfigTab() {
     const cleanUrl = sanitizeUrl(settings.chatwoot_url);
 
     try {
-      // 1) Update brokerages
       if (settings.brokerageId) {
         const { error: brokErr } = await supabase
           .from("brokerages")
@@ -197,6 +208,9 @@ export function AutomationConfigTab() {
             chatwoot_url: cleanUrl || null,
             chatwoot_token: settings.chatwoot_api_key || null,
             chatwoot_account_id: settings.chatwoot_account_id || null,
+            elevenlabs_api_key: elevenLabsApiKey || null,
+            elevenlabs_voice_id: elevenLabsVoiceId || null,
+            elevenlabs_model_id: elevenLabsModelId || 'eleven_multilingual_v2',
           })
           .eq("id", settings.brokerageId)
           .eq("user_id", user.id);
@@ -378,6 +392,31 @@ export function AutomationConfigTab() {
     }
   };
 
+  const handleTestElevenLabs = async () => {
+    if (!elevenLabsApiKey) {
+      toast.error("Insira a API Key da ElevenLabs antes de testar");
+      return;
+    }
+    setTestingElevenLabs(true);
+    const toastId = toast.loading("Validando chave ElevenLabs...");
+    try {
+      const response = await fetch("https://api.elevenlabs.io/v1/voices", {
+        headers: { "xi-api-key": elevenLabsApiKey }
+      });
+      toast.dismiss(toastId);
+      if (response.ok) {
+        toast.success("✅ Chave ElevenLabs válida!");
+      } else {
+        toast.error("Chave ElevenLabs inválida.");
+      }
+    } catch (err: any) {
+      toast.dismiss(toastId);
+      toast.error("Erro ao conectar à ElevenLabs.");
+    } finally {
+      setTestingElevenLabs(false);
+    }
+  };
+
   const handleCopyWebhook = () => {
     navigator.clipboard.writeText(webhookUrl);
     setCopiedWebhook(true);
@@ -499,6 +538,97 @@ export function AutomationConfigTab() {
               <p className="text-xs text-muted-foreground">
                 Chave de API do provedor selecionado. Armazenada de forma segura.
               </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Card 0.5: ElevenLabs — Voz do SDR ── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+              <Mic className="h-5 w-5 text-orange-400" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base">ElevenLabs — Voz do SDR</CardTitle>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">Áudio</Badge>
+              </div>
+              <CardDescription>
+                Síntese de áudio autônoma para mensagens de voz
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Modelo de Síntese</Label>
+              <Select value={elevenLabsModelId} onValueChange={setElevenLabsModelId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o modelo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="eleven_multilingual_v2">Multilingual v2 (Recomendado)</SelectItem>
+                  <SelectItem value="eleven_turbo_v2_5">Turbo v2.5 (Alta Velocidade)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Voice ID Padrão</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="ID da voz (ex: pNInz6obpg...)"
+                  value={elevenLabsVoiceId}
+                  onChange={(e) => setElevenLabsVoiceId(e.target.value)}
+                  className="flex-1 font-mono text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>API Key</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showElevenLabsKey ? "text" : "password"}
+                    placeholder="Insira a chave da ElevenLabs"
+                    value={elevenLabsApiKey}
+                    onChange={(e) => setElevenLabsApiKey(e.target.value)}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowElevenLabsKey(!showElevenLabsKey)}
+                  >
+                    {showElevenLabsKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  title="Testar API Key da ElevenLabs"
+                  disabled={!elevenLabsApiKey || testingElevenLabs}
+                  onClick={handleTestElevenLabs}
+                  className="shrink-0 h-10 w-10"
+                >
+                  {testingElevenLabs ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wifi className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            
+            <div className="md:col-span-2 mt-2">
+              <Alert className="bg-muted">
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  O Voice ID prioritário é o configurado nas Etapas do Funil (em Motor de IA). Este Voice ID Padrão atua como fallback caso a etapa não tenha uma voz configurada.
+                </AlertDescription>
+              </Alert>
             </div>
           </div>
         </CardContent>

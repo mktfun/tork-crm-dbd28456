@@ -21,14 +21,17 @@ export async function dispatchToN8n(
     autoCreatedProductId: string | null,
     autoCreatedProductName: string | null,
     objectiveResult: any,
-    N8N_WEBHOOK_URL: string | undefined
+    N8N_WEBHOOK_URL: string | undefined,
+    finalAiMessage?: string,
+    audioUrl?: string | null,
+    queueMessageId?: string | null
   }
 ) {
   const {
     body, userId, brokerageId, role, senderRole, aiEnabled, clientId, currentDeal, currentStage,
     promptResult, stageAiSettings, finalSystemPrompt, mediaResult, content,
     autoCreatedDeal, autoCreatedProductId, autoCreatedProductName, objectiveResult,
-    N8N_WEBHOOK_URL
+    N8N_WEBHOOK_URL, finalAiMessage, audioUrl, queueMessageId
   } = params
 
   let finalN8nUrl = N8N_WEBHOOK_URL
@@ -62,6 +65,7 @@ export async function dispatchToN8n(
       stage_ai_is_active: promptResult.stageAiIsActive,
       is_active: stageAiSettings?.is_active ?? true,
       ai_system_prompt: finalSystemPrompt,
+      final_ai_message: finalAiMessage,
       agent_name: promptResult.agentName,
       company_name: promptResult.companyName,
       voice_tone: promptResult.voiceTone,
@@ -82,6 +86,9 @@ export async function dispatchToN8n(
       stage_completed: objectiveResult.completed,
       previous_stage_id: objectiveResult.previousStageId,
       previous_stage_name: objectiveResult.previousStageName,
+      audio_url: audioUrl,
+      queue_message_id: queueMessageId,
+      response_type: audioUrl ? 'audio' : 'text'
     }
   }
 
