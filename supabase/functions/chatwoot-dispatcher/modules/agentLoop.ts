@@ -1,13 +1,14 @@
-import { availableTools, executeToolCall } from './security/toolsRegistry.ts'
-import { SupabaseClient } from '@supabase/supabase-js'
+import { availableTools, executeToolCall, ToolContext } from './security/toolsRegistry.ts'
+import { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 
 export async function runAgentLoop(
   supabase: SupabaseClient,
   systemPrompt: string,
   userMessage: string,
   brokerageId: number,
-  resolvedAI: { url: string; auth: string; provider: string; model: string },
-  history: any[] = []
+  resolvedAI: { url: string; auth: string; model: string },
+  history: any[] = [],
+  toolCtx: ToolContext = {}
 ): Promise<string> {
   
   let messages: any[] = [
@@ -28,7 +29,7 @@ export async function runAgentLoop(
       messages: messages,
       tools: availableTools,
       tool_choice: "auto",
-      temperature: 0.3
+      temperature: 0.7
     };
 
     const response = await fetch(resolvedAI.url, {
@@ -43,24 +44,36 @@ export async function runAgentLoop(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('LLM API Error:', errorText);
-      return "Desculpe, ocorreu um erro interno de conexão neste momento.";
+      return "Desculpe, tive um probleminha aqui. Pode repetir?";
     }
 
     const responseData = await response.json();
     const assistantMessage = responseData.choices[0].message;
     messages.push(assistantMessage);
 
-    // If the model did not ask to use any tool, break and return the text.
+    // If no tool calls, extract and return clean text (strip <thought> blocks)
     if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0) {
-      return assistantMessage.content || "Não consegui formular uma resposta.";
+      const rawContent = assistantMessage.content || "Pode repetir?"
+
+      // Extract thought for server-side logging (never sent to client)
+      const thoughtMatch = rawContent.match(/<thought>([\s\S]*?)<\/thought>/i)
+      if (thoughtMatch) {
+        console.log(`💭 Agent thought: ${thoughtMatch[1].trim().slice(0, 300)}`)
+      }
+
+      // Strip <thought> tags — only clean response reaches the client
+      const cleanContent = rawContent
+        .replace(/<thought>[\s\S]*?<\/thought>\n?/gi, '')
+        .trim()
+
+      return cleanContent || "Pode repetir?"
     }
 
-    // The model wants to call one or more tools
+    // Execute tool calls
     for (const toolCall of assistantMessage.tool_calls) {
       if (toolCall.type === 'function') {
-        const toolResult = await executeToolCall(supabase, brokerageId, toolCall);
+        const toolResult = await executeToolCall(supabase, brokerageId, toolCall, toolCtx);
         
-        // Feed the result back to the LLM
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
@@ -71,5 +84,5 @@ export async function runAgentLoop(
     }
   }
 
-  return "Desculpe, precisei encerrar meu raciocínio porque estava complexo demais. Podemos recomeçar?";
+  return "Desculpe, me perdi um pouco aqui. Pode repetir sua pergunta?";
 }

@@ -111,6 +111,7 @@ export function AutomationConfigTab() {
   const [elevenLabsModelId, setElevenLabsModelId] = useState("eleven_multilingual_v2");
   const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
   const [testingElevenLabs, setTestingElevenLabs] = useState(false);
+  const [adminAlertPhone, setAdminAlertPhone] = useState("");
 
   const [settings, setSettings] = useState<AutomationSettings>({
     chatwoot_url: "",
@@ -141,7 +142,7 @@ export function AutomationConfigTab() {
       const [brokerageRes, crmRes, globalRes] = await Promise.all([
         supabase
           .from("brokerages")
-          .select("id, chatwoot_url, chatwoot_token, chatwoot_account_id, updated_at, elevenlabs_api_key, elevenlabs_voice_id, elevenlabs_model_id")
+          .select("id, chatwoot_url, chatwoot_token, chatwoot_account_id, updated_at, elevenlabs_api_key, elevenlabs_voice_id, elevenlabs_model_id, admin_alert_phone")
           .eq("user_id", user?.id ?? "")
           .maybeSingle(),
         supabase
@@ -186,6 +187,7 @@ export function AutomationConfigTab() {
         setElevenLabsApiKey(brok.elevenlabs_api_key || "");
         setElevenLabsVoiceId(brok.elevenlabs_voice_id || "");
         setElevenLabsModelId(brok.elevenlabs_model_id || "eleven_multilingual_v2");
+        setAdminAlertPhone((brok as any).admin_alert_phone || "");
       }
     } catch (error) {
       console.error("Error fetching settings:", error);
@@ -212,6 +214,7 @@ export function AutomationConfigTab() {
             elevenlabs_api_key: elevenLabsApiKey || null,
             elevenlabs_voice_id: elevenLabsVoiceId || null,
             elevenlabs_model_id: elevenLabsModelId || 'eleven_multilingual_v2',
+            admin_alert_phone: adminAlertPhone || null,
           })
           .eq("id", settings.brokerageId)
           .eq("user_id", user.id);
@@ -631,6 +634,48 @@ export function AutomationConfigTab() {
                 </AlertDescription>
               </Alert>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Card 0.6: Alertas do SDR ── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+              <Send className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base">Alertas do SDR</CardTitle>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">Escalonamento</Badge>
+              </div>
+              <CardDescription>
+                Número que receberá alertas quando o SDR precisar de intervenção humana
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="admin_alert_phone">Telefone para Alertas (WhatsApp)</Label>
+              <Input
+                id="admin_alert_phone"
+                placeholder="Ex: +5511999999999"
+                value={adminAlertPhone}
+                onChange={(e) => setAdminAlertPhone(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Quando o SDR escalar um atendimento (ex: 2ª via, cancelamento), este número será notificado automaticamente pelo WhatsApp. Use o formato internacional com código do país.
+              </p>
+            </div>
+            <Alert className="bg-muted">
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                O SDR pausará automaticamente durante 24h após o escalonamento. O cliente não receberá respostas automáticas nesse período — você assume o atendimento manualmente.
+              </AlertDescription>
+            </Alert>
           </div>
         </CardContent>
       </Card>

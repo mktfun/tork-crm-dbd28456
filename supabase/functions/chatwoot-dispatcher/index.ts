@@ -135,7 +135,25 @@ async function processWebhook(body: any) {
       return
     }
 
-    // ── 1.6 Debounce Check (Encavalamento) ──
+    // ── 1.5.5 AI Mute Check (Escalonamento 24h) ──
+    if (clientId && senderRole !== 'admin') {
+      const { data: mutedClient } = await supabase
+        .from('crm_clients')
+        .select('ai_muted_until')
+        .eq('id', clientId)
+        .maybeSingle()
+      const mutedUntil = (mutedClient as any)?.ai_muted_until
+      if (mutedUntil && new Date(mutedUntil) > new Date()) {
+        console.log(`🔇 AI muted for client ${clientId} until ${mutedUntil}. Skipping.`)
+        await updateQueueStatus(supabase, queueId, 'skipped', { errorMessage: 'IA pausada por escalonamento' })
+        return
+      }
+    }
+
+    // ── 1.6 Debounce Window (2s) — aguarda rajadas de mensagens ──
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    // ── 1.7 Debounce Check (Encavalamento) ──
     const debounce = await checkDebounce(supabase, conversation.id, queueId, queueEntry.created_at)
     if (!debounce.isLatest) {
       await updateQueueStatus(supabase, queueId, 'skipped', { errorMessage: 'Encavalamento: uma mensagem mais nova existe.' })
@@ -193,9 +211,10 @@ async function processWebhook(body: any) {
       }
 
       if (testSession?.status === 'feedback_pending') {
-        // Capture feedback and save to ai_feedbacks
+        // Capture feedback using RAW content (not DLP-masked) so guidelines are preserved
+        console.log(`💬 Saving SDR feedback for brokerage ${brokerageId}: "${rawCleanContent.slice(0, 80)}..."`)
         await supabase.from('ai_feedbacks').insert({
-          brokerage_id: brokerageId, type: 'sdr', feedback_text: cleanContent
+          brokerage_id: brokerageId, type: 'sdr', feedback_text: rawCleanContent
         })
         await supabase.from('admin_test_sessions').delete().eq('id', testSession.id)
         await sendChatwootMessage(supabase, brokerageId, conversation.id,
@@ -262,14 +281,40 @@ async function processWebhook(body: any) {
     // 8.5 Load Conversation History (Isolated)
     const history = brokerageId ? await getHistory(supabase, { conversationId: conversation.id, brokerageId, limit: 15 }) : []
 
+    // 8.6 Fetch Chatwoot creds + admin alert phone for ToolContext
+    let toolCtxChatwootUrl: string | null = null
+    let toolCtxChatwootToken: string | null = null
+    let toolCtxChatwootAccountId: string | null = null
+    let toolCtxAdminAlertPhone: string | null = null
+    if (brokerageId) {
+      const { data: brokCreds } = await supabase
+        .from('brokerages')
+        .select('chatwoot_url, chatwoot_token, chatwoot_account_id, admin_alert_phone')
+        .eq('id', brokerageId)
+        .maybeSingle()
+      toolCtxChatwootUrl = brokCreds?.chatwoot_url || null
+      toolCtxChatwootToken = brokCreds?.chatwoot_token || null
+      toolCtxChatwootAccountId = brokCreds?.chatwoot_account_id || null
+      toolCtxAdminAlertPhone = (brokCreds as any)?.admin_alert_phone || null
+    }
+
     // 9. Run AI Edge Agent Loop locally (Tool Calling & Generation)
     const generatedRawMessage = await runAgentLoop(
       supabase,
       finalSystemPrompt,
-      lowerContent, // This is the masked clean prompt
+      lowerContent,
       brokerageId || 0,
       resolvedAI,
-      history
+      history,
+      {
+        clientId,
+        conversationId: conversation.id,
+        brokerageId: brokerageId || 0,
+        chatwootUrl: toolCtxChatwootUrl,
+        chatwootToken: toolCtxChatwootToken,
+        chatwootAccountId: toolCtxChatwootAccountId,
+        adminAlertPhone: toolCtxAdminAlertPhone,
+      }
     )
 
     // 10. Unmask PII before sending the message out to the client
