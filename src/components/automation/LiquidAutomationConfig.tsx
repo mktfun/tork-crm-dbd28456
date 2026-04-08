@@ -89,7 +89,7 @@ export function LiquidAutomationConfig() {
         stage_id: stage.id,
         is_active: active,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'stage_id' });
+      } as any, { onConflict: 'stage_id' });
     }
     
     toast.success(`IA ${active ? 'ativada' : 'desativada'} no funil com sucesso!`);

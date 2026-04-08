@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Loader2, AlertCircle, ChevronDown, ChevronUp, Database, Search, FileText, Calendar, Users, TrendingUp, Building2, Layers, GitBranch, UserPlus, Edit, Trash2, Move } from 'lucide-react';
+import { CheckCircle, Loader2, AlertCircle, ChevronDown, ChevronUp, Database, Search, FileText, Calendar, Users, TrendingUp, Building2, Layers, GitBranch, UserPlus, Edit, Trash2, Move, Plus } from 'lucide-react';
 
 export interface ToolStep {
   label: string;
