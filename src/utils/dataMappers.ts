@@ -141,7 +141,8 @@ export function mapClientToSupabase(data: any) {
     city: 'city',
     state: 'state',
     observations: 'observations',
-    userId: 'user_id'
+    userId: 'user_id',
+    user_id: 'user_id',
   };
 
   // Only include fields that are explicitly mapped (whitelist)
@@ -150,7 +151,8 @@ export function mapClientToSupabase(data: any) {
     const mappedKey = fieldMappings[key];
     const value = data[key];
     
-    if (value !== '' && value !== null && value !== undefined) {
+    // Allow empty strings for NOT NULL fields (phone, email)
+    if (value !== null && value !== undefined) {
       mapped[mappedKey] = value;
     }
   });
@@ -180,7 +182,9 @@ export function mapPolicyToSupabase(data: any) {
     brokerageId: 'brokerage_id',
     pdfUrl: 'pdf_url',
     pdfAttachedName: 'pdf_attached_name',
-    pdfAttachedData: 'pdf_attached_data'
+    pdfAttachedData: 'pdf_attached_data',
+    userId: 'user_id',
+    user_id: 'user_id',
   };
 
   // Only include fields that are explicitly mapped (whitelist)
@@ -189,7 +193,7 @@ export function mapPolicyToSupabase(data: any) {
     const mappedKey = fieldMappings[key];
     const value = data[key];
     
-    if (value !== '' && value !== null && value !== undefined) {
+    if (value !== null && value !== undefined) {
       mapped[mappedKey] = value;
     }
   });
