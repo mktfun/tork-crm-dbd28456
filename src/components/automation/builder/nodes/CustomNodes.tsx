@@ -4,16 +4,24 @@ import { Zap, Settings, GitBranch, MessageCircle, Bot } from 'lucide-react';
 
 const nodeBaseClass = "rounded-lg p-3 shadow-lg border backdrop-blur-md min-w-[160px] text-sm";
 
-export const TriggerNode = ({ data }: any) => (
-  <div className={`${nodeBaseClass} bg-primary/20 dark:bg-primary/30 border-primary/50 text-foreground font-semibold`}>
-    <div className="flex items-center gap-2 mb-1">
-      <Zap className="w-4 h-4 text-primary" />
-      <span>{data.label}</span>
+export const TriggerNode = ({ data }: any) => {
+  const audience = data.config?.target_audience || 'Todos';
+  const stage = data.config?.stage_rule || 'Qualquer Etapa';
+
+  return (
+    <div className={`${nodeBaseClass} bg-primary/20 dark:bg-primary/30 border-primary/50 text-foreground font-semibold`}>
+      <div className="flex items-center gap-2 mb-1">
+        <Zap className="w-4 h-4 text-primary" />
+        <span>{data.label}</span>
+      </div>
+      <div className="text-[10px] font-normal text-muted-foreground flex flex-col gap-0.5 mt-2">
+        <span>👤 {audience}</span>
+        <span>🎯 {stage}</span>
+      </div>
+      <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-primary" />
     </div>
-    <div className="text-xs font-normal text-muted-foreground">Início do Fluxo</div>
-    <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-primary" />
-  </div>
-);
+  );
+};
 
 export const ActionNode = ({ data }: any) => (
   <div className={`${nodeBaseClass} ${data.color || 'bg-card border-border'}`}>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ReactFlow, Controls, Background, addEdge, useNodesState, useEdgesState, Connection, Edge, Node, Panel, ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Card } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Loader2, Settings2, Save, Wand2, Plus, GripVertical, Trash2, Play, CircleDot, GitBranch } from 'lucide-react';
 import { toast } from 'sonner';
 import { customNodeTypes } from './nodes/CustomNodes';
+import { SDRSimulator } from './SDRSimulator';
 
 // Tools available for drag-and-drop
 const AVAILABLE_TOOLS = [
@@ -23,35 +24,102 @@ const AVAILABLE_TOOLS = [
   { type: 'decision', nodeType: 'decision_condition', label: '🔀 Decisão (Se... Então)', color: 'bg-yellow-500/10 dark:bg-yellow-900/40 border-yellow-500/30' },
 ];
 
-const initialNodes: Node[] = [
-  {
-    id: 'trigger',
-    type: 'trigger',
-    data: { label: 'Início da Conversa' },
-    position: { x: 250, y: 25 },
-  },
-  {
-    id: 'qualify',
-    type: 'decision',
-    data: { label: 'Qualificação (Lead)', color: 'bg-yellow-500/10 border-yellow-500/30', config: { condition: 'Cliente pediu cotação?' } },
-    position: { x: 250, y: 125 },
-  }
-];
-
-const initialEdges: Edge[] = [
-  { id: 'e1-2', source: 'trigger', target: 'qualify', animated: true },
-];
-
 let id = 0;
 const getId = () => `dndnode_${id++}`;
 
+interface Workflow {
+  id: string;
+  name: string;
+  isActive: boolean;
+  nodes: Node[];
+  edges: Edge[];
+}
+
+const defaultTriggerNode: Node = {
+  id: 'trigger',
+  type: 'trigger',
+  data: { label: 'Início da Conversa', config: { target_audience: 'Todos', stage_rule: 'Qualquer Etapa' } },
+  position: { x: 250, y: 25 },
+};
+
 function SDRBuilderContent() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  
+  // State for Workflows
+  const [workflows, setWorkflows] = useState<Workflow[]>([
+    { 
+      id: 'w1', 
+      name: 'Fluxo Padrão', 
+      isActive: true, 
+      nodes: [
+        defaultTriggerNode,
+        { id: 'qualify', type: 'decision', data: { label: 'Qualificação (Lead)', color: 'bg-yellow-500/10 border-yellow-500/30', config: { condition: 'Pediu cotação?' } }, position: { x: 250, y: 125 } }
+      ],
+      edges: [{ id: 'e1-2', source: 'trigger', target: 'qualify', animated: true }]
+    },
+    { 
+      id: 'w2', 
+      name: 'Triagem Noturna', 
+      isActive: false, 
+      nodes: [{ ...defaultTriggerNode, id: 'trigger_w2' }], 
+      edges: [] 
+    }
+  ]);
+  const [activeWorkflowId, setActiveWorkflowId] = useState('w1');
+  const activeWorkflow = workflows.find(w => w.id === activeWorkflowId)!;
+
+  // React Flow State (Synced to active workflow)
+  const [nodes, setNodes, onNodesChange] = useNodesState(activeWorkflow.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(activeWorkflow.edges);
+  
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  
+  // Simulator State
+  const [simulatorOpen, setSimulatorOpen] = useState(false);
+
+  // Sync local nodes/edges back to workflow array when they change
+  useEffect(() => {
+    setWorkflows(prev => prev.map(w => 
+      w.id === activeWorkflowId ? { ...w, nodes, edges } : w
+    ));
+  }, [nodes, edges, activeWorkflowId]);
+
+  // When switching workflows, load their nodes/edges
+  const switchWorkflow = (id: string) => {
+    const wf = workflows.find(w => w.id === id);
+    if (wf) {
+      setActiveWorkflowId(id);
+      setNodes(wf.nodes);
+      setEdges(wf.edges);
+      setSelectedNode(null);
+    }
+  };
+
+  const createWorkflow = () => {
+    const newWf: Workflow = {
+      id: `w${Date.now()}`,
+      name: 'Novo Fluxo SDR',
+      isActive: false,
+      nodes: [{ ...defaultTriggerNode, id: `trigger_${Date.now()}` }],
+      edges: []
+    };
+    setWorkflows(prev => [...prev, newWf]);
+    switchWorkflow(newWf.id);
+  };
+
+  const toggleWorkflowStatus = () => {
+    setWorkflows(prev => prev.map(w => 
+      w.id === activeWorkflowId ? { ...w, isActive: !w.isActive } : w
+    ));
+  };
+
+  const updateWorkflowName = (newName: string) => {
+    setWorkflows(prev => prev.map(w => 
+      w.id === activeWorkflowId ? { ...w, name: newName } : w
+    ));
+  };
 
   const onConnect = useCallback(
     (params: Connection | Edge) => setEdges((eds) => addEdge({ ...params, animated: true }, eds)),
@@ -72,17 +140,18 @@ function SDRBuilderContent() {
     (event: React.DragEvent) => {
       event.preventDefault();
 
-      const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
       const nodeDataStr = event.dataTransfer.getData('application/reactflow');
       
-      if (!nodeDataStr || !reactFlowInstance || !reactFlowBounds) {
+      if (!nodeDataStr || !reactFlowInstance) {
         return;
       }
 
       const nodeData = JSON.parse(nodeDataStr);
+      
+      // Fix for v12: screenToFlowPosition only needs clientX/Y without bounds subtraction
       const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
+        x: event.clientX,
+        y: event.clientY,
       });
 
       const newNode: Node = {
@@ -136,7 +205,7 @@ function SDRBuilderContent() {
     setSaving(true);
     setTimeout(() => {
       setSaving(false);
-      toast.success('Fluxo publicado com sucesso!');
+      toast.success('Workflows salvos com sucesso!');
     }, 1000);
   };
 
@@ -146,22 +215,38 @@ function SDRBuilderContent() {
       <div className="h-14 bg-card/60 backdrop-blur-xl border-b border-border/50 z-10 flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-3">
           <Input 
-            defaultValue="Fluxo de Qualificação Padrão" 
+            value={activeWorkflow.name}
+            onChange={(e) => updateWorkflowName(e.target.value)}
             className="h-8 bg-transparent border-transparent hover:border-border focus:border-border font-semibold text-foreground w-72 shadow-none" 
           />
-          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 gap-1.5 hidden sm:flex">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Em Produção
-          </Badge>
+          {activeWorkflow.isActive ? (
+            <Badge 
+              variant="outline" 
+              className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 gap-1.5 cursor-pointer hover:bg-emerald-500/20"
+              onClick={toggleWorkflowStatus}
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Em Produção
+            </Badge>
+          ) : (
+            <Badge 
+              variant="outline" 
+              className="bg-amber-500/10 text-amber-500 border-amber-500/20 gap-1.5 cursor-pointer hover:bg-amber-500/20"
+              onClick={toggleWorkflowStatus}
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              Rascunho Inativo
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => toast.info('O simulador de chat abrirá uma janela para testes.')}>
+          <Button variant="secondary" size="sm" onClick={() => setSimulatorOpen(!simulatorOpen)}>
             <Play className="w-4 h-4 mr-2 text-primary" />
             <span className="hidden sm:inline">Testar no Simulador</span>
           </Button>
           <Button onClick={handleSave} disabled={saving} size="sm" className="shadow-[0_0_15px_rgba(var(--primary),0.3)]">
             {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-            Publicar
+            Salvar Tudo
           </Button>
         </div>
       </div>
@@ -196,21 +281,27 @@ function SDRBuilderContent() {
             </TabsContent>
             
             <TabsContent value="flows" className="flex-1 overflow-y-auto p-4 space-y-3 mt-0">
-              <div className="p-3 rounded-xl border border-primary/50 bg-primary/5 cursor-pointer transition-colors shadow-sm">
-                <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
-                  <CircleDot className="w-3.5 h-3.5 text-emerald-500" />
-                  Fluxo Padrão
-                </h4>
-                <p className="text-xs text-muted-foreground mt-1">4 ferramentas ativas</p>
-              </div>
-              <div className="p-3 rounded-xl border border-border bg-card/50 hover:border-primary/50 cursor-pointer transition-colors shadow-sm">
-                <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
-                  <CircleDot className="w-3.5 h-3.5 text-amber-500" />
-                  Triagem Noturna
-                </h4>
-                <p className="text-xs text-muted-foreground mt-1">Rascunho • 8 nós</p>
-              </div>
-              <Button variant="outline" className="w-full mt-4 border-dashed bg-transparent hover:bg-muted/50">
+              {workflows.map(wf => (
+                <div 
+                  key={wf.id}
+                  onClick={() => switchWorkflow(wf.id)}
+                  className={`p-3 rounded-xl border cursor-pointer transition-colors shadow-sm
+                    ${activeWorkflowId === wf.id 
+                      ? 'border-primary/50 bg-primary/5' 
+                      : 'border-border bg-card/50 hover:border-primary/50'
+                    }`}
+                >
+                  <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                    <CircleDot className={`w-3.5 h-3.5 ${wf.isActive ? 'text-emerald-500' : 'text-amber-500'}`} />
+                    {wf.name}
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {wf.isActive ? 'Ativo' : 'Rascunho'} • {wf.nodes.length} nós
+                  </p>
+                </div>
+              ))}
+              
+              <Button variant="outline" className="w-full mt-4 border-dashed bg-transparent hover:bg-muted/50" onClick={createWorkflow}>
                 <Plus className="w-4 h-4 mr-2" /> Novo Fluxo
               </Button>
             </TabsContent>
@@ -238,6 +329,9 @@ function SDRBuilderContent() {
             <Background gap={16} size={1} color="rgba(255,255,255,0.1)" />
             <Controls className="bg-card border-border fill-foreground shadow-xl" />
           </ReactFlow>
+
+          {/* Simulator Floating Window */}
+          <SDRSimulator open={simulatorOpen} onClose={() => setSimulatorOpen(false)} workflowName={activeWorkflow.name} />
         </div>
 
         {/* Properties Sidebar (Right) */}
@@ -257,10 +351,59 @@ function SDRBuilderContent() {
               <div className="space-y-4 flex-1">
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-muted-foreground">Nome do Nó</label>
-                  <div className="p-2 bg-muted/50 rounded-md border border-border/50 font-medium text-foreground">
-                    {selectedNode.data.label as string}
-                  </div>
+                  <Input 
+                    className="p-2 bg-muted/50 rounded-md border border-border/50 font-medium text-foreground h-9"
+                    value={selectedNode.data.label as string}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setNodes((nds) => nds.map((node) => {
+                        if (node.id === selectedNode.id) {
+                          const newData = { ...node.data, label: value };
+                          setSelectedNode({ ...node, data: newData });
+                          return { ...node, data: newData };
+                        }
+                        return node;
+                      }));
+                    }}
+                  />
                 </div>
+
+                {/* TYPE: TRIGGER */}
+                {selectedNode.type === 'trigger' && (
+                  <div className="space-y-4 pt-4 border-t border-border/30">
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                      Gatilho Inicial
+                    </Badge>
+                    <p className="text-xs text-muted-foreground">Defina quando a IA deve iniciar este fluxo.</p>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Público-Alvo</label>
+                      <select 
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        value={selectedNode.data.config?.target_audience || 'Todos'}
+                        onChange={(e) => updateNodeData('target_audience', e.target.value)}
+                      >
+                        <option value="Todos">Todos os Contatos</option>
+                        <option value="Somente Clientes">Somente Clientes</option>
+                        <option value="Somente Desconhecidos">Somente Desconhecidos</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Regra de Etapa (Funil)</label>
+                      <select 
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        value={selectedNode.data.config?.stage_rule || 'Qualquer Etapa'}
+                        onChange={(e) => updateNodeData('stage_rule', e.target.value)}
+                      >
+                        <option value="Qualquer Etapa">Em Qualquer Etapa / Situação</option>
+                        <option value="Fora de Funil">Sem Funil (Apenas Contato)</option>
+                        <option value="Qualificação">Etapa Específica: Qualificação</option>
+                        <option value="Negociação">Etapa Específica: Negociação</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
 
                 {/* TYPE: DECISION */}
                 {selectedNode.type === 'decision' && (
