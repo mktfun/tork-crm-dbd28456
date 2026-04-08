@@ -1,10 +1,60 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.56.0";
+import { encodeHex } from "https://deno.land/std@0.224.0/encoding/hex.ts";
+import { crypto } from "https://deno.land/std@0.224.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-chatwoot-signature',
 };
+
+// 1. Defina a sua variável CHATWOOT_WEBHOOK_SECRET no painel do Supabase Edge Functions
+const CHATWOOT_WEBHOOK_SECRET = Deno.env.get('CHATWOOT_WEBHOOK_SECRET');
+
+// Função para validar a assinatura do webhook do Chatwoot
+async function verifySignature(payload: string, signature: string | null): Promise<boolean> {
+  if (!CHATWOOT_WEBHOOK_SECRET) {
+    console.warn("⚠️ CHATWOOT_WEBHOOK_SECRET não configurado. Verificação de assinatura ignorada.");
+    return true; // Retornar false em produção! Ignorado aqui caso a variável não esteja setada.
+  }
+
+  if (!signature) {
+    return false;
+  }
+
+  try {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(CHATWOOT_WEBHOOK_SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+
+    // O Chatwoot pode usar métodos diferentes para a signature dependendo da versão, 
+    // mas normalmente ele envia um HMAC SHA256 do body convertido em JSON string.
+    // Como a implementação exata requer assinar, faremos o cálculo:
+    const data = encoder.encode(payload);
+
+    // Convert hex signature to ArrayBuffer
+    const signatureBytes = new Uint8Array(
+      signature.match(/[\da-f]{2}/gi)?.map((h) => parseInt(h, 16)) || []
+    );
+
+    const isValid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      signatureBytes,
+      data
+    );
+
+    return isValid;
+  } catch (error) {
+    console.error("Erro ao validar assinatura:", error);
+    return false;
+  }
+}
 
 // ========== VENDOR RESOLUTION ==========
 interface VendorResolution {

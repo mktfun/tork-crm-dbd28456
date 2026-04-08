@@ -1032,6 +1032,21 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "move_lead_to_status",
+      description: "Move um lead para uma nova etapa do funil usando o NOME da etapa (ex: 'Negociação').",
+      parameters: {
+        type: "object",
+        properties: {
+          lead_id: { type: "string", description: "ID do lead/deal (UUID)" },
+          new_status: { type: "string", description: "Nome da nova etapa (status)" }
+        },
+        required: ["lead_id", "new_status"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "create_client",
       description: "Cria um novo cliente no sistema. Campos obrigatórios: name, phone.",
       parameters: {
@@ -1686,6 +1701,10 @@ const toolHandlers: Record<string, (args: any, supabase: any, userId: string) =>
       new_stage_id: stage_id,
       new_stage_name: stage.name
     };
+  },
+
+  move_lead_to_status: async (args, supabase, userId) => {
+    return await CRM.move_lead_to_status(args, supabase, userId);
   },
 
   create_client: async (args, supabase, userId) => {

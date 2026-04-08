@@ -339,3 +339,64 @@ export async function delete_deal(
     throw error;
   }
 }
+
+/**
+ * Move um lead para uma nova etapa (status) usando o nome da etapa
+ */
+export async function move_lead_to_status(
+  args: {
+    lead_id: string;
+    new_status: string;
+  },
+  supabase: SupabaseClient,
+  userId: string
+): Promise<any> {
+  const audit = createAuditTimer(supabase, {
+    user_id: userId,
+    operation_type: 'update',
+    entity_type: 'deal',
+    entity_id: args.lead_id,
+    tool_name: 'move_lead_to_status',
+  });
+
+  try {
+    logger.info('Moving lead to new status name', { 
+      userId, 
+      leadId: args.lead_id, 
+      newStatus: args.new_status 
+    });
+
+    // 1. Buscar a etapa pelo nome (case insensitive)
+    const { data: stages, error: stageError } = await supabase
+      .from('crm_stages')
+      .select('id, name')
+      .eq('user_id', userId)
+      .ilike('name', args.new_status.trim());
+
+    if (stageError) throw stageError;
+    
+    if (!stages || stages.length === 0) {
+      throw new Error(`Etapa "${args.new_status}" não encontrada. Verifique os nomes disponíveis.`);
+    }
+
+    // Se houver mais de uma (em funis diferentes), pegar a primeira ou lançar erro?
+    // Por enquanto pegamos a primeira que bater exatamente, ou a primeira do array.
+    const targetStage = stages.find(s => s.name.toLowerCase() === args.new_status.toLowerCase()) || stages[0];
+
+    // 2. Chamar a função base de movimentação
+    return await move_deal_to_stage(
+      { deal_id: args.lead_id, stage_id: targetStage.id },
+      supabase,
+      userId
+    );
+
+  } catch (error: any) {
+    await audit.failure(error);
+    logger.error('Failed to move lead to status', { 
+      userId, 
+      leadId: args.lead_id, 
+      error: error.message 
+    });
+    throw error;
+  }
+}

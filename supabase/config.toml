@@ -1,55 +1,55 @@
 project_id = "jaouwhckqqnaxqyfvgyq"
 
 [functions.ai-assistant]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-sandbox]
-verify_jwt = false
+verify_jwt = true
 
 [functions.analyze-policy]
-verify_jwt = false
+verify_jwt = true
 
 [functions.analyze-receipt]
-verify_jwt = false
+verify_jwt = true
 
 [functions.auto-changelog]
-verify_jwt = false
+verify_jwt = true
 
 [functions.backfill-commissions]
-verify_jwt = false
+verify_jwt = true
 
 [functions.chatwoot-sync]
-verify_jwt = false
+verify_jwt = true
 
 [functions.chatwoot-webhook]
 verify_jwt = false
 
 [functions.create-next-appointment]
-verify_jwt = false
+verify_jwt = true
 
 [functions.enrich-old-transactions]
-verify_jwt = false
+verify_jwt = true
 
 [functions.extract-quote-data]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-card-pdf]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-embeddings]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ocr-bulk-analyze]
-verify_jwt = false
+verify_jwt = true
 
 [functions.analyze-policy-mistral]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-summary]
-verify_jwt = false
+verify_jwt = true
 
 [functions.admin-dispatcher]
-verify_jwt = false
+verify_jwt = true
 
 [functions.chatwoot-dispatcher]
 verify_jwt = false

@@ -84,11 +84,13 @@ async function uploadReceiptToStorage(file: File, userId: string): Promise<strin
 
     if (error) throw error;
 
-    const { data: urlData } = supabase.storage
+    const { data: urlData, error: urlError } = await supabase.storage
       .from('comprovantes')
-      .getPublicUrl(fileName);
+      .createSignedUrl(fileName, 3600 * 24 * 7); // 1 semana
 
-    return urlData.publicUrl;
+    if (urlError) throw urlError;
+
+    return urlData.signedUrl;
   } catch (err) {
     console.error('Erro ao fazer upload:', err);
     return null;

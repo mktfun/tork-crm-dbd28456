@@ -35,8 +35,8 @@ const suggestedQuestions = [
 
 // ... (previous interfaces)
 
-const DEFAULT_WIDTH = 420;
-const DEFAULT_HEIGHT = 600;
+const DEFAULT_WIDTH = 500;
+const DEFAULT_HEIGHT = 750;
 const MIN_WIDTH = 350;
 const MIN_HEIGHT = 450;
 const MAX_WIDTH = 1000;

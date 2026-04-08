@@ -148,11 +148,13 @@ export function NovaDespesaModal() {
 
           if (uploadError) throw uploadError;
 
-          const { data: urlData } = supabase.storage
+          const { data: urlData, error: urlError } = await supabase.storage
             .from('comprovantes')
-            .getPublicUrl(fileName);
+            .createSignedUrl(fileName, 3600 * 24 * 7); // 1 semana
 
-          attachmentUrl = urlData.publicUrl;
+          if (urlError) throw urlError;
+
+          attachmentUrl = urlData.signedUrl;
         } catch (uploadErr) {
           console.error('Erro no upload:', uploadErr);
           toast.error('Erro ao anexar comprovante');

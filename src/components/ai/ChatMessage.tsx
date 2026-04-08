@@ -97,7 +97,12 @@ export const ChatMessage = memo<ChatMessageProps>(({
   onFeedbackNoteCancel,
 }) => {
   const isAssistant = message.role === 'assistant';
-  const showLoader = toolExecutions.length === 0 && message.isLoading && message.content === '';
+  // FASE P0.1 & P0.3: Garantir loader único e apenas quando necessário
+  const showLoader = isAssistant && 
+                    isCurrentMessage && 
+                    toolExecutions.length === 0 && 
+                    message.isLoading && 
+                    !message.content;
   const showContent = Boolean(message.content);
   const hasFeedback = message.id ? feedbackSent.has(message.id) : false;
   const showFeedbackInput = feedbackNoteId === message.id;
