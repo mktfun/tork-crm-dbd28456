@@ -4,14 +4,21 @@ import '@xyflow/react/dist/style.css';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Loader2, Settings2, Save, Wand2, Plus, GripVertical } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Ferramentas disponíveis para arrastar
 const AVAILABLE_TOOLS = [
-  { type: 'tool_create_client', label: '⚙️ Criar Cliente', color: 'bg-emerald-500/10 border-emerald-500/30' },
-  { type: 'tool_search_policy', label: '⚙️ Buscar Apólice', color: 'bg-blue-500/10 border-blue-500/30' },
-  { type: 'tool_financial', label: '⚙️ Consultar Financeiro', color: 'bg-amber-500/10 border-amber-500/30' },
+  { type: 'tool_create_client', label: '👤 Criar Cliente', color: 'bg-emerald-500/10 dark:bg-emerald-900/40 border-emerald-500/30' },
+  { type: 'tool_search_policy', label: '📄 Buscar Apólice', color: 'bg-blue-500/10 dark:bg-blue-900/40 border-blue-500/30' },
+  { type: 'tool_financial', label: '💰 Consultar Financeiro', color: 'bg-amber-500/10 dark:bg-amber-900/40 border-amber-500/30' },
+  { type: 'action_move_deal', label: '🔄 Mover Negociação', color: 'bg-indigo-500/10 dark:bg-indigo-900/40 border-indigo-500/30' },
+  { type: 'action_close_deal', label: '🏆 Ganho / ❌ Perda', color: 'bg-red-500/10 dark:bg-red-900/40 border-red-500/30' },
+  { type: 'action_send_text', label: '💬 Enviar Texto Padrão', color: 'bg-cyan-500/10 dark:bg-cyan-900/40 border-cyan-500/30' },
+  { type: 'action_custom_prompt', label: '🧠 Instrução Livre', color: 'bg-fuchsia-500/10 dark:bg-fuchsia-900/40 border-fuchsia-500/30' },
+  { type: 'decision_condition', label: '🔀 Decisão (Se... Então)', color: 'bg-yellow-500/10 dark:bg-yellow-900/40 border-yellow-500/30' },
 ];
 
 const initialNodes: Node[] = [
@@ -20,7 +27,7 @@ const initialNodes: Node[] = [
     type: 'input',
     data: { label: 'Início da Conversa' },
     position: { x: 250, y: 25 },
-    className: 'bg-primary/20 border-primary text-foreground rounded-lg p-3 font-semibold shadow-lg backdrop-blur-md',
+    className: 'bg-primary/20 dark:bg-primary/30 border-primary text-foreground rounded-lg p-3 font-semibold shadow-lg backdrop-blur-md',
   },
   {
     id: 'qualify',
@@ -176,15 +183,93 @@ function SDRBuilderContent() {
                     Ferramenta (Tool)
                   </Badge>
                   <p className="text-sm text-muted-foreground">
-                    Esta ferramenta permite que a IA execute ações autônomas. Em versões futuras, você poderá restringir campos obrigatórios aqui.
+                    Esta ferramenta permite que a IA execute ações autônomas na base de dados.
                   </p>
-                  
                   <div className="p-3 bg-muted/20 rounded-lg border border-border/50 flex items-center justify-between">
                     <span className="text-sm">Status Ativo</span>
                     <input type="checkbox" defaultChecked className="toggle" />
                   </div>
                 </div>
               )}
+
+              {selectedNode.type === 'action_move_deal' || selectedNode.data.label.toString().includes('🔄') ? (
+                <div className="space-y-3 pt-4 border-t border-border/30">
+                  <Badge variant="outline" className="bg-indigo-500/10 text-indigo-500 border-indigo-500/20">
+                    Ação de CRM
+                  </Badge>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Etapa de Destino</label>
+                    <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+                      <option>Qualificação</option>
+                      <option>Apresentação de Proposta</option>
+                      <option>Negociação</option>
+                    </select>
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedNode.type === 'action_close_deal' || selectedNode.data.label.toString().includes('🏆') ? (
+                <div className="space-y-3 pt-4 border-t border-border/30">
+                  <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20">
+                    Fechamento
+                  </Badge>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Status a Aplicar</label>
+                    <div className="flex items-center gap-4 mt-2">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="radio" name="close_status" defaultChecked /> Ganho
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="radio" name="close_status" /> Perda
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedNode.type === 'action_send_text' || selectedNode.data.label.toString().includes('💬') ? (
+                <div className="space-y-3 pt-4 border-t border-border/30">
+                  <Badge variant="outline" className="bg-cyan-500/10 text-cyan-500 border-cyan-500/20">
+                    Mensagem
+                  </Badge>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Texto Fixo (Template)</label>
+                    <Textarea 
+                      placeholder="Ex: Obrigado pelo contato! Nossos consultores retornarão em breve." 
+                      className="resize-none h-24"
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedNode.type === 'action_custom_prompt' || selectedNode.data.label.toString().includes('🧠') ? (
+                <div className="space-y-3 pt-4 border-t border-border/30">
+                  <Badge variant="outline" className="bg-fuchsia-500/10 text-fuchsia-500 border-fuchsia-500/20">
+                    Processamento Cognitivo
+                  </Badge>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Instrução Secreta (Prompt)</label>
+                    <Textarea 
+                      placeholder="Ex: Se o cliente pedir o preço, primeiro pergunte a placa do veículo antes de responder." 
+                      className="resize-none h-32"
+                    />
+                    <p className="text-xs text-muted-foreground">A IA interpretará isso dinamicamente na jornada.</p>
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedNode.type === 'decision_condition' || selectedNode.data.label.toString().includes('🔀') ? (
+                <div className="space-y-3 pt-4 border-t border-border/30">
+                  <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+                    Decisão Lógica
+                  </Badge>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Condição (Se...)</label>
+                    <Input placeholder="Ex: O cliente demonstrou objeção ao preço?" />
+                    <p className="text-xs text-muted-foreground">O fluxo se dividirá em duas saídas: Verdadeiro ou Falso.</p>
+                  </div>
+                </div>
+              ) : null}
             </div>
             
             <Button className="w-full mt-4" variant="secondary" onClick={() => setSelectedNode(null)}>

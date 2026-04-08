@@ -10,10 +10,10 @@ export function AIAutomationDashboard() {
   const [activeTab, setActiveTab] = useState('configuracao');
 
   return (
-    <div className="h-full flex flex-col min-h-0 bg-background/50">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+    <div className="h-full flex flex-col flex-1 w-full min-h-0">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col min-h-0">
         {/* Header Tabs */}
-        <div className="px-6 flex-shrink-0 pt-4 pb-0">
+        <div className="px-6 flex-shrink-0 pt-4 pb-2">
           <TabsList className="gap-1 bg-card/40 backdrop-blur-xl border border-border/50 rounded-xl p-1 h-auto flex max-w-fit shadow-sm">
             <TabsTrigger
               value="configuracao"
