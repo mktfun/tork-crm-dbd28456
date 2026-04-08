@@ -183,7 +183,6 @@ export function mapPolicyToSupabase(data: any) {
     pdfUrl: 'pdf_url',
     pdfAttachedName: 'pdf_attached_name',
     pdfAttachedData: 'pdf_attached_data',
-    userId: 'user_id',
   };
 
   // Only include fields that are explicitly mapped (whitelist)
