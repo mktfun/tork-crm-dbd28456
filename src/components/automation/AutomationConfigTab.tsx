@@ -143,7 +143,7 @@ export function AutomationConfigTab() {
       const [brokerageRes, crmRes, globalRes] = await Promise.all([
         supabase
           .from("brokerages")
-          .select("id, chatwoot_url, chatwoot_token, chatwoot_account_id, updated_at, elevenlabs_api_key, elevenlabs_voice_id, elevenlabs_model_id, admin_alert_phone")
+          .select("id, chatwoot_url, chatwoot_token, chatwoot_account_id, updated_at, elevenlabs_api_key, elevenlabs_voice_id, elevenlabs_model_id")
           .eq("user_id", user?.id ?? "")
           .maybeSingle(),
         supabase

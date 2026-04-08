@@ -183,8 +183,9 @@ export function mapPolicyToSupabase(data: any) {
     pdfUrl: 'pdf_url',
     pdfAttachedName: 'pdf_attached_name',
     pdfAttachedData: 'pdf_attached_data',
-    userId: 'user_id',
-    user_id: 'user_id',
+  };
+  // Also accept snake_case user_id
+  const extendedMappings: Record<string, string> = { ...fieldMappings, user_id: 'user_id' };
   };
 
   // Only include fields that are explicitly mapped (whitelist)
