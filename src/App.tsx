@@ -78,16 +78,16 @@ if (Capacitor.isNativePlatform()) {
   // Force StatusBar to adapt to dark backgrounds (white text)
   StatusBar.setStyle({ style: Style.Dark }).catch(() => { });
   StatusBar.setBackgroundColor({ color: '#09090b' }).catch(() => { }); // Tailwind zinc-950
-}
 
-// 2. Android Hardware Back Button Handler
-CapacitorApp.addListener('backButton', ({ canGoBack }) => {
-  if (!canGoBack) {
-    CapacitorApp.exitApp();
-  } else {
-    window.history.back();
-  }
-});
+  // 2. Android Hardware Back Button Handler
+  CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+    if (!canGoBack) {
+      CapacitorApp.exitApp();
+    } else {
+      window.history.back();
+    }
+  });
+}
 // ==========================================
 
 // Helper to redirect legacy detail routes to dashboard namespace

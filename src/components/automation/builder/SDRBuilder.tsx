@@ -85,7 +85,7 @@ function SDRBuilderContent() {
         className: `${nodeData.color} text-foreground rounded-lg p-3 shadow-lg`,
       };
 
-      setNodes((nds) => eds.concat(newNode));
+      setNodes((nds) => nds.concat(newNode));
     },
     [reactFlowInstance, setNodes],
   );
