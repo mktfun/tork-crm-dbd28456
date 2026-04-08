@@ -108,50 +108,51 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="p-6 space-y-8">
-      {/* HEADER DE PÁGINA ROBUSTO */}
-      <div className="dashboard-header">
-        <DashboardHeader />
-      </div>
-
-      {/* CARD DE INSIGHT GLOBAL ESTRATÉGICO + RACIOCÍNIO IA */}
-      <div className="dashboard-global-insight grid grid-cols-1">
-        <ThinkingCard
-          title="Análise em Tempo Real"
-          steps={aiReasoningSteps}
-          isThinking={true}
-          strategicSummary={{ focus: 'general' }}
-        />
-      </div>
-
-      {/* GRADE DE KPIs - SEM FILTRO DE DATA (dados do mês atual) */}
-      <div className="dashboard-kpis">
-        <DashboardKpis />
-      </div>
-
-      {/* LINHA 2: Performance Chart (2/3) + Próximos Agendamentos (1/3) */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 performance-chart">
-          <PerformanceChart />
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 h-full">
+      <div className="max-w-[1600px] mx-auto space-y-8">
+        {/* HEADER DE PÁGINA ROBUSTO */}
+        <div className="dashboard-header">
+          <DashboardHeader />
         </div>
-        <div className="lg:col-span-1 dashboard-sidebar">
-          <DashboardSidebar />
+
+        {/* CARD DE INSIGHT GLOBAL ESTRATÉGICO + RACIOCÍNIO IA */}
+        <div className="dashboard-global-insight grid grid-cols-1">
+          <ThinkingCard
+            steps={aiReasoningSteps}
+            isThinking={true}
+            strategicSummary={{ focus: 'general' }}
+          />
         </div>
-      </div>
 
-      {/* LINHA 3: Sistema de Controle de Gráficos - COM FILTRO DE DATA PRÓPRIO */}
-      <div className="dashboard-controller">
-        <DashboardController />
-      </div>
+        {/* GRADE DE KPIs - SEM FILTRO DE DATA (dados do mês atual) */}
+        <div className="dashboard-kpis">
+          <DashboardKpis />
+        </div>
 
-      {/* SISTEMA DE ONBOARDING À PROVA DE FALHAS */}
-      {shouldShowOnboarding && (
-        <OnboardingTour
-          steps={dashboardSteps}
-          isActive={true}
-          onComplete={completeOnboarding}
-        />
-      )}
+        {/* LINHA 2: Performance Chart (2/3) + Próximos Agendamentos (1/3) */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 performance-chart">
+            <PerformanceChart />
+          </div>
+          <div className="lg:col-span-1 dashboard-sidebar">
+            <DashboardSidebar />
+          </div>
+        </div>
+
+        {/* LINHA 3: Sistema de Controle de Gráficos - COM FILTRO DE DATA PRÓPRIO */}
+        <div className="dashboard-controller">
+          <DashboardController />
+        </div>
+
+        {/* SISTEMA DE ONBOARDING À PROVA DE FALHAS */}
+        {shouldShowOnboarding && (
+          <OnboardingTour
+            steps={dashboardSteps}
+            isActive={true}
+            onComplete={completeOnboarding}
+          />
+        )}
+      </div>
     </div>
   );
 }

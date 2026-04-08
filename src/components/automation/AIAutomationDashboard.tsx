@@ -56,8 +56,8 @@ export function AIAutomationDashboard() {
             </motion.div>
           </TabsContent>
           
-          <TabsContent value="sdr-builder" className="flex-1 m-0 h-full overflow-hidden">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full">
+          <TabsContent value="sdr-builder" className="flex-1 m-0 h-full overflow-hidden p-0">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full w-full">
               <SDRBuilder />
             </motion.div>
           </TabsContent>

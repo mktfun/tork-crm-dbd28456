@@ -41,12 +41,10 @@ export function RootLayout() {
 
           {/* ÁREA PRINCIPAL ONDE AS PÁGINAS VÃO APARECER */}
           <main className={cn(
-            "flex-1 overflow-y-auto p-4 md:p-6",
-            isMobile && "pb-20" // Espaço para o floating nav
+            "flex-1 overflow-hidden",
+            isMobile && "pb-20"
           )}>
-            <div className="max-w-[1600px] mx-auto">
-              <Outlet />
-            </div>
+            <Outlet />
           </main>
         </div>
       </div>

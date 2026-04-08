@@ -15,6 +15,10 @@ import {
   Clock,
   LineChart,
   GitCompare,
+  Calendar,
+  CreditCard,
+  ArrowUpRight,
+  ChevronRight,
 } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -197,132 +201,136 @@ function DreTab() {
 export default function FinanceiroERP() {
   usePageTitle('Financeiro');
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'visao-geral');
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
+    to: endOfMonth(new Date()),
   });
 
-  const [activeTab, setActiveTab] = useState('visao-geral');
-  const [detailsTransactionId, setDetailsTransactionId] = useState<string | null>(null);
-  const [isLegacyLookup, setIsLegacyLookup] = useState(false);
-  const navigate = useNavigate();
+  const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : format(startOfMonth(new Date()), 'yyyy-MM-dd');
+  const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
-  const { startDate, endDate } = useMemo(() => {
-    const from = dateRange?.from || startOfMonth(new Date());
-    const to = dateRange?.to || endOfMonth(new Date());
-    return {
-      startDate: format(startOfDay(from), 'yyyy-MM-dd'),
-      endDate: format(endOfDay(to), 'yyyy-MM-dd')
-    };
-  }, [dateRange]);
+  // Controle do Modal de Detalhes (Sheet)
+  const detailsTransactionId = searchParams.get('details');
+  const isLegacyLookup = searchParams.get('lookup') === 'legacy';
 
-  const handleViewTransactionDetails = (id: string) => {
-    setDetailsTransactionId(id);
-    setIsLegacyLookup(false);
+  const handleViewTransactionDetails = (id: string, legacy = false) => {
+    setSearchParams(prev => {
+      prev.set('details', id);
+      if (legacy) prev.set('lookup', 'legacy');
+      return prev;
+    });
   };
 
   const handleCloseDetails = () => {
-    setDetailsTransactionId(null);
-    setIsLegacyLookup(false);
+    setSearchParams(prev => {
+      prev.delete('details');
+      prev.delete('lookup');
+      return prev;
+    });
   };
 
   return (
-    <div className="space-y-6">
-      {/* Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-2">
-        <DateRangeFilter value={dateRange} onChange={setDateRange} />
-        <ImportReceiptsModal />
-        <ImportTransactionsModal />
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 h-full">
+      <div className="max-w-[1600px] mx-auto space-y-6">
+        {/* Action Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-2">
+          <DateRangeFilter value={dateRange} onChange={setDateRange} />
+          <ImportReceiptsModal />
+          <ImportTransactionsModal />
+        </div>
+
+        {/* KPIs - Glass Design */}
+        <KpiSection startDate={startDate} endDate={endDate} />
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="bg-muted/50 backdrop-blur-md border border-border/50 p-1 rounded-xl">
+            <TabsTrigger value="visao-geral" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <BarChart3 className="w-4 h-4" />
+              Visão Geral
+            </TabsTrigger>
+            <TabsTrigger value="caixa" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <Landmark className="w-4 h-4" />
+              Bancos
+            </TabsTrigger>
+            <TabsTrigger value="tesouraria" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <Wallet className="w-4 h-4" />
+              Tesouraria
+            </TabsTrigger>
+            <TabsTrigger value="transacoes" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <Wallet className="w-4 h-4" />
+              Transações
+            </TabsTrigger>
+            <TabsTrigger value="provisoes" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <LineChart className="w-4 h-4" />
+              Provisões
+            </TabsTrigger>
+            <TabsTrigger value="dre" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <FileSpreadsheet className="w-4 h-4" />
+              DRE
+            </TabsTrigger>
+            <TabsTrigger value="conciliacao" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <GitCompare className="w-4 h-4" />
+              Conciliação
+            </TabsTrigger>
+            <TabsTrigger value="config" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <Settings className="w-4 h-4" />
+              Configurações
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="visao-geral">
+            <VisaoGeral
+              dateRange={dateRange}
+              onNavigate={(path) => navigate(path)}
+              onTabChange={setActiveTab}
+            />
+            <div className="mt-6">
+              <RecentTransactionsCard onViewDetails={handleViewTransactionDetails} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="caixa">
+            <CaixaTab dateRange={dateRange} />
+          </TabsContent>
+
+          <TabsContent value="tesouraria">
+            <TesourariaTab dateRange={dateRange} />
+          </TabsContent>
+
+          <TabsContent value="transacoes">
+            <TransacoesTab dateRange={dateRange} />
+          </TabsContent>
+
+          <TabsContent value="provisoes">
+            <ProvisoesTab dateRange={dateRange} />
+          </TabsContent>
+
+          <TabsContent value="dre">
+            <DreTab />
+          </TabsContent>
+
+          <TabsContent value="conciliacao">
+            <ReconciliationPage />
+          </TabsContent>
+
+          <TabsContent value="config">
+            <ConfiguracoesTab />
+          </TabsContent>
+        </Tabs>
+
+        <TransactionDetailsSheet
+          transactionId={detailsTransactionId}
+          isLegacyId={isLegacyLookup}
+          open={!!detailsTransactionId}
+          onClose={handleCloseDetails}
+        />
+
+        {import.meta.env.DEV && <PageDebugger context={activeTab} />}
       </div>
-
-      {/* KPIs - Glass Design */}
-      <KpiSection startDate={startDate} endDate={endDate} />
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-muted/50 backdrop-blur-md border border-border/50 p-1 rounded-xl">
-          <TabsTrigger value="visao-geral" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
-            <BarChart3 className="w-4 h-4" />
-            Visão Geral
-          </TabsTrigger>
-          <TabsTrigger value="caixa" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
-            <Landmark className="w-4 h-4" />
-            Bancos
-          </TabsTrigger>
-          <TabsTrigger value="tesouraria" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
-            <Wallet className="w-4 h-4" />
-            Tesouraria
-          </TabsTrigger>
-          <TabsTrigger value="transacoes" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
-            <Wallet className="w-4 h-4" />
-            Transações
-          </TabsTrigger>
-          <TabsTrigger value="provisoes" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
-            <LineChart className="w-4 h-4" />
-            Provisões
-          </TabsTrigger>
-          <TabsTrigger value="dre" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
-            <FileSpreadsheet className="w-4 h-4" />
-            DRE
-          </TabsTrigger>
-          <TabsTrigger value="conciliacao" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
-            <GitCompare className="w-4 h-4" />
-            Conciliação
-          </TabsTrigger>
-          <TabsTrigger value="config" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
-            <Settings className="w-4 h-4" />
-            Configurações
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="visao-geral">
-          <VisaoGeral
-            dateRange={dateRange}
-            onNavigate={(path) => navigate(path)}
-            onTabChange={setActiveTab}
-          />
-          <div className="mt-6">
-            <RecentTransactionsCard onViewDetails={handleViewTransactionDetails} />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="caixa">
-          <CaixaTab dateRange={dateRange} />
-        </TabsContent>
-
-        <TabsContent value="tesouraria">
-          <TesourariaTab dateRange={dateRange} />
-        </TabsContent>
-
-        <TabsContent value="transacoes">
-          <TransacoesTab dateRange={dateRange} />
-        </TabsContent>
-
-        <TabsContent value="provisoes">
-          <ProvisoesTab dateRange={dateRange} />
-        </TabsContent>
-
-        <TabsContent value="dre">
-          <DreTab />
-        </TabsContent>
-
-        <TabsContent value="conciliacao">
-          <ReconciliationPage />
-        </TabsContent>
-
-        <TabsContent value="config">
-          <ConfiguracoesTab />
-        </TabsContent>
-      </Tabs>
-
-      <TransactionDetailsSheet
-        transactionId={detailsTransactionId}
-        isLegacyId={isLegacyLookup}
-        open={!!detailsTransactionId}
-        onClose={handleCloseDetails}
-      />
-
-      {import.meta.env.DEV && <PageDebugger context={activeTab} />}
     </div>
   );
 }

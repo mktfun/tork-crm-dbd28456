@@ -210,7 +210,7 @@ function SDRBuilderContent() {
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-background/50 relative">
+    <div className="flex flex-col h-full w-full bg-background/5 relative overflow-hidden">
       {/* TopBar Lifecycle Header */}
       <div className="h-14 bg-card/60 backdrop-blur-xl border-b border-border/50 z-10 flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-3">
@@ -309,7 +309,7 @@ function SDRBuilderContent() {
         </div>
 
         {/* Canvas Area */}
-        <div className="flex-1 relative" ref={reactFlowWrapper}>
+        <div className="flex-1 relative overflow-hidden" ref={reactFlowWrapper}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -536,7 +536,7 @@ function SDRBuilderContent() {
                 )}
               </div>
               
-              <div className="mt-6 space-y-2 border-t border-border/30 pt-4">
+              <div className="mt-6 space-y-2 border-t border-border/30 pt-4 shrink-0">
                 <Button className="w-full text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/20" variant="outline" onClick={deleteSelectedNode}>
                   <Trash2 className="w-4 h-4 mr-2" />
                   Excluir Nó
