@@ -183,15 +183,16 @@ export function mapPolicyToSupabase(data: any) {
     pdfUrl: 'pdf_url',
     pdfAttachedName: 'pdf_attached_name',
     pdfAttachedData: 'pdf_attached_data',
-  };
-  // Also accept snake_case user_id
-  const extendedMappings: Record<string, string> = { ...fieldMappings, user_id: 'user_id' };
+    userId: 'user_id',
   };
 
   // Only include fields that are explicitly mapped (whitelist)
+  // Also accept snake_case keys directly
+  const allMappings: Record<string, string> = { ...fieldMappings, user_id: 'user_id' };
+  
   Object.keys(data).forEach(key => {
-    if (!(key in fieldMappings)) return;
-    const mappedKey = fieldMappings[key];
+    if (!(key in allMappings)) return;
+    const mappedKey = allMappings[key];
     const value = data[key];
     
     if (value !== null && value !== undefined) {
