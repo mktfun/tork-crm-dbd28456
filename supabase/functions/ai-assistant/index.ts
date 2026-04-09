@@ -9,6 +9,7 @@ import * as CRM from "./tools-crm.ts";
 import * as INSPECTOR from "./tools-inspector.ts";
 import * as ANALYTICS from "./tools-analytics.ts";
 import { resolveUserModel } from "../_shared/model-resolver.ts";
+import { getActiveSDRWorkflow, processSDRFlow } from "./engine-sdr.ts";
 
 // --- Configuração do Rate Limiter ---
 const redis = new Redis({
@@ -2049,15 +2050,42 @@ serve(async (req) => {
 
   try {
     const rawBody = await req.text();
-    const { messages, userId, conversationId, stream = false, system_override } = JSON.parse(rawBody);
+    const { messages, userId, conversationId, stream = false, system_override, is_simulation = false, workflow_data } = JSON.parse(rawBody);
 
-    logger.info('Request parsed', { requestId, userId, stream, conversationId, hasSystemOverride: !!system_override });
+    logger.info('Request parsed', { requestId, userId, stream, conversationId, isSimulation: is_simulation });
 
-    // Rate Limiting
-    const identifier = userId || req.headers.get("x-forwarded-for") || 'anon';
-    const { success: rateLimitSuccess, remaining } = await ratelimit.limit(identifier);
+    // 1. ROTEAMENTO SDR (Prioridade 1)
+    if (!system_override) {
+      const lastMsg = messages[messages.length - 1]?.content || "";
+      const lastMsgText = typeof lastMsg === 'string' ? lastMsg : 
+                        (Array.isArray(lastMsg) ? lastMsg.find((p: any) => p.type === 'text')?.text || '' : '');
 
-    if (!rateLimitSuccess) {
+      let sdrWorkflow = null;
+      
+      if (is_simulation && workflow_data) {
+        sdrWorkflow = workflow_data;
+        console.log(`[SDR-ROUTING] Usando workflow de simulação recebido no payload.`);
+      } else {
+        sdrWorkflow = await getActiveSDRWorkflow(supabase, userId, {});
+      }
+
+      if (sdrWorkflow) {
+        const sdrResult = await processSDRFlow(sdrWorkflow, lastMsgText, messages, supabase, userId);
+        if (sdrResult) {
+          console.log(`[SDR-ROUTING] Mensagem processada pela engine SDR.`);
+          return new Response(
+            JSON.stringify({ 
+              message: sdrResult.content,
+              metadata: sdrResult.metadata
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+    }
+
+    // Rate Limiting (apenas produção)
+    if (!is_simulation) {
       logger.warn('Rate limit exceeded', { userId, identifier });
       clearTimeout(timeoutId);
       return new Response(JSON.stringify({

@@ -3,15 +3,29 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Bot, User, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Message {
   id: string;
   role: 'assistant' | 'user';
   text: string;
   isSimulated?: boolean;
+  metadata?: any;
 }
 
-export function SDRSimulator({ open, onClose, workflowName }: { open: boolean; onClose: () => void; workflowName: string }) {
+export function SDRSimulator({ 
+  open, 
+  onClose, 
+  workflowName,
+  workflowData 
+}: { 
+  open: boolean; 
+  onClose: () => void; 
+  workflowName: string;
+  workflowData: { nodes: any[], edges: any[] }
+}) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -19,13 +33,9 @@ export function SDRSimulator({ open, onClose, workflowName }: { open: boolean; o
 
   useEffect(() => {
     if (open && messages.length === 0) {
-      setIsTyping(true);
-      setTimeout(() => {
-        setMessages([
-          { id: '1', role: 'assistant', text: `Olá! Eu sou a IA rodando o fluxo simulado "${workflowName}". Como posso ajudar hoje?`, isSimulated: true }
-        ]);
-        setIsTyping(false);
-      }, 1000);
+      setMessages([
+        { id: 'welcome', role: 'assistant', text: `Simulador de Fluxo "${workflowName}" ativado. Envie um "Olá" para testar o gatilho.`, isSimulated: true }
+      ]);
     }
   }, [open, messages.length, workflowName]);
 
@@ -33,25 +43,52 @@ export function SDRSimulator({ open, onClose, workflowName }: { open: boolean; o
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || !user) return;
 
     const userMsg: Message = { id: Date.now().toString(), role: 'user', text: input };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
 
-    // Mock response based on flow
-    setTimeout(() => {
+    try {
+      // Formatar histórico para a Edge Function
+      const history = messages.map(m => ({
+        role: m.role,
+        content: m.text,
+        metadata: m.metadata
+      }));
+      history.push({ role: 'user', content: userMsg.text, metadata: {} });
+
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+        body: {
+          userId: user.id,
+          messages: history,
+          is_simulation: true,
+          workflow_data: workflowData
+        }
+      });
+
+      if (error) throw error;
+
       const assistantMsg: Message = { 
         id: (Date.now() + 1).toString(), 
         role: 'assistant', 
-        text: `(Simulação) Entendi que você disse: "${userMsg.text}". A lógica do fluxo ditaria a próxima ação aqui.`,
+        text: data.message,
+        metadata: data.metadata,
         isSimulated: true
       };
       setMessages(prev => [...prev, assistantMsg]);
+    } catch (error: any) {
+      console.error('Erro no simulador:', error);
+      setMessages(prev => [...prev, { 
+        id: 'err', 
+        role: 'assistant', 
+        text: `Erro na simulação: ${error.message}. Verifique a aba de logs no Supabase.` 
+      }]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   return (

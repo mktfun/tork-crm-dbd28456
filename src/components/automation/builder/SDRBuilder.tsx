@@ -11,6 +11,7 @@ import { Loader2, Settings2, Save, Wand2, Plus, GripVertical, Trash2, Play, Circ
 import { toast } from 'sonner';
 import { customNodeTypes } from './nodes/CustomNodes';
 import { SDRSimulator } from './SDRSimulator';
+import { useSDRWorkflows } from '@/hooks/useSDRWorkflows';
 
 // Tools available for drag-and-drop
 const AVAILABLE_TOOLS = [
@@ -24,16 +25,8 @@ const AVAILABLE_TOOLS = [
   { type: 'decision', nodeType: 'decision_condition', label: '🔀 Decisão (Se... Então)', color: 'bg-yellow-500/10 dark:bg-yellow-900/40 border-yellow-500/30' },
 ];
 
-let id = 0;
-const getId = () => `dndnode_${id++}`;
-
-interface Workflow {
-  id: string;
-  name: string;
-  isActive: boolean;
-  nodes: Node[];
-  edges: Edge[];
-}
+let idCounter = 0;
+const getUniqueId = () => `dndnode_${Date.now()}_${idCounter++}`;
 
 const defaultTriggerNode: Node = {
   id: 'trigger',
@@ -44,81 +37,56 @@ const defaultTriggerNode: Node = {
 
 function SDRBuilderContent() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const { workflows, isLoading: loadingWfs, upsertWorkflow, deleteWorkflow } = useSDRWorkflows();
   
-  // State for Workflows
-  const [workflows, setWorkflows] = useState<Workflow[]>([
-    { 
-      id: 'w1', 
-      name: 'Fluxo Padrão', 
-      isActive: true, 
-      nodes: [
-        defaultTriggerNode,
-        { id: 'qualify', type: 'decision', data: { label: 'Qualificação (Lead)', color: 'bg-yellow-500/10 border-yellow-500/30', config: { condition: 'Pediu cotação?' } }, position: { x: 250, y: 125 } }
-      ],
-      edges: [{ id: 'e1-2', source: 'trigger', target: 'qualify', animated: true }]
-    },
-    { 
-      id: 'w2', 
-      name: 'Triagem Noturna', 
-      isActive: false, 
-      nodes: [{ ...defaultTriggerNode, id: 'trigger_w2' }], 
-      edges: [] 
-    }
-  ]);
-  const [activeWorkflowId, setActiveWorkflowId] = useState('w1');
-  const activeWorkflow = workflows.find(w => w.id === activeWorkflowId)!;
-
-  // React Flow State (Synced to active workflow)
-  const [nodes, setNodes, onNodesChange] = useNodesState(activeWorkflow.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(activeWorkflow.edges);
+  const [activeWorkflowId, setActiveWorkflowId] = useState<string | null>(null);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [workflowName, setWorkflowName] = useState('');
+  const [isActive, setIsActive] = useState(false);
   
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-  const [saving, setSaving] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  
-  // Simulator State
   const [simulatorOpen, setSimulatorOpen] = useState(false);
 
-  // Sync local nodes/edges back to workflow array when they change
+  // Initialize with the first workflow or create a default one
   useEffect(() => {
-    setWorkflows(prev => prev.map(w => 
-      w.id === activeWorkflowId ? { ...w, nodes, edges } : w
-    ));
-  }, [nodes, edges, activeWorkflowId]);
+    if (!loadingWfs && workflows.length > 0 && !activeWorkflowId) {
+      const first = workflows[0];
+      setActiveWorkflowId(first.id);
+      setNodes(first.nodes);
+      setEdges(first.edges);
+      setWorkflowName(first.name);
+      setIsActive(first.is_active);
+    } else if (!loadingWfs && workflows.length === 0 && !activeWorkflowId) {
+      // Create initial local state for a new workflow
+      setNodes([defaultTriggerNode]);
+      setEdges([]);
+      setWorkflowName('Fluxo SDR Inicial');
+      setIsActive(false);
+    }
+  }, [workflows, loadingWfs, activeWorkflowId, setNodes, setEdges]);
 
-  // When switching workflows, load their nodes/edges
   const switchWorkflow = (id: string) => {
     const wf = workflows.find(w => w.id === id);
     if (wf) {
       setActiveWorkflowId(id);
       setNodes(wf.nodes);
       setEdges(wf.edges);
+      setWorkflowName(wf.name);
+      setIsActive(wf.is_active);
       setSelectedNode(null);
     }
   };
 
-  const createWorkflow = () => {
-    const newWf: Workflow = {
-      id: `w${Date.now()}`,
-      name: 'Novo Fluxo SDR',
-      isActive: false,
-      nodes: [{ ...defaultTriggerNode, id: `trigger_${Date.now()}` }],
-      edges: []
-    };
-    setWorkflows(prev => [...prev, newWf]);
-    switchWorkflow(newWf.id);
-  };
-
-  const toggleWorkflowStatus = () => {
-    setWorkflows(prev => prev.map(w => 
-      w.id === activeWorkflowId ? { ...w, isActive: !w.isActive } : w
-    ));
-  };
-
-  const updateWorkflowName = (newName: string) => {
-    setWorkflows(prev => prev.map(w => 
-      w.id === activeWorkflowId ? { ...w, name: newName } : w
-    ));
+  const handleCreateNew = () => {
+    setActiveWorkflowId(null);
+    setNodes([defaultTriggerNode]);
+    setEdges([]);
+    setWorkflowName('Novo Fluxo SDR');
+    setIsActive(false);
+    setSelectedNode(null);
+    toast.info('Criando novo rascunho...');
   };
 
   const onConnect = useCallback(
@@ -139,30 +107,24 @@ function SDRBuilderContent() {
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
-
       const nodeDataStr = event.dataTransfer.getData('application/reactflow');
-      
-      if (!nodeDataStr || !reactFlowInstance) {
-        return;
-      }
+      if (!nodeDataStr || !reactFlowInstance) return;
 
       const nodeData = JSON.parse(nodeDataStr);
-      
-      // Fix for v12: screenToFlowPosition only needs clientX/Y without bounds subtraction
       const position = reactFlowInstance.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
 
       const newNode: Node = {
-        id: getId(),
+        id: getUniqueId(),
         type: nodeData.type,
         position,
         data: { 
           label: nodeData.label, 
           nodeType: nodeData.nodeType, 
           color: nodeData.color,
-          config: {} // Start with empty config
+          config: {} 
         },
       };
 
@@ -177,14 +139,18 @@ function SDRBuilderContent() {
     setNodes((nds) => 
       nds.map((node) => {
         if (node.id === selectedNode.id) {
-          const newData = {
-            ...node.data,
-            config: {
-              ...(node.data.config as Record<string, any>),
-              [key]: value
-            }
-          };
-          // Sync local state for immediate re-render of sidebar
+          let newData;
+          if (key === 'label') {
+            newData = { ...node.data, label: value };
+          } else {
+            newData = {
+              ...node.data,
+              config: {
+                ...(node.data.config as Record<string, any>),
+                [key]: value
+              }
+            };
+          }
           setSelectedNode({ ...node, data: newData });
           return { ...node, data: newData };
         }
@@ -193,67 +159,83 @@ function SDRBuilderContent() {
     );
   };
 
-  const deleteSelectedNode = () => {
+  const handleDeleteNode = () => {
     if (!selectedNode) return;
+    if (selectedNode.id === 'trigger' || selectedNode.type === 'trigger') {
+      toast.error("O nó de início não pode ser removido.");
+      return;
+    }
     setNodes(nds => nds.filter(n => n.id !== selectedNode.id));
     setEdges(eds => eds.filter(e => e.source !== selectedNode.id && e.target !== selectedNode.id));
     setSelectedNode(null);
-    toast.success("Bloco removido com sucesso!");
+    toast.success("Bloco removido!");
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      toast.success('Workflows salvos com sucesso!');
-    }, 1000);
+    // Extract trigger config for top-level column
+    const triggerNode = nodes.find(n => n.type === 'trigger');
+    const trigger_config = triggerNode?.data.config || {};
+
+    try {
+      const result = await upsertWorkflow.mutateAsync({
+        id: activeWorkflowId || undefined,
+        name: workflowName,
+        is_active: isActive,
+        nodes,
+        edges,
+        trigger_config
+      });
+      
+      if (!activeWorkflowId) {
+        setActiveWorkflowId(result.id);
+      }
+      toast.success('Workflow publicado com sucesso!');
+    } catch (e) {
+      // toast handled in hook
+    }
   };
+
+  if (loadingWfs) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full w-full bg-background/5 relative overflow-hidden">
-      {/* TopBar Lifecycle Header */}
+      {/* TopBar */}
       <div className="h-14 bg-card/60 backdrop-blur-xl border-b border-border/50 z-10 flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-3">
           <Input 
-            value={activeWorkflow.name}
-            onChange={(e) => updateWorkflowName(e.target.value)}
+            value={workflowName}
+            onChange={(e) => setWorkflowName(e.target.value)}
             className="h-8 bg-transparent border-transparent hover:border-border focus:border-border font-semibold text-foreground w-72 shadow-none" 
           />
-          {activeWorkflow.isActive ? (
-            <Badge 
-              variant="outline" 
-              className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 gap-1.5 cursor-pointer hover:bg-emerald-500/20"
-              onClick={toggleWorkflowStatus}
-            >
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Em Produção
-            </Badge>
-          ) : (
-            <Badge 
-              variant="outline" 
-              className="bg-amber-500/10 text-amber-500 border-amber-500/20 gap-1.5 cursor-pointer hover:bg-amber-500/20"
-              onClick={toggleWorkflowStatus}
-            >
-              <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              Rascunho Inativo
-            </Badge>
-          )}
+          <Badge 
+            variant="outline" 
+            className={`gap-1.5 cursor-pointer hover:opacity-80 transition-opacity ${isActive ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}
+            onClick={() => setIsActive(!isActive)}
+          >
+            <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+            {isActive ? 'Em Produção' : 'Rascunho Inativo'}
+          </Badge>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" onClick={() => setSimulatorOpen(!simulatorOpen)}>
             <Play className="w-4 h-4 mr-2 text-primary" />
             <span className="hidden sm:inline">Testar no Simulador</span>
           </Button>
-          <Button onClick={handleSave} disabled={saving} size="sm" className="shadow-[0_0_15px_rgba(var(--primary),0.3)]">
-            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+          <Button onClick={handleSave} disabled={upsertWorkflow.isPending} size="sm" className="shadow-[0_0_15px_rgba(var(--primary),0.3)] min-w-[100px]">
+            {upsertWorkflow.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
             Salvar Tudo
           </Button>
         </div>
       </div>
 
-      {/* Main Builder Layout */}
       <div className="flex flex-1 min-h-0 relative">
-        {/* Left Sidebar (Tabs: Tools & Flows) */}
+        {/* Left Sidebar */}
         <div className="w-72 border-r border-border/50 bg-card/40 backdrop-blur-xl flex flex-col z-10">
           <Tabs defaultValue="tools" className="flex flex-col h-full w-full">
             <div className="p-3 pb-0">
@@ -264,17 +246,17 @@ function SDRBuilderContent() {
             </div>
             
             <TabsContent value="tools" className="flex-1 overflow-y-auto p-4 space-y-4 mt-0">
-              <p className="text-xs text-muted-foreground">Arraste os blocos para o canvas para dar ações, decisões e inteligência à IA.</p>
+              <p className="text-xs text-muted-foreground font-medium">Arraste para o canvas:</p>
               <div className="space-y-2">
                 {AVAILABLE_TOOLS.map((tool) => (
                   <div
                     key={tool.nodeType}
                     onDragStart={(event) => onDragStart(event, tool.type, tool.nodeType, tool.label, tool.color)}
                     draggable
-                    className={`p-3 rounded-lg border cursor-grab hover:brightness-110 transition-all flex items-center gap-2 ${tool.color}`}
+                    className={`p-3 rounded-lg border cursor-grab hover:brightness-110 transition-all flex items-center gap-2 ${tool.color} shadow-sm`}
                   >
                     <GripVertical className="w-4 h-4 opacity-50" />
-                    <span className="text-sm font-medium">{tool.label}</span>
+                    <span className="text-sm font-medium text-foreground">{tool.label}</span>
                   </div>
                 ))}
               </div>
@@ -285,24 +267,34 @@ function SDRBuilderContent() {
                 <div 
                   key={wf.id}
                   onClick={() => switchWorkflow(wf.id)}
-                  className={`p-3 rounded-xl border cursor-pointer transition-colors shadow-sm
+                  className={`p-3 rounded-xl border cursor-pointer transition-all shadow-sm
                     ${activeWorkflowId === wf.id 
-                      ? 'border-primary/50 bg-primary/5' 
-                      : 'border-border bg-card/50 hover:border-primary/50'
+                      ? 'border-primary bg-primary/10 scale-[1.02]' 
+                      : 'border-border bg-card/50 hover:border-primary/30'
                     }`}
                 >
-                  <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground">
-                    <CircleDot className={`w-3.5 h-3.5 ${wf.isActive ? 'text-emerald-500' : 'text-amber-500'}`} />
-                    {wf.name}
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {wf.isActive ? 'Ativo' : 'Rascunho'} • {wf.nodes.length} nós
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground truncate max-w-[150px]">
+                      <CircleDot className={`w-3.5 h-3.5 ${wf.is_active ? 'text-emerald-500' : 'text-amber-500'}`} />
+                      {wf.name}
+                    </h4>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => { e.stopPropagation(); if(confirm('Excluir este fluxo?')) deleteWorkflow.mutate(wf.id); }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {wf.is_active ? 'Ativo' : 'Rascunho'} • {wf.nodes.length} blocos
                   </p>
                 </div>
               ))}
               
-              <Button variant="outline" className="w-full mt-4 border-dashed bg-transparent hover:bg-muted/50" onClick={createWorkflow}>
-                <Plus className="w-4 h-4 mr-2" /> Novo Fluxo
+              <Button variant="outline" className="w-full mt-4 border-dashed bg-transparent hover:bg-muted/50 py-6" onClick={handleCreateNew}>
+                <Plus className="w-4 h-4 mr-2" /> Novo Fluxo SDR
               </Button>
             </TabsContent>
           </Tabs>
@@ -330,11 +322,15 @@ function SDRBuilderContent() {
             <Controls className="bg-card border-border fill-foreground shadow-xl" />
           </ReactFlow>
 
-          {/* Simulator Floating Window */}
-          <SDRSimulator open={simulatorOpen} onClose={() => setSimulatorOpen(false)} workflowName={activeWorkflow.name} />
+          <SDRSimulator 
+            open={simulatorOpen} 
+            onClose={() => setSimulatorOpen(false)} 
+            workflowName={workflowName}
+            workflowData={{ nodes, edges }}
+          />
         </div>
 
-        {/* Properties Sidebar (Right) */}
+        {/* Right Sidebar */}
         <div className={`w-80 border-l border-border/50 bg-card/60 backdrop-blur-2xl flex flex-col transition-all duration-300 absolute right-0 h-full z-20 shadow-[-10px_0_30px_rgba(0,0,0,0.1)] ${selectedNode ? 'translate-x-0' : 'translate-x-full'}`}>
           {selectedNode ? (
             <div className="p-6 flex flex-col h-full overflow-y-auto">
@@ -343,43 +339,29 @@ function SDRBuilderContent() {
                   <Settings2 className="w-5 h-5 text-primary" />
                   Propriedades
                 </h3>
-                <Button variant="ghost" size="icon" onClick={() => setSelectedNode(null)}>
-                  &times;
+                <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setSelectedNode(null)}>
+                  <Plus className="w-5 h-5 rotate-45" />
                 </Button>
               </div>
               
               <div className="space-y-4 flex-1">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-muted-foreground">Nome do Nó</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nome do Bloco</label>
                   <Input 
-                    className="p-2 bg-muted/50 rounded-md border border-border/50 font-medium text-foreground h-9"
+                    className="bg-background/50 border-border/50 font-medium text-foreground h-10"
                     value={selectedNode.data.label as string}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setNodes((nds) => nds.map((node) => {
-                        if (node.id === selectedNode.id) {
-                          const newData = { ...node.data, label: value };
-                          setSelectedNode({ ...node, data: newData });
-                          return { ...node, data: newData };
-                        }
-                        return node;
-                      }));
-                    }}
+                    onChange={(e) => updateNodeData('label', e.target.value)}
                   />
                 </div>
 
                 {/* TYPE: TRIGGER */}
                 {selectedNode.type === 'trigger' && (
                   <div className="space-y-4 pt-4 border-t border-border/30">
-                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                      Gatilho Inicial
-                    </Badge>
-                    <p className="text-xs text-muted-foreground">Defina quando a IA deve iniciar este fluxo.</p>
-                    
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Gatilho Inicial</Badge>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Público-Alvo</label>
                       <select 
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                         value={selectedNode.data.config?.target_audience || 'Todos'}
                         onChange={(e) => updateNodeData('target_audience', e.target.value)}
                       >
@@ -392,14 +374,14 @@ function SDRBuilderContent() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Regra de Etapa (Funil)</label>
                       <select 
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                         value={selectedNode.data.config?.stage_rule || 'Qualquer Etapa'}
                         onChange={(e) => updateNodeData('stage_rule', e.target.value)}
                       >
-                        <option value="Qualquer Etapa">Em Qualquer Etapa / Situação</option>
+                        <option value="Qualquer Etapa">Qualquer Etapa / Situação</option>
                         <option value="Fora de Funil">Sem Funil (Apenas Contato)</option>
-                        <option value="Qualificação">Etapa Específica: Qualificação</option>
-                        <option value="Negociação">Etapa Específica: Negociação</option>
+                        <option value="Qualificacao">Etapa: Qualificação</option>
+                        <option value="Negociacao">Etapa: Negociação</option>
                       </select>
                     </div>
                   </div>
@@ -407,15 +389,13 @@ function SDRBuilderContent() {
 
                 {/* TYPE: DECISION */}
                 {selectedNode.type === 'decision' && (
-                  <div className="space-y-3 pt-4 border-t border-border/30">
-                    <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
-                      Decisão Lógica
-                    </Badge>
-                    <p className="text-xs text-muted-foreground">A IA avaliará esta condição para determinar qual saída utilizar na árvore (Caminho Verde ou Vermelho).</p>
+                  <div className="space-y-4 pt-4 border-t border-border/30">
+                    <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">Decisão Lógica</Badge>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Condição de Avaliação (Se...)</label>
+                      <label className="text-sm font-medium text-foreground">Condição (Se...)</label>
                       <Input 
-                        placeholder="Ex: O cliente pediu cotação auto?" 
+                        placeholder="Ex: Pediu cotação?" 
+                        className="bg-background/50"
                         value={selectedNode.data.config?.condition || ''}
                         onChange={(e) => updateNodeData('condition', e.target.value)}
                       />
@@ -425,16 +405,13 @@ function SDRBuilderContent() {
 
                 {/* TYPE: MESSAGE */}
                 {selectedNode.type === 'message' && (
-                  <div className="space-y-3 pt-4 border-t border-border/30">
-                    <Badge variant="outline" className="bg-cyan-500/10 text-cyan-500 border-cyan-500/20">
-                      Mensagem da IA
-                    </Badge>
-                    <p className="text-xs text-muted-foreground">A IA enviará exatamente este texto ao usuário (sem invenções).</p>
+                  <div className="space-y-4 pt-4 border-t border-border/30">
+                    <Badge variant="outline" className="bg-cyan-500/10 text-cyan-500 border-cyan-500/20">Mensagem da IA</Badge>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Texto Fixo (Template)</label>
+                      <label className="text-sm font-medium text-foreground">Texto (Template)</label>
                       <Textarea 
-                        placeholder="Ex: Obrigado pelo contato! Retornaremos em breve." 
-                        className="resize-none h-24"
+                        placeholder="Escreva a resposta..." 
+                        className="resize-none h-24 bg-background/50"
                         value={selectedNode.data.config?.message_template || ''}
                         onChange={(e) => updateNodeData('message_template', e.target.value)}
                       />
@@ -442,108 +419,68 @@ function SDRBuilderContent() {
                   </div>
                 )}
 
-                {/* TYPE: ACTION (CRM Tools) */}
-                {selectedNode.type === 'action' && selectedNode.data.nodeType?.toString().includes('tool_') && (
-                  <div className="space-y-3 pt-4 border-t border-border/30">
-                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                      Ferramenta CRM (Tool)
-                    </Badge>
-                    <p className="text-xs text-muted-foreground">
-                      A IA pode utilizar esta ferramenta autônoma para consultar ou gravar dados. A saída lateral (vermelha) é ativada se a API falhar.
-                    </p>
-                    <div className="p-3 bg-muted/20 rounded-lg border border-border/50 flex items-center justify-between">
-                      <span className="text-sm">Obrigatório antes de continuar?</span>
-                      <input 
-                        type="checkbox" 
-                        className="toggle" 
-                        checked={selectedNode.data.config?.is_required || false}
-                        onChange={(e) => updateNodeData('is_required', e.target.checked)}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* TYPE: ACTION (Move Deal) */}
-                {selectedNode.type === 'action' && selectedNode.data.nodeType === 'action_move_deal' && (
-                  <div className="space-y-3 pt-4 border-t border-border/30">
-                    <Badge variant="outline" className="bg-indigo-500/10 text-indigo-500 border-indigo-500/20">
-                      Ação de Funil
-                    </Badge>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Etapa de Destino (Pipeline)</label>
-                      <select 
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        value={selectedNode.data.config?.target_stage || ''}
-                        onChange={(e) => updateNodeData('target_stage', e.target.value)}
-                      >
-                        <option value="">Selecione uma etapa...</option>
-                        <option value="qualificacao">Qualificação</option>
-                        <option value="apresentacao">Apresentação de Proposta</option>
-                        <option value="negociacao">Negociação</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {/* TYPE: ACTION (Close Deal) */}
-                {selectedNode.type === 'action' && selectedNode.data.nodeType === 'action_close_deal' && (
-                  <div className="space-y-3 pt-4 border-t border-border/30">
-                    <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20">
-                      Fechamento de Negócio
-                    </Badge>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Status a Aplicar</label>
-                      <div className="flex items-center gap-4 mt-2">
-                        <label className="flex items-center gap-2 text-sm">
-                          <input 
-                            type="radio" 
-                            name="close_status" 
-                            value="won"
-                            checked={selectedNode.data.config?.close_status === 'won'}
-                            onChange={(e) => updateNodeData('close_status', e.target.value)}
-                          /> Ganho
-                        </label>
-                        <label className="flex items-center gap-2 text-sm">
-                          <input 
-                            type="radio" 
-                            name="close_status" 
-                            value="lost"
-                            checked={selectedNode.data.config?.close_status === 'lost'}
-                            onChange={(e) => updateNodeData('close_status', e.target.value)}
-                          /> Perda
-                        </label>
+                {/* TYPE: ACTION (Tools/CRM) */}
+                {selectedNode.type === 'action' && (
+                  <div className="space-y-4 pt-4 border-t border-border/30">
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Ação de Sistema</Badge>
+                    
+                    {selectedNode.data.nodeType === 'action_move_deal' && (
+                       <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Etapa de Destino</label>
+                        <select 
+                          className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                          value={selectedNode.data.config?.target_stage || ''}
+                          onChange={(e) => updateNodeData('target_stage', e.target.value)}
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="qualificacao">Qualificação</option>
+                          <option value="apresentacao">Apresentação</option>
+                          <option value="negociacao">Negociação</option>
+                        </select>
                       </div>
-                    </div>
-                  </div>
-                )}
+                    )}
 
-                {/* TYPE: ACTION (Custom Prompt) */}
-                {selectedNode.type === 'action' && selectedNode.data.nodeType === 'action_custom_prompt' && (
-                  <div className="space-y-3 pt-4 border-t border-border/30">
-                    <Badge variant="outline" className="bg-fuchsia-500/10 text-fuchsia-500 border-fuchsia-500/20">
-                      Intrução Cognitiva Dinâmica
-                    </Badge>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Comando Livre (Prompt)</label>
-                      <Textarea 
-                        placeholder="Ex: Peça a placa do veículo antes de avançar para a cotação." 
-                        className="resize-none h-32"
-                        value={selectedNode.data.config?.prompt_override || ''}
-                        onChange={(e) => updateNodeData('prompt_override', e.target.value)}
-                      />
-                    </div>
+                    {selectedNode.data.nodeType === 'action_close_deal' && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Status do Negócio</label>
+                        <div className="flex items-center gap-4 mt-2">
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input type="radio" name="close_status" value="won" checked={selectedNode.data.config?.close_status === 'won'} onChange={(e) => updateNodeData('close_status', e.target.value)} /> Ganho
+                          </label>
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input type="radio" name="close_status" value="lost" checked={selectedNode.data.config?.close_status === 'lost'} onChange={(e) => updateNodeData('close_status', e.target.value)} /> Perda
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedNode.data.nodeType === 'action_custom_prompt' && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Instrução Secreta</label>
+                        <Textarea 
+                          placeholder="Foque em..." 
+                          className="resize-none h-32 bg-background/50"
+                          value={selectedNode.data.config?.prompt_override || ''}
+                          onChange={(e) => updateNodeData('prompt_override', e.target.value)}
+                        />
+                      </div>
+                    )}
+
+                    {!['action_move_deal', 'action_close_deal', 'action_custom_prompt'].includes(selectedNode.data.nodeType) && (
+                      <div className="p-3 bg-muted/20 rounded-lg border border-border/50 flex items-center justify-between">
+                        <span className="text-sm text-foreground">Execução Automática</span>
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
               
               <div className="mt-6 space-y-2 border-t border-border/30 pt-4 shrink-0">
-                <Button className="w-full text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/20" variant="outline" onClick={deleteSelectedNode}>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Excluir Nó
+                <Button className="w-full text-destructive bg-destructive/10 hover:bg-destructive/20 border-destructive/20" variant="outline" onClick={handleDeleteNode}>
+                  <Trash2 className="w-4 h-4 mr-2" /> Excluir Bloco
                 </Button>
-                <Button className="w-full" variant="secondary" onClick={() => setSelectedNode(null)}>
-                  Fechar Painel
-                </Button>
+                <Button className="w-full" variant="secondary" onClick={() => setSelectedNode(null)}>Fechar</Button>
               </div>
             </div>
           ) : null}
