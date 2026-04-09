@@ -1,7 +1,16 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.56.0";
+import { resolveUserModel } from "../_shared/model-resolver.ts";
+
+const SDR_SYSTEM_PROMPT = `Você é um Agente de Vendas Automatizado (SDR) de uma corretora de seguros.
+Sua missão é seguir ESTRITAMENTE o fluxo de conversação desenhado.
+REGRAS CRÍTICAS:
+1. NUNCA use tags <thinking> ou exponha seu raciocínio.
+2. Responda de forma curta, cordial e humana.
+3. Não invente ferramentas ou funcionalidades do sistema que não foram citadas na sua instrução atual.
+4. Se o fluxo chegar ao fim, encerre a conversa educadamente.`;
 
 /**
- * Engine SDR: Interpreta o grafo do ReactFlow e decide a próxima ação da IA.
+ * Engine SDR v2: Executor de Grafo com Inteligência Real
  */
 export async function processSDRFlow(
   workflow: any,
@@ -10,103 +19,153 @@ export async function processSDRFlow(
   supabase: SupabaseClient,
   userId: string
 ) {
-  console.log(`[SDR-ENGINE] Processando fluxo: ${workflow.name}`);
+  console.log(`[SDR-ENGINE] Rodando motor para: ${workflow.name}`);
 
-  // 1. Identificar o nó atual
-  // Estratégia: Buscar no metadados da última mensagem da IA
+  // 1. Identificar Ponto de Partida
   const lastAssistantMsg = [...history].reverse().find(m => m.role === 'assistant');
   let currentNodeId = lastAssistantMsg?.metadata?.current_node_id || 'trigger';
 
-  // Se o trigger foi o último, precisamos avançar para o próximo nó conectado
-  if (currentNodeId === 'trigger' || currentNodeId.startsWith('trigger')) {
+  // Se o trigger foi o último, avançamos para o primeiro nó real
+  if (currentNodeId.startsWith('trigger')) {
     const edge = workflow.edges.find((e: any) => e.source === currentNodeId);
-    if (edge) currentNodeId = edge.target;
+    if (!edge) return { content: "Olá! Como posso ajudar?", metadata: { current_node_id: 'trigger' } };
+    currentNodeId = edge.target;
   }
 
-  const currentNode = workflow.nodes.find((n: any) => n.id === currentNodeId);
+  let currentNode = workflow.nodes.find((n: any) => n.id === currentNodeId);
   
-  if (!currentNode) {
-    console.warn(`[SDR-ENGINE] Nó ${currentNodeId} não encontrado no grafo.`);
-    return null; // Fallback para Amorim AI padrão
-  }
+  // 2. Loop de Travessia Automática (avança enquanto não exigir input do usuário)
+  let maxSteps = 5; // Evitar loops infinitos no grafo
+  let finalResponse = null;
 
-  console.log(`[SDR-ENGINE] Nó Atual: ${currentNode.data.label} (Tipo: ${currentNode.type})`);
+  const resolvedModel = await resolveUserModel(supabase, userId);
+  const geminiKey = Deno.env.get('GOOGLE_AI_API_KEY');
 
-  // 2. Lógica por Tipo de Nó
-  
-  // NÓ DE MENSAGEM: Apenas emite e espera
-  if (currentNode.type === 'message') {
-    return {
-      content: currentNode.data.config?.message_template || "Olá! Como posso ajudar?",
-      metadata: { current_node_id: currentNode.id }
-    };
-  }
+  while (currentNode && maxSteps > 0) {
+    maxSteps--;
+    console.log(`[SDR-ENGINE] Processando Nó: ${currentNode.data.label} (${currentNode.type})`);
 
-  // NÓ DE DECISÃO: O LLM precisa escolher o caminho
-  if (currentNode.type === 'decision') {
-    const condition = currentNode.data.config?.condition;
-    
-    // Chamada rápida ao LLM para decidir Sim/Não
-    // Aqui injetamos uma instrução especial
-    const prompt = `Analise a mensagem do usuário: "${userMessage}".
-Com base na condição: "${condition}", responda APENAS "TRUE" se a condição for atendida ou "FALSE" caso contrário.`;
-    
-    // Nota: Em uma implementação real, usaríamos o model resolver aqui.
-    // Simulando decisão True por enquanto para o MVP de conexão.
-    const decision = "TRUE"; // TODO: Integrar chamada real de decisão
-
-    const edgeId = decision === "TRUE" ? "true" : "false";
-    const nextEdge = workflow.edges.find((e: any) => e.source === currentNode.id && e.sourceHandle === edgeId);
-    
-    if (nextEdge) {
-      // Recursão para processar o próximo nó imediatamente (se for mensagem ou ação)
-      const nextNode = workflow.nodes.find((n: any) => n.id === nextEdge.target);
-      return {
-        content: `(SDR Decisão: ${decision}) Seguindo para ${nextNode?.data.label}`,
-        metadata: { current_node_id: nextNode?.id }
+    // A) NÓ DE MENSAGEM
+    if (currentNode.type === 'message') {
+      finalResponse = {
+        content: currentNode.data.config?.message_template || "Olá!",
+        metadata: { current_node_id: currentNode.id }
       };
+      // Mensagem sempre para e espera o usuário, a menos que queiramos encadear mensagens (futuro)
+      break; 
     }
-  }
 
-  // NÓ DE AÇÃO: Executa ferramenta e segue
-  if (currentNode.type === 'action') {
-    const actionType = currentNode.data.nodeType;
-    console.log(`[SDR-ENGINE] Executando Ação: ${actionType}`);
-    
-    // TODO: Mapear para toolHandlers reais
-    const edge = workflow.edges.find((e: any) => e.source === currentNode.id && e.sourceHandle === 'success');
-    if (edge) {
-      const nextNode = workflow.nodes.find((n: any) => n.id === edge.target);
-      return {
-        content: `Executei a ação ${currentNode.data.label}. Próximo passo: ${nextNode?.data.label}`,
-        metadata: { current_node_id: nextNode?.id }
-      };
-    }
-  }
+    // B) NÓ DE DECISÃO (Avaliação real via LLM)
+    if (currentNode.type === 'decision') {
+      const condition = currentNode.data.config?.condition;
+      console.log(`[SDR-ENGINE] Avaliando Condição: ${condition}`);
 
-  // NÓ DE ESCALONAMENTO: Pausa a IA e notifica humano
-  if (currentNode.type === 'escalation') {
-    const config = currentNode.data.config || {};
-    console.log(`[SDR-ENGINE] Escalando para humano: ${config.human_phone}`);
-    
-    // 1. Notificar Humano (via n8n ou ferramenta interna)
-    // TODO: Implementar chamada real de notificação
-    
-    return {
-      content: config.client_message || "Aguarde um momento, um de nossos consultores irá te atender.",
-      metadata: { 
-        current_node_id: currentNode.id,
-        ai_paused: true,
-        pause_until: new Date(Date.now() + (config.pause_duration || 24) * 60 * 60 * 1000).toISOString()
+      const decision = await evaluateCondition(userMessage, condition, geminiKey);
+      const edgeId = decision ? "true" : "false";
+      const nextEdge = workflow.edges.find((e: any) => e.source === currentNode.id && e.sourceHandle === edgeId);
+      
+      if (nextEdge) {
+        currentNode = workflow.nodes.find((n: any) => n.id === nextEdge.target);
+        continue; // Segue para o próximo nó imediatamente
+      } else {
+        break; // Fim do caminho
       }
-    };
+    }
+
+    // C) NÓ DE INSTRUÇÃO LIVRE / AÇÃO CUSTOMIZADA
+    if (currentNode.type === 'action' && currentNode.data.nodeType === 'action_custom_prompt') {
+      const instruction = currentNode.data.config?.prompt_override;
+      console.log(`[SDR-ENGINE] Executando Instrução Livre: ${instruction}`);
+
+      const response = await generateResponseWithInstruction(userMessage, instruction, history, geminiKey);
+      finalResponse = {
+        content: response,
+        metadata: { current_node_id: currentNode.id }
+      };
+      break; // IA respondeu, espera usuário
+    }
+
+    // D) NÓ DE ESCALONAMENTO
+    if (currentNode.type === 'escalation') {
+      const config = currentNode.data.config || {};
+      finalResponse = {
+        content: config.client_message || "Aguarde, estamos chamando um consultor.",
+        metadata: { 
+          current_node_id: currentNode.id,
+          ai_paused: true,
+          pause_until: new Date(Date.now() + (config.pause_duration || 24) * 3600000).toISOString()
+        }
+      };
+      break;
+    }
+
+    // E) FERRAMENTAS CRM (Ainda mockadas ou automáticas)
+    if (currentNode.type === 'action' && currentNode.data.nodeType.startsWith('tool_')) {
+       // Por enquanto, apenas finge sucesso e segue
+       const nextEdge = workflow.edges.find((e: any) => e.source === currentNode.id && e.sourceHandle === 'success');
+       if (nextEdge) {
+         currentNode = workflow.nodes.find((n: any) => n.id === nextEdge.target);
+         continue;
+       }
+       break;
+    }
+
+    break; // Se não cair em nenhum tipo conhecido
   }
 
-  return null;
+  return finalResponse;
 }
 
 /**
- * Busca o workflow SDR ativo para o usuário baseado nas regras de gatilho
+ * Usa o LLM para decidir TRUE/FALSE sobre uma condição
+ */
+async function evaluateCondition(userMsg: string, condition: string, apiKey?: string): Promise<boolean> {
+  if (!apiKey) return true; // Fallback se sem chave
+
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: `Dada a mensagem do usuário: "${userMsg}" e a condição: "${condition}", responda estritamente com apenas uma palavra: "TRUE" se a condição for atendida ou "FALSE" caso contrário.` }]
+        }]
+      })
+    });
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase();
+    console.log(`[SDR-LLM] Decisão: ${text}`);
+    return text === "TRUE";
+  } catch (e) {
+    console.error('[SDR-LLM] Erro na avaliação:', e);
+    return false;
+  }
+}
+
+/**
+ * Gera resposta baseada em uma instrução específica do fluxo
+ */
+async function generateResponseWithInstruction(userMsg: string, instruction: string, history: any[], apiKey?: string): Promise<string> {
+  if (!apiKey) return "Estou processando sua solicitação...";
+
+  try {
+    const messages = [
+      { role: 'user', parts: [{ text: `${SDR_SYSTEM_PROMPT}\n\nSUA INSTRUÇÃO ATUAL: ${instruction}\n\nMENSAGEM DO USUÁRIO: ${userMsg}` }] }
+    ];
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      body: JSON.stringify({ contents: messages })
+    });
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Desculpe, tive um problema ao processar seu pedido.";
+  } catch (e) {
+    console.error('[SDR-LLM] Erro na instrução:', e);
+    return "Um erro ocorreu na inteligência do fluxo.";
+  }
+}
+
+/**
+ * Busca o workflow SDR ativo
  */
 export async function getActiveSDRWorkflow(supabase: SupabaseClient, userId: string, contactInfo: any) {
   const { data: workflows, error } = await supabase
@@ -116,26 +175,6 @@ export async function getActiveSDRWorkflow(supabase: SupabaseClient, userId: str
     .eq('is_active', true);
 
   if (error || !workflows || workflows.length === 0) return null;
-
-  // Lógica de matching de gatilho (Fase 1)
-  const contactType = contactInfo?.type || 'unknown'; // ex: 'client', 'prospect'
-  const currentFunnel = contactInfo?.funnel_id;
-  const currentStage = contactInfo?.stage_id;
-
-  for (const wf of workflows) {
-    const trigger = wf.trigger_config || {};
-    
-    // Match de Público
-    if (trigger.target_audience === 'Somente Clientes' && contactType !== 'client') continue;
-    if (trigger.target_audience === 'Somente Desconhecidos' && contactType !== 'unknown') continue;
-
-    // Match de Funil/Etapa
-    if (trigger.stage_rule === 'Fora de Funil' && currentFunnel) continue;
-    if (trigger.stage_rule === 'Qualificação' && currentStage !== 'qualificacao_id_aqui') continue; // TODO: Usar IDs dinâmicos
-
-    return wf; // Retorna o primeiro que der match
-  }
-
-  return null;
+  return workflows[0];
 }
 

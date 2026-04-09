@@ -2104,8 +2104,19 @@ serve(async (req) => {
         }
       }
 
-      // Se for contato externo e não houver fluxo SDR, NÃO responder (Silêncio de segurança)
-      if (!isInternal && !is_simulation) {
+      // IMPORTANTE: Se chegamos aqui e é SDR/Simulação, não podemos vazar para o Mentor.
+      // Retornamos um erro amigável ou silêncio se for produção.
+      if (is_simulation) {
+         return new Response(
+            JSON.stringify({ 
+              message: "Fim do fluxo atingido ou nó não configurado no SDR Builder.",
+              error: "SDR_FLOW_END"
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+      }
+
+      if (!isInternal) {
         console.log(`[SDR-SECURITY] Contato externo sem trigger ativo. Ignorando mensagem.`);
         return new Response(null, { status: 204, headers: corsHeaders });
       }
