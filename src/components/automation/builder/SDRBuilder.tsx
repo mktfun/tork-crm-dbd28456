@@ -23,6 +23,7 @@ const AVAILABLE_TOOLS = [
   { type: 'message', nodeType: 'action_send_text', label: '💬 Enviar Texto Padrão', color: 'bg-cyan-500/10 dark:bg-cyan-900/40 border-cyan-500/30' },
   { type: 'action', nodeType: 'action_custom_prompt', label: '🧠 Instrução Livre', color: 'bg-fuchsia-500/10 dark:bg-fuchsia-900/40 border-fuchsia-500/30' },
   { type: 'decision', nodeType: 'decision_condition', label: '🔀 Decisão (Se... Então)', color: 'bg-yellow-500/10 dark:bg-yellow-900/40 border-yellow-500/30' },
+  { type: 'escalation', nodeType: 'action_escalate', label: '🎧 Escalar p/ Humano', color: 'bg-rose-500/10 dark:bg-rose-900/40 border-rose-500/30' },
 ];
 
 let idCounter = 0;
@@ -463,6 +464,52 @@ function SDRBuilderContent() {
                           value={selectedNode.data.config?.prompt_override || ''}
                           onChange={(e) => updateNodeData('prompt_override', e.target.value)}
                         />
+                      </div>
+                    )}
+
+                    {selectedNode.data.nodeType === 'action_escalate' && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">Mensagem ao Cliente</label>
+                          <Textarea 
+                            placeholder="Ex: Aguarde um momento, um consultor vai te atender." 
+                            className="resize-none h-20 bg-background/50"
+                            value={selectedNode.data.config?.client_message || ''}
+                            onChange={(e) => updateNodeData('client_message', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">Alerta Interno (Humano)</label>
+                          <Textarea 
+                            placeholder="Ex: O cliente solicitou ajuda humana." 
+                            className="resize-none h-20 bg-background/50"
+                            value={selectedNode.data.config?.internal_alert || ''}
+                            onChange={(e) => updateNodeData('internal_alert', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">Telefone de Destino</label>
+                          <Input 
+                            placeholder="+5511999999999" 
+                            className="bg-background/50"
+                            value={selectedNode.data.config?.human_phone || ''}
+                            onChange={(e) => updateNodeData('human_phone', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">Pausa da IA (Horas)</label>
+                          <select 
+                            className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                            value={selectedNode.data.config?.pause_duration || '24'}
+                            onChange={(e) => updateNodeData('pause_duration', e.target.value)}
+                          >
+                            <option value="1">1 hora</option>
+                            <option value="12">12 horas</option>
+                            <option value="24">24 horas</option>
+                            <option value="48">48 horas</option>
+                            <option value="0">Permanente (manual)</option>
+                          </select>
+                        </div>
                       </div>
                     )}
 

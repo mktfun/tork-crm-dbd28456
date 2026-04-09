@@ -2050,12 +2050,32 @@ serve(async (req) => {
 
   try {
     const rawBody = await req.text();
-    const { messages, userId, conversationId, stream = false, system_override, is_simulation = false, workflow_data } = JSON.parse(rawBody);
+    const { messages, userId, conversationId, stream = false, system_override, is_simulation = false, workflow_data, contact_info } = JSON.parse(rawBody);
 
     logger.info('Request parsed', { requestId, userId, stream, conversationId, isSimulation: is_simulation });
 
-    // 1. ROTEAMENTO SDR (Prioridade 1)
-    if (!system_override) {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // 1. IDENTIFICAR TIPO DE USUÁRIO (Interno vs Externo)
+    let isInternal = false;
+    
+    // Se vier do Dashboard (userId logado)
+    if (userId && !contact_info) {
+      const { data: profile } = await supabase.from('profiles').select('id').eq('id', userId).maybeSingle();
+      if (profile) isInternal = true;
+    }
+
+    // Se vier via Webhook (contact_info presente)
+    const senderPhone = contact_info?.phone_number;
+    if (senderPhone) {
+      const { data: producer } = await supabase.from('producers').select('id').eq('phone', senderPhone).maybeSingle();
+      if (producer) isInternal = true;
+    }
+
+    // 2. ROTEAMENTO SDR (Prioridade 1 para Simulação ou Contatos Externos)
+    if (is_simulation || !isInternal) {
       const lastMsg = messages[messages.length - 1]?.content || "";
       const lastMsgText = typeof lastMsg === 'string' ? lastMsg : 
                         (Array.isArray(lastMsg) ? lastMsg.find((p: any) => p.type === 'text')?.text || '' : '');
@@ -2064,9 +2084,10 @@ serve(async (req) => {
       
       if (is_simulation && workflow_data) {
         sdrWorkflow = workflow_data;
-        console.log(`[SDR-ROUTING] Usando workflow de simulação recebido no payload.`);
+        console.log(`[SDR-ROUTING] Simulação ativa. Usando workflow do payload.`);
       } else {
-        sdrWorkflow = await getActiveSDRWorkflow(supabase, userId, {});
+        // Busca fluxo ativo apenas se for contato externo
+        sdrWorkflow = await getActiveSDRWorkflow(supabase, userId, contact_info);
       }
 
       if (sdrWorkflow) {
@@ -2082,19 +2103,28 @@ serve(async (req) => {
           );
         }
       }
+
+      // Se for contato externo e não houver fluxo SDR, NÃO responder (Silêncio de segurança)
+      if (!isInternal && !is_simulation) {
+        console.log(`[SDR-SECURITY] Contato externo sem trigger ativo. Ignorando mensagem.`);
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
     }
 
-    // Rate Limiting (apenas produção)
+    // 3. ASSISTENTE AMORIM (Apenas para Internos / CRM)
+    if (!isInternal && !is_simulation) {
+       throw new Error('Acesso negado: O Assistente Amorim é exclusivo para produtores da corretora.');
+    }
+
+    // Rate Limiting (apenas produção interna)
     if (!is_simulation) {
-      logger.warn('Rate limit exceeded', { userId, identifier });
-      clearTimeout(timeoutId);
-      return new Response(JSON.stringify({
-        error: "Limite de requisições excedido. Tente novamente em alguns segundos.",
-        code: 'RATE_LIMIT_EXCEEDED'
-      }), {
-        status: 429,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      const identifier = userId || senderPhone || 'anon';
+      const { success: rateLimitSuccess } = await ratelimit.limit(identifier);
+      if (!rateLimitSuccess) {
+        return new Response(JSON.stringify({ error: "Limite de requisições excedido.", code: 'RATE_LIMIT_EXCEEDED' }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     if (!userId) {

@@ -84,6 +84,24 @@ Com base na condição: "${condition}", responda APENAS "TRUE" se a condição f
     }
   }
 
+  // NÓ DE ESCALONAMENTO: Pausa a IA e notifica humano
+  if (currentNode.type === 'escalation') {
+    const config = currentNode.data.config || {};
+    console.log(`[SDR-ENGINE] Escalando para humano: ${config.human_phone}`);
+    
+    // 1. Notificar Humano (via n8n ou ferramenta interna)
+    // TODO: Implementar chamada real de notificação
+    
+    return {
+      content: config.client_message || "Aguarde um momento, um de nossos consultores irá te atender.",
+      metadata: { 
+        current_node_id: currentNode.id,
+        ai_paused: true,
+        pause_until: new Date(Date.now() + (config.pause_duration || 24) * 60 * 60 * 1000).toISOString()
+      }
+    };
+  }
+
   return null;
 }
 
@@ -99,7 +117,25 @@ export async function getActiveSDRWorkflow(supabase: SupabaseClient, userId: str
 
   if (error || !workflows || workflows.length === 0) return null;
 
-  // TODO: Implementar lógica de matching de trigger_config (audience, funnel, stage)
-  // Por enquanto, retorna o primeiro ativo
-  return workflows[0];
+  // Lógica de matching de gatilho (Fase 1)
+  const contactType = contactInfo?.type || 'unknown'; // ex: 'client', 'prospect'
+  const currentFunnel = contactInfo?.funnel_id;
+  const currentStage = contactInfo?.stage_id;
+
+  for (const wf of workflows) {
+    const trigger = wf.trigger_config || {};
+    
+    // Match de Público
+    if (trigger.target_audience === 'Somente Clientes' && contactType !== 'client') continue;
+    if (trigger.target_audience === 'Somente Desconhecidos' && contactType !== 'unknown') continue;
+
+    // Match de Funil/Etapa
+    if (trigger.stage_rule === 'Fora de Funil' && currentFunnel) continue;
+    if (trigger.stage_rule === 'Qualificação' && currentStage !== 'qualificacao_id_aqui') continue; // TODO: Usar IDs dinâmicos
+
+    return wf; // Retorna o primeiro que der match
+  }
+
+  return null;
 }
+

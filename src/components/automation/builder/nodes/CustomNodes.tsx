@@ -1,6 +1,6 @@
 import React from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { Zap, Settings, GitBranch, MessageCircle, Bot } from 'lucide-react';
+import { Zap, Settings, GitBranch, MessageCircle, Bot, Headset } from 'lucide-react';
 
 const nodeBaseClass = "rounded-lg p-3 shadow-lg border backdrop-blur-md min-w-[160px] text-sm";
 
@@ -71,9 +71,25 @@ export const MessageNode = ({ data }: any) => (
   </div>
 );
 
+export const EscalationNode = ({ data }: any) => (
+  <div className={`${nodeBaseClass} bg-rose-500/10 dark:bg-rose-900/40 border-rose-500/30`}>
+    <Handle type="target" position={Position.Top} className="w-3 h-3 bg-muted-foreground" />
+    <div className="flex items-center gap-2 mb-1 text-rose-500">
+      <Headset className="w-4 h-4" />
+      <span className="font-medium text-foreground">{data.label}</span>
+    </div>
+    <div className="text-[10px] opacity-70 text-foreground">
+      Escalar p/ Humano
+    </div>
+    {/* Geralmente nó final, mas pode ter saída para debug */}
+    <Handle type="source" position={Position.Bottom} className="w-2 h-2 opacity-0" />
+  </div>
+);
+
 export const customNodeTypes = {
   trigger: TriggerNode,
   action: ActionNode,
   decision: DecisionNode,
   message: MessageNode,
+  escalation: EscalationNode,
 };
