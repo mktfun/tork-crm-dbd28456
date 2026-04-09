@@ -19,7 +19,12 @@ export async function processSDRFlow(
   supabase: SupabaseClient,
   userId: string
 ) {
-  console.log(`[SDR-ENGINE] Rodando motor para: ${workflow.name}`);
+  if (!workflow || !workflow.nodes || !workflow.edges) {
+    console.error(`[SDR-ENGINE] Workflow inválido ou incompleto.`);
+    return { content: "Desculpe, tive um problema técnico ao processar seu fluxo.", metadata: {} };
+  }
+
+  console.log(`[SDR-ENGINE] Rodando motor para: ${workflow.name} (ID: ${workflow.id})`);
 
   // 1. Identificar Ponto de Partida
   const lastAssistantMsg = [...history].reverse().find(m => m.role === 'assistant');
@@ -35,10 +40,9 @@ export async function processSDRFlow(
   let currentNode = workflow.nodes.find((n: any) => n.id === currentNodeId);
   
   // 2. Loop de Travessia Automática (avança enquanto não exigir input do usuário)
-  let maxSteps = 5; // Evitar loops infinitos no grafo
+  let maxSteps = 5; 
   let finalResponse = null;
 
-  const resolvedModel = await resolveUserModel(supabase, userId);
   const geminiKey = Deno.env.get('GOOGLE_AI_API_KEY');
 
   while (currentNode && maxSteps > 0) {
@@ -47,18 +51,24 @@ export async function processSDRFlow(
 
     // A) NÓ DE MENSAGEM
     if (currentNode.type === 'message') {
+      const template = currentNode.data.config?.message_template || "Olá!";
       finalResponse = {
-        content: currentNode.data.config?.message_template || "Olá!",
+        content: sanitizeOutput(template),
         metadata: { current_node_id: currentNode.id }
       };
-      // Mensagem sempre para e espera o usuário, a menos que queiramos encadear mensagens (futuro)
       break; 
     }
 
-    // B) NÓ DE DECISÃO (Avaliação real via LLM)
+    // B) NÓ DE DECISÃO
     if (currentNode.type === 'decision') {
       const condition = currentNode.data.config?.condition;
-      console.log(`[SDR-ENGINE] Avaliando Condição: ${condition}`);
+      if (!condition) {
+         console.warn("[SDR-ENGINE] Nó de decisão sem condição. Seguindo caminho 'FALSE'.");
+         const falseEdge = workflow.edges.find((e: any) => e.source === currentNode.id && e.sourceHandle === "false");
+         if (!falseEdge) break;
+         currentNode = workflow.nodes.find((n: any) => n.id === falseEdge.target);
+         continue;
+      }
 
       const decision = await evaluateCondition(userMessage, condition, geminiKey);
       const edgeId = decision ? "true" : "false";
@@ -66,30 +76,28 @@ export async function processSDRFlow(
       
       if (nextEdge) {
         currentNode = workflow.nodes.find((n: any) => n.id === nextEdge.target);
-        continue; // Segue para o próximo nó imediatamente
+        continue; 
       } else {
-        break; // Fim do caminho
+        break; 
       }
     }
 
-    // C) NÓ DE INSTRUÇÃO LIVRE / AÇÃO CUSTOMIZADA
+    // C) NÓ DE INSTRUÇÃO LIVRE
     if (currentNode.type === 'action' && currentNode.data.nodeType === 'action_custom_prompt') {
       const instruction = currentNode.data.config?.prompt_override;
-      console.log(`[SDR-ENGINE] Executando Instrução Livre: ${instruction}`);
-
       const response = await generateResponseWithInstruction(userMessage, instruction, history, geminiKey);
       finalResponse = {
-        content: response,
+        content: sanitizeOutput(response),
         metadata: { current_node_id: currentNode.id }
       };
-      break; // IA respondeu, espera usuário
+      break;
     }
 
     // D) NÓ DE ESCALONAMENTO
     if (currentNode.type === 'escalation') {
       const config = currentNode.data.config || {};
       finalResponse = {
-        content: config.client_message || "Aguarde, estamos chamando um consultor.",
+        content: sanitizeOutput(config.client_message || "Aguarde, estamos chamando um consultor."),
         metadata: { 
           current_node_id: currentNode.id,
           ai_paused: true,
@@ -99,9 +107,8 @@ export async function processSDRFlow(
       break;
     }
 
-    // E) FERRAMENTAS CRM (Ainda mockadas ou automáticas)
+    // E) FERRAMENTAS CRM
     if (currentNode.type === 'action' && currentNode.data.nodeType.startsWith('tool_')) {
-       // Por enquanto, apenas finge sucesso e segue
        const nextEdge = workflow.edges.find((e: any) => e.source === currentNode.id && e.sourceHandle === 'success');
        if (nextEdge) {
          currentNode = workflow.nodes.find((n: any) => n.id === nextEdge.target);
@@ -110,10 +117,18 @@ export async function processSDRFlow(
        break;
     }
 
-    break; // Se não cair em nenhum tipo conhecido
+    break;
   }
 
   return finalResponse;
+}
+
+/**
+ * Remove qualquer vazamento de <thinking> da saída final
+ */
+function sanitizeOutput(text: string): string {
+  if (!text) return "";
+  return text.replace(/<thinking>[\s\S]*?<\/thinking>/gi, "").trim();
 }
 
 /**

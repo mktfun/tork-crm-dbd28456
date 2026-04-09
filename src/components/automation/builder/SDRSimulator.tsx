@@ -71,10 +71,22 @@ export function SDRSimulator({
 
       if (error) throw error;
 
+      let cleanMessage = data.message || "";
+      let isFallback = false;
+
+      // 1. Sanitizar <thinking> (camada extra de segurança no frontend)
+      cleanMessage = cleanMessage.replace(/<thinking>[\s\S]*?<\/thinking>/gi, "").trim();
+
+      // 2. Detectar sinal de vazamento para o Assistente Genérico
+      const fallbackSignals = ["Amorim AI", "Mentor Técnico", "Modo WhatsApp", "como posso ajudar hoje? Estou pronto"];
+      if (fallbackSignals.some(s => cleanMessage.includes(s))) {
+        isFallback = true;
+      }
+
       const assistantMsg: Message = { 
         id: (Date.now() + 1).toString(), 
         role: 'assistant', 
-        text: data.message,
+        text: isFallback ? "⚠️ ALERTA: A simulação caiu no Assistente genérico. Verifique os logs e o roteamento da function." : cleanMessage,
         metadata: data.metadata,
         isSimulated: true
       };

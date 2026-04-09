@@ -24,10 +24,9 @@ export function useSDRWorkflows() {
     queryKey: ['sdr-workflows', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      const { data, error } = await supabase
-        .from('crm_sdr_workflows')
-        .select('*')
-        .order('updated_at', { ascending: false });
+      const { data, error } = await (supabase
+        .from('crm_sdr_workflows' as any)
+        .select('*') as any);
 
       if (error) throw error;
       return data as SDRWorkflow[];
@@ -39,18 +38,18 @@ export function useSDRWorkflows() {
     mutationFn: async (workflow: Partial<SDRWorkflow>) => {
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
-        .from('crm_sdr_workflows')
+      const { data, error } = await (supabase
+        .from('crm_sdr_workflows' as any)
         .upsert({
           ...workflow,
           user_id: user.id,
           updated_at: new Date().toISOString(),
         } as any)
         .select()
-        .single();
+        .single() as any);
 
       if (error) throw error;
-      return data;
+      return data as SDRWorkflow;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sdr-workflows'] });
