@@ -46,11 +46,11 @@ export function IntegrationFlowViz({
   ];
 
   return (
-    <div className={cn('flex items-center justify-between gap-1', className)}>
+    <div className={cn('flex items-end justify-between gap-1 pb-1', className)}>
       {steps.map((step, index) => (
         <React.Fragment key={index}>
           {/* Step node */}
-          <div className="flex flex-col items-center gap-1 min-w-0">
+          <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
             <div
               className={cn(
                 'flex items-center justify-center w-8 h-8 rounded-lg transition-colors',
@@ -79,7 +79,7 @@ export function IntegrationFlowViz({
           {/* Arrow connector */}
           {index < steps.length - 1 && (
             <ArrowRight className={cn(
-              'h-3 w-3 shrink-0 -mt-4',
+              'h-3 w-3 shrink-0 mb-5',
               step.active ? 'text-primary/50' : 'text-border'
             )} />
           )}

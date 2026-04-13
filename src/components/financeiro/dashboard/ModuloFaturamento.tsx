@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, CreditCard, RefreshCw, BarChart3, ArrowRight } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, CreditCard, BarChart3, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFinancialSummary } from "@/hooks/useFinanceiro";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DateRange } from "react-day-picker";
 
 interface StatItemProps {
   label: string;
@@ -24,19 +25,19 @@ const StatItem = ({ label, value, percent, icon, isHero = false }: StatItemProps
       <div className="flex items-center gap-3">
         <div className={cn(
           "flex items-center justify-center rounded-lg",
-          isHero ? "h-10 w-10 bg-primary/20 text-primary" : "h-8 w-8 bg-zinc-800 text-zinc-400"
+          isHero ? "h-10 w-10 bg-primary/20 text-primary" : "h-8 w-8 bg-secondary text-muted-foreground"
         )}>
           {icon}
         </div>
         <div>
           <p className={cn(
-            "text-zinc-400",
+            "text-muted-foreground",
             isHero ? "text-sm" : "text-xs"
           )}>
             {label}
           </p>
           <p className={cn(
-            "font-semibold text-white",
+            "font-semibold text-foreground",
             isHero ? "text-2xl" : "text-base"
           )}>
             {value}
@@ -63,12 +64,17 @@ const StatItem = ({ label, value, percent, icon, isHero = false }: StatItemProps
 
 interface ModuloFaturamentoProps {
   onClick?: () => void;
+  dateRange?: DateRange;
 }
 
-export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
+export const ModuloFaturamento = ({ onClick, dateRange }: ModuloFaturamentoProps) => {
+  // Use dateRange if provided, otherwise use current month
   const now = new Date();
-  const startDate = format(startOfMonth(now), 'yyyy-MM-dd');
-  const endDate = format(endOfMonth(now), 'yyyy-MM-dd');
+  const from = dateRange?.from || startOfMonth(now);
+  const to = dateRange?.to || endOfMonth(now);
+
+  const startDate = format(startOfDay(from), 'yyyy-MM-dd');
+  const endDate = format(endOfDay(to), 'yyyy-MM-dd');
 
   const { data: summary, isLoading } = useFinancialSummary(startDate, endDate);
 
@@ -83,9 +89,15 @@ export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
 
   if (isLoading) {
     return (
-      <Card className="h-full bg-zinc-900/50 border-zinc-800">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-white flex items-center gap-2 text-base">
+      <Card
+        className={cn(
+          "h-full bg-card/50 border-border transition-all duration-200",
+          onClick && "cursor-pointer hover:bg-card/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+        )}
+        onClick={onClick}
+      >
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-foreground flex items-center gap-2 text-base">
             <BarChart3 className="h-5 w-5 text-primary" />
             Faturamento & Vendas
           </CardTitle>
@@ -97,20 +109,24 @@ export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
     );
   }
 
-  const faturamentoMes = summary?.totalIncome || 0;
-  const operacoes = summary?.transactionCount || 0;
+  const faturamentoMes = summary?.current?.totalIncome || 0;
+  const operacoes = summary?.current?.transactionCount || 0;
   const ticketMedio = operacoes > 0 ? faturamentoMes / operacoes : 0;
+
+  // Trend calculation
+  const prevIncome = summary?.previous?.totalIncome || 0;
+  const incomeTrend = prevIncome > 0 ? ((faturamentoMes - prevIncome) / prevIncome) * 100 : undefined;
 
   return (
     <Card
       className={cn(
-        "h-full bg-zinc-900/50 border-zinc-800 transition-all duration-200",
-        onClick && "cursor-pointer hover:bg-zinc-900/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+        "h-full bg-card/50 border-border transition-all duration-200",
+        onClick && "cursor-pointer hover:bg-card/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
       )}
       onClick={onClick}
     >
       <CardHeader className="pb-2">
-        <CardTitle className="text-white flex items-center justify-between text-base">
+        <CardTitle className="text-foreground flex items-center justify-between text-base">
           <span className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-primary" />
             Faturamento & Vendas
@@ -122,20 +138,20 @@ export const ModuloFaturamento = ({ onClick }: ModuloFaturamentoProps) => {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Hero Number */}
-        <div className="rounded-xl bg-zinc-800/50 p-4">
+        <div className="rounded-xl bg-secondary/50 p-4">
           <StatItem
-            label="Faturamento Mês"
+            label="Receita Confirmada"
             value={formatCurrency(faturamentoMes)}
-            // percent removido pois não tenho dado histórico real fácil aqui
+            percent={incomeTrend !== undefined ? Math.round(incomeTrend) : undefined}
             icon={<DollarSign className="h-5 w-5" />}
             isHero
           />
-          <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
-            <span className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2 py-0.5">
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5">
               <CreditCard className="h-3 w-3" />
               {operacoes} operações
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2 py-0.5 ml-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 ml-2">
               <TrendingUp className="h-3 w-3 text-emerald-500" />
               Ticket Médio: {formatCurrency(ticketMedio)}
             </span>

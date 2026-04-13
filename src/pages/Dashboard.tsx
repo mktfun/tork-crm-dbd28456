@@ -3,7 +3,7 @@ import { DashboardKpis } from '@/components/dashboard/DashboardKpis';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardController } from '@/components/dashboard/DashboardController';
 import { PerformanceChart } from '@/components/dashboard/PerformanceChart';
-import { DashboardGlobalInsight } from '@/components/dashboard/DashboardGlobalInsight';
+// DashboardGlobalInsight merged into ThinkingCard
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
@@ -86,12 +86,8 @@ export default function Dashboard() {
   const { data: profile, isLoading: profileIsLoading } = useProfile();
   const updateProfileMutation = useUpdateProfile();
 
-  // Exemplo de passos de raciocínio da IA (Demo)
-  const aiReasoningSteps: ThinkingStep[] = [
-    { step: "Analisando fluxo de caixa recente...", status: "success", detail: "R$ 15.430,00 recebidos nos últimos 7 dias." },
-    { step: "Verificando padrões de cancelamento...", status: "success", detail: "Taxa de churn estável em 0.8%." },
-    { step: "Identificando oportunidades de cross-sell...", status: "thinking", detail: "3 clientes com perfil para seguro de vida." }
-  ];
+  // Compact mode: no reasoning steps, only strategic summary
+  const aiReasoningSteps: ThinkingStep[] = [];
 
   // A LÓGICA CORRETA E SEGURA
   const shouldShowOnboarding = !profileIsLoading && profile && profile.onboarding_completed === false;
@@ -112,57 +108,51 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="p-6 space-y-8">
-      {/* HEADER DE PÁGINA ROBUSTO */}
-      <div className="dashboard-header">
-        <DashboardHeader />
-      </div>
-
-      {/* CARD DE INSIGHT GLOBAL ESTRATÉGICO */}
-      <div className="dashboard-global-insight">
-        <DashboardGlobalInsight
-          insight={metrics.dashboardGlobalInsight}
-          isLoading={metrics.isLoading}
-        />
-      </div>
-
-      {/* DEMO: INTEGRAÇÃO DE RACIOCÍNIO IA */}
-      <div className="grid grid-cols-1">
-        <ThinkingCard
-          title="Análise em Tempo Real (Glass Box Demo)"
-          steps={aiReasoningSteps}
-          isThinking={true}
-        />
-      </div>
-
-      {/* GRADE DE KPIs - SEM FILTRO DE DATA (dados do mês atual) */}
-      <div className="dashboard-kpis">
-        <DashboardKpis />
-      </div>
-
-      {/* LINHA 2: Performance Chart (2/3) + Próximos Agendamentos (1/3) */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 performance-chart">
-          <PerformanceChart />
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 h-full">
+      <div className="max-w-[1600px] mx-auto space-y-8">
+        {/* HEADER DE PÁGINA ROBUSTO */}
+        <div className="dashboard-header">
+          <DashboardHeader />
         </div>
-        <div className="lg:col-span-1 dashboard-sidebar">
-          <DashboardSidebar />
+
+        {/* CARD DE INSIGHT GLOBAL ESTRATÉGICO + RACIOCÍNIO IA */}
+        <div className="dashboard-global-insight grid grid-cols-1">
+          <ThinkingCard
+            steps={aiReasoningSteps}
+            isThinking={true}
+            strategicSummary={{ focus: 'general' }}
+          />
         </div>
-      </div>
 
-      {/* LINHA 3: Sistema de Controle de Gráficos - COM FILTRO DE DATA PRÓPRIO */}
-      <div className="dashboard-controller">
-        <DashboardController />
-      </div>
+        {/* GRADE DE KPIs - SEM FILTRO DE DATA (dados do mês atual) */}
+        <div className="dashboard-kpis">
+          <DashboardKpis />
+        </div>
 
-      {/* SISTEMA DE ONBOARDING À PROVA DE FALHAS */}
-      {shouldShowOnboarding && (
-        <OnboardingTour
-          steps={dashboardSteps}
-          isActive={true}
-          onComplete={completeOnboarding}
-        />
-      )}
+        {/* LINHA 2: Performance Chart (2/3) + Próximos Agendamentos (1/3) */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 performance-chart">
+            <PerformanceChart />
+          </div>
+          <div className="lg:col-span-1 dashboard-sidebar">
+            <DashboardSidebar />
+          </div>
+        </div>
+
+        {/* LINHA 3: Sistema de Controle de Gráficos - COM FILTRO DE DATA PRÓPRIO */}
+        <div className="dashboard-controller">
+          <DashboardController />
+        </div>
+
+        {/* SISTEMA DE ONBOARDING À PROVA DE FALHAS */}
+        {shouldShowOnboarding && (
+          <OnboardingTour
+            steps={dashboardSteps}
+            isActive={true}
+            onComplete={completeOnboarding}
+          />
+        )}
+      </div>
     </div>
   );
 }

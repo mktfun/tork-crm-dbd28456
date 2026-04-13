@@ -141,16 +141,18 @@ export function mapClientToSupabase(data: any) {
     city: 'city',
     state: 'state',
     observations: 'observations',
-    userId: 'user_id'
+    userId: 'user_id',
+    user_id: 'user_id',
   };
 
-  // Aplica o mapeamento apenas para campos que existem nos dados
+  // Only include fields that are explicitly mapped (whitelist)
   Object.keys(data).forEach(key => {
-    const mappedKey = fieldMappings[key] || key;
+    if (!(key in fieldMappings)) return;
+    const mappedKey = fieldMappings[key];
     const value = data[key];
     
-    // Só inclui o campo se tiver valor (não vazio)
-    if (value !== '' && value !== null && value !== undefined) {
+    // Allow empty strings for NOT NULL fields (phone, email)
+    if (value !== null && value !== undefined) {
       mapped[mappedKey] = value;
     }
   });
@@ -180,14 +182,19 @@ export function mapPolicyToSupabase(data: any) {
     brokerageId: 'brokerage_id',
     pdfUrl: 'pdf_url',
     pdfAttachedName: 'pdf_attached_name',
-    pdfAttachedData: 'pdf_attached_data'
+    pdfAttachedData: 'pdf_attached_data',
   };
 
+  // Only include fields that are explicitly mapped (whitelist)
+  // Also accept snake_case keys directly
+  const allMappings: Record<string, string> = { ...fieldMappings, user_id: 'user_id' };
+  
   Object.keys(data).forEach(key => {
-    const mappedKey = fieldMappings[key] || key;
+    if (!(key in allMappings)) return;
+    const mappedKey = allMappings[key];
     const value = data[key];
     
-    if (value !== '' && value !== null && value !== undefined) {
+    if (value !== null && value !== undefined) {
       mapped[mappedKey] = value;
     }
   });

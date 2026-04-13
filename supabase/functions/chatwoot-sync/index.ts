@@ -49,41 +49,58 @@ function formatPhoneToE164(phone: string | null): string | undefined {
   return undefined;
 }
 
-async function getChatwootConfig(supabase: any, userId: string): Promise<ChatwootConfig | null> {
-  // First try brokerages table (new approach - multi-tenant)
-  const { data: brokerage, error: brokerageError } = await supabase
-    .from('brokerages')
-    .select('chatwoot_url, chatwoot_token, chatwoot_account_id')
-    .eq('user_id', userId)
-    .maybeSingle();
+/** Normalize a Chatwoot base URL: trim, strip /api/v1, strip trailing slashes */
+function normalizeBaseUrl(url: string): string {
+  return url.trim().replace(/\/api\/v1\/?$/i, '').replace(/\/+$/, '');
+}
 
-  if (brokerage?.chatwoot_url && brokerage?.chatwoot_token && brokerage?.chatwoot_account_id) {
-    console.log('Using Chat Tork config from brokerages table');
+async function getChatwootConfig(supabase: any, userId: string, configOverride?: any): Promise<ChatwootConfig | null> {
+  // 1) If caller sent config_override with all 3 fields, use it directly (test/sync from UI)
+  if (configOverride?.chatwoot_url && configOverride?.chatwoot_api_key && configOverride?.chatwoot_account_id) {
+    console.log('Using config_override from request body');
     return {
-      chatwoot_url: brokerage.chatwoot_url,
-      chatwoot_api_key: brokerage.chatwoot_token,
-      chatwoot_account_id: brokerage.chatwoot_account_id
+      chatwoot_url: normalizeBaseUrl(configOverride.chatwoot_url),
+      chatwoot_api_key: configOverride.chatwoot_api_key,
+      chatwoot_account_id: configOverride.chatwoot_account_id,
     };
   }
 
-  // Fallback to crm_settings for backwards compatibility
-  const { data, error } = await supabase
-    .from('crm_settings')
-    .select('chatwoot_url, chatwoot_api_key, chatwoot_account_id')
-    .eq('user_id', userId)
-    .maybeSingle();
+  // 2) Fetch both sources in parallel
+  const [brokRes, crmRes] = await Promise.all([
+    supabase.from('brokerages').select('chatwoot_url, chatwoot_token, chatwoot_account_id, updated_at').eq('user_id', userId).maybeSingle(),
+    supabase.from('crm_settings').select('chatwoot_url, chatwoot_api_key, chatwoot_account_id, updated_at').eq('user_id', userId).maybeSingle(),
+  ]);
 
-  if (error || !data) {
-    console.log('No Chat Tork config found for user:', userId);
-    return null;
+  const brok = brokRes.data;
+  const crm = crmRes.data;
+
+  const brokComplete = brok?.chatwoot_url && brok?.chatwoot_token && brok?.chatwoot_account_id;
+  const crmComplete = crm?.chatwoot_url && crm?.chatwoot_api_key && crm?.chatwoot_account_id;
+
+  // Pick the most recently updated complete config
+  if (brokComplete && crmComplete) {
+    const brokTime = new Date(brok.updated_at || 0).getTime();
+    const crmTime = new Date(crm.updated_at || 0).getTime();
+    if (crmTime >= brokTime) {
+      console.log('Using Chat Tork config from crm_settings (newer)');
+      return { chatwoot_url: normalizeBaseUrl(crm.chatwoot_url), chatwoot_api_key: crm.chatwoot_api_key, chatwoot_account_id: crm.chatwoot_account_id };
+    }
+    console.log('Using Chat Tork config from brokerages (newer)');
+    return { chatwoot_url: normalizeBaseUrl(brok.chatwoot_url), chatwoot_api_key: brok.chatwoot_token, chatwoot_account_id: brok.chatwoot_account_id };
   }
 
-  if (!data.chatwoot_url || !data.chatwoot_api_key || !data.chatwoot_account_id) {
-    console.log('Incomplete Chat Tork config for user:', userId);
-    return null;
+  if (crmComplete) {
+    console.log('Using Chat Tork config from crm_settings');
+    return { chatwoot_url: normalizeBaseUrl(crm.chatwoot_url), chatwoot_api_key: crm.chatwoot_api_key, chatwoot_account_id: crm.chatwoot_account_id };
   }
 
-  return data as ChatwootConfig;
+  if (brokComplete) {
+    console.log('Using Chat Tork config from brokerages');
+    return { chatwoot_url: normalizeBaseUrl(brok.chatwoot_url), chatwoot_api_key: brok.chatwoot_token, chatwoot_account_id: brok.chatwoot_account_id };
+  }
+
+  console.log('No complete Chat Tork config found for user:', userId);
+  return null;
 }
 
 async function chatwootRequest(
@@ -188,8 +205,8 @@ serve(async (req) => {
 
     console.log('CRM Sync action:', action, 'for user:', user.id);
 
-    // Get Chatwoot config
-    const config = await getChatwootConfig(supabase, user.id);
+    // Get Chatwoot config (prefer config_override from request body)
+    const config = await getChatwootConfig(supabase, user.id, body.config_override);
     
     if (!config) {
       return new Response(
@@ -257,7 +274,9 @@ serve(async (req) => {
           console.error('Connection validation failed:', error);
           
           let message = 'Erro desconhecido';
-          if (error.message?.includes('401')) {
+          if (error.message?.includes('dns') || error.message?.includes('lookup')) {
+            message = 'Domínio do Chatwoot não encontrado. Verifique se a URL está correta e acessível publicamente.';
+          } else if (error.message?.includes('401')) {
             message = 'Token de API inválido';
           } else if (error.message?.includes('404')) {
             message = 'URL ou Account ID incorretos';
@@ -474,6 +493,21 @@ serve(async (req) => {
             console.warn('⚠️ Algumas etiquetas antigas ainda estão presentes:', stillHasOldLabels);
           }
 
+          // Emit audit event for AI-driven stage changes
+          const oldStage = allStages?.find(s => {
+            const label = s.chatwoot_label || s.name.toLowerCase().replace(/\s+/g, '_');
+            return labelsToRemove.some(r => normalizeLabel(r) === normalizeLabel(label));
+          });
+          
+          await supabase.from('crm_deal_events').insert({
+            deal_id: deal_id,
+            event_type: 'stage_change',
+            old_value: oldStage?.name || labelsToRemove[0] || null,
+            new_value: newStage?.name || newLabel,
+            source: 'ai_automation',
+            created_by: null
+          });
+
           return new Response(
             JSON.stringify({ 
               success: true, 
@@ -633,8 +667,10 @@ serve(async (req) => {
           if (labelColor === '000000') {
             labelColor = '3B82F6';
           }
+          // Chatwoot API expects #RRGGBB format
+          const labelColorHex = `#${labelColor}`;
           
-          console.log('Processing label:', labelTitle, 'color:', labelColor, '(original:', rawColor, ')');
+          console.log('Processing label:', labelTitle, 'color:', labelColorHex, '(original:', rawColor, ')');
           
           // Verificar se a etiqueta já existe
           const existingLabel = existingLabels.find(
@@ -645,7 +681,7 @@ serve(async (req) => {
             // ATUALIZAR a cor da etiqueta existente via PATCH
             try {
               await chatwootRequest(config, `/labels/${existingLabel.id}`, 'PATCH', {
-                color: labelColor,
+                color: labelColorHex,
                 description: `Etapa CRM: ${stage.name}`
               });
               updated++;
@@ -663,8 +699,8 @@ serve(async (req) => {
                 'POST',
                 {
                   title: labelTitle,
-                  description: `Etapa CRM: ${stage.name}`,
-                  color: labelColor
+                    description: `Etapa CRM: ${stage.name}`,
+                    color: labelColorHex
                 }
               );
               synced++;
@@ -680,7 +716,7 @@ serve(async (req) => {
                   );
                   if (foundLabel) {
                     await chatwootRequest(config, `/labels/${foundLabel.id}`, 'PATCH', {
-                      color: labelColor,
+                      color: labelColorHex,
                       description: `Etapa CRM: ${stage.name}`
                     });
                     updated++;

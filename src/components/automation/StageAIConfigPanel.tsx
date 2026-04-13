@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Bot, Save, Info, Sparkles, ArrowRight, Target, RotateCcw } from 'lucide-react';
+import { Bot, Save, Info, ArrowRight, Target, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -34,7 +34,6 @@ export function StageAIConfigPanel({
   // Config States
   const [isActive, setIsActive] = useState(false);
   const [aiObjective, setAiObjective] = useState('');
-  const [aiPersona, setAiPersona] = useState(''); // Instruções de tom/estilo
   const [completionActionType, setCompletionActionType] = useState('notify');
   const [targetStageId, setTargetStageId] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
@@ -49,7 +48,6 @@ export function StageAIConfigPanel({
     // Load from settings or defaults
     setIsActive(aiSetting?.is_active ?? false);
     setAiObjective(aiSetting?.ai_objective ?? '');
-    setAiPersona(aiSetting?.ai_persona ?? pipelineDefault?.ai_persona ?? globalConfig?.base_instructions ?? '');
 
     // Parse Completion Action (JSON)
     // Ex: { type: "move_stage", target_stage_id: "..." }
@@ -74,7 +72,7 @@ export function StageAIConfigPanel({
   // Track Changes
   useEffect(() => {
     setHasChanges(true); // Simplificação: qualquer edição marca como alterado para habilitar botão salvar
-  }, [isActive, aiObjective, aiPersona, completionActionType, targetStageId]);
+  }, [isActive, aiObjective, completionActionType, targetStageId]);
 
   const handleSave = async () => {
     if (!stage) return;
@@ -87,7 +85,6 @@ export function StageAIConfigPanel({
       stage_id: stage.id,
       is_active: isActive,
       ai_objective: aiObjective,
-      ai_persona: aiPersona,
       ai_completion_action: JSON.stringify(completionAction) // Serializar para salvar
     });
     setHasChanges(false);
@@ -184,19 +181,7 @@ export function StageAIConfigPanel({
               </div>
             </div>
 
-            {/* PERSONALIDADE (Advanced) */}
-            <div className="pt-4 border-t border-border/50 space-y-3">
-              <Label className="text-muted-foreground flex items-center gap-2 text-xs">
-                <Sparkles className="h-3 w-3" />
-                Instruções de Personalidade (Opcional - Sobrescreve Global)
-              </Label>
-              <Textarea
-                placeholder="Ex: Seja extremamente formal e jurídico."
-                className="bg-background/30 text-xs h-20"
-                value={aiPersona}
-                onChange={(e) => setAiPersona(e.target.value)}
-              />
-            </div>
+
 
           </div>
         )}

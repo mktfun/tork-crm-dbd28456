@@ -3,11 +3,11 @@ import { format } from 'date-fns';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { 
-  Repeat, 
-  Plus, 
-  Pencil, 
-  CalendarDays, 
+import {
+  Repeat,
+  Plus,
+  Pencil,
+  CalendarDays,
   DollarSign,
   Loader2
 } from 'lucide-react';
@@ -43,15 +43,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 
 import { useFinancialAccounts } from '@/hooks/useFinanceiro';
-import { 
-  useCreateRecurringConfig, 
-  useUpdateRecurringConfig 
+import {
+  useCreateRecurringConfig,
+  useUpdateRecurringConfig
 } from '@/hooks/useRecurringConfigs';
-import { 
-  RecurringConfig, 
-  RecurringFrequency, 
+import {
+  RecurringConfig,
+  RecurringFrequency,
   RecurringNature,
-  FREQUENCY_LABELS 
+  FREQUENCY_LABELS
 } from '@/types/recurring';
 
 const formSchema = z.object({
@@ -75,17 +75,17 @@ interface RecurringConfigModalProps {
   onSuccess?: () => void;
 }
 
-export function RecurringConfigModal({ 
-  config, 
-  trigger, 
-  onSuccess 
+export function RecurringConfigModal({
+  config,
+  trigger,
+  onSuccess
 }: RecurringConfigModalProps) {
   const [open, setOpen] = useState(false);
-  
+
   const { data: accounts = [] } = useFinancialAccounts();
   const createMutation = useCreateRecurringConfig();
   const updateMutation = useUpdateRecurringConfig();
-  
+
   const isEditing = !!config;
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
@@ -245,12 +245,13 @@ export function RecurringConfigModal({
                     <FormControl>
                       <div className="relative">
                         <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input 
-                          type="number" 
-                          step="0.01" 
+                        <Input
+                          type="number"
+                          step="0.01"
                           className="pl-9"
                           placeholder="0,00"
-                          {...field} 
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                         />
                       </div>
                     </FormControl>
@@ -295,14 +296,18 @@ export function RecurringConfigModal({
                     <FormControl>
                       <div className="relative">
                         <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input 
-                          type="number" 
-                          min={1} 
+                        <Input
+                          type="number"
+                          min={1}
                           max={31}
                           className="pl-9"
                           placeholder="10"
                           {...field}
                           value={field.value ?? ''}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            field.onChange(isNaN(val) ? undefined : val);
+                          }}
                         />
                       </div>
                     </FormControl>
@@ -363,10 +368,10 @@ export function RecurringConfigModal({
                   <FormItem>
                     <FormLabel>Data Fim (opcional)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="date" 
-                        {...field} 
-                        value={field.value || ''} 
+                      <Input
+                        type="date"
+                        {...field}
+                        value={field.value || ''}
                       />
                     </FormControl>
                     <FormDescription>
@@ -386,11 +391,11 @@ export function RecurringConfigModal({
                 <FormItem>
                   <FormLabel>Descrição</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Detalhes adicionais..."
                       className="resize-none"
                       rows={2}
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -411,9 +416,9 @@ export function RecurringConfigModal({
                     </FormDescription>
                   </div>
                   <FormControl>
-                    <Switch 
-                      checked={field.value} 
-                      onCheckedChange={field.onChange} 
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
                     />
                   </FormControl>
                 </FormItem>

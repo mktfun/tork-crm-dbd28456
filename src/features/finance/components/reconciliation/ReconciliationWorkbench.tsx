@@ -1,0 +1,1204 @@
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
+import {
+    ArrowUpRight, ArrowDownRight, CheckCircle2, AlertTriangle,
+    Plus, X, Zap, Wand2, Loader2, Search, Unlink, Landmark, Building2
+} from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
+import {
+    ResizablePanelGroup, ResizablePanel, ResizableHandle
+} from '@/components/ui/resizable';
+import {
+    usePendingReconciliation,
+    useReconcileManual,
+    useReconcilePartial,
+    useMatchSuggestions,
+    useCreateFromStatement,
+    type PendingReconciliationItem,
+    type MatchSuggestion,
+} from '@/features/finance/api/useReconciliation';
+import { useFinancialAccounts } from '@/hooks/useFinanceiro';
+import { formatCurrency } from '@/utils/formatCurrency';
+import { cn } from '@/lib/utils';
+import { DateRange } from 'react-day-picker';
+import { PartialReconciliationModal } from './PartialReconciliationModal';
+import { usePendingInsuranceAggregate, type InsuranceAggregateItem } from '@/features/finance/api/usePendingInsuranceAggregate';
+import { useReconcileAggregate } from '@/features/finance/api/useReconcileAggregate';
+import { InsuranceAggregateCard } from './InsuranceAggregateCard';
+
+interface BankAccountOption {
+    id: string;
+    bankName: string;
+}
+
+interface ReconciliationWorkbenchProps {
+    bankAccountId: string | null;
+    dateRange?: DateRange;
+    bankAccounts?: BankAccountOption[];
+}
+
+// Compact card for statement/system items
+function EntryCard({
+    item,
+    selected,
+    suggested,
+    onClick,
+    isUnassigned,
+}: {
+    item: PendingReconciliationItem;
+    selected: boolean;
+    suggested: boolean;
+    onClick: () => void;
+    isUnassigned?: boolean;
+}) {
+    const isRevenue = item.amount >= 0;
+
+    return (
+        <button
+            onClick={onClick}
+            className={cn(
+                'w-full text-left p-3 rounded-lg border transition-all duration-150',
+                'hover:bg-secondary/50',
+                selected
+                    ? 'border-primary bg-primary/10 ring-1 ring-primary/30'
+                    : suggested
+                        ? 'border-amber-500/40 bg-amber-500/5'
+                        : 'border-border bg-card',
+            )}
+        >
+            <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-foreground truncate">{item.description}</p>
+                        {isUnassigned && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-500/30 text-amber-500 shrink-0">
+                                <Unlink className="w-2.5 h-2.5 mr-0.5" />
+                                Sem Banco
+                            </Badge>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-muted-foreground">
+                            {format(new Date(item.transaction_date), 'dd/MM/yyyy')}
+                        </span>
+                        {item.reference_number && (
+                            <span className="text-[10px] text-muted-foreground/70 font-mono">
+                                #{item.reference_number}
+                            </span>
+                        )}
+                        {suggested && !selected && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-500/50 text-amber-500">
+                                <Wand2 className="w-2.5 h-2.5 mr-0.5" />
+                                Match
+                            </Badge>
+                        )}
+                    </div>
+                </div>
+                <span className={cn(
+                    'text-sm font-bold shrink-0',
+                    isRevenue ? 'text-emerald-400' : 'text-red-400'
+                )}>
+                    {isRevenue ? '+' : ''}{formatCurrency(item.amount)}
+                </span>
+            </div>
+        </button>
+    );
+}
+
+// Rich card for system items with policy details
+function SystemEntryCard({
+    item,
+    selected,
+    suggested,
+    onClick,
+    isUnassigned,
+}: {
+    item: PendingReconciliationItem;
+    selected: boolean;
+    suggested: boolean;
+    onClick: () => void;
+    isUnassigned?: boolean;
+}) {
+    const isRevenue = item.amount >= 0;
+    const hasRichData = !!(item.customer_name || item.insurer_name || item.branch_name);
+    const displayAmount = item.remaining_amount != null ? Math.abs(item.remaining_amount) : Math.abs(item.amount);
+
+    // Fallback to standard EntryCard if no rich data
+    if (!hasRichData) {
+        return <EntryCard item={item} selected={selected} suggested={suggested} onClick={onClick} isUnassigned={isUnassigned} />;
+    }
+
+    return (
+        <button
+            onClick={onClick}
+            className={cn(
+                'w-full text-left p-3 rounded-lg border transition-all duration-150',
+                'hover:bg-secondary/50',
+                selected
+                    ? 'border-primary bg-primary/10 ring-1 ring-primary/30'
+                    : suggested
+                        ? 'border-amber-500/40 bg-amber-500/5'
+                        : 'border-border bg-card',
+            )}
+        >
+            {/* Title row */}
+            <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-sm font-bold text-foreground truncate">
+                    {item.customer_name || item.description?.replace(/undefined/g, '').trim() || 'Comissão'}
+                </p>
+                <span className={cn(
+                    'text-sm font-bold shrink-0',
+                    isRevenue ? 'text-emerald-400' : 'text-red-400'
+                )}>
+                    {isRevenue ? '+' : '-'}{formatCurrency(displayAmount)}
+                </span>
+            </div>
+
+            {/* Badges row */}
+            <div className="flex flex-wrap items-center gap-1 mb-1.5">
+                {item.branch_name && (
+                    <Badge variant="metallic" className="text-[10px] px-1.5 py-0 h-4">{item.branch_name}</Badge>
+                )}
+                {item.insurer_name && (
+                    <Badge variant="silverOutline" className="text-[10px] px-1.5 py-0 h-4">{item.insurer_name}</Badge>
+                )}
+                {item.item_name && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground">{item.item_name}</Badge>
+                )}
+                {!item.branch_name && !item.insurer_name && !item.item_name && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground">
+                        Comissão Automática
+                    </Badge>
+                )}
+                {isUnassigned && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-500/30 text-amber-500 shrink-0">
+                        <Unlink className="w-2.5 h-2.5 mr-0.5" />
+                        Sem Banco
+                    </Badge>
+                )}
+                {suggested && !selected && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-500/50 text-amber-500">
+                        <Wand2 className="w-2.5 h-2.5 mr-0.5" />
+                        Match
+                    </Badge>
+                )}
+            </div>
+
+            {/* Value breakdown */}
+            <div className="flex items-center gap-3 text-[10px] mb-1">
+                <span className="text-muted-foreground">
+                    Cheio: {formatCurrency(Math.abs(item.total_amount ?? 0))}
+                </span>
+                <span className="text-emerald-500">
+                    Baixado: {formatCurrency(Math.abs(item.paid_amount ?? 0))}
+                </span>
+                <span className="text-red-400 font-bold">
+                    Faltante: {formatCurrency(Math.abs(item.remaining_amount ?? 0))}
+                </span>
+            </div>
+
+            {/* Date */}
+            <span className="text-[10px] text-muted-foreground">
+                {format(new Date(item.transaction_date), 'dd/MM/yyyy')}
+            </span>
+        </button>
+    );
+}
+
+export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts = [] }: ReconciliationWorkbenchProps) {
+    const [selectedStatementIds, setSelectedStatementIds] = useState<string[]>([]);
+    const [selectedSystemIds, setSelectedSystemIds] = useState<string[]>([]);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [createCategoryId, setCreateCategoryId] = useState('');
+    const [createBankId, setCreateBankId] = useState('');
+    const [operatorName, setOperatorName] = useState('');
+    const [bankSearch, setBankSearch] = useState('');
+    const [systemSearch, setSystemSearch] = useState('');
+    const [showPartialModal, setShowPartialModal] = useState(false);
+    const [showUnassigned, setShowUnassigned] = useState(false);
+
+    const queryClient = useQueryClient();
+
+    // On-demand bank selection modal state
+    const [showBankModal, setShowBankModal] = useState(false);
+    const [selectedBankForMatch, setSelectedBankForMatch] = useState('');
+    // Context: what action triggered the bank modal
+    const [bankModalContext, setBankModalContext] = useState<'reconcile' | 'aggregate'>('reconcile');
+
+    // Aggregate FIFO state
+    const [selectedAggregateId, setSelectedAggregateId] = useState<string | null>(null);
+    const [showAggregateModal, setShowAggregateModal] = useState(false);
+
+    // Data
+    const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined;
+    const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined;
+
+    const isConsolidated = !bankAccountId;
+    const { data: pendingData, isLoading } = usePendingReconciliation(bankAccountId, startDate, endDate, showUnassigned);
+    const { data: suggestions = [] } = useMatchSuggestions(bankAccountId);
+    const { data: accounts } = useFinancialAccounts();
+
+    const reconcileManual = useReconcileManual();
+    const reconcilePartial = useReconcilePartial();
+    const createFromStatement = useCreateFromStatement();
+    const reconcileAggregate = useReconcileAggregate();
+
+    // Insurance aggregate for consolidated mode
+    const { data: insuranceAggregates = [], isLoading: isLoadingAggregates } = usePendingInsuranceAggregate();
+
+    const statementItems = pendingData?.statement || [];
+    const systemItems = pendingData?.system || [];
+
+    // Filter
+    const filteredStatement = useMemo(() => {
+        if (!bankSearch) return statementItems;
+        const q = bankSearch.toLowerCase();
+        return statementItems.filter(i => i.description.toLowerCase().includes(q));
+    }, [statementItems, bankSearch]);
+
+    const filteredSystem = useMemo(() => {
+        if (!systemSearch) return systemItems;
+        const q = systemSearch.toLowerCase();
+        return systemItems.filter(i => i.description.toLowerCase().includes(q));
+    }, [systemItems, systemSearch]);
+
+    // Filter aggregates
+    const filteredAggregates = useMemo(() => {
+        if (!systemSearch) return insuranceAggregates;
+        const q = systemSearch.toLowerCase();
+        return insuranceAggregates.filter(i => i.company_name.toLowerCase().includes(q));
+    }, [insuranceAggregates, systemSearch]);
+
+    // Aggregate total for balance bar
+    const aggregateTotal = useMemo(() =>
+        insuranceAggregates.reduce((s, i) => s + i.total_amount_pending, 0),
+        [insuranceAggregates]
+    );
+
+    // Suggested IDs sets
+    const suggestedStatementIds = useMemo(() => new Set(suggestions.map(s => s.statement_entry_id)), [suggestions]);
+    const suggestedSystemIds = useMemo(() => new Set(suggestions.map(s => s.system_transaction_id)), [suggestions]);
+
+    // Selection logic
+    const toggleStatement = useCallback((id: string) => {
+        setSelectedStatementIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    }, []);
+
+    const toggleSystem = useCallback((id: string) => {
+        setSelectedSystemIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    }, []);
+
+    // Computed sums
+    const bankSum = useMemo(() =>
+        statementItems.filter(i => selectedStatementIds.includes(i.id)).reduce((s, i) => s + i.amount, 0),
+        [statementItems, selectedStatementIds]
+    );
+
+    const systemSum = useMemo(() =>
+        systemItems.filter(i => selectedSystemIds.includes(i.id)).reduce((s, i) => {
+            const val = i.remaining_amount != null ? Math.abs(i.remaining_amount) : Math.abs(i.amount);
+            const signed = (i.type === 'expense' || i.type === 'despesa') ? -val : val;
+            return s + signed;
+        }, 0),
+        [systemItems, selectedSystemIds]
+    );
+
+    const diff = bankSum - systemSum;
+    const hasLeftSelection = selectedStatementIds.length > 0;
+    const hasRightSelection = selectedSystemIds.length > 0;
+    const hasBothSides = hasLeftSelection && hasRightSelection;
+    const isPerfectMatch = hasBothSides && Math.abs(diff) < 0.01;
+    const isMissingTransaction = hasLeftSelection && !hasRightSelection;
+
+    /**
+     * True if any selected System item is a pure manual entry.
+     * Manual = related_entity_type is null (not 'policy' and not 'legacy_transaction').
+     * Partial reconciliation is only allowed for policy commissions and legacy commissions.
+     */
+    const hasManualSystemItems = useMemo(() => {
+        if (selectedSystemIds.length === 0) return false;
+        return selectedSystemIds.some(id => {
+            const item = systemItems.find(i => i.id === id);
+            if (!item) return false;
+            // If it's an automatic commission (by type OR description fallback), allow partial
+            if (item.is_automatic_commission) return false;
+            // Otherwise it's manual → block partial
+            return true;
+        });
+    }, [selectedSystemIds, systemItems]);
+
+    // Determine the target bank for reconciliation
+    const getTargetBankId = (): string | null => {
+        // If a specific bank is selected (Mode B), use it
+        if (bankAccountId) return bankAccountId;
+
+        // Check if any selected statement item has a bank
+        const selectedStmts = statementItems.filter(i => selectedStatementIds.includes(i.id));
+        const stmtWithBank = selectedStmts.find(i => i.bank_account_id);
+        if (stmtWithBank?.bank_account_id) return stmtWithBank.bank_account_id;
+
+        // Check if any selected system item has a bank
+        const selectedSys = systemItems.filter(i => selectedSystemIds.includes(i.id));
+        const sysWithBank = selectedSys.find(i => i.bank_account_id);
+        if (sysWithBank?.bank_account_id) return sysWithBank.bank_account_id;
+
+        return null; // Both sides unassigned
+    };
+
+    // Execute reconciliation with a given bankId
+    const executeReconcile = async (targetBankId: string, opName?: string) => {
+        const finalOpName = opName || operatorName.trim();
+        if (selectedStatementIds.length === 1 && selectedSystemIds.length === 1) {
+            await reconcilePartial.mutateAsync({
+                statementEntryId: selectedStatementIds[0],
+                systemTransactionId: selectedSystemIds[0],
+                targetBankId,
+            });
+            // Audit log
+            try {
+                const entry = statementItems.find(i => i.id === selectedStatementIds[0]);
+                await supabase.from('reconciliation_audit_log').insert({
+                    user_id: (await supabase.auth.getUser()).data.user?.id,
+                    action_type: 'reconcile',
+                    statement_entry_id: selectedStatementIds[0],
+                    system_transaction_id: selectedSystemIds[0],
+                    bank_account_id: targetBankId,
+                    amount: entry?.amount ? Math.abs(entry.amount) : 0,
+                    operator_name: finalOpName || 'Sistema',
+                    details: { method: 'manual_1to1' },
+                });
+            } catch { /* best-effort */ }
+        } else {
+            for (const stmtId of selectedStatementIds) {
+                for (const sysId of selectedSystemIds) {
+                    try {
+                        await reconcilePartial.mutateAsync({
+                            statementEntryId: stmtId,
+                            systemTransactionId: sysId,
+                            targetBankId,
+                        });
+                        // Audit log
+                        try {
+                            const entry = statementItems.find(i => i.id === stmtId);
+                            await supabase.from('reconciliation_audit_log').insert({
+                                user_id: (await supabase.auth.getUser()).data.user?.id,
+                                action_type: 'reconcile',
+                                statement_entry_id: stmtId,
+                                system_transaction_id: sysId,
+                                bank_account_id: targetBankId,
+                                amount: entry?.amount ? Math.abs(entry.amount) : 0,
+                                operator_name: finalOpName || 'Sistema',
+                                details: { method: 'manual_NtoM' },
+                            });
+                        } catch { /* best-effort */ }
+                    } catch { /* skip duplicates */ }
+                }
+            }
+        }
+        setSelectedStatementIds([]);
+        setSelectedSystemIds([]);
+        setOperatorName('');
+    };
+
+    // Reconcile handler (1:1 or N:M via multiple calls)
+    const handleReconcile = async () => {
+        // If mismatch detected, check if partial is allowed
+        if (!isPerfectMatch && hasBothSides) {
+            if (hasManualSystemItems) {
+                toast.error(
+                    'Lançamentos manuais exigem valor exato. Apenas comissões de apólices aceitam baixa parcial.',
+                    { duration: 5000 }
+                );
+                return;
+            }
+            setShowPartialModal(true);
+            return;
+        }
+
+        const targetBankId = getTargetBankId();
+        if (!targetBankId) {
+            // Both sides unassigned -> ask user which bank
+            setSelectedBankForMatch('');
+            setBankModalContext('reconcile');
+            setShowBankModal(true);
+            return;
+        }
+
+        await executeReconcile(targetBankId);
+    };
+
+    const handleBankModalConfirm = async () => {
+        if (!selectedBankForMatch) return;
+        setShowBankModal(false);
+        if (bankModalContext === 'aggregate') {
+            await executeAggregateWithBank(selectedBankForMatch);
+        } else {
+            await executeReconcile(selectedBankForMatch);
+        }
+    };
+
+    const handlePartialReconcile = async (amount: number) => {
+        if (selectedStatementIds.length < 1 || selectedSystemIds.length < 1) return;
+        const targetBankId = getTargetBankId();
+        if (!targetBankId) {
+            // For partial reconcile with no bank, we also need to ask
+            setSelectedBankForMatch('');
+            setShowBankModal(true);
+            return;
+        }
+        await reconcilePartial.mutateAsync({
+            statementEntryId: selectedStatementIds[0],
+            systemTransactionId: selectedSystemIds[0],
+            amountToReconcile: amount,
+            targetBankId,
+        });
+        setShowPartialModal(false);
+        setSelectedStatementIds([]);
+        setSelectedSystemIds([]);
+    };
+
+    const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
+
+    const handleCreateTransaction = async () => {
+        if (!createCategoryId || selectedStatementIds.length === 0 || !operatorName.trim()) return;
+        const total = selectedStatementIds.length;
+        let successCount = 0;
+        setBulkProgress({ current: 0, total });
+        for (let i = 0; i < total; i++) {
+            setBulkProgress({ current: i + 1, total });
+            try {
+                const entry = statementItems.find(it => it.id === selectedStatementIds[i]);
+                const result = await createFromStatement.mutateAsync({
+                    statementEntryId: selectedStatementIds[i],
+                    categoryAccountId: createCategoryId,
+                    bankAccountId: createBankId || undefined,
+                });
+                successCount++;
+                // Insert audit log
+                try {
+                    await supabase.from('reconciliation_audit_log').insert({
+                        user_id: (await supabase.auth.getUser()).data.user?.id,
+                        action_type: 'create',
+                        statement_entry_id: selectedStatementIds[i],
+                        system_transaction_id: result.transaction_id || null,
+                        bank_account_id: createBankId || entry?.bank_account_id || null,
+                        amount: entry?.amount ? Math.abs(entry.amount) : 0,
+                        operator_name: operatorName.trim(),
+                        details: { category_id: createCategoryId },
+                    });
+                } catch { /* audit log is best-effort */ }
+            } catch { /* skip */ }
+        }
+        setBulkProgress(null);
+        setShowCreateModal(false);
+        setCreateCategoryId('');
+        setCreateBankId('');
+        setOperatorName('');
+        setSelectedStatementIds([]);
+        toast.success(`${successCount} lançamento${successCount > 1 ? 's' : ''} criado${successCount > 1 ? 's' : ''} com sucesso!`);
+    };
+
+    const clearSelection = () => {
+        setSelectedStatementIds([]);
+        setSelectedSystemIds([]);
+        setSelectedAggregateId(null);
+    };
+
+    // Aggregate FIFO handler
+    const handleAggregateMatch = () => {
+        if (selectedStatementIds.length < 1 || !selectedAggregateId) return;
+        setShowAggregateModal(true);
+    };
+
+    // Execute aggregate FIFO with a known bank
+    const executeAggregateWithBank = async (targetBankId: string) => {
+        if (selectedStatementIds.length < 1 || !selectedAggregateId) return;
+        for (const stmtId of selectedStatementIds) {
+            try {
+                const entry = statementItems.find(i => i.id === stmtId);
+                await reconcileAggregate.mutateAsync({
+                    statementEntryId: stmtId,
+                    insuranceCompanyId: selectedAggregateId,
+                    targetBankId,
+                });
+                // Audit log for aggregate FIFO
+                try {
+                    await supabase.from('reconciliation_audit_log').insert({
+                        user_id: (await supabase.auth.getUser()).data.user?.id,
+                        action_type: 'fifo',
+                        statement_entry_id: stmtId,
+                        bank_account_id: targetBankId,
+                        amount: entry?.amount ? Math.abs(entry.amount) : 0,
+                        operator_name: operatorName.trim() || 'Sistema',
+                        details: { insurance_company_id: selectedAggregateId, method: 'aggregate_fifo' },
+                    });
+                } catch { /* best-effort */ }
+            } catch { /* skip if already reconciled */ }
+        }
+        setShowAggregateModal(false);
+        setSelectedStatementIds([]);
+        setSelectedAggregateId(null);
+    };
+
+    const handleAggregateConfirm = async () => {
+        if (selectedStatementIds.length < 1 || !selectedAggregateId) return;
+
+        // Determine target bank
+        const targetBankId = getTargetBankId();
+        if (!targetBankId) {
+            // No bank assigned — ask user
+            setShowAggregateModal(false);
+            setSelectedBankForMatch('');
+            setBankModalContext('aggregate');
+            setShowBankModal(true);
+            return;
+        }
+
+        await executeAggregateWithBank(targetBankId);
+    };
+
+    const toggleAggregate = useCallback((id: string) => {
+        setSelectedAggregateId(prev => prev === id ? null : id);
+        // Clear individual system selection when picking aggregate
+        setSelectedSystemIds([]);
+    }, []);
+
+    const hasAggregateSelection = !!selectedAggregateId;
+    const canAggregateMatch = selectedStatementIds.length >= 1 && hasAggregateSelection;
+
+    // Balance bar totals (when nothing selected, show totals)
+    const bankTotal = useMemo(() => statementItems.reduce((s, i) => s + i.amount, 0), [statementItems]);
+    const systemTotal = useMemo(() => systemItems.reduce((s, i) => {
+        const val = i.remaining_amount != null ? Math.abs(i.remaining_amount) : Math.abs(i.amount);
+        const signed = (i.type === 'expense' || i.type === 'despesa') ? -val : val;
+        return s + signed;
+    }, 0), [systemItems]);
+    const displayBankSum = hasLeftSelection ? bankSum : bankTotal;
+    const displaySystemSum = isConsolidated
+        ? (hasAggregateSelection
+            ? insuranceAggregates.find(a => a.insurance_company_id === selectedAggregateId)?.total_amount_pending ?? 0
+            : aggregateTotal)
+        : (hasRightSelection ? systemSum : systemTotal);
+    const displayDiff = hasLeftSelection || hasRightSelection || hasAggregateSelection
+        ? (hasLeftSelection ? bankSum : bankTotal) - displaySystemSum
+        : bankTotal - systemTotal;
+
+    return (
+        <div className="space-y-4">
+            {/* Consolidated Mode Info Banner */}
+            {isConsolidated && (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-muted/50 border border-border">
+                    <Landmark className="w-5 h-5 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground">
+                            Visão Consolidada
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            Exibindo itens sem banco vinculado. Ao conciliar, o sistema perguntará o banco de destino.
+                        </p>
+                    </div>
+                </div>
+            )}
+            {/* Balance Bar */}
+            <div className="grid grid-cols-3 gap-4 p-4 rounded-xl bg-muted/50 border border-border">
+                <div className="text-left">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Extrato (Banco)</span>
+                    <p className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(displayBankSum)}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {hasLeftSelection
+                            ? `${selectedStatementIds.length} selecionados`
+                            : `${statementItems.length} pendentes`
+                        }
+                    </p>
+                </div>
+                <div className="text-center">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Δ Diferença</span>
+                    <p className={cn(
+                        'text-xl font-bold font-mono mt-0.5',
+                        Math.abs(displayDiff) < 0.01 ? 'text-emerald-400' : 'text-red-400'
+                    )}>
+                        {formatCurrency(displayDiff)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        {Math.abs(displayDiff) < 0.01 ? 'Equilibrado ✓' : 'Divergente'}
+                    </p>
+                </div>
+                <div className="text-right">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        {isConsolidated ? 'Seguradoras (Agregado)' : 'Sistema (ERP)'}
+                    </span>
+                    <p className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(displaySystemSum)}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {isConsolidated
+                            ? (hasAggregateSelection ? '1 seguradora selecionada' : `${insuranceAggregates.length} seguradoras`)
+                            : (hasRightSelection
+                                ? `${selectedSystemIds.length} selecionados`
+                                : `${systemItems.length} pendentes`)
+                        }
+                    </p>
+                </div>
+            </div>
+
+            {/* Split View */}
+            <div className="rounded-xl border border-border overflow-hidden bg-card" style={{ height: 'calc(100vh - 520px)', minHeight: 400 }}>
+                <ResizablePanelGroup direction="horizontal">
+                    {/* Left Panel - Bank Statement */}
+                    <ResizablePanel defaultSize={50} minSize={30}>
+                        <div className="flex flex-col h-full">
+                            <div className="p-3 border-b border-border bg-muted/30 flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs font-semibold">Extrato</Badge>
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Filtrar..."
+                                        className="h-7 pl-7 text-xs"
+                                        value={bankSearch}
+                                        onChange={(e) => setBankSearch(e.target.value)}
+                                    />
+                                </div>
+                                <span className="text-xs text-muted-foreground shrink-0">{filteredStatement.length}</span>
+                            </div>
+                            <div className="flex-1 overflow-auto p-2 space-y-1.5">
+                                {isLoading ? (
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                                    ))
+                                ) : filteredStatement.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                                        <p>Nenhuma entrada pendente</p>
+                                    </div>
+                                ) : (
+                                    filteredStatement.map(item => (
+                                        <EntryCard
+                                            key={item.id}
+                                            item={item}
+                                            selected={selectedStatementIds.includes(item.id)}
+                                            suggested={suggestedStatementIds.has(item.id)}
+                                            onClick={() => toggleStatement(item.id)}
+                                            isUnassigned={!item.bank_account_id}
+                                        />
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </ResizablePanel>
+
+                    <ResizableHandle withHandle />
+
+                    {/* Right Panel - System Transactions or Insurance Aggregates */}
+                    <ResizablePanel defaultSize={50} minSize={30}>
+                        <div className="flex flex-col h-full">
+                            <div className="p-3 border-b border-border bg-muted/30 flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs font-semibold">
+                                    {isConsolidated ? 'Seguradoras' : 'Sistema'}
+                                </Badge>
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Filtrar..."
+                                        className="h-7 pl-7 text-xs"
+                                        value={systemSearch}
+                                        onChange={(e) => setSystemSearch(e.target.value)}
+                                    />
+                                </div>
+                                {!isConsolidated && (
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <Switch
+                                            id="show-unassigned"
+                                            checked={showUnassigned}
+                                            onCheckedChange={setShowUnassigned}
+                                            className="scale-75"
+                                        />
+                                        <Label htmlFor="show-unassigned" className="text-[10px] text-muted-foreground cursor-pointer whitespace-nowrap">
+                                            Sem Banco
+                                        </Label>
+                                    </div>
+                                )}
+                                <span className="text-xs text-muted-foreground shrink-0">
+                                    {isConsolidated ? filteredAggregates.length : filteredSystem.length}
+                                </span>
+                            </div>
+                            <div className="flex-1 overflow-auto p-2 space-y-1.5">
+                                {isConsolidated ? (
+                                    // Consolidated mode: Show Insurance Aggregate Cards
+                                    isLoadingAggregates ? (
+                                        Array.from({ length: 4 }).map((_, i) => (
+                                            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                                        ))
+                                    ) : filteredAggregates.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                                            <Building2 className="w-8 h-8 mb-2 opacity-40" />
+                                            <p>Nenhuma seguradora com pendências</p>
+                                        </div>
+                                    ) : (
+                                        filteredAggregates.map(item => (
+                                            <InsuranceAggregateCard
+                                                key={item.insurance_company_id}
+                                                item={item}
+                                                selected={selectedAggregateId === item.insurance_company_id}
+                                                onClick={() => toggleAggregate(item.insurance_company_id)}
+                                            />
+                                        ))
+                                    )
+                                ) : (
+                                    // Filtered mode: Show individual system transactions
+                                    isLoading ? (
+                                        Array.from({ length: 5 }).map((_, i) => (
+                                            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                                        ))
+                                    ) : filteredSystem.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                                            <p>Nenhuma transação pendente</p>
+                                        </div>
+                                    ) : (
+                                        filteredSystem.map(item => (
+                                            <SystemEntryCard
+                                                key={item.id}
+                                                item={item}
+                                                selected={selectedSystemIds.includes(item.id)}
+                                                suggested={suggestedSystemIds.has(item.id)}
+                                                onClick={() => toggleSystem(item.id)}
+                                                isUnassigned={!item.bank_account_id}
+                                            />
+                                        ))
+                                    )
+                                )}
+                            </div>
+                        </div>
+                    </ResizablePanel>
+                </ResizablePanelGroup>
+            </div>
+
+            {/* Floating Action Bar */}
+            <AnimatePresence>
+                {(hasLeftSelection || hasRightSelection || hasAggregateSelection) && (
+                    <motion.div
+                        initial={{ y: 80, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 80, opacity: 0 }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+                    >
+                        <div className="flex items-center gap-4 px-6 py-3 rounded-2xl border border-primary/30 bg-card/95 backdrop-blur-xl shadow-2xl shadow-primary/10">
+                            {/* Selection info */}
+                            <div className="flex items-center gap-3 text-sm">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                                        {selectedStatementIds.length}
+                                    </div>
+                                    <span className="text-muted-foreground">banco</span>
+                                </div>
+                                <span className="text-muted-foreground">×</span>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                                        {hasAggregateSelection ? 1 : selectedSystemIds.length}
+                                    </div>
+                                    <span className="text-muted-foreground">
+                                        {hasAggregateSelection ? 'seguradora' : 'sistema'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="h-6 w-px bg-border" />
+
+                            {/* Diff indicator */}
+                            {hasBothSides && (
+                                <div className={cn(
+                                    'text-sm font-mono font-bold',
+                                    isPerfectMatch ? 'text-emerald-400' : 'text-red-400'
+                                )}>
+                                    Δ {formatCurrency(diff)}
+                                </div>
+                            )}
+
+                            <div className="h-6 w-px bg-border" />
+
+                            {/* Actions */}
+                            {isPerfectMatch && (
+                                <Button
+                                    size="sm"
+                                    className="gap-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    onClick={handleReconcile}
+                                    disabled={reconcilePartial.isPending}
+                                >
+                                    {reconcilePartial.isPending ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <CheckCircle2 className="w-4 h-4" />
+                                    )}
+                                    Conciliar
+                                </Button>
+                            )}
+
+                            {hasBothSides && !isPerfectMatch && !hasManualSystemItems && (
+                                <Button
+                                    size="sm"
+                                    className="gap-2 font-semibold bg-amber-600 hover:bg-amber-700 text-white"
+                                    onClick={() => setShowPartialModal(true)}
+                                >
+                                    <AlertTriangle className="w-4 h-4" />
+                                    Baixa Parcial
+                                </Button>
+                            )}
+
+                            {hasBothSides && !isPerfectMatch && hasManualSystemItems && (
+                                <Button
+                                    size="sm"
+                                    disabled
+                                    title="Lançamentos manuais exigem valor exato. Baixa parcial não permitida."
+                                    className="gap-2 font-semibold opacity-50 cursor-not-allowed bg-amber-600 text-white"
+                                >
+                                    <AlertTriangle className="w-4 h-4" />
+                                    Valores Divergentes
+                                </Button>
+                            )}
+
+                            {/* Aggregate FIFO match button */}
+                            {canAggregateMatch && (
+                                <Button
+                                    size="sm"
+                                    className="gap-2 font-semibold bg-amber-600 hover:bg-amber-700 text-white"
+                                    onClick={handleAggregateMatch}
+                                    disabled={reconcileAggregate.isPending}
+                                >
+                                    {reconcileAggregate.isPending ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <AlertTriangle className="w-4 h-4" />
+                                    )}
+                                    Conciliar FIFO
+                                </Button>
+                            )}
+
+                            {isMissingTransaction && !hasAggregateSelection && (
+                                <Button
+                                    size="sm"
+                                    variant="outline-subtle"
+                                    className="gap-2"
+                                    onClick={() => setShowCreateModal(true)}
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Criar Despesa/Receita
+                                </Button>
+                            )}
+
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-foreground"
+                                onClick={clearSelection}
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Create Transaction Modal */}
+            <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Plus className="w-5 h-5 text-primary" />
+                            Criar Lançamento do Extrato
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Crie uma transação no sistema a partir da(s) entrada(s) selecionada(s) do extrato.
+                        </p>
+
+                        {/* Preview selected entries */}
+                        {(() => {
+                            const selectedEntries = statementItems.filter(i => selectedStatementIds.includes(i.id));
+                            const totalSum = selectedEntries.reduce((s, i) => s + i.amount, 0);
+                            return (
+                                <>
+                                    <div className="flex justify-between items-center p-2 bg-primary/10 rounded border border-primary/20">
+                                        <span className="text-sm font-medium">{selectedEntries.length} entrada{selectedEntries.length > 1 ? 's' : ''} selecionada{selectedEntries.length > 1 ? 's' : ''}</span>
+                                        <span className={cn('text-sm font-bold', totalSum >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                                            Total: {formatCurrency(totalSum)}
+                                        </span>
+                                    </div>
+                                    <div className="space-y-2 max-h-40 overflow-auto">
+                                        {selectedEntries.map(item => (
+                                            <div key={item.id} className="flex justify-between p-2 bg-muted/50 rounded text-sm border border-border/50">
+                                                <div className="min-w-0">
+                                                    <p className="font-medium truncate">{item.description}</p>
+                                                    <p className="text-xs text-muted-foreground">{item.transaction_date}</p>
+                                                </div>
+                                                <p className={cn('font-semibold shrink-0 ml-2', item.amount >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                                                    {formatCurrency(item.amount)}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            );
+                        })()}
+
+                        {/* Category selector - filtered by sign */}
+                        {(() => {
+                            const selectedEntries = statementItems.filter(i => selectedStatementIds.includes(i.id));
+                            const hasPositive = selectedEntries.some(e => e.amount >= 0);
+                            const hasNegative = selectedEntries.some(e => e.amount < 0);
+                            const hasMixedSigns = hasPositive && hasNegative;
+
+                            if (hasMixedSigns) {
+                                return (
+                                    <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+                                        <AlertTriangle className="w-4 h-4 inline mr-1.5" />
+                                        Seleção contém entradas positivas e negativas. Separe em lotes do mesmo sinal para criar lançamentos.
+                                    </div>
+                                );
+                            }
+
+                            // Filter accounts by sign: positive → revenue, negative → expense
+                            const allowedTypes = hasPositive ? ['revenue'] : ['expense'];
+                            const filteredAccounts = (accounts || []).filter((acc: any) => allowedTypes.includes(acc.type));
+
+                            return (
+                                <div>
+                                    <label className="text-sm font-medium text-foreground mb-1.5 block">
+                                        Categoria ({hasPositive ? 'Receita' : 'Despesa'})
+                                    </label>
+                                    <Select value={createCategoryId} onValueChange={setCreateCategoryId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Selecione a categoria..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {filteredAccounts.map((acc: any) => (
+                                                <SelectItem key={acc.id} value={acc.id}>
+                                                    {acc.code ? `${acc.code} - ` : ''}{acc.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Bank selector */}
+                        <div>
+                            <label className="text-sm font-medium text-foreground mb-1.5 block">
+                                Banco de Destino
+                            </label>
+                            <Select value={createBankId} onValueChange={setCreateBankId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o banco..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {bankAccounts.map((account) => (
+                                        <SelectItem key={account.id} value={account.id}>
+                                            {account.bankName}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Operator name */}
+                        <div>
+                            <label className="text-sm font-medium text-foreground mb-1.5 block">
+                                Nome do Responsável *
+                            </label>
+                            <Input
+                                placeholder="Quem está processando..."
+                                value={operatorName}
+                                onChange={(e) => setOperatorName(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowCreateModal(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleCreateTransaction}
+                            disabled={!createCategoryId || !operatorName.trim() || createFromStatement.isPending || !!bulkProgress || (() => { const sel = statementItems.filter(i => selectedStatementIds.includes(i.id)); return sel.some(e => e.amount >= 0) && sel.some(e => e.amount < 0); })()}
+                            className="gap-2"
+                        >
+                            {bulkProgress ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Criando {bulkProgress.current} de {bulkProgress.total}...
+                                </>
+                            ) : (
+                                <>
+                                    <Plus className="w-4 h-4" />
+                                    Criar e Conciliar
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Partial Reconciliation Modal */}
+            <PartialReconciliationModal
+                isOpen={showPartialModal}
+                onClose={() => setShowPartialModal(false)}
+                onConfirm={handlePartialReconcile}
+                isLoading={reconcilePartial.isPending}
+                statementItem={{
+                    description: (statementItems.find(i => i.id === selectedStatementIds[0]))?.description || '',
+                    amount: (statementItems.find(i => i.id === selectedStatementIds[0]))?.amount || 0,
+                    date: (statementItems.find(i => i.id === selectedStatementIds[0]))?.transaction_date || '',
+                }}
+                systemItem={{
+                    description: (systemItems.find(i => i.id === selectedSystemIds[0]))?.description?.replace(/undefined/g, '').trim() || 'Comissão',
+                    totalAmount: Math.abs((systemItems.find(i => i.id === selectedSystemIds[0]))?.total_amount ?? 0),
+                    paidAmount: Math.abs((systemItems.find(i => i.id === selectedSystemIds[0]))?.paid_amount ?? 0),
+                    remainingAmount: Math.abs((systemItems.find(i => i.id === selectedSystemIds[0]))?.remaining_amount ?? 0),
+                    customerName: (systemItems.find(i => i.id === selectedSystemIds[0]))?.customer_name || undefined,
+                    branchName: (systemItems.find(i => i.id === selectedSystemIds[0]))?.branch_name || undefined,
+                    insurerName: (systemItems.find(i => i.id === selectedSystemIds[0]))?.insurer_name || undefined,
+                    itemName: (systemItems.find(i => i.id === selectedSystemIds[0]))?.item_name || undefined,
+                }}
+            />
+
+            {/* On-Demand Bank Selection Modal */}
+            <Dialog open={showBankModal} onOpenChange={setShowBankModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Landmark className="w-5 h-5 text-primary" />
+                            Para qual banco deseja vincular esta conciliação?
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Ambos os itens não possuem banco vinculado. Selecione o banco de destino:
+                        </p>
+                        <Select value={selectedBankForMatch} onValueChange={setSelectedBankForMatch}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione o banco..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {bankAccounts.map((account) => (
+                                    <SelectItem key={account.id} value={account.id}>
+                                        {account.bankName}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <div>
+                            <label className="text-sm font-medium text-foreground mb-1.5 block">
+                                Nome do Responsável *
+                            </label>
+                            <Input
+                                placeholder="Quem está processando..."
+                                value={operatorName}
+                                onChange={(e) => setOperatorName(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setShowBankModal(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            disabled={!selectedBankForMatch || !operatorName.trim() || reconcilePartial.isPending}
+                            onClick={handleBankModalConfirm}
+                        >
+                            {reconcilePartial.isPending ? 'Conciliando...' : 'Vincular e Conciliar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Aggregate FIFO Confirmation Modal */}
+            <Dialog open={showAggregateModal} onOpenChange={setShowAggregateModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Zap className="w-5 h-5 text-primary" />
+                            Conciliar Lote da Seguradora
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        {(() => {
+                            const selectedStmts = statementItems.filter(i => selectedStatementIds.includes(i.id));
+                            const totalStmtAmount = selectedStmts.reduce((s, i) => s + Math.abs(i.amount), 0);
+                            const selectedAgg = insuranceAggregates.find(a => a.insurance_company_id === selectedAggregateId);
+                            return (
+                                <>
+                                    <p className="text-sm text-muted-foreground">
+                                        O valor total de{' '}
+                                        <span className="font-bold text-foreground">
+                                            {formatCurrency(totalStmtAmount)}
+                                        </span>{' '}
+                                        ({selectedStmts.length} extrato{selectedStmts.length > 1 ? 's' : ''}) será usado para dar baixa nas comissões mais antigas pendentes da empresa{' '}
+                                        <span className="font-bold text-foreground">
+                                            {selectedAgg?.company_name ?? ''}
+                                        </span>
+                                        , automaticamente (Método FIFO).
+                                    </p>
+
+                                    {/* Preview */}
+                                    <div className="space-y-2">
+                                        <div className="p-3 bg-muted/50 rounded-lg border border-border/50 max-h-40 overflow-auto space-y-1.5">
+                                            <p className="text-xs text-muted-foreground mb-1">Extrato ({selectedStmts.length} depósito{selectedStmts.length > 1 ? 's' : ''})</p>
+                                            {selectedStmts.map(stmt => (
+                                                <div key={stmt.id} className="flex justify-between">
+                                                    <p className="text-sm font-medium truncate">{stmt.description}</p>
+                                                    <p className="text-sm font-bold text-emerald-400 shrink-0 ml-2">
+                                                        {formatCurrency(Math.abs(stmt.amount))}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="p-3 bg-muted/50 rounded-lg border border-border/50">
+                                            <p className="text-xs text-muted-foreground mb-1">Seguradora (Pendente)</p>
+                                            <div className="flex justify-between">
+                                                <p className="text-sm font-medium">{selectedAgg?.company_name}</p>
+                                                <p className="text-sm font-bold text-foreground shrink-0 ml-2">
+                                                    {formatCurrency(selectedAgg?.total_amount_pending ?? 0)}
+                                                </p>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                {selectedAgg?.transaction_count} comissões pendentes
+                                            </p>
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setShowAggregateModal(false)}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleAggregateConfirm}
+                            disabled={reconcileAggregate.isPending}
+                            className="gap-2"
+                        >
+                            {reconcileAggregate.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Zap className="w-4 h-4" />
+                            )}
+                            Confirmar FIFO
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+        </div>
+    );
+}

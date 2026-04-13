@@ -2,11 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Trash2, Bot, User, Loader2, FlaskConical, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useAISandbox } from '@/hooks/useAISandbox';
 import { FormattingAlert } from './FormattingAlert';
 import { IntegrationFlowViz } from './IntegrationFlowViz';
+import { AI_PERSONA_PRESETS } from './aiPresets';
 
 interface Stage {
   id: string;
@@ -37,6 +41,23 @@ interface AISandboxProps {
     ai_objective?: string | null;
     is_active?: boolean | null;
   } | null;
+  nextStageName?: string;
+  companyName?: string;
+  globalBaseInstructions?: string;
+  globalAgentName?: string;
+}
+
+function getSuggestions(stageName: string): string[] {
+  const name = stageName.toLowerCase();
+  if (name.includes('lead') || name.includes('novo'))
+    return ['Oi, tudo bem?', 'Quero uma cotação', 'Quanto custa?'];
+  if (name.includes('contato') || name.includes('qualific'))
+    return ['Qual plano vocês têm?', 'Tem cobertura para dentista?', 'E o prazo de carência?'];
+  if (name.includes('proposta') || name.includes('negocia'))
+    return ['Posso parcelar?', 'Qual o desconto?', 'E para PJ?'];
+  if (name.includes('sinistro') || name.includes('suporte') || name.includes('pós'))
+    return ['Preciso de ajuda com reembolso', 'Tive um acidente', 'Como faço para usar?'];
+  return ['Oi, tudo bem?', 'Quero saber mais', 'Pode me ajudar?'];
 }
 
 export function AISandbox({
@@ -44,34 +65,45 @@ export function AISandbox({
   selectedPipeline,
   aiSetting,
   pipelineDefault,
+  nextStageName,
+  companyName,
+  globalBaseInstructions,
+  globalAgentName,
 }: AISandboxProps) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // Build config for sandbox
+  const activePersona = aiSetting?.ai_persona ?? pipelineDefault?.ai_persona ?? undefined;
+  // Resolve ID curto → xmlPrompt completo (retrocompat: tenta match por id, depois por xmlPrompt)
+  const resolvedPreset = activePersona
+    ? AI_PERSONA_PRESETS.find(p => p.id === activePersona) ?? AI_PERSONA_PRESETS.find(p => p.xmlPrompt === activePersona)
+    : undefined;
+  
   const sandboxConfig = selectedStage && selectedPipeline ? {
     stageId: selectedStage.id,
     pipelineId: selectedPipeline.id,
     pipelineName: selectedPipeline.name,
     stageName: selectedStage.name,
-    aiName: aiSetting?.ai_name ?? pipelineDefault?.ai_name ?? undefined,
-    aiPersona: aiSetting?.ai_persona ?? pipelineDefault?.ai_persona ?? undefined,
+    nextStageName,
+    aiName: aiSetting?.ai_name ?? pipelineDefault?.ai_name ?? globalAgentName ?? undefined,
+    aiPersona: resolvedPreset?.xmlPrompt ?? activePersona,
     aiObjective: aiSetting?.ai_objective ?? pipelineDefault?.ai_objective ?? undefined,
-    dealTitle: selectedPipeline.name, // Use pipeline name as context
+    dealTitle: selectedPipeline.name,
+    companyName,
+    globalBaseInstructions,
+    allowEmojis: resolvedPreset?.allowEmojis ?? false,
   } : null;
   
   const { messages, isLoading, lastViolations, sendMessage, clearChat } = useAISandbox(sandboxConfig);
   
   const isAiActive = aiSetting?.is_active ?? pipelineDefault?.is_active ?? false;
   
-  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
   
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
-    
     const message = input.trim();
     setInput('');
     await sendMessage(message);
@@ -85,15 +117,21 @@ export function AISandbox({
   };
 
   return (
-    <div className="flex flex-col h-full bg-card/30 rounded-xl border border-border overflow-hidden">
+    <Card className="flex flex-col h-full border-border/50 bg-card/80 backdrop-blur-sm">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border/50">
+      <CardHeader className="flex-shrink-0 flex-row items-center justify-between space-y-0 p-4 border-b border-border/50">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/20">
             <FlaskConical className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-foreground">Laboratório do Robô</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-foreground">Laboratório do Robô</h2>
+              <Badge variant="outline" className="text-[10px] h-4 px-1.5 gap-1 text-muted-foreground">
+                <Sparkles className="w-2.5 h-2.5" />
+                Gemini Flash
+              </Badge>
+            </div>
             <p className="text-[10px] text-muted-foreground">
               Teste o comportamento da IA
             </p>
@@ -101,21 +139,16 @@ export function AISandbox({
         </div>
         
         {messages.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearChat}
-            className="text-xs"
-          >
+          <Button variant="ghost" size="sm" onClick={clearChat} className="text-xs">
             <Trash2 className="h-3.5 w-3.5 mr-1" />
             Limpar
           </Button>
         )}
-      </div>
+      </CardHeader>
       
       {/* Integration Flow Viz */}
       {selectedStage && (
-        <div className="px-4 py-3 border-b border-border/50 bg-secondary/20">
+        <div className="flex-shrink-0 px-4 py-3 border-b border-border/50 bg-secondary/20">
           <IntegrationFlowViz
             chatwootLabel={selectedStage.chatwoot_label}
             aiName={aiSetting?.ai_name ?? pipelineDefault?.ai_name ?? 'Agente IA'}
@@ -124,113 +157,120 @@ export function AISandbox({
           />
         </div>
       )}
-      
+
       {/* Formatting Alert */}
       {lastViolations.length > 0 && (
-        <div className="px-4 pt-3">
+        <div className="flex-shrink-0 px-4 pt-3">
           <FormattingAlert violations={lastViolations} />
         </div>
       )}
       
       {/* Messages area */}
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-4">
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-secondary/50 flex items-center justify-center mb-4">
-                <Sparkles className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-sm font-medium text-foreground mb-1">
-                Sandbox Pronto
-              </h3>
-              <p className="text-xs text-muted-foreground max-w-[200px] mb-4">
-                {selectedStage 
-                  ? `Teste como a IA vai responder na etapa "${selectedStage.name}"`
-                  : 'Selecione uma etapa para testar o comportamento da IA'
-                }
-              </p>
-              
-              {selectedStage && (
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {['Oi, tudo bem?', 'Quero um orçamento', 'Quanto custa?'].map((suggestion) => (
-                    <Button
-                      key={suggestion}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => sendMessage(suggestion)}
-                      disabled={isLoading}
-                    >
-                      {suggestion}
-                    </Button>
-                  ))}
+      <CardContent className="flex-1 min-h-0 p-0">
+        <ScrollArea className="h-full">
+          <div className="p-4 space-y-4">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-secondary/50 flex items-center justify-center mb-4">
+                  <Sparkles className="h-8 w-8 text-muted-foreground" />
                 </div>
-              )}
-            </div>
-          ) : (
-            messages.map((message, index) => (
-              <div
-                key={index}
-                className={cn(
-                  'flex gap-3',
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                )}
-              >
-                {message.role === 'assistant' && (
-                  <div className={cn(
-                    'flex items-center justify-center w-7 h-7 rounded-lg shrink-0',
-                    message.violations?.length ? 'bg-destructive/20' : 'bg-primary/20'
-                  )}>
-                    <Bot className={cn(
-                      'h-4 w-4',
-                      message.violations?.length ? 'text-destructive' : 'text-primary'
-                    )} />
+                <h3 className="text-sm font-medium text-foreground mb-1">
+                  Sandbox Pronto
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-[200px] mb-4">
+                  {selectedStage 
+                    ? `Teste como a IA vai responder na etapa "${selectedStage.name}"`
+                    : 'Selecione uma etapa para testar o comportamento da IA'
+                  }
+                </p>
+                
+                {selectedStage && (
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {getSuggestions(selectedStage.name).map((suggestion) => (
+                      <Button
+                        key={suggestion}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => sendMessage(suggestion)}
+                        disabled={isLoading}
+                      >
+                        {suggestion}
+                      </Button>
+                    ))}
                   </div>
                 )}
-                
+              </div>
+            ) : (
+              messages.map((message, index) => (
                 <div
+                  key={index}
                   className={cn(
-                    'max-w-[80%] rounded-xl px-3 py-2',
-                    message.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : message.violations?.length
-                      ? 'bg-destructive/10 border border-destructive/30 text-foreground'
-                      : 'bg-secondary text-foreground'
+                    'flex gap-3',
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
                   )}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                </div>
-                
-                {message.role === 'user' && (
-                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-secondary shrink-0">
-                    <User className="h-4 w-4 text-muted-foreground" />
+                  {message.role === 'assistant' && (
+                    <Avatar className="h-7 w-7 shrink-0">
+                      <AvatarFallback className={cn(
+                        'text-xs',
+                        message.violations?.length
+                          ? 'bg-destructive/20 text-destructive'
+                          : 'bg-primary/10 text-primary'
+                      )}>
+                        <Bot className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+                  
+                  <div
+                    className={cn(
+                      'max-w-[80%] rounded-xl px-3 py-2',
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : message.violations?.length
+                        ? 'bg-destructive/10 border border-destructive/30 text-foreground'
+                        : 'bg-secondary text-foreground'
+                    )}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                   </div>
-                )}
-              </div>
-            ))
-          )}
-          
-          {isLoading && (
-            <div className="flex gap-3">
-              <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/20 shrink-0">
-                <Bot className="h-4 w-4 text-primary" />
-              </div>
-              <div className="bg-secondary rounded-xl px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Digitando...</span>
+                  
+                  {message.role === 'user' && (
+                    <Avatar className="h-7 w-7 shrink-0">
+                      <AvatarFallback className="bg-secondary text-muted-foreground text-xs">
+                        <User className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+                </div>
+              ))
+            )}
+            
+            {isLoading && (
+              <div className="flex gap-3">
+                <Avatar className="h-7 w-7 shrink-0">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                    <Bot className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="bg-secondary rounded-xl px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Digitando...</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
+            )}
+            
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+      </CardContent>
       
       {/* Input area */}
-      <div className="p-4 border-t border-border/50">
-        <div className="flex gap-2">
+      <CardFooter className="flex-shrink-0 flex-col p-4 border-t border-border/50">
+        <div className="flex gap-2 w-full">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -247,10 +287,10 @@ export function AISandbox({
             <Send className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-2 text-center">
-          Ctrl+Enter para enviar • Esc para limpar
+        <p className="text-[10px] text-muted-foreground mt-2 text-center w-full">
+          Enter para enviar
         </p>
-      </div>
-    </div>
+      </CardFooter>
+    </Card>
   );
 }

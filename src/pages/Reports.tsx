@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { DateRange } from 'react-day-picker';
 import { getCurrentMonthRange } from '@/utils/dateUtils';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+} from '@/components/ui/carousel';
 import { VisaoGeralCarteira } from '@/components/reports/VisaoGeralCarteira';
 import { RelatorioFaturamento } from '@/components/reports/RelatorioFaturamento';
 import { FiltrosAvancados } from '@/components/reports/FiltrosAvancados';
@@ -11,7 +18,9 @@ import { PlaceholderGraficos } from '@/components/reports/PlaceholderGraficos';
 import { EnhancedGrowthChart } from '@/components/reports/enhanced/EnhancedGrowthChart';
 import { EnhancedProducerPerformanceChart } from '@/components/reports/enhanced/EnhancedProducerPerformanceChart';
 import { EnhancedExpirationCalendarChart } from '@/components/reports/enhanced/EnhancedExpirationCalendarChart';
-import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
+import { AdimplenciaDonut } from '@/components/reports/AdimplenciaDonut';
+import { DreCompactoBar } from '@/components/reports/DreCompactoBar';
+import { AlertaAtrasoFinanceiro } from '@/components/reports/AlertaAtrasoFinanceiro';
 import { useFilteredDataForReports } from '@/hooks/useFilteredDataForReports';
 import { useClientesPreviewWithStats } from '@/hooks/useClientesPreviewWithStats';
 import { useApolicesPreview } from '@/hooks/useApolicesPreview';
@@ -29,6 +38,7 @@ interface FiltrosGlobais {
   ramos: string[];
   produtorIds: string[];
   statusIds: string[];
+  onlyConciled?: boolean;
 }
 
 export default function Reports() {
@@ -38,6 +48,7 @@ export default function Reports() {
     ramos: [],
     produtorIds: [],
     statusIds: [],
+    onlyConciled: false,
   });
 
   const previewFilters = {
@@ -51,8 +62,8 @@ export default function Reports() {
     (filtrosGlobais.ramos && filtrosGlobais.ramos.length > 0)
   );
 
-  const { 
-    apolicesFiltradas, 
+  const {
+    apolicesFiltradas,
     clientesFiltrados,
     transacoesFiltradas,
     seguradoras,
@@ -90,11 +101,14 @@ export default function Reports() {
     <div className="p-6 space-y-6">
       <div className="mb-2 flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Relatórios</h1>
-          <p className="text-slate-400">Central de inteligência para análise completa da carteira e tomada de decisões estratégicas</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Relatórios</h1>
+          <p className="text-muted-foreground">Central de inteligência para análise completa da carteira e tomada de decisões estratégicas</p>
         </div>
         <ExportManagementModal
           initialDateRange={filtrosGlobais.intervalo}
+          filtrosGlobais={filtrosGlobais}
+          seguradoras={seguradoras}
+          ramosDisponiveis={ramosDisponiveis}
           disabled={isLoading}
         />
       </div>
@@ -120,12 +134,12 @@ export default function Reports() {
         ) : (
           <>
             <VisaoGeralCarteira clientes={clientesFiltrados} apolices={apolicesFiltradas} />
-            
+
             {/* Resumo Financeiro Geral (Faturamento) */}
             <div className="space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-white mb-1">Resumo Financeiro Geral</h2>
-                <p className="text-sm text-slate-400">Análise de fluxo de caixa real da corretora (transações efetivadas)</p>
+                <h2 className="text-lg font-semibold text-foreground mb-1">Resumo Financeiro Geral</h2>
+                <p className="text-sm text-muted-foreground">Análise de fluxo de caixa real da corretora (transações efetivadas)</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <KpiCard
@@ -153,16 +167,16 @@ export default function Reports() {
                   trendValue={saldoLiquido > 0 ? 'Positivo' : saldoLiquido < 0 ? 'Negativo' : 'Neutro'}
                 />
               </div>
-              
+
               {/* Gráficos de Distribuição */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <BranchDistributionChart 
+                <BranchDistributionChart
                   data={branchDistributionDataFromTransactions}
                   dateRange={filtrosGlobais.intervalo}
                   insight="Distribuição de comissões realizadas por ramo no período selecionado."
                 />
-                
-                <CompanyDistributionChart 
+
+                <CompanyDistributionChart
                   data={companyDistributionDataFromTransactions}
                   dateRange={filtrosGlobais.intervalo}
                   insight="Distribuição de comissões realizadas por seguradora no período selecionado."
@@ -171,36 +185,36 @@ export default function Reports() {
             </div>
 
             <RelatorioFaturamento apolices={apolicesFiltradas} clientes={clientesFiltrados} transactions={transacoesFiltradas} intervalo={filtrosGlobais.intervalo} />
-            <div className="flex flex-col gap-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold text-white">Análises Avançadas e Detalhadas</h3>
-                  <p className="text-sm text-slate-400">Arraste para navegar • Gráficos interativos com métricas expandidas</p>
-                </div>
-                <Carousel className="w-full" opts={{ align: 'start', loop: true }}>
-                  <div className="flex items-center justify-end gap-2 mb-4">
-                    <CarouselPrevious />
-                    <CarouselNext />
-                  </div>
-                  <CarouselContent>
-                    <CarouselItem>
-                      <div className="h-full">
-                        <EnhancedGrowthChart data={dadosEvolucaoCarteira.data} dateRange={filtrosGlobais.intervalo} insight={dadosEvolucaoCarteira.insight} />
-                      </div>
-                    </CarouselItem>
-                    <CarouselItem>
-                      <div className="h-full">
-                        <EnhancedProducerPerformanceChart data={dadosPerformanceProdutor.data} insight={dadosPerformanceProdutor.insight} />
-                      </div>
-                    </CarouselItem>
-                    <CarouselItem>
-                      <div className="h-full">
-                        <EnhancedExpirationCalendarChart data={dadosVencimentosCriticos.data} insight={dadosVencimentosCriticos.insight} />
-                      </div>
-                    </CarouselItem>
-                  </CarouselContent>
-                </Carousel>
+
+            {/* Insights Financeiros */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <AdimplenciaDonut apolices={apolicesFiltradas} transacoes={transacoesFiltradas} />
+              <DreCompactoBar apolices={apolicesFiltradas} transacoes={transacoesFiltradas} totalGanhos={totalGanhos} totalPerdas={totalPerdas} />
+              <AlertaAtrasoFinanceiro apolices={apolicesFiltradas} transacoes={transacoesFiltradas} />
+            </div>
+
+            {/* Análises Avançadas - Carousel Restored */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-foreground">Análises Avançadas e Detalhadas</h3>
               </div>
+              <Carousel className="w-full" opts={{ align: "start" }}>
+                <CarouselContent className="-ml-4">
+                  <CarouselItem className="pl-4 md:basis-1/2 lg:basis-[80%] xl:basis-[60%]">
+                    <EnhancedGrowthChart data={dadosEvolucaoCarteira.data} dateRange={filtrosGlobais.intervalo} insight={dadosEvolucaoCarteira.insight} />
+                  </CarouselItem>
+                  <CarouselItem className="pl-4 md:basis-1/2 lg:basis-[80%] xl:basis-[60%]">
+                    <EnhancedProducerPerformanceChart data={dadosPerformanceProdutor.data} insight={dadosPerformanceProdutor.insight} />
+                  </CarouselItem>
+                  <CarouselItem className="pl-4 md:basis-1/2 lg:basis-[80%] xl:basis-[60%]">
+                    <EnhancedExpirationCalendarChart data={dadosVencimentosCriticos.data} insight={dadosVencimentosCriticos.insight} />
+                  </CarouselItem>
+                </CarouselContent>
+                <div className="flex justify-end gap-2 mt-4 relative pr-12">
+                  <CarouselPrevious className="relative left-0 top-0 translate-y-0 translate-x-0" />
+                  <CarouselNext className="relative right-0 top-0 translate-y-0 translate-x-0" />
+                </div>
+              </Carousel>
             </div>
             <PlaceholderGraficos />
           </>

@@ -4,14 +4,14 @@ export interface Client {
   phone?: string; // Optional - but need at least email OR phone
   email?: string; // Optional - but need at least email OR phone
   createdAt: string;
-  
+
   // --- NOVOS CAMPOS ESSENCIAIS ---
   cpfCnpj?: string; // Documento é fundamental
   birthDate?: string;
   maritalStatus?: 'Solteiro(a)' | 'Casado(a)' | 'Divorciado(a)' | 'Viúvo(a)' | '';
   profession?: string;
   status?: 'Ativo' | 'Inativo';
-  
+
   // --- ENDEREÇO COMPLETO ---
   cep?: string;
   address?: string;
@@ -20,6 +20,9 @@ export interface Client {
   neighborhood?: string;
   city?: string;
   state?: string;
+
+  // --- CONTROLE DE IA ---
+  ai_enabled?: boolean;
 
   // --- CAMPO ABERTO ---
   observations?: string;
@@ -92,6 +95,8 @@ export interface Task {
   policyId?: string;   // Link para uma apólice
   taskType: 'Follow-up' | 'Pós-venda' | 'Documentação' | 'Renovação' | 'Sinistro' | 'Administrativa';
   createdAt: string;
+  google_task_id?: string;
+  google_synced_at?: string;
 }
 
 export interface TransactionType {
@@ -109,23 +114,23 @@ export interface Transaction {
   amount: number;
   status: 'PREVISTO' | 'REALIZADO' | 'PENDENTE' | 'PAGO' | 'PARCIALMENTE_PAGO' | 'ATRASADO' | 'CANCELADO';
   date: string;
-  
+
   // 🆕 CAMPOS DO MÓDULO FINANCEIRO
   nature: 'RECEITA' | 'DESPESA'; // Natureza da transação (alinhado com transaction_types no DB)
   transactionDate: string; // Data da transação financeira
   dueDate: string; // Data de vencimento
-  
+
   // 🆕 NOVOS CAMPOS DNA DA CORRETAGEM
   brokerageId?: number; // ID da corretora
   producerId?: string; // ID do produtor
   ramoId?: string; // ID do ramo de seguro
-  
+
   // 🆕 CAMPOS PARA PRÊMIO VS COMISSÃO (calculados via JOIN com apolices)
   premiumValue?: number; // Valor do prêmio da apólice (ou amount se for bônus manual)
   commissionValue?: number; // Valor da comissão (sempre amount)
   commissionRate?: number; // Taxa de comissão da apólice (ou 100% se for bônus)
   transactionType?: 'policy_commission' | 'manual_bonus'; // Tipo discriminado
-  
+
   // Associações opcionais
   clientId?: string;
   policyId?: string;
@@ -152,11 +157,14 @@ export interface Appointment {
   time: string;
   status: 'Pendente' | 'Realizado';
   createdAt: string;
+  google_event_id?: string;
+  google_synced_at?: string;
 }
 
 export interface Company {
   id: string;
   name: string;
+  service_phone?: string | null;
   createdAt: string;
 }
 

@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { format, isValid, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  Calendar, 
-  FileText, 
-  User, 
-  FileCheck, 
+import {
+  Calendar,
+  FileText,
+  User,
+  FileCheck,
   ArrowUpDown,
   ExternalLink,
   Loader2,
@@ -73,7 +73,7 @@ import { parseDateOnly } from '@/lib/utils';
 // Helper seguro para formatar datas - evita "Invalid time value"
 function safeFormatDate(dateValue: string | null | undefined, formatStr: string, fallback: string = '---'): string {
   if (!dateValue) return fallback;
-  
+
   try {
     // Usa parseDateOnly para evitar o bug do dia anterior
     const parsed = parseDateOnly(dateValue);
@@ -101,28 +101,46 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
   const reverseTransaction = useReverseTransaction();
   const settleCommission = useSettleCommission();
   const { data: assetAccounts = [] } = useFinancialAccounts('asset');
-  
+
   const [showReverseDialog, setShowReverseDialog] = useState(false);
   const [reverseReason, setReverseReason] = useState('');
   const [showSettlementDialog, setShowSettlementDialog] = useState(false);
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>('');
 
-  // Debug: Ver dados recebidos
-  console.log('🔍 DADOS RECEBIDOS NA GAVETA:', transaction);
-
-  // Calcular valor total (soma dos valores positivos) - com fallback para array vazio
+  // Calcular valor total - Prioriza total_amount da transação (agora confiável)
   const entries = transaction?.ledgerEntries ?? [];
-  const totalAmount = entries
-    .filter(e => e.amount > 0)
-    .reduce((sum, e) => sum + e.amount, 0);
+  const headerAmount = transaction?.amount || entries.reduce((acc, entry) => {
+    if (entry.accountType === 'revenue' || entry.accountType === 'expense') {
+      return acc + Math.abs(entry.amount);
+    }
+    return acc;
+  }, 0);
+
+  // Determinar se é despesa ou receita
+  const isExpenseTransaction = entries.some(e => e.accountType === 'expense') ||
+    entries.some(e => e.accountType === 'asset' && e.amount < 0);
+
+  // Encontrar conta bancária (asset) e conta de categoria (revenue/expense)
+  const bankEntry = entries.find(e => e.accountType === 'asset');
+  const categoryEntry = entries.find(e => e.accountType === 'revenue' || e.accountType === 'expense');
+
+  // Mapear origem amigável
+  const originLabel = (() => {
+    const t = transaction?.relatedEntityType;
+    if (t === 'bank_statement') return 'Extrato Bancário (Conciliação)';
+    if (t === 'policy') return 'Comissão de Apólice';
+    if (t === 'legacy_transaction') return 'Migração';
+    if (t === 'reversal') return 'Estorno';
+    return 'Lançamento Manual';
+  })();
 
   // Verificar se é transação sincronizada (não pode ser editada manualmente)
-  const isSynchronized = transaction?.relatedEntityType === 'legacy_transaction' || 
-                         transaction?.relatedEntityType === 'policy';
-  
+  const isSynchronized = transaction?.relatedEntityType === 'legacy_transaction' ||
+    transaction?.relatedEntityType === 'policy';
+
   // Verificar se já foi anulada
   const isVoid = transaction?.isVoid ?? false;
-  
+
   // Verificar se é um estorno
   const isReversal = transaction?.relatedEntityType === 'reversal';
 
@@ -132,10 +150,10 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
   // ✅ CORREÇÃO: Verificar se é uma provisão pendente de baixa
   // Agora considera TANTO legacy_transaction QUANTO policy com status 'pending'
   const transactionStatus = (transaction as any)?.status || transaction?.legacyData?.originalStatus;
-  const isPendingSettlement = !isVoid && !isReversal && 
+  const isPendingSettlement = !isVoid && !isReversal &&
     (transaction?.relatedEntityType === 'legacy_transaction' || transaction?.relatedEntityType === 'policy') &&
     (transactionStatus === 'pending' || transaction?.legacyData?.originalStatus === 'PENDENTE');
-  
+
   // Verificar se é origem de apólice (para exibição correta)
   const isFromPolicy = transaction?.relatedEntityType === 'policy';
 
@@ -217,9 +235,9 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                   <Skeleton className="h-5 w-20" />
                 </div>
               </div>
-              
+
               <Skeleton className="h-px w-full" />
-              
+
               {/* Skeleton dos metadados */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -231,9 +249,9 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                   <Skeleton className="h-5 w-28" />
                 </div>
               </div>
-              
+
               <Skeleton className="h-px w-full" />
-              
+
               {/* Skeleton dos links */}
               <div className="space-y-3">
                 <Skeleton className="h-4 w-24" />
@@ -242,9 +260,9 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                   <Skeleton className="h-9 w-32" />
                 </div>
               </div>
-              
+
               <Skeleton className="h-px w-full" />
-              
+
               {/* Skeleton dos movimentos */}
               <div className="space-y-3">
                 <Skeleton className="h-4 w-36" />
@@ -265,14 +283,21 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
             <ScrollArea className="h-[calc(100vh-120px)]">
               <div className="space-y-6 pr-4">
                 {/* Valor em Destaque */}
-                <div className="text-center p-6 rounded-lg bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20">
-                  <p className={`text-3xl font-bold ${isVoid ? 'text-muted-foreground line-through' : 'text-emerald-500'}`}>
-                    {formatCurrency(totalAmount)}
+                <div className={`text-center p-6 rounded-lg bg-gradient-to-br border ${
+                  isExpenseTransaction
+                    ? 'from-red-500/10 to-red-600/5 border-red-500/20'
+                    : 'from-emerald-500/10 to-emerald-600/5 border-emerald-500/20'
+                }`}>
+                  <p className={`text-3xl font-bold ${
+                    isVoid ? 'text-muted-foreground line-through'
+                    : isExpenseTransaction ? 'text-red-500' : 'text-emerald-500'
+                  }`}>
+                    {isExpenseTransaction ? '-' : ''}{formatCurrency(headerAmount)}
                   </p>
                   <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                     {transaction.description}
                   </p>
-                  
+
                   {/* Badges de Status */}
                   <div className="flex flex-wrap justify-center gap-2 mt-3">
                     {isVoid && (
@@ -376,24 +401,24 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                           <Button asChild variant="outline" size="sm" className="gap-2">
                             <Link to={`/dashboard/policies/${transaction.legacyData.policyId}`}>
                               <FileCheck className="w-4 h-4" />
-                              {transaction.legacyData.policyNumber 
+                              {transaction.legacyData.policyNumber
                                 ? `Apólice #${transaction.legacyData.policyNumber.slice(0, 10)}`
                                 : 'Ver Apólice'}
                             </Link>
                           </Button>
                         )}
-                        
+
                         {/* Link direto via relatedEntityType (quando não há legacyData) */}
-                        {!transaction.legacyData?.policyId && 
-                         transaction.relatedEntityType === 'policy' && 
-                         transaction.relatedEntityId && (
-                          <Button asChild variant="outline" size="sm" className="gap-2">
-                            <Link to={`/dashboard/policies/${transaction.relatedEntityId}`}>
-                              <FileWarning className="w-4 h-4" />
-                              Ver Apólice Relacionada
-                            </Link>
-                          </Button>
-                        )}
+                        {!transaction.legacyData?.policyId &&
+                          transaction.relatedEntityType === 'policy' &&
+                          transaction.relatedEntityId && (
+                            <Button asChild variant="outline" size="sm" className="gap-2">
+                              <Link to={`/dashboard/policies/${transaction.relatedEntityId}`}>
+                                <FileWarning className="w-4 h-4" />
+                                Ver Apólice Relacionada
+                              </Link>
+                            </Button>
+                          )}
                       </div>
 
                       {/* Dados Adicionais do Legado */}
@@ -422,28 +447,39 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                 <div className="space-y-3">
                   <h4 className="text-sm font-medium flex items-center gap-2">
                     <ArrowUpDown className="w-4 h-4" />
-                    Movimentos Contábeis
+                    Movimento
                   </h4>
-                  <div className="space-y-2">
-                    {transaction.ledgerEntries.map((entry) => (
-                      <div 
-                        key={entry.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-muted/30"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Badge 
-                            variant={entry.amount > 0 ? "default" : "secondary"}
-                            className="text-xs font-mono"
-                          >
-                            {entry.amount > 0 ? 'D' : 'C'}
-                          </Badge>
-                          <span className="text-sm">{entry.accountName}</span>
-                        </div>
-                        <span className={`font-medium ${entry.amount > 0 ? 'text-emerald-500' : 'text-muted-foreground'}`}>
-                          {entry.amount > 0 ? '+' : ''}{formatCurrency(entry.amount)}
+
+                  {/* Visão simplificada de caixa */}
+                  <div className={`p-4 rounded-lg border ${
+                    isExpenseTransaction
+                      ? 'bg-red-500/5 border-red-500/20'
+                      : 'bg-emerald-500/5 border-emerald-500/20'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={isExpenseTransaction ? "destructive" : "default"} className="text-xs">
+                          {isExpenseTransaction ? 'Saída' : 'Entrada'}
+                        </Badge>
+                        <span className="text-sm font-medium">
+                          {bankEntry?.accountName || 'Conta Bancária'}
                         </span>
                       </div>
-                    ))}
+                      <span className={`font-bold ${isExpenseTransaction ? 'text-red-500' : 'text-emerald-500'}`}>
+                        {isExpenseTransaction ? '-' : '+'}{formatCurrency(headerAmount)}
+                      </span>
+                    </div>
+                    {categoryEntry && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Categoria: {categoryEntry.accountName}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Origem da transação */}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+                    <Info className="w-3 h-3" />
+                    Origem: {originLabel}
                   </div>
                 </div>
 
@@ -458,11 +494,11 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                       </h4>
                       <div className="flex flex-wrap gap-2">
                         {transaction.attachments.map((url, idx) => (
-                          <Button 
-                            key={idx} 
-                            asChild 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            key={idx}
+                            asChild
+                            variant="outline"
+                            size="sm"
                             className="gap-2"
                           >
                             <a href={url} target="_blank" rel="noopener noreferrer">
@@ -511,9 +547,9 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
                       <Info className="w-4 h-4 flex-shrink-0" />
                       <span>
-                        {isVoid 
-                          ? 'Esta transação já foi anulada.' 
-                          : isReversal 
+                        {isVoid
+                          ? 'Esta transação já foi anulada.'
+                          : isReversal
                             ? 'Estornos não podem ser estornados novamente.'
                             : 'Esta transação não pode ser estornada.'}
                       </span>
@@ -525,7 +561,7 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                 <Separator />
                 <div className="space-y-2 text-xs text-muted-foreground">
                   <p><strong>Criado em:</strong> {safeFormatDate(transaction.createdAt, 'dd/MM/yyyy HH:mm')}</p>
-                  <p><strong>Origem:</strong> {transaction.relatedEntityType || 'manual'}</p>
+                  <p><strong>Origem:</strong> {originLabel}</p>
                   <p className="font-mono break-all"><strong>ID:</strong> {transaction.id}</p>
                   {transaction.isVoid && transaction.voidReason && (
                     <p className="text-destructive"><strong>Motivo anulação:</strong> {transaction.voidReason}</p>
@@ -547,7 +583,7 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4">
               <p>
-                Sistemas contábeis não permitem exclusão de lançamentos. 
+                Sistemas contábeis não permitem exclusão de lançamentos.
                 O estorno criará uma nova transação com valores inversos, zerando o saldo.
               </p>
               <div className="space-y-2">
@@ -596,7 +632,7 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
             <AlertDialogDescription asChild>
               <div className="space-y-4">
                 <p>
-                  Confirme que o valor de <strong className="text-foreground">{formatCurrency(totalAmount)}</strong> foi recebido.
+                  Confirme que o valor de <strong className="text-foreground">{formatCurrency(headerAmount)}</strong> foi recebido.
                   Selecione a conta bancária onde o dinheiro entrou.
                 </p>
                 <div className="space-y-2">

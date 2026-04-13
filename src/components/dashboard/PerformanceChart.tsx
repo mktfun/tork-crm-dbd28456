@@ -24,22 +24,16 @@ export function PerformanceChart() {
   const { policies, loading: policiesLoading } = useSupabasePolicies();
 
   const formatCurrency = (value: number) => {
-    return value.toLocaleString('pt-BR', { 
-      style: 'currency', 
+    return value.toLocaleString('pt-BR', {
+      style: 'currency',
       currency: 'BRL',
-      minimumFractionDigits: 0 
+      minimumFractionDigits: 0
     });
   };
 
-  // Debug dos dados
-  console.log('🚀 [PerformanceChart] Estado:', opcoesGrafico);
-  console.log('🚀 [PerformanceChart] Transações:', transactions.length);
-  console.log('🚀 [PerformanceChart] Apólices:', policies.length);
-
   // Lógica principal com granularidade inteligente
   const dadosParaGrafico = useMemo(() => {
-    console.log('💰 [PerformanceChart] Recalculando dados...');
-    
+
     if (!opcoesGrafico.intervalo?.from || !opcoesGrafico.intervalo?.to) {
       return [];
     }
@@ -56,10 +50,9 @@ export function PerformanceChart() {
       formatoNome = 'dd/MM';
     }
 
-    console.log(`📅 [PerformanceChart] Granularidade: ${granularidade}, Dias: ${diasDiferenca}`);
-
-    // 2. FILTRAR TRANSAÇÕES POR PERÍODO (LÓGICA CORRIGIDA)
-    // O Mapa de apólices sobe, pois é necessário para o filtro de transações
+    // 2. FILTRAR TRANSAÇÕES POR PERÍODO — usa sempre a data da transação (t.date)
+    // CORREÇÃO: anteriormente usava apolice.startDate, que causava quase todas as transações
+    // serem excluídas do mês atual (apólice criada em meses anteriores).
     const dataInicio = startOfDay(
       typeof opcoesGrafico.intervalo.from === 'string'
         ? parse(opcoesGrafico.intervalo.from, 'yyyy-MM-dd', new Date())
@@ -71,73 +64,37 @@ export function PerformanceChart() {
         : opcoesGrafico.intervalo.to!
     );
 
-    const apolicesMap = new Map(policies.map(p => [p.id, p]));
-
     const transacoesFiltradas = transactions.filter(t => {
-      if (!t.date || t.nature !== 'RECEITA') return false; // Ignora se não for receita ou não tiver data
-
-      // Se for comissão manual (sem apólice), filtrar pela data da transação
-      if (!t.policyId) {
-        const dataTransacao = startOfDay(new Date(t.date));
-        return dataTransacao >= dataInicio && dataTransacao <= dataFim;
-      }
-      
-      // Se for comissão de apólice, FILTRAR PELA DATA DE VIGÊNCIA (start_date)
-      const apolice = apolicesMap.get(t.policyId);
-      if (!apolice || !apolice.startDate) return false; // Apólice ou data inválida
-
-      const dataVigencia = startOfDay(new Date(apolice.startDate));
-      // A comissão só entra se a VIGÊNCIA da apólice estiver no período
-      return dataVigencia >= dataInicio && dataVigencia <= dataFim;
+      if (!t.date || t.nature !== 'RECEITA') return false;
+      const dataTransacao = startOfDay(new Date(t.date));
+      return dataTransacao >= dataInicio && dataTransacao <= dataFim;
     });
 
-    // 3. FILTRAR APÓLICES POR PERÍODO - ✅ USANDO start_date (DATA DE VIGÊNCIA)
+    // 3. FILTRAR APÓLICES POR PERÍODO — usa start_date OU created_at como referência
     const apolicesFiltradas = policies.filter(p => {
-      if (!p.startDate) return false; // Proteção contra dado nulo
-      const dataApolice = startOfDay(new Date(p.startDate));
-      return dataApolice >= dataInicio && 
-             dataApolice <= dataFim &&
-             p.status !== 'Orçamento'; // Só apólices efetivas
+      const refDate = p.startDate ? new Date(p.startDate) : null;
+      if (!refDate) return false;
+      const dataApolice = startOfDay(refDate);
+      return dataApolice >= dataInicio &&
+        dataApolice <= dataFim &&
+        p.status !== 'Orçamento';
     });
-
-    console.log(`📊 [PerformanceChart] Transações filtradas: ${transacoesFiltradas.length}`);
-    console.log(`📊 [PerformanceChart] Apólices filtradas: ${apolicesFiltradas.length}`);
 
     // 4. PROCESSAR DADOS POR GRANULARIDADE
     const dadosAgrupados = new Map<string, { nome: string; comissao: number; novasApolices: number }>();
 
-    // O apolicesMap já foi criado acima, no passo 2. Não precisa criar de novo.
-
-    // Processar comissões - ✅ USANDO start_date DA APÓLICE (DATA DE VIGÊNCIA)
+    // Processar comissões — SEMPRE usa a data da transação para agrupamento
     transacoesFiltradas.forEach(t => {
-      if (t.nature !== 'RECEITA') return; // Só receitas contam como comissão
-      
-      // Se a transação tem policyId, usar a start_date da apólice
-      if (t.policyId) {
-        const apolice = apolicesMap.get(t.policyId);
-        if (!apolice || !apolice.startDate) return; // Pular se não encontrar apólice ou não tiver start_date
-        
-        const dataVigencia = new Date(apolice.startDate);
-        const chave = format(dataVigencia, formatoChave);
-        const nomeAmigavel = format(dataVigencia, formatoNome);
-        
-        if (!dadosAgrupados.has(chave)) {
-          dadosAgrupados.set(chave, { nome: nomeAmigavel, comissao: 0, novasApolices: 0 });
-        }
-        
-        dadosAgrupados.get(chave)!.comissao += Number(t.amount);
+      if (t.nature !== 'RECEITA') return;
+
+      const chave = format(new Date(t.date), formatoChave);
+      const nomeAmigavel = format(new Date(t.date), formatoNome);
+
+      if (!dadosAgrupados.has(chave)) {
+        dadosAgrupados.set(chave, { nome: nomeAmigavel, comissao: 0, novasApolices: 0 });
       }
-      // Se não tem policyId, usar a data da transação (fallback para comissões avulsas)
-      else {
-        const chave = format(new Date(t.date), formatoChave);
-        const nomeAmigavel = format(new Date(t.date), formatoNome);
-        
-        if (!dadosAgrupados.has(chave)) {
-          dadosAgrupados.set(chave, { nome: nomeAmigavel, comissao: 0, novasApolices: 0 });
-        }
-        
-        dadosAgrupados.get(chave)!.comissao += Number(t.amount);
-      }
+
+      dadosAgrupados.get(chave)!.comissao += Number(t.amount);
     });
 
     // Processar novas apólices - ✅ USANDO start_date (DATA DE VIGÊNCIA)
@@ -145,11 +102,11 @@ export function PerformanceChart() {
       if (!p.startDate) return; // Proteção contra dado nulo
       const chave = format(new Date(p.startDate), formatoChave);
       const nomeAmigavel = format(new Date(p.startDate), formatoNome);
-      
+
       if (!dadosAgrupados.has(chave)) {
         dadosAgrupados.set(chave, { nome: nomeAmigavel, comissao: 0, novasApolices: 0 });
       }
-      
+
       dadosAgrupados.get(chave)!.novasApolices += 1;
     });
 
@@ -158,7 +115,6 @@ export function PerformanceChart() {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([_, dados]) => dados);
 
-    console.log('📈 [PerformanceChart] Dados finais:', resultado);
     return resultado;
 
   }, [transactions, policies, opcoesGrafico.intervalo]);
@@ -166,16 +122,16 @@ export function PerformanceChart() {
   // Calcular insight dinâmico
   const insightPerformance = () => {
     if (dadosParaGrafico.length === 0) return 'Carregando análise de performance...';
-    
+
     const ultimosPeriodos = dadosParaGrafico.slice(-2);
     if (ultimosPeriodos.length < 2) return 'Dados insuficientes para análise comparativa.';
-    
+
     const [penultimo, ultimo] = ultimosPeriodos;
-    const crescimentoComissao = penultimo.comissao > 0 
-      ? ((ultimo.comissao - penultimo.comissao) / penultimo.comissao) * 100 
+    const crescimentoComissao = penultimo.comissao > 0
+      ? ((ultimo.comissao - penultimo.comissao) / penultimo.comissao) * 100
       : 0;
     const crescimentoApolices = ultimo.novasApolices - penultimo.novasApolices;
-    
+
     if (crescimentoComissao > 0 && crescimentoApolices > 0) {
       return `Excelente! Crescimento de ${crescimentoComissao.toFixed(1)}% na comissão e +${crescimentoApolices} apólices no último período.`;
     } else if (crescimentoComissao > 0) {
@@ -191,13 +147,13 @@ export function PerformanceChart() {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-gray-900/95 backdrop-blur-sm p-3 border border-gray-700 rounded-lg shadow-lg">
-          <p className="font-semibold text-white mb-2">{label}</p>
+        <div className="bg-popover/95 backdrop-blur-sm p-3 border border-border rounded-lg shadow-lg">
+          <p className="font-semibold text-foreground mb-2">{label}</p>
           {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm text-gray-200">
+            <p key={index} className="text-sm text-muted-foreground">
               <span className="font-medium" style={{ color: entry.color }}>
                 {entry.dataKey === 'comissao' ? 'Comissão' : 'Novas Apólices'}:
-              </span> {entry.dataKey === 'comissao' 
+              </span> {entry.dataKey === 'comissao'
                 ? formatCurrency(entry.value)
                 : `${entry.value} apólices`
               }
@@ -215,8 +171,8 @@ export function PerformanceChart() {
     return (
       <AppCard className="p-6">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-700 rounded mb-4 w-3/4"></div>
-          <div className="h-80 bg-gray-700 rounded"></div>
+          <div className="h-6 bg-muted rounded mb-4 w-3/4"></div>
+          <div className="h-80 bg-muted rounded"></div>
         </div>
       </AppCard>
     );
@@ -224,13 +180,13 @@ export function PerformanceChart() {
 
   return (
     <AppCard className="p-6">
-      <h3 className="text-lg font-semibold text-white mb-4">
+      <h3 className="text-lg font-semibold text-foreground mb-4">
         Performance Financeira vs. Crescimento de Clientes
       </h3>
-      
+
       {/* BARRA DE CONTROLES MODERNIZADA */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-2 rounded-lg border border-slate-800 bg-slate-900">
-        
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-2 rounded-lg border border-border bg-card">
+
         {/* FILTRO DE PERÍODO */}
         <DatePickerWithRange
           date={opcoesGrafico.intervalo}
@@ -244,7 +200,7 @@ export function PerformanceChart() {
             variant="outline"
             value={opcoesGrafico.series}
             onValueChange={(series) => series.length > 0 && setOpcoesGrafico(prev => ({ ...prev, series }))}
-            className="[&>button]:rounded-md [&>button]:border-slate-700"
+            className="[&>button]:rounded-md [&>button]:border-border"
           >
             <ToggleGroupItem value="comissao" className="text-blue-400">Comissão</ToggleGroupItem>
             <ToggleGroupItem value="novasApolices" className="text-green-400">Apólices</ToggleGroupItem>
@@ -256,7 +212,7 @@ export function PerformanceChart() {
             variant="outline"
             value={opcoesGrafico.tipoGrafico}
             onValueChange={(tipo) => tipo && setOpcoesGrafico(prev => ({ ...prev, tipoGrafico: tipo as 'bar' | 'line' | 'composed' }))}
-            className="[&>button]:rounded-md [&>button]:border-slate-700"
+            className="[&>button]:rounded-md [&>button]:border-border"
           >
             <ToggleGroupItem value="bar"><BarChartIcon className="h-4 w-4" /></ToggleGroupItem>
             <ToggleGroupItem value="line"><LineChartIcon className="h-4 w-4" /></ToggleGroupItem>
@@ -269,48 +225,48 @@ export function PerformanceChart() {
         {dadosParaGrafico.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <p className="text-slate-400 text-lg mb-2">📊 Nenhum dado encontrado</p>
-              <p className="text-slate-500 text-sm">Ajuste o período ou verifique se há transações/apólices no intervalo selecionado</p>
+              <p className="text-muted-foreground text-lg mb-2">📊 Nenhum dado encontrado</p>
+              <p className="text-muted-foreground text-sm">Ajuste o período ou verifique se há transações/apólices no intervalo selecionado</p>
             </div>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             {opcoesGrafico.tipoGrafico === 'composed' ? (
               <ComposedChart data={dadosParaGrafico} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis 
-                  dataKey="nome" 
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="nome"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                 />
-                <YAxis 
+                <YAxis
                   yAxisId="left"
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                   tickFormatter={(value) => formatCurrency(value)}
                 />
-                <YAxis 
-                  yAxisId="right" 
+                <YAxis
+                  yAxisId="right"
                   orientation="right"
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                 />
                 <Tooltip content={<CustomTooltip />} />
                 {opcoesGrafico.series.includes('comissao') && (
-                  <Bar 
+                  <Bar
                     yAxisId="left"
-                    dataKey="comissao" 
-                    fill="#3b82f6" 
+                    dataKey="comissao"
+                    fill="#3b82f6"
                     name="Comissão (R$)"
                     radius={[2, 2, 0, 0]}
                   />
                 )}
                 {opcoesGrafico.series.includes('novasApolices') && (
-                  <Line 
+                  <Line
                     yAxisId="right"
-                    type="monotone" 
-                    dataKey="novasApolices" 
-                    stroke="#10b981" 
+                    type="monotone"
+                    dataKey="novasApolices"
+                    stroke="#10b981"
                     name="Novas Apólices"
                     strokeWidth={3}
                     dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
@@ -320,15 +276,15 @@ export function PerformanceChart() {
               </ComposedChart>
             ) : opcoesGrafico.tipoGrafico === 'bar' ? (
               <BarChart data={dadosParaGrafico} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis 
-                  dataKey="nome" 
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="nome"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                 />
-                <YAxis 
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                <YAxis
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                   tickFormatter={(value) => `${Math.abs(value) / 1000}k`}
                 />
                 <Tooltip content={<CustomTooltip />} />
@@ -341,33 +297,33 @@ export function PerformanceChart() {
               </BarChart>
             ) : (
               <LineChart data={dadosParaGrafico} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis 
-                  dataKey="nome" 
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="nome"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                 />
-                <YAxis 
-                  tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.8)' }}
-                  stroke="rgba(255,255,255,0.3)"
+                <YAxis
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  stroke="hsl(var(--border))"
                   tickFormatter={(value) => `${Math.abs(value) / 1000}k`}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 {opcoesGrafico.series.includes('comissao') && (
-                  <Line 
-                    type="monotone" 
-                    dataKey="comissao" 
-                    stroke="#3b82f6" 
+                  <Line
+                    type="monotone"
+                    dataKey="comissao"
+                    stroke="#3b82f6"
                     name="Comissão"
                     strokeWidth={3}
                     dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
                   />
                 )}
                 {opcoesGrafico.series.includes('novasApolices') && (
-                  <Line 
-                    type="monotone" 
-                    dataKey="novasApolices" 
-                    stroke="#10b981" 
+                  <Line
+                    type="monotone"
+                    dataKey="novasApolices"
+                    stroke="#10b981"
                     name="Novas Apólices"
                     strokeWidth={3}
                     dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}

@@ -12,20 +12,20 @@ import { cn } from '@/lib/utils';
 export function RootLayout() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const isMobile = useIsMobile();
-  
+
   // 🚀 **REALTIME GLOBAL** - Ativo em toda a aplicação
   useRealtimeClients();
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-zinc-950">
+    <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Gradiente radial sutil para profundidade - estilo fintech */}
-      <div 
+      <div
         className="absolute inset-0 pointer-events-none"
-        style={{ 
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(39, 39, 42, 0.5) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(24, 24, 27, 0.3) 0%, transparent 40%)'
+        style={{
+          background: 'radial-gradient(ellipse at 50% 0%, hsl(var(--primary) / 0.15) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, hsl(var(--secondary) / 0.4) 0%, transparent 40%)'
         }}
       />
-      
+
       {/* Content Container */}
       <div className="relative z-10 flex h-full w-full">
         {/* SIDEBAR APENAS NO DESKTOP */}
@@ -33,7 +33,7 @@ export function RootLayout() {
 
         {/* RESTO DA TELA - HEADER + CONTEÚDO */}
         <div className="flex flex-1 flex-col min-w-0">
-          
+
           {/* HEADER CONTAINER */}
           <div className="flex-shrink-0 w-full">
             <Header onSearchClick={() => setIsSearchOpen(true)} />
@@ -41,12 +41,10 @@ export function RootLayout() {
 
           {/* ÁREA PRINCIPAL ONDE AS PÁGINAS VÃO APARECER */}
           <main className={cn(
-            "flex-1 overflow-y-auto p-4 md:p-6",
-            isMobile && "pb-20" // Espaço para o floating nav
+            "flex-1 overflow-hidden",
+            isMobile && "pb-20"
           )}>
-            <div className="max-w-7xl mx-auto">
-              <Outlet />
-            </div>
+            <Outlet />
           </main>
         </div>
       </div>

@@ -1,9 +1,9 @@
 import React from 'react';
-import { Rocket, Shield, Heart, Check } from 'lucide-react';
+import { Rocket, Shield, Heart, Check, Blend } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AI_PERSONA_PRESETS } from './aiPresets';
 
-export type VibeId = 'proactive' | 'technical' | 'supportive';
+export type VibeId = 'proactive' | 'technical' | 'supportive_sales' | 'supportive';
 
 interface VibeSelectorProps {
   value: VibeId | null;
@@ -19,6 +19,7 @@ const VIBE_CONFIG: Record<VibeId, {
   description: string;
   style: string;
   activeStyle: string;
+  ringColor: string;
 }> = {
   proactive: {
     id: 'proactive',
@@ -28,6 +29,7 @@ const VIBE_CONFIG: Record<VibeId, {
     description: 'Direto, ping-pong, fecha rápido',
     style: 'Sem pontuação, foco em CNPJ',
     activeStyle: 'border-emerald-500/50 bg-emerald-500/10',
+    ringColor: 'ring-emerald-500/40',
   },
   technical: {
     id: 'technical',
@@ -37,15 +39,27 @@ const VIBE_CONFIG: Record<VibeId, {
     description: 'Autoridade, diagnóstico, precisão',
     style: 'Especialista mas humano',
     activeStyle: 'border-blue-500/50 bg-blue-500/10',
+    ringColor: 'ring-blue-500/40',
   },
-  supportive: {
-    id: 'supportive',
+  supportive_sales: {
+    id: 'supportive_sales',
     name: 'O Amigo',
     shortName: 'Amigo',
     icon: <Heart className="h-5 w-5" />,
     description: 'Calmo, resolutivo, acolhedor',
     style: 'Suporte VIP, sem burocracia',
     activeStyle: 'border-amber-500/50 bg-amber-500/10',
+    ringColor: 'ring-amber-500/40',
+  },
+  supportive: {
+    id: 'supportive',
+    name: 'O Geral',
+    shortName: 'Geral',
+    icon: <Blend className="h-5 w-5" />,
+    description: 'Híbrido, descontraído e astuto',
+    style: 'Amigo + Técnico + Vendedor',
+    activeStyle: 'border-violet-500/50 bg-violet-500/10',
+    ringColor: 'ring-violet-500/40',
   },
 };
 
@@ -57,7 +71,7 @@ export function VibeSelector({ value, onChange, disabled }: VibeSelectorProps) {
   const vibes = Object.values(VIBE_CONFIG);
 
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
       {vibes.map((vibe) => {
         const isActive = value === vibe.id;
         
@@ -68,12 +82,12 @@ export function VibeSelector({ value, onChange, disabled }: VibeSelectorProps) {
             disabled={disabled}
             onClick={() => onChange(vibe.id)}
             className={cn(
-              'relative flex flex-col items-center gap-2 p-3 rounded-lg border transition-all duration-200',
-              'hover:scale-[1.02] active:scale-[0.98]',
+              'relative flex flex-col items-center gap-2.5 p-4 rounded-xl border transition-all duration-200',
+              'hover:translate-y-[-2px] active:scale-[0.98]',
               disabled && 'opacity-50 cursor-not-allowed',
               isActive
-                ? vibe.activeStyle
-                : 'border-border bg-secondary/30 hover:border-muted-foreground/30'
+                ? cn(vibe.activeStyle, 'ring-1 ring-offset-1 ring-offset-background backdrop-blur-sm shadow-md', vibe.ringColor)
+                : 'border-border bg-secondary/30 hover:border-muted-foreground/30 hover:shadow-sm'
             )}
           >
             {isActive && (
@@ -97,7 +111,7 @@ export function VibeSelector({ value, onChange, disabled }: VibeSelectorProps) {
                 {vibe.shortName}
               </p>
               <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
-                {vibe.style}
+                {vibe.description}
               </p>
             </div>
           </button>

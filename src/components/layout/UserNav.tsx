@@ -48,7 +48,7 @@ export function UserNav() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Avatar className="
-          h-8 w-8 cursor-pointer hover:ring-2 hover:ring-white/20 transition-all
+          h-8 w-8 cursor-pointer hover:ring-2 hover:ring-foreground/20 transition-all
           md:h-9 md:w-9
         ">
           <AvatarImage src={profile?.avatar_url || ''} alt="Usuário" />
@@ -57,37 +57,37 @@ export function UserNav() {
           </AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
-      <DropdownMenuContent 
-        align="end" 
-        className="w-56 bg-zinc-900/95 backdrop-blur-lg border-zinc-700 text-white"
+      <DropdownMenuContent
+        align="end"
+        className="w-56 bg-popover/95 backdrop-blur-lg border-border text-popover-foreground"
       >
-        <DropdownMenuLabel className="text-white/80">
+        <DropdownMenuLabel className="text-muted-foreground">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium text-white">
+            <p className="text-sm font-medium text-foreground">
               {user?.email || 'Usuário'}
             </p>
-            <p className="text-xs text-white/60">Corretor</p>
+            <p className="text-xs text-muted-foreground">Corretor</p>
           </div>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator className="bg-white/20" />
-        <DropdownMenuItem 
+        <DropdownMenuSeparator className="bg-border" />
+        <DropdownMenuItem
           onClick={handleProfile}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-muted focus:bg-muted cursor-pointer"
         >
           <User className="mr-2 h-4 w-4" />
           Perfil
         </DropdownMenuItem>
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={handleSettings}
-          className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+          className="hover:bg-muted focus:bg-muted cursor-pointer"
         >
           <SettingsIcon className="mr-2 h-4 w-4" />
           Configurações
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-white/20" />
-        <DropdownMenuItem 
+        <DropdownMenuSeparator className="bg-border" />
+        <DropdownMenuItem
           onClick={handleLogout}
-          className="hover:bg-white/10 focus:bg-white/10 text-red-400 hover:text-red-300 cursor-pointer"
+          className="hover:bg-muted focus:bg-muted text-red-400 hover:text-red-300 cursor-pointer"
         >
           <LogOut className="mr-2 h-4 w-4" />
           Sair

@@ -6,23 +6,61 @@ type Appointment = Tables<'appointments'>;
 type AppointmentInsert = TablesInsert<'appointments'>;
 type AppointmentUpdate = TablesUpdate<'appointments'>;
 
-export function useSupabaseAppointments() {
+// Enriched appointment with related data (client, policy, ramo)
+export type AppointmentWithRelations = Appointment & {
+  clientName?: string | null;
+  clientPhone?: string | null;
+  policyNumber?: string | null;
+  ramoName?: string | null;
+};
+
+interface DateRange {
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+}
+
+export function useSupabaseAppointments(dateRange?: DateRange) {
   const queryClient = useQueryClient();
 
   const { data: appointments = [], isLoading, error } = useQuery({
-    queryKey: ['appointments'],
+    queryKey: ['appointments', dateRange?.startDate, dateRange?.endDate],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('appointments')
-        .select('*')
-        .order('date', { ascending: true });
-      
+        .select(`
+          *,
+          client:clientes(name, phone),
+          policy:apolices(policy_number, ramo:ramos(nome)),
+          direct_ramo:ramos(nome)
+        `);
+
+      // Apply date range filter to avoid Supabase's default 1000-row limit
+      if (dateRange?.startDate && dateRange?.endDate) {
+        query = query
+          .gte('date', dateRange.startDate)
+          .lte('date', dateRange.endDate);
+      }
+
+      const { data, error } = await query
+        .order('date', { ascending: true })
+        .order('time', { ascending: true });
+
       if (error) {
         console.error('Error fetching appointments:', error);
         throw error;
       }
-      
-      return data;
+
+      // Flatten nested relations for easy consumption
+      return (data || []).map((apt: any) => ({
+        ...apt,
+        clientName: apt.client?.name || null,
+        clientPhone: apt.client?.phone || null,
+        policyNumber: apt.policy?.policy_number || null,
+        ramoName: apt.policy?.ramo?.nome || apt.direct_ramo?.nome || null,
+        // Clean up nested objects to avoid confusion
+        client: undefined,
+        policy: undefined,
+      })) as AppointmentWithRelations[];
     },
     staleTime: 1 * 60 * 1000, // 1 minuto
   });
@@ -80,9 +118,9 @@ export function useSupabaseAppointments() {
           // - É prioritário
           // - É dos próximos dias
           return appointment.isOverdue ||
-                 appointment.isToday ||
-                 appointment.isPriority ||
-                 appointment.isUpcoming;
+            appointment.isToday ||
+            appointment.isPriority ||
+            appointment.isUpcoming;
         })
         .sort((a, b) => {
           // Ordenar por prioridade: atrasados primeiro, depois hoje, depois prioritários, depois futuros
@@ -101,22 +139,33 @@ export function useSupabaseAppointments() {
   });
 
   const { data: weeklyStats, isLoading: isLoadingStats } = useQuery({
-    queryKey: ['appointments', 'weekly-stats'],
+    queryKey: ['appointments', 'period-stats', dateRange?.startDate, dateRange?.endDate],
     queryFn: async () => {
-      const now = new Date();
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - now.getDay());
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      // Use the visible period if available, otherwise fall back to current week
+      let rangeStart: string;
+      let rangeEnd: string;
+
+      if (dateRange?.startDate && dateRange?.endDate) {
+        rangeStart = dateRange.startDate;
+        rangeEnd = dateRange.endDate;
+      } else {
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        rangeStart = startOfWeek.toISOString().split('T')[0];
+        rangeEnd = endOfWeek.toISOString().split('T')[0];
+      }
 
       const { data, error } = await supabase
         .from('appointments')
         .select('status')
-        .gte('date', startOfWeek.toISOString().split('T')[0])
-        .lte('date', endOfWeek.toISOString().split('T')[0]);
-      
+        .gte('date', rangeStart)
+        .lte('date', rangeEnd);
+
       if (error) {
-        console.error('Error fetching weekly stats:', error);
+        console.error('Error fetching period stats:', error);
         throw error;
       }
 
@@ -152,7 +201,7 @@ export function useSupabaseAppointments() {
         .lte('date', nextWeek.toISOString().split('T')[0])
         .order('date', { ascending: true })
         .order('time', { ascending: true });
-      
+
       if (error) {
         console.error('Error fetching schedule gaps:', error);
         throw error;
@@ -160,15 +209,15 @@ export function useSupabaseAppointments() {
 
       const gaps = [];
       const today = new Date();
-      
+
       for (let i = 0; i < 7; i++) {
         const checkDate = new Date(today);
         checkDate.setDate(today.getDate() + i);
         const dateStr = checkDate.toISOString().split('T')[0];
-        
-        const morningAppts = data.filter(apt => 
-          apt.date === dateStr && 
-          apt.time >= '06:00:00' && 
+
+        const morningAppts = data.filter(apt =>
+          apt.date === dateStr &&
+          apt.time >= '06:00:00' &&
           apt.time <= '12:00:00'
         );
 
@@ -183,9 +232,9 @@ export function useSupabaseAppointments() {
           });
         }
 
-        const afternoonAppts = data.filter(apt => 
-          apt.date === dateStr && 
-          apt.time >= '13:00:00' && 
+        const afternoonAppts = data.filter(apt =>
+          apt.date === dateStr &&
+          apt.time >= '13:00:00' &&
           apt.time <= '18:00:00'
         );
 
@@ -296,7 +345,7 @@ export function useSupabaseAppointments() {
     isLoadingGaps,
     error,
     addAppointment: addAppointmentMutation.mutateAsync,
-    updateAppointment: (id: string, updates: AppointmentUpdate) => 
+    updateAppointment: (id: string, updates: AppointmentUpdate) =>
       updateAppointmentMutation.mutateAsync({ id, updates }),
     deleteAppointment: deleteAppointmentMutation.mutateAsync,
     isAdding: addAppointmentMutation.isPending,

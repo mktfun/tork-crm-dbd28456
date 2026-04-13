@@ -36,18 +36,18 @@ const STATUS_ICONS = {
 
 export function EnhancedRenewalStatusChart({ data, insight }: EnhancedRenewalStatusChartProps) {
   const totalRenewals = data.reduce((sum, item) => sum + item.count, 0);
-  
+
   // Calcular métricas
   const renovadas = data.find(item => item.status === 'Renovada')?.count || 0;
   const pendentes = data.find(item => item.status === 'Pendente')?.count || 0;
-  const emAndamento = data.filter(item => 
+  const emAndamento = data.filter(item =>
     ['Em Contato', 'Proposta Enviada'].includes(item.status)
   ).reduce((sum, item) => sum + item.count, 0);
   const naoRenovadas = data.find(item => item.status === 'Não Renovada')?.count || 0;
-  
+
   const taxaRenovacao = totalRenewals > 0 ? (renovadas / totalRenewals) * 100 : 0;
   const taxaConversao = (renovadas + emAndamento) > 0 ? (renovadas / (renovadas + emAndamento)) * 100 : 0;
-  
+
   // Meta fictícia de 85% de renovação
   const metaRenovacao = totalRenewals * 0.85;
 
@@ -55,18 +55,18 @@ export function EnhancedRenewalStatusChart({ data, insight }: EnhancedRenewalSta
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       const icon = STATUS_ICONS[data.status as keyof typeof STATUS_ICONS] || '📊';
-      
+
       return (
-        <div className="bg-slate-800 border border-slate-600 rounded-lg p-4 shadow-lg">
+        <div style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }} className="border rounded-lg p-4 shadow-lg">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">{icon}</span>
-            <p className="text-white font-medium">{data.status}</p>
+            <p className="text-foreground font-medium">{data.status}</p>
           </div>
           <div className="space-y-1 text-sm">
-            <p className="text-slate-300">
+            <p className="text-muted-foreground">
               <span className="font-semibold">{data.count}</span> apólices
             </p>
-            <p className="text-slate-400">
+            <p className="text-muted-foreground text-sm">
               {data.percentage.toFixed(1)}% do total
             </p>
             {data.status === 'Renovada' && (
@@ -83,7 +83,7 @@ export function EnhancedRenewalStatusChart({ data, insight }: EnhancedRenewalSta
 
   const CustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percentage, payload }: any) => {
     if (percentage < 5) return null;
-    
+
     const RADIAN = Math.PI / 180;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -91,11 +91,11 @@ export function EnhancedRenewalStatusChart({ data, insight }: EnhancedRenewalSta
     const icon = STATUS_ICONS[payload.status as keyof typeof STATUS_ICONS] || '';
 
     return (
-      <text 
-        x={x} 
-        y={y} 
-        fill="white" 
-        textAnchor={x > cx ? 'start' : 'end'} 
+      <text
+        x={x}
+        y={y}
+        fill="white"
+        textAnchor={x > cx ? 'start' : 'end'}
         dominantBaseline="central"
         fontSize="14"
         fontWeight="500"
@@ -117,12 +117,12 @@ export function EnhancedRenewalStatusChart({ data, insight }: EnhancedRenewalSta
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 bg-opacity-20">
-            <PieChartIcon className="w-5 h-5 text-white" />
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <PieChartIcon className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">Central de Comando - Renovações</h3>
-            <p className="text-sm text-slate-400">
+            <h3 className="text-lg font-semibold text-foreground">Central de Comando - Renovações</h3>
+            <p className="text-sm text-muted-foreground">
               Funil de renovações • {totalRenewals} apólices no período
             </p>
           </div>
@@ -149,7 +149,7 @@ export function EnhancedRenewalStatusChart({ data, insight }: EnhancedRenewalSta
           trend={taxaRenovacao >= 80 ? 'up' : taxaRenovacao >= 60 ? 'neutral' : 'down'}
           trendValue={taxaRenovacao >= 80 ? 'Excelente' : 'Atenção'}
         />
-        
+
         <KpiCard
           title="Taxa de Conversão"
           value={`${taxaConversao.toFixed(0)}%`}
@@ -158,7 +158,7 @@ export function EnhancedRenewalStatusChart({ data, insight }: EnhancedRenewalSta
           trend={taxaConversao >= 70 ? 'up' : 'neutral'}
           trendValue={`${emAndamento} em andamento`}
         />
-        
+
         <KpiCard
           title="Ações Urgentes"
           value={pendentes}
@@ -181,22 +181,22 @@ export function EnhancedRenewalStatusChart({ data, insight }: EnhancedRenewalSta
 
       {/* Funil de Conversão */}
       <div className="mb-6">
-        <h4 className="text-sm font-medium text-white mb-3">Funil de Conversão</h4>
+        <h4 className="text-sm font-medium text-foreground mb-3">Funil de Conversão</h4>
         <div className="space-y-2">
           {funnelData.map((stage, index) => {
             const percentage = totalRenewals > 0 ? (stage.value / totalRenewals) * 100 : 0;
             return (
               <div key={stage.stage} className="flex items-center gap-3">
-                <div className="w-24 text-xs text-slate-400">{stage.stage}</div>
+                <div className="w-24 text-xs text-muted-foreground">{stage.stage}</div>
                 <div className="flex-1">
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-300">{stage.value} apólices</span>
-                    <span className="text-slate-400">{percentage.toFixed(0)}%</span>
+                    <span className="text-muted-foreground">{stage.value} apólices</span>
+                    <span className="text-muted-foreground">{percentage.toFixed(0)}%</span>
                   </div>
-                  <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div 
+                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <div
                       className="h-full transition-all duration-300 rounded-full"
-                      style={{ 
+                      style={{
                         width: `${percentage}%`,
                         backgroundColor: stage.color
                       }}
@@ -226,25 +226,24 @@ export function EnhancedRenewalStatusChart({ data, insight }: EnhancedRenewalSta
               stroke="none"
             >
               {data.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
-                  fill={STATUS_COLORS[entry.status as keyof typeof STATUS_COLORS] || '#6b7280'} 
+                <Cell
+                  key={`cell-${index}`}
+                  fill={STATUS_COLORS[entry.status as keyof typeof STATUS_COLORS] || '#6b7280'}
                 />
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip />} />
-            <Legend 
-              verticalAlign="bottom" 
+            <Legend
+              verticalAlign="bottom"
               height={36}
               iconType="circle"
               wrapperStyle={{
                 paddingTop: '20px',
                 fontSize: '14px',
-                color: '#cbd5e1'
               }}
               formatter={(value, entry) => {
                 const icon = STATUS_ICONS[value as keyof typeof STATUS_ICONS] || '';
-                return <span style={{ color: '#cbd5e1' }}>{icon} {value}</span>;
+                return <span className="text-muted-foreground">{icon} {value}</span>;
               }}
             />
           </PieChart>

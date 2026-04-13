@@ -362,7 +362,8 @@ export function useSupabasePolicies() {
         .update({
           status: newStatus,
           pdf_attached_name: file.name,
-          pdf_attached_data: pdfBase64
+          pdf_attached_data: pdfBase64,
+          ...(newStatus === 'Ativa' ? { automatic_renewal: true } : {})
         })
         .eq('id', policyId)
         .eq('user_id', user.id);

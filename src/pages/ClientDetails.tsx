@@ -13,6 +13,9 @@ import { ClientPersonalInfo } from '@/components/clients/ClientPersonalInfo';
 import { ClientPoliciesHistory } from '@/components/clients/ClientPoliciesHistory';
 import { ClientFinancialHistory } from '@/components/clients/ClientFinancialHistory';
 import { ClientInteractionsHistory } from '@/components/clients/ClientInteractionsHistory';
+import { CommissionPaymentTimeline } from '@/components/financeiro/CommissionPaymentTimeline';
+import { DollarSign } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 export default function ClientDetails() {
   const { id } = useParams<{ id: string }>();
@@ -28,7 +31,7 @@ export default function ClientDetails() {
   const { policies, loading: policiesLoading } = usePolicies();
   const { transactions, loading: transactionsLoading } = useTransactions();
   const { transactionTypes } = useTransactionTypes();
-  
+
   const [client, setClient] = useState<Client | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedClient, setEditedClient] = useState<Client | null>(null);
@@ -46,7 +49,9 @@ export default function ClientDetails() {
 
   const handleSaveChanges = async () => {
     if (client && editedClient) {
-      updateClient({ id: client.id, ...editedClient });
+      // Filter out read-only fields before sending to Supabase
+      const { id: _id, createdAt: _ca, updatedAt: _ua, aiEnabled: _ai, userId: _uid, ...editableFields } = editedClient as any;
+      updateClient({ id: client.id, ...editableFields });
       setClient(editedClient);
       setIsEditing(false);
     }
@@ -76,7 +81,7 @@ export default function ClientDetails() {
     return (
       <div className="max-w-7xl mx-auto">
         <AppCard className="p-8 text-center">
-          <h3 className="text-lg font-medium text-white mb-2">
+          <h3 className="text-lg font-medium text-foreground mb-2">
             Carregando dados do cliente...
           </h3>
         </AppCard>
@@ -88,10 +93,10 @@ export default function ClientDetails() {
     return (
       <div className="max-w-7xl mx-auto">
         <AppCard className="p-8 text-center">
-          <h3 className="text-lg font-medium text-white mb-2">
+          <h3 className="text-lg font-medium text-foreground mb-2">
             Cliente não encontrado
           </h3>
-          <p className="text-slate-300 mb-4">
+          <p className="text-muted-foreground mb-4">
             O cliente solicitado não existe ou foi removido.
           </p>
           <Button onClick={() => navigate('/clients')}>
@@ -146,11 +151,45 @@ export default function ClientDetails() {
 
         <div className="lg:col-span-2 space-y-6">
           <ClientPoliciesHistory policies={clientPolicies} />
-          <ClientFinancialHistory 
-            transactions={clientTransactions} 
-            transactionTypes={mappedTransactionTypes} 
+          <ClientFinancialHistory
+            transactions={clientTransactions}
+            transactionTypes={mappedTransactionTypes}
           />
           <ClientInteractionsHistory />
+
+          {/* Histórico de comissões das apólices do cliente */}
+          {clientPolicies.length > 0 && (
+            <AppCard className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-foreground/10 p-2 rounded-lg">
+                  <DollarSign className="w-5 h-5 text-foreground" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">Recebimentos de Comissão</h3>
+                  <p className="text-xs text-muted-foreground">Histórico de baixas por apólice</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {clientPolicies.map((policy, index) => (
+                  <div key={policy.id}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-semibold text-foreground">
+                        Apólice {policy.policyNumber || policy.id.slice(0, 8)}
+                      </p>
+                      {policy.type && (
+                        <Badge variant="metallic" className="text-[10px]">{policy.type}</Badge>
+                      )}
+                    </div>
+                    <CommissionPaymentTimeline policyId={policy.id} compact />
+                    {index < clientPolicies.length - 1 && (
+                      <div className="border-t border-border mt-4" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </AppCard>
+          )}
         </div>
       </div>
     </div>

@@ -5,13 +5,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Upload, 
-  FileText, 
-  Image, 
-  File, 
-  X, 
-  CheckCircle, 
+import {
+  Upload,
+  FileText,
+  Image,
+  File,
+  X,
+  CheckCircle,
   Loader2,
   AlertTriangle,
   Download,
@@ -23,7 +23,7 @@ import { toast } from 'sonner';
 
 const documentTypes = [
   'Boletim de Ocorrência',
-  'Laudo Pericial', 
+  'Laudo Pericial',
   'Orçamento',
   'Nota Fiscal',
   'Foto do Sinistro',
@@ -55,7 +55,7 @@ export function SinistroDocumentUpload({ sinistroId, onSuccess }: SinistroDocume
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
-    
+
     const newFiles: DocumentFile[] = selectedFiles.map(file => ({
       file,
       type: '', // User will select this
@@ -68,7 +68,7 @@ export function SinistroDocumentUpload({ sinistroId, onSuccess }: SinistroDocume
   };
 
   const updateFileType = (fileId: string, type: string) => {
-    setFiles(prev => prev.map(f => 
+    setFiles(prev => prev.map(f =>
       f.id === fileId ? { ...f, type } : f
     ));
   };
@@ -79,7 +79,7 @@ export function SinistroDocumentUpload({ sinistroId, onSuccess }: SinistroDocume
 
   const uploadFiles = async () => {
     if (!user?.id) return;
-    
+
     const filesToUpload = files.filter(f => f.type && f.status !== 'success');
     if (filesToUpload.length === 0) {
       toast.error('Selecione o tipo de documento para todos os arquivos');
@@ -91,7 +91,7 @@ export function SinistroDocumentUpload({ sinistroId, onSuccess }: SinistroDocume
     try {
       for (const fileData of filesToUpload) {
         // Update progress
-        setFiles(prev => prev.map(f => 
+        setFiles(prev => prev.map(f =>
           f.id === fileData.id ? { ...f, progress: 10 } : f
         ));
 
@@ -110,7 +110,7 @@ export function SinistroDocumentUpload({ sinistroId, onSuccess }: SinistroDocume
         if (uploadError) throw uploadError;
 
         // Update progress
-        setFiles(prev => prev.map(f => 
+        setFiles(prev => prev.map(f =>
           f.id === fileData.id ? { ...f, progress: 70 } : f
         ));
 
@@ -137,19 +137,19 @@ export function SinistroDocumentUpload({ sinistroId, onSuccess }: SinistroDocume
         if (dbError) throw dbError;
 
         // Mark as complete
-        setFiles(prev => prev.map(f => 
-          f.id === fileData.id ? { 
-            ...f, 
-            progress: 100, 
+        setFiles(prev => prev.map(f =>
+          f.id === fileData.id ? {
+            ...f,
+            progress: 100,
             status: 'success' as const,
-            url: urlData.publicUrl 
+            url: urlData.publicUrl
           } : f
         ));
       }
 
       toast.success('Documentos enviados com sucesso!');
       onSuccess?.();
-      
+
       // Clear successful uploads after delay
       setTimeout(() => {
         setFiles(prev => prev.filter(f => f.status !== 'success'));
@@ -158,7 +158,7 @@ export function SinistroDocumentUpload({ sinistroId, onSuccess }: SinistroDocume
     } catch (error) {
       console.error('Erro ao enviar documentos:', error);
       toast.error('Erro ao enviar documentos');
-      
+
       // Mark failed uploads
       setFiles(prev => prev.map(f => ({ ...f, status: 'error' as const })));
     } finally {
@@ -180,15 +180,15 @@ export function SinistroDocumentUpload({ sinistroId, onSuccess }: SinistroDocume
   return (
     <div className="space-y-4">
       {/* Upload Area */}
-      <div 
-        className="border-2 border-dashed border-white/20 rounded-lg p-6 text-center hover:border-white/40 transition-colors cursor-pointer"
+      <div
+        className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-muted-foreground/40 transition-colors cursor-pointer"
         onClick={() => fileInputRef.current?.click()}
       >
-        <Upload className="w-8 h-8 text-white/40 mx-auto mb-2" />
-        <p className="text-white/60 text-sm">
+        <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+        <p className="text-muted-foreground text-sm">
           Clique aqui ou arraste arquivos para enviar documentos
         </p>
-        <p className="text-white/40 text-xs mt-1">
+        <p className="text-muted-foreground text-xs mt-1">
           Formatos aceitos: PDF, JPG, PNG, DOC, DOCX (máx. 10MB cada)
         </p>
         <input
@@ -204,21 +204,21 @@ export function SinistroDocumentUpload({ sinistroId, onSuccess }: SinistroDocume
       {/* Files List */}
       {files.length > 0 && (
         <div className="space-y-3">
-          <h4 className="text-white font-medium">Arquivos selecionados:</h4>
-          
+          <h4 className="text-foreground font-medium">Arquivos selecionados:</h4>
+
           {files.map((fileData) => (
-            <div key={fileData.id} className="bg-white/5 rounded-lg p-4 space-y-3">
+            <div key={fileData.id} className="bg-card rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {getFileIcon(fileData.file.name)}
                   <div>
-                    <p className="text-white font-medium text-sm">{fileData.file.name}</p>
-                    <p className="text-white/60 text-xs">
+                    <p className="text-foreground font-medium text-sm">{fileData.file.name}</p>
+                    <p className="text-muted-foreground text-xs">
                       {(fileData.file.size / 1024 / 1024).toFixed(2)} MB
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   {fileData.status === 'success' && (
                     <CheckCircle className="w-5 h-5 text-green-400" />
@@ -264,7 +264,7 @@ export function SinistroDocumentUpload({ sinistroId, onSuccess }: SinistroDocume
               {fileData.status === 'uploading' && fileData.progress > 0 && (
                 <div className="space-y-1">
                   <Progress value={fileData.progress} className="h-2" />
-                  <p className="text-xs text-white/60">
+                  <p className="text-xs text-muted-foreground">
                     Enviando... {fileData.progress}%
                   </p>
                 </div>

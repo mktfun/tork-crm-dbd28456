@@ -40,7 +40,7 @@ export function usePolicies() {
   };
 }
 
-export function useAppointments() {
+export function useAppointments(dateRange?: { startDate: string; endDate: string }) {
   const { 
     appointments, 
     upcomingAppointments,
@@ -50,7 +50,7 @@ export function useAppointments() {
     addAppointment, 
     updateAppointment, 
     deleteAppointment 
-  } = useSupabaseAppointments();
+  } = useSupabaseAppointments(dateRange);
   
   return {
     appointments,

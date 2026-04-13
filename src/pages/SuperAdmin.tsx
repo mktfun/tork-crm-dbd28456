@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { KpiCard } from '@/components/policies/KpiCard';
+import { AppCard } from '@/components/ui/app-card';
 import { ApiKeysManager } from '@/components/superadmin/ApiKeysManager';
 import { AuditLogsViewer } from '@/components/superadmin/AuditLogsViewer';
+import { AdminControlCenter } from '@/components/superadmin/AdminControlCenter';
 import { 
   LayoutDashboard, 
   Cpu, 
@@ -24,7 +26,8 @@ import {
   Eye,
   CheckCircle2,
   XCircle,
-  Clock
+  Clock,
+  SlidersHorizontal
 } from 'lucide-react';
 
 export default function SuperAdmin() {
@@ -107,6 +110,13 @@ export default function SuperAdmin() {
             Auditoria
           </TabsTrigger>
           <TabsTrigger 
+            value="control" 
+            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 gap-2"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Control Center
+          </TabsTrigger>
+          <TabsTrigger 
             value="system" 
             className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 gap-2"
           >
@@ -167,41 +177,51 @@ export default function SuperAdmin() {
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                        <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                        <AppCard className="p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:translate-y-[-2px] hover:shadow-xl cursor-pointer border-border bg-card hover:bg-secondary/70">
                           <div className="flex items-center gap-2 mb-2">
-                            <Activity className="h-4 w-4 text-blue-400" />
-                            <span className="text-sm text-zinc-400">Total</span>
+                            <div className="p-2 rounded-lg bg-foreground/10">
+                              <Activity className="h-4 w-4 text-foreground" />
+                            </div>
+                            <span className="text-sm font-medium text-muted-foreground">Total</span>
                           </div>
-                          <p className="text-2xl font-bold text-zinc-100">{auditStats.total.toLocaleString('pt-BR')}</p>
-                        </div>
-                        <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                          <p className="text-2xl md:text-3xl font-bold text-foreground">{auditStats.total.toLocaleString('pt-BR')}</p>
+                        </AppCard>
+                        <AppCard className="p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:translate-y-[-2px] hover:shadow-xl cursor-pointer border-border bg-card hover:bg-secondary/70">
                           <div className="flex items-center gap-2 mb-2">
-                            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                            <span className="text-sm text-zinc-400">Sucesso</span>
+                            <div className="p-2 rounded-lg bg-foreground/10">
+                              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                            </div>
+                            <span className="text-sm font-medium text-muted-foreground">Sucesso</span>
                           </div>
-                          <p className="text-2xl font-bold text-emerald-400">{auditStats.successful.toLocaleString('pt-BR')}</p>
-                        </div>
-                        <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                          <p className="text-2xl md:text-3xl font-bold text-foreground">{auditStats.successful.toLocaleString('pt-BR')}</p>
+                        </AppCard>
+                        <AppCard className="p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:translate-y-[-2px] hover:shadow-xl cursor-pointer border-border bg-card hover:bg-secondary/70">
                           <div className="flex items-center gap-2 mb-2">
-                            <XCircle className="h-4 w-4 text-red-400" />
-                            <span className="text-sm text-zinc-400">Falhas</span>
+                            <div className="p-2 rounded-lg bg-foreground/10">
+                              <XCircle className="h-4 w-4 text-red-400" />
+                            </div>
+                            <span className="text-sm font-medium text-muted-foreground">Falhas</span>
                           </div>
-                          <p className="text-2xl font-bold text-red-400">{auditStats.failed.toLocaleString('pt-BR')}</p>
-                        </div>
-                        <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                          <p className="text-2xl md:text-3xl font-bold text-foreground">{auditStats.failed.toLocaleString('pt-BR')}</p>
+                        </AppCard>
+                        <AppCard className="p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:translate-y-[-2px] hover:shadow-xl cursor-pointer border-border bg-card hover:bg-secondary/70">
                           <div className="flex items-center gap-2 mb-2">
-                            <Clock className="h-4 w-4 text-amber-400" />
-                            <span className="text-sm text-zinc-400">Últimas 24h</span>
+                            <div className="p-2 rounded-lg bg-foreground/10">
+                              <Clock className="h-4 w-4 text-amber-400" />
+                            </div>
+                            <span className="text-sm font-medium text-muted-foreground">Últimas 24h</span>
                           </div>
-                          <p className="text-2xl font-bold text-amber-400">{auditStats.recent24h.toLocaleString('pt-BR')}</p>
-                        </div>
-                        <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                          <p className="text-2xl md:text-3xl font-bold text-foreground">{auditStats.recent24h.toLocaleString('pt-BR')}</p>
+                        </AppCard>
+                        <AppCard className="p-4 shadow-lg flex flex-col justify-between transition-all duration-200 hover:translate-y-[-2px] hover:shadow-xl cursor-pointer border-border bg-card hover:bg-secondary/70">
                           <div className="flex items-center gap-2 mb-2">
-                            <Activity className="h-4 w-4 text-purple-400" />
-                            <span className="text-sm text-zinc-400">Taxa de Sucesso</span>
+                            <div className="p-2 rounded-lg bg-foreground/10">
+                              <Activity className="h-4 w-4 text-purple-400" />
+                            </div>
+                            <span className="text-sm font-medium text-muted-foreground">Taxa de Sucesso</span>
                           </div>
-                          <p className="text-2xl font-bold text-purple-400">{auditStats.successRate.toFixed(1)}%</p>
-                        </div>
+                          <p className="text-2xl md:text-3xl font-bold text-foreground">{auditStats.successRate.toFixed(1)}%</p>
+                        </AppCard>
                       </div>
                     </CardContent>
                   </Card>
@@ -287,33 +307,38 @@ export default function SuperAdmin() {
           <AuditLogsViewer />
         </TabsContent>
 
+        {/* Control Center Tab */}
+        <TabsContent value="control" className="mt-6">
+          <AdminControlCenter />
+        </TabsContent>
+
         {/* System Tab */}
         <TabsContent value="system" className="mt-6">
-          <Card className="bg-zinc-900/50 border-zinc-800">
-            <CardHeader>
-              <CardTitle className="text-zinc-100">Configurações do Sistema</CardTitle>
-              <CardDescription>Controles globais e informações técnicas</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
-                <h3 className="text-sm font-medium text-zinc-100 mb-2">Status do Sistema</h3>
+          <div className="glass-component p-0 shadow-lg border-border bg-card">
+            <div className="flex flex-col space-y-1.5 p-6 pb-4">
+              <h3 className="text-lg font-semibold text-foreground">Configurações do Sistema</h3>
+              <p className="text-sm text-muted-foreground">Controles globais e informações técnicas</p>
+            </div>
+            <div className="p-6 pt-0 space-y-4">
+              <div className="glass-component p-4 shadow-lg border-border bg-card">
+                <h3 className="text-sm font-medium text-foreground mb-2">Status do Sistema</h3>
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-sm text-zinc-300">Operacional</span>
+                  <span className="text-sm text-muted-foreground">Operacional</span>
                 </div>
               </div>
               
-              <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
-                <h3 className="text-sm font-medium text-zinc-100 mb-2">Versão do Sistema</h3>
-                <p className="text-sm text-zinc-400">Tork CRM v2.0.0</p>
+              <div className="glass-component p-4 shadow-lg border-border bg-card">
+                <h3 className="text-sm font-medium text-foreground mb-2">Versão do Sistema</h3>
+                <p className="text-sm text-muted-foreground">Tork CRM v2.0.0</p>
               </div>
 
-              <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
-                <h3 className="text-sm font-medium text-zinc-100 mb-2">Banco de Dados</h3>
-                <p className="text-sm text-zinc-400">Supabase PostgreSQL</p>
+              <div className="glass-component p-4 shadow-lg border-border bg-card">
+                <h3 className="text-sm font-medium text-foreground mb-2">Banco de Dados</h3>
+                <p className="text-sm text-muted-foreground">Supabase PostgreSQL</p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

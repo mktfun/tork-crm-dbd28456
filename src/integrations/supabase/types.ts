@@ -14,6 +14,107 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_chat_history: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          phone_number: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          phone_number: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          phone_number?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      admin_test_sessions: {
+        Row: {
+          brokerage_id: number
+          created_at: string
+          id: number
+          phone: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          brokerage_id: number
+          created_at?: string
+          id?: never
+          phone: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          brokerage_id?: number
+          created_at?: string
+          id?: never
+          phone?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_analysis_sessions: {
+        Row: {
+          brokerage_id: number
+          chatwoot_conversation_id: number
+          collected_data: Json | null
+          created_at: string
+          expires_at: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brokerage_id: number
+          chatwoot_conversation_id: number
+          collected_data?: Json | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brokerage_id?: number
+          chatwoot_conversation_id?: number
+          collected_data?: Json | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_analysis_sessions_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_conversations: {
         Row: {
           created_at: string | null
@@ -37,6 +138,103 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      ai_feedbacks: {
+        Row: {
+          brokerage_id: number
+          created_at: string
+          feedback_text: string
+          id: number
+          type: string
+        }
+        Insert: {
+          brokerage_id: number
+          created_at?: string
+          feedback_text: string
+          id?: never
+          type: string
+        }
+        Update: {
+          brokerage_id?: number
+          created_at?: string
+          feedback_text?: string
+          id?: never
+          type?: string
+        }
+        Relationships: []
+      }
+      ai_follow_ups: {
+        Row: {
+          attempt_count: number
+          brokerage_id: number | null
+          chatwoot_conversation_id: number
+          created_at: string
+          deal_id: string
+          follow_up_message: string | null
+          id: string
+          interval_minutes: number
+          max_attempts: number
+          next_check_at: string
+          status: string
+          trigger_reason: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          brokerage_id?: number | null
+          chatwoot_conversation_id: number
+          created_at?: string
+          deal_id: string
+          follow_up_message?: string | null
+          id?: string
+          interval_minutes?: number
+          max_attempts?: number
+          next_check_at: string
+          status?: string
+          trigger_reason: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempt_count?: number
+          brokerage_id?: number | null
+          chatwoot_conversation_id?: number
+          created_at?: string
+          deal_id?: string
+          follow_up_message?: string | null
+          id?: string
+          interval_minutes?: number
+          max_attempts?: number
+          next_check_at?: string
+          status?: string
+          trigger_reason?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_follow_ups_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_follow_ups_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_follow_ups_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "v_n8n_agent_config"
+            referencedColumns: ["deal_id"]
+          },
+        ]
       }
       ai_improvement_log: {
         Row: {
@@ -227,6 +425,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_summaries: {
+        Row: {
+          content: string
+          created_at: string
+          focus: string
+          id: string
+          scope: string
+          summary_date: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          focus?: string
+          id?: string
+          scope?: string
+          summary_date?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          focus?: string
+          id?: string
+          scope?: string
+          summary_date?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       ai_usage_logs: {
         Row: {
@@ -470,6 +698,7 @@ export type Database = {
           parent_appointment_id: string | null
           policy_id: string | null
           priority: string | null
+          ramo_id: string | null
           recurrence_rule: string | null
           status: string
           time: string
@@ -487,6 +716,7 @@ export type Database = {
           parent_appointment_id?: string | null
           policy_id?: string | null
           priority?: string | null
+          ramo_id?: string | null
           recurrence_rule?: string | null
           status?: string
           time: string
@@ -504,6 +734,7 @@ export type Database = {
           parent_appointment_id?: string | null
           policy_id?: string | null
           priority?: string | null
+          ramo_id?: string | null
           recurrence_rule?: string | null
           status?: string
           time?: string
@@ -540,6 +771,13 @@ export type Database = {
             referencedRelation: "apolices"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "appointments_ramo_id_fkey"
+            columns: ["ramo_id"]
+            isOneToOne: false
+            referencedRelation: "ramos"
+            referencedColumns: ["id"]
+          },
         ]
       }
       bank_accounts: {
@@ -553,6 +791,7 @@ export type Database = {
           current_balance: number
           icon: string | null
           id: string
+          initial_balance: number | null
           is_active: boolean
           last_sync_date: string | null
           updated_at: string
@@ -568,6 +807,7 @@ export type Database = {
           current_balance?: number
           icon?: string | null
           id?: string
+          initial_balance?: number | null
           is_active?: boolean
           last_sync_date?: string | null
           updated_at?: string
@@ -583,6 +823,7 @@ export type Database = {
           current_balance?: number
           icon?: string | null
           id?: string
+          initial_balance?: number | null
           is_active?: boolean
           last_sync_date?: string | null
           updated_at?: string
@@ -590,10 +831,70 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_import_history: {
+        Row: {
+          auditor_name: string | null
+          bank_account_id: string | null
+          created_at: string | null
+          error_message: string | null
+          file_name: string | null
+          file_size_bytes: number | null
+          id: string
+          imported_at: string | null
+          imported_by: string | null
+          status: string | null
+          total_amount: number | null
+          total_transactions: number | null
+        }
+        Insert: {
+          auditor_name?: string | null
+          bank_account_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          file_name?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          imported_at?: string | null
+          imported_by?: string | null
+          status?: string | null
+          total_amount?: number | null
+          total_transactions?: number | null
+        }
+        Update: {
+          auditor_name?: string | null
+          bank_account_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          file_name?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          imported_at?: string | null
+          imported_by?: string | null
+          status?: string | null
+          total_amount?: number | null
+          total_transactions?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_import_history_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_import_history_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliation_dashboard"
+            referencedColumns: ["bank_account_id"]
+          },
+        ]
+      }
       bank_statement_entries: {
         Row: {
           amount: number
-          bank_account_id: string
+          bank_account_id: string | null
           created_at: string | null
           description: string
           id: string
@@ -613,7 +914,7 @@ export type Database = {
         }
         Insert: {
           amount: number
-          bank_account_id: string
+          bank_account_id?: string | null
           created_at?: string | null
           description: string
           id?: string
@@ -633,7 +934,7 @@ export type Database = {
         }
         Update: {
           amount?: number
-          bank_account_id?: string
+          bank_account_id?: string | null
           created_at?: string | null
           description?: string
           id?: string
@@ -729,20 +1030,27 @@ export type Database = {
           chatwoot_url: string | null
           cnpj: string | null
           created_at: string
+          elevenlabs_api_key: string | null
+          elevenlabs_model_id: string | null
+          elevenlabs_voice_id: string | null
           financial_settings: Json | null
           id: number
           logo_url: string | null
           name: string
+          phone: string | null
           portal_allow_card_download: boolean | null
           portal_allow_policy_download: boolean | null
           portal_allow_profile_edit: boolean | null
           portal_enabled: boolean | null
           portal_show_cards: boolean | null
           portal_show_policies: boolean | null
+          quote_form_enabled: boolean | null
           slug: string
           susep_code: string | null
+          theme_color: string | null
           updated_at: string
           user_id: string
+          whatsapp_number: string | null
         }
         Insert: {
           api_key?: string | null
@@ -751,20 +1059,27 @@ export type Database = {
           chatwoot_url?: string | null
           cnpj?: string | null
           created_at?: string
+          elevenlabs_api_key?: string | null
+          elevenlabs_model_id?: string | null
+          elevenlabs_voice_id?: string | null
           financial_settings?: Json | null
           id?: never
           logo_url?: string | null
           name: string
+          phone?: string | null
           portal_allow_card_download?: boolean | null
           portal_allow_policy_download?: boolean | null
           portal_allow_profile_edit?: boolean | null
           portal_enabled?: boolean | null
           portal_show_cards?: boolean | null
           portal_show_policies?: boolean | null
+          quote_form_enabled?: boolean | null
           slug: string
           susep_code?: string | null
+          theme_color?: string | null
           updated_at?: string
           user_id: string
+          whatsapp_number?: string | null
         }
         Update: {
           api_key?: string | null
@@ -773,22 +1088,85 @@ export type Database = {
           chatwoot_url?: string | null
           cnpj?: string | null
           created_at?: string
+          elevenlabs_api_key?: string | null
+          elevenlabs_model_id?: string | null
+          elevenlabs_voice_id?: string | null
           financial_settings?: Json | null
           id?: never
           logo_url?: string | null
           name?: string
+          phone?: string | null
           portal_allow_card_download?: boolean | null
           portal_allow_policy_download?: boolean | null
           portal_allow_profile_edit?: boolean | null
           portal_enabled?: boolean | null
           portal_show_cards?: boolean | null
           portal_show_policies?: boolean | null
+          quote_form_enabled?: boolean | null
           slug?: string
           susep_code?: string | null
+          theme_color?: string | null
           updated_at?: string
           user_id?: string
+          whatsapp_number?: string | null
         }
         Relationships: []
+      }
+      campaign_posts: {
+        Row: {
+          campaign_id: string | null
+          caption: string | null
+          created_at: string | null
+          hook: string | null
+          id: string
+          image_urls: string[] | null
+          scheduled_date: string | null
+          slide_data: Json | null
+          status: string | null
+          text_briefing: Json | null
+          theme: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          caption?: string | null
+          created_at?: string | null
+          hook?: string | null
+          id?: string
+          image_urls?: string[] | null
+          scheduled_date?: string | null
+          slide_data?: Json | null
+          status?: string | null
+          text_briefing?: Json | null
+          theme?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          caption?: string | null
+          created_at?: string | null
+          hook?: string | null
+          id?: string
+          image_urls?: string[] | null
+          scheduled_date?: string | null
+          slide_data?: Json | null
+          status?: string | null
+          text_briefing?: Json | null
+          theme?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_posts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       changelogs: {
         Row: {
@@ -877,6 +1255,7 @@ export type Database = {
       clientes: {
         Row: {
           address: string | null
+          ai_enabled: boolean
           birth_date: string | null
           cep: string | null
           chatwoot_contact_id: number | null
@@ -903,6 +1282,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          ai_enabled?: boolean
           birth_date?: string | null
           cep?: string | null
           chatwoot_contact_id?: number | null
@@ -929,6 +1309,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          ai_enabled?: boolean
           birth_date?: string | null
           cep?: string | null
           chatwoot_contact_id?: number | null
@@ -961,6 +1342,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          service_phone: string | null
           updated_at: string
           user_id: string
         }
@@ -969,6 +1351,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          service_phone?: string | null
           updated_at?: string
           user_id: string
         }
@@ -977,6 +1360,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          service_phone?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1100,6 +1484,9 @@ export type Database = {
       crm_ai_global_config: {
         Row: {
           agent_name: string | null
+          ai_model: string | null
+          ai_provider: string | null
+          api_key: string | null
           base_instructions: string | null
           company_name: string | null
           created_at: string | null
@@ -1111,6 +1498,9 @@ export type Database = {
         }
         Insert: {
           agent_name?: string | null
+          ai_model?: string | null
+          ai_provider?: string | null
+          api_key?: string | null
           base_instructions?: string | null
           company_name?: string | null
           created_at?: string | null
@@ -1122,6 +1512,9 @@ export type Database = {
         }
         Update: {
           agent_name?: string | null
+          ai_model?: string | null
+          ai_provider?: string | null
+          api_key?: string | null
           base_instructions?: string | null
           company_name?: string | null
           created_at?: string | null
@@ -1133,54 +1526,62 @@ export type Database = {
         }
         Relationships: []
       }
-      crm_ai_prompts: {
+      crm_ai_security_events: {
         Row: {
-          config_id: string
-          content: string
-          created_at: string
+          brokerage_id: number | null
+          chatwoot_conversation_id: number | null
+          created_at: string | null
+          event_type: Database["public"]["Enums"]["crm_ai_security_event_type"]
           id: string
-          is_enabled: boolean | null
-          module_type: string
-          position: number | null
-          updated_at: string
+          metadata: Json | null
+          original_text_encrypted: string | null
+          severity: string | null
+          user_id: string | null
         }
         Insert: {
-          config_id: string
-          content: string
-          created_at?: string
+          brokerage_id?: number | null
+          chatwoot_conversation_id?: number | null
+          created_at?: string | null
+          event_type: Database["public"]["Enums"]["crm_ai_security_event_type"]
           id?: string
-          is_enabled?: boolean | null
-          module_type: string
-          position?: number | null
-          updated_at?: string
+          metadata?: Json | null
+          original_text_encrypted?: string | null
+          severity?: string | null
+          user_id?: string | null
         }
         Update: {
-          config_id?: string
-          content?: string
-          created_at?: string
+          brokerage_id?: number | null
+          chatwoot_conversation_id?: number | null
+          created_at?: string | null
+          event_type?: Database["public"]["Enums"]["crm_ai_security_event_type"]
           id?: string
-          is_enabled?: boolean | null
-          module_type?: string
-          position?: number | null
-          updated_at?: string
+          metadata?: Json | null
+          original_text_encrypted?: string | null
+          severity?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "crm_ai_prompts_config_id_fkey"
-            columns: ["config_id"]
+            foreignKeyName: "crm_ai_security_events_brokerage_id_fkey"
+            columns: ["brokerage_id"]
             isOneToOne: false
-            referencedRelation: "crm_ai_config"
+            referencedRelation: "brokerages"
             referencedColumns: ["id"]
           },
         ]
       }
       crm_ai_settings: {
         Row: {
+          ai_completion_action: Json | null
           ai_custom_rules: string | null
           ai_name: string | null
           ai_objective: string | null
           ai_persona: string | null
           created_at: string | null
+          follow_up_enabled: boolean | null
+          follow_up_interval_minutes: number | null
+          follow_up_max_attempts: number | null
+          follow_up_message: string | null
           id: string
           is_active: boolean | null
           max_messages_before_human: number | null
@@ -1190,11 +1591,16 @@ export type Database = {
           voice_id: string | null
         }
         Insert: {
+          ai_completion_action?: Json | null
           ai_custom_rules?: string | null
           ai_name?: string | null
           ai_objective?: string | null
           ai_persona?: string | null
           created_at?: string | null
+          follow_up_enabled?: boolean | null
+          follow_up_interval_minutes?: number | null
+          follow_up_max_attempts?: number | null
+          follow_up_message?: string | null
           id?: string
           is_active?: boolean | null
           max_messages_before_human?: number | null
@@ -1204,11 +1610,16 @@ export type Database = {
           voice_id?: string | null
         }
         Update: {
+          ai_completion_action?: Json | null
           ai_custom_rules?: string | null
           ai_name?: string | null
           ai_objective?: string | null
           ai_persona?: string | null
           created_at?: string | null
+          follow_up_enabled?: boolean | null
+          follow_up_interval_minutes?: number | null
+          follow_up_max_attempts?: number | null
+          follow_up_message?: string | null
           id?: string
           is_active?: boolean | null
           max_messages_before_human?: number | null
@@ -1234,6 +1645,93 @@ export type Database = {
           },
         ]
       }
+      crm_deal_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          event_type: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          event_type: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          event_type?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_deal_events_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deal_events_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "v_n8n_agent_config"
+            referencedColumns: ["deal_id"]
+          },
+        ]
+      }
+      crm_deal_notes: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string
+          deal_id: string
+          id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by: string
+          deal_id: string
+          id?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string
+          deal_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_deal_notes_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deal_notes_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "v_n8n_agent_config"
+            referencedColumns: ["deal_id"]
+          },
+        ]
+      }
       crm_deals: {
         Row: {
           chatwoot_conversation_id: number | null
@@ -1244,6 +1742,7 @@ export type Database = {
           last_sync_source: string | null
           notes: string | null
           position: number
+          product_id: string | null
           stage_id: string
           sync_token: string | null
           title: string
@@ -1260,6 +1759,7 @@ export type Database = {
           last_sync_source?: string | null
           notes?: string | null
           position?: number
+          product_id?: string | null
           stage_id: string
           sync_token?: string | null
           title: string
@@ -1276,6 +1776,7 @@ export type Database = {
           last_sync_source?: string | null
           notes?: string | null
           position?: number
+          product_id?: string | null
           stage_id?: string
           sync_token?: string | null
           title?: string
@@ -1296,6 +1797,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_deals_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "crm_products"
             referencedColumns: ["id"]
           },
           {
@@ -1407,6 +1915,93 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_products: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_with_ramos_count"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_quotes: {
+        Row: {
+          brokerage_slug: string
+          created_at: string | null
+          description: string | null
+          email: string | null
+          id: string
+          name: string
+          phone: string
+          product_type: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          brokerage_slug: string
+          created_at?: string | null
+          description?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          phone: string
+          product_type: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          brokerage_slug?: string
+          created_at?: string | null
+          description?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string
+          product_type?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       crm_settings: {
         Row: {
           chatwoot_account_id: string | null
@@ -1415,6 +2010,7 @@ export type Database = {
           chatwoot_webhook_secret: string | null
           created_at: string
           id: string
+          n8n_webhook_url: string | null
           updated_at: string
           user_id: string
         }
@@ -1425,6 +2021,7 @@ export type Database = {
           chatwoot_webhook_secret?: string | null
           created_at?: string
           id?: string
+          n8n_webhook_url?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1435,6 +2032,7 @@ export type Database = {
           chatwoot_webhook_secret?: string | null
           created_at?: string
           id?: string
+          n8n_webhook_url?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1812,66 +2410,102 @@ export type Database = {
       }
       financial_transactions: {
         Row: {
+          archived: boolean | null
           attachments: string[] | null
           bank_account_id: string | null
           created_at: string
           created_by: string
           description: string
+          document_number: string | null
+          due_date: string | null
           id: string
+          insurance_company_id: string | null
           is_confirmed: boolean
           is_reconciled: boolean | null
           is_void: boolean | null
+          paid_amount: number | null
+          producer_id: string | null
+          ramo_id: string | null
+          reconciled: boolean | null
           reconciled_at: string | null
           reconciled_statement_id: string | null
+          reconciliation_method: string | null
           reference_number: string | null
           related_entity_id: string | null
           related_entity_type: string | null
+          statement_id: string | null
           status: string | null
+          total_amount: number | null
           transaction_date: string
+          type: string | null
           user_id: string
           void_reason: string | null
           voided_at: string | null
           voided_by: string | null
         }
         Insert: {
+          archived?: boolean | null
           attachments?: string[] | null
           bank_account_id?: string | null
           created_at?: string
           created_by: string
           description: string
+          document_number?: string | null
+          due_date?: string | null
           id?: string
+          insurance_company_id?: string | null
           is_confirmed?: boolean
           is_reconciled?: boolean | null
           is_void?: boolean | null
+          paid_amount?: number | null
+          producer_id?: string | null
+          ramo_id?: string | null
+          reconciled?: boolean | null
           reconciled_at?: string | null
           reconciled_statement_id?: string | null
+          reconciliation_method?: string | null
           reference_number?: string | null
           related_entity_id?: string | null
           related_entity_type?: string | null
+          statement_id?: string | null
           status?: string | null
+          total_amount?: number | null
           transaction_date?: string
+          type?: string | null
           user_id: string
           void_reason?: string | null
           voided_at?: string | null
           voided_by?: string | null
         }
         Update: {
+          archived?: boolean | null
           attachments?: string[] | null
           bank_account_id?: string | null
           created_at?: string
           created_by?: string
           description?: string
+          document_number?: string | null
+          due_date?: string | null
           id?: string
+          insurance_company_id?: string | null
           is_confirmed?: boolean
           is_reconciled?: boolean | null
           is_void?: boolean | null
+          paid_amount?: number | null
+          producer_id?: string | null
+          ramo_id?: string | null
+          reconciled?: boolean | null
           reconciled_at?: string | null
           reconciled_statement_id?: string | null
+          reconciliation_method?: string | null
           reference_number?: string | null
           related_entity_id?: string | null
           related_entity_type?: string | null
+          statement_id?: string | null
           status?: string | null
+          total_amount?: number | null
           transaction_date?: string
+          type?: string | null
           user_id?: string
           void_reason?: string | null
           voided_at?: string | null
@@ -1891,6 +2525,34 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "reconciliation_dashboard"
             referencedColumns: ["bank_account_id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_insurance_company_id_fkey"
+            columns: ["insurance_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_insurance_company_id_fkey"
+            columns: ["insurance_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_with_ramos_count"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_producer_id_fkey"
+            columns: ["producer_id"]
+            isOneToOne: false
+            referencedRelation: "producers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_ramo_id_fkey"
+            columns: ["ramo_id"]
+            isOneToOne: false
+            referencedRelation: "ramos"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "financial_transactions_reconciled_statement_id_fkey"
@@ -1963,6 +2625,202 @@ export type Database = {
           },
         ]
       }
+      organization_payments: {
+        Row: {
+          amount: number
+          brokerage_id: number
+          created_at: string
+          id: string
+          payment_date: string
+          period_added: string
+          recorded_by: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          brokerage_id: number
+          created_at?: string
+          id?: string
+          payment_date?: string
+          period_added: string
+          recorded_by: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          brokerage_id?: number
+          created_at?: string
+          id?: string
+          payment_date?: string
+          period_added?: string
+          recorded_by?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_payments_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      policy_renewal_history: {
+        Row: {
+          created_at: string
+          id: string
+          new_bonus_class: string | null
+          new_commission_rate: number
+          new_expiration_date: string
+          new_policy_number: string | null
+          new_premium_value: number
+          observations: string | null
+          policy_id: string
+          previous_bonus_class: string | null
+          previous_commission_rate: number
+          previous_expiration_date: string
+          previous_policy_number: string | null
+          previous_premium_value: number
+          renewal_type: string
+          renewed_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          new_bonus_class?: string | null
+          new_commission_rate: number
+          new_expiration_date: string
+          new_policy_number?: string | null
+          new_premium_value: number
+          observations?: string | null
+          policy_id: string
+          previous_bonus_class?: string | null
+          previous_commission_rate: number
+          previous_expiration_date: string
+          previous_policy_number?: string | null
+          previous_premium_value: number
+          renewal_type?: string
+          renewed_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          new_bonus_class?: string | null
+          new_commission_rate?: number
+          new_expiration_date?: string
+          new_policy_number?: string | null
+          new_premium_value?: number
+          observations?: string | null
+          policy_id?: string
+          previous_bonus_class?: string | null
+          previous_commission_rate?: number
+          previous_expiration_date?: string
+          previous_policy_number?: string | null
+          previous_premium_value?: number
+          renewal_type?: string
+          renewed_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "policy_renewal_history_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "apolices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      portal_requests: {
+        Row: {
+          brokerage_user_id: string
+          client_id: string
+          created_at: string | null
+          custom_fields: Json | null
+          deal_id: string | null
+          disqualification_reason: string | null
+          id: string
+          insurance_type: string
+          is_qualified: boolean | null
+          policy_id: string | null
+          qar_report: string | null
+          request_type: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          brokerage_user_id: string
+          client_id: string
+          created_at?: string | null
+          custom_fields?: Json | null
+          deal_id?: string | null
+          disqualification_reason?: string | null
+          id?: string
+          insurance_type: string
+          is_qualified?: boolean | null
+          policy_id?: string | null
+          qar_report?: string | null
+          request_type: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          brokerage_user_id?: string
+          client_id?: string
+          created_at?: string | null
+          custom_fields?: Json | null
+          deal_id?: string | null
+          disqualification_reason?: string | null
+          id?: string
+          insurance_type?: string
+          is_qualified?: boolean | null
+          policy_id?: string | null
+          qar_report?: string | null
+          request_type?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_requests_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "crm_deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_requests_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "v_n8n_agent_config"
+            referencedColumns: ["deal_id"]
+          },
+          {
+            foreignKeyName: "portal_requests_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "apolices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       producers: {
         Row: {
           brokerage_id: number
@@ -2012,6 +2870,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ai_enabled: boolean
           ativo: boolean
           avatar_url: string | null
           birthday_message_template: string | null
@@ -2029,6 +2888,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_enabled?: boolean
           ativo?: boolean
           avatar_url?: string | null
           birthday_message_template?: string | null
@@ -2046,6 +2906,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_enabled?: boolean
           ativo?: boolean
           avatar_url?: string | null
           birthday_message_template?: string | null
@@ -2084,6 +2945,230 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      reconciliation_audit_log: {
+        Row: {
+          action_type: string
+          amount: number | null
+          bank_account_id: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          operator_name: string | null
+          statement_entry_id: string | null
+          system_transaction_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          amount?: number | null
+          bank_account_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          operator_name?: string | null
+          statement_entry_id?: string | null
+          system_transaction_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          amount?: number | null
+          bank_account_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          operator_name?: string | null
+          statement_entry_id?: string | null
+          system_transaction_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_audit_log_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_audit_log_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliation_dashboard"
+            referencedColumns: ["bank_account_id"]
+          },
+          {
+            foreignKeyName: "reconciliation_audit_log_statement_entry_id_fkey"
+            columns: ["statement_entry_id"]
+            isOneToOne: false
+            referencedRelation: "bank_statement_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_audit_log_system_transaction_id_fkey"
+            columns: ["system_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "financial_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_chat_history: {
+        Row: {
+          audio_url: string | null
+          brokerage_id: number
+          chatwoot_message_id: number | null
+          client_id: string | null
+          contact_phone: string | null
+          content: string
+          conversation_id: number
+          created_at: string | null
+          id: string
+          message_type: string | null
+          queue_message_id: string | null
+          role: string
+        }
+        Insert: {
+          audio_url?: string | null
+          brokerage_id: number
+          chatwoot_message_id?: number | null
+          client_id?: string | null
+          contact_phone?: string | null
+          content: string
+          conversation_id: number
+          created_at?: string | null
+          id?: string
+          message_type?: string | null
+          queue_message_id?: string | null
+          role: string
+        }
+        Update: {
+          audio_url?: string | null
+          brokerage_id?: number
+          chatwoot_message_id?: number | null
+          client_id?: string | null
+          contact_phone?: string | null
+          content?: string
+          conversation_id?: number
+          created_at?: string | null
+          id?: string
+          message_type?: string | null
+          queue_message_id?: string | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_chat_history_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_chat_history_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_chat_history_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_chat_history_queue_message_id_fkey"
+            columns: ["queue_message_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_message_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_conversation_locks: {
+        Row: {
+          conversation_id: number
+          expires_at: string
+          locked_at: string
+          locked_by_queue_id: string | null
+        }
+        Insert: {
+          conversation_id: number
+          expires_at?: string
+          locked_at?: string
+          locked_by_queue_id?: string | null
+        }
+        Update: {
+          conversation_id?: number
+          expires_at?: string
+          locked_at?: string
+          locked_by_queue_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_conversation_locks_locked_by_queue_id_fkey"
+            columns: ["locked_by_queue_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_message_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_message_queue: {
+        Row: {
+          audio_url: string | null
+          brokerage_id: number
+          chatwoot_message_id: number
+          contact_phone: string | null
+          content: string | null
+          conversation_id: number
+          created_at: string | null
+          error_message: string | null
+          id: string
+          message_type: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          brokerage_id: number
+          chatwoot_message_id: number
+          contact_phone?: string | null
+          content?: string | null
+          conversation_id: number
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_type?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          brokerage_id?: number
+          chatwoot_message_id?: number
+          contact_phone?: string | null
+          content?: string | null
+          conversation_id?: number
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_type?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_message_queue_brokerage_id_fkey"
+            columns: ["brokerage_id"]
+            isOneToOne: false
+            referencedRelation: "brokerages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       security_audit_log: {
         Row: {
@@ -2734,6 +3819,36 @@ export type Database = {
           },
         ]
       }
+      weekly_campaigns: {
+        Row: {
+          created_at: string | null
+          id: string
+          n8n_metrics: Json | null
+          start_date: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          n8n_metrics?: Json | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          n8n_metrics?: Json | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       clients_with_stats: {
@@ -2756,10 +3871,12 @@ export type Database = {
       }
       companies_with_ramos_count: {
         Row: {
+          assistance_phone: string | null
           created_at: string | null
           id: string | null
           name: string | null
           ramos_count: number | null
+          service_phone: string | null
           updated_at: string | null
           user_id: string | null
         }
@@ -3012,6 +4129,10 @@ export type Database = {
           transaction_id: string
         }[]
       }
+      authenticate_portal_client: {
+        Args: { p_client_id: string; p_password: string }
+        Returns: boolean
+      }
       backfill_legacy_transactions: { Args: never; Returns: Json }
       batch_update_transactions: {
         Args: { p_user_id: string; updates: Json }
@@ -3025,6 +4146,11 @@ export type Database = {
         Args: { p_transactions: Json }
         Returns: Json
       }
+      bulk_manual_reconcile: {
+        Args: { p_bank_account_id?: string; p_transaction_ids: string[] }
+        Returns: Json
+      }
+      bulk_unreconcile: { Args: { p_transaction_ids: string[] }; Returns: Json }
       calculate_projected_cash_flow: {
         Args: { p_days?: number }
         Returns: {
@@ -3033,6 +4159,10 @@ export type Database = {
           outflows: number
           projected_balance: number
         }[]
+      }
+      check_portal_cpf_duplicate: {
+        Args: { p_client_id: string; p_cpf: string; p_user_id: string }
+        Returns: Json
       }
       check_upcoming_appointments: { Args: never; Returns: undefined }
       count_ledger_entries_by_account: {
@@ -3070,8 +4200,11 @@ export type Database = {
             Args: {
               p_bank_account_id?: string
               p_description: string
+              p_insurance_company_id?: string
               p_is_confirmed?: boolean
               p_movements: Json
+              p_producer_id?: string
+              p_ramo_id?: string
               p_reference_number?: string
               p_related_entity_id?: string
               p_related_entity_type?: string
@@ -3079,14 +4212,24 @@ export type Database = {
             }
             Returns: string
           }
-      create_transaction_from_statement: {
-        Args: {
-          p_category_account_id: string
-          p_description?: string
-          p_statement_entry_id: string
-        }
-        Returns: Json
-      }
+      create_transaction_from_statement:
+        | {
+            Args: {
+              p_category_account_id: string
+              p_description?: string
+              p_statement_entry_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_bank_account_id?: string
+              p_category_account_id: string
+              p_description?: string
+              p_statement_entry_id: string
+            }
+            Returns: Json
+          }
       delete_financial_account_safe: {
         Args: { p_migrate_to_account_id?: string; p_target_account_id: string }
         Returns: Json
@@ -3124,6 +4267,7 @@ export type Database = {
           occurrence_date: string
         }[]
       }
+      generate_recurring_transactions: { Args: never; Returns: number }
       get_account_balances: {
         Args: never
         Returns: {
@@ -3162,7 +4306,7 @@ export type Database = {
       }
       get_admin_metrics: { Args: never; Returns: Json }
       get_aging_report: {
-        Args: { p_reference_date?: string; p_user_id: string }
+        Args: { p_reference_date?: string; p_type?: string; p_user_id: string }
         Returns: {
           bucket_amount: number
           bucket_color: string
@@ -3170,18 +4314,105 @@ export type Database = {
           bucket_range: string
         }[]
       }
+      get_bank_account_statement: {
+        Args: { p_bank_account_id: string }
+        Returns: {
+          amount: number
+          category: string
+          created_at: string
+          description: string
+          status: string
+          transaction_date: string
+          transaction_id: string
+        }[]
+      }
       get_bank_balance: {
         Args: { p_bank_account_id: string; p_include_pending?: boolean }
         Returns: number
       }
-      get_bank_transactions: {
+      get_bank_statement_detailed: {
         Args: {
-          p_bank_account_id?: string
+          p_bank_account_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: {
+          bank_account_id: string
+          category_name: string
+          description: string
+          document_number: string
+          expense_amount: number
+          id: string
+          method: string
+          reconciled: boolean
+          revenue_amount: number
+          running_balance: number
+          status: string
+          transaction_date: string
+        }[]
+      }
+      get_bank_statement_paginated: {
+        Args: {
+          p_bank_account_id: string
+          p_end_date: string
           p_page?: number
           p_page_size?: number
+          p_search_term?: string
+          p_start_date: string
+          p_status?: string
+          p_type?: string
         }
-        Returns: Json
+        Returns: {
+          amount: number
+          bank_account_id: string
+          bank_name: string
+          category_name: string
+          description: string
+          id: string
+          reconciled: boolean
+          reconciled_by_name: string
+          running_balance: number
+          status_display: string
+          total_count: number
+          transaction_date: string
+          type: string
+        }[]
       }
+      get_bank_transactions:
+        | {
+            Args: {
+              p_bank_account_id?: string
+              p_page?: number
+              p_page_size?: number
+              p_search?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_bank_account_id: string
+              p_end_date: string
+              p_page?: number
+              p_page_size?: number
+              p_search?: string
+              p_start_date: string
+              p_status?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_bank_account_id: string
+              p_end_date: string
+              p_page?: number
+              p_page_size?: number
+              p_reconciled_only?: boolean
+              p_search?: string
+              p_start_date: string
+              p_status?: string
+            }
+            Returns: Json
+          }
       get_brokerage_by_slug: { Args: { p_slug: string }; Returns: Json }
       get_cash_flow_data: {
         Args: {
@@ -3217,6 +4448,7 @@ export type Database = {
         }
         Returns: {
           address: string | null
+          ai_enabled: boolean
           birth_date: string | null
           cep: string | null
           chatwoot_contact_id: number | null
@@ -3272,30 +4504,66 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_daily_balances: {
+        Args: {
+          p_bank_account_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: {
+          balance: number
+          day: string
+        }[]
+      }
       get_dashboard_financial_kpis: {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: Json
       }
-      get_dre_data: {
-        Args: { p_year?: number }
-        Returns: {
-          abr: number
-          account_type: string
-          ago: number
-          category: string
-          dez: number
-          fev: number
-          jan: number
-          jul: number
-          jun: number
-          mai: number
-          mar: number
-          nov: number
-          out: number
-          set: number
-          total: number
-        }[]
-      }
+      get_dre_data:
+        | {
+            Args: { p_year?: number }
+            Returns: {
+              abr: number
+              account_type: string
+              ago: number
+              category: string
+              dez: number
+              fev: number
+              jan: number
+              jul: number
+              jun: number
+              mai: number
+              mar: number
+              nov: number
+              out: number
+              set: number
+              total: number
+            }[]
+          }
+        | {
+            Args: {
+              p_end_date?: string
+              p_start_date?: string
+              p_year?: number
+            }
+            Returns: {
+              abr: number
+              account_type: string
+              ago: number
+              category: string
+              dez: number
+              fev: number
+              jan: number
+              jul: number
+              jun: number
+              mai: number
+              mar: number
+              nov: number
+              out: number
+              set: number
+              total: number
+            }[]
+          }
       get_empresas_com_metricas: {
         Args: { p_corretora_id: string }
         Returns: {
@@ -3360,8 +4628,7 @@ export type Database = {
           actual_amount: number
           difference: number
           goal_amount: number
-          goal_id: string
-          percentage_achieved: number
+          pct: number
           status: string
         }[]
       }
@@ -3423,6 +4690,16 @@ export type Database = {
           transaction_date: string
         }[]
       }
+      get_pending_revenue_by_insurance: {
+        Args: { p_user_id: string }
+        Returns: {
+          company_name: string
+          insurance_company_id: string
+          oldest_due_date: string
+          total_amount_pending: number
+          transaction_count: number
+        }[]
+      }
       get_pending_this_month: {
         Args: never
         Returns: {
@@ -3450,6 +4727,7 @@ export type Database = {
           p_user_id: string
         }
         Returns: {
+          carteirinha_url: string
           expiration_date: string
           id: string
           insurance_company: string
@@ -3482,6 +4760,17 @@ export type Database = {
           type: string
         }[]
       }
+      get_portal_requests_by_client: {
+        Args: { p_brokerage_user_id: string; p_client_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          insurance_type: string
+          is_qualified: boolean
+          request_type: string
+          status: string
+        }[]
+      }
       get_producao_por_ramo: {
         Args: { end_range: string; p_user_id: string; start_range: string }
         Returns: {
@@ -3508,6 +4797,15 @@ export type Database = {
           running_balance: number
         }[]
       }
+      get_public_brokerages: {
+        Args: never
+        Returns: {
+          id: number
+          logo_url: string
+          name: string
+          slug: string
+        }[]
+      }
       get_recent_financial_transactions: {
         Args: { p_limit?: number; p_offset?: number; p_type?: string }
         Returns: {
@@ -3515,12 +4813,23 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          is_confirmed: boolean
           is_void: boolean
+          reconciled: boolean
           reference_number: string
           status: string
           total_amount: number
           transaction_date: string
         }[]
+      }
+      get_reconciliation_kpis: {
+        Args: {
+          p_bank_account_id: string
+          p_end_date: string
+          p_search_term?: string
+          p_start_date: string
+        }
+        Returns: Json
       }
       get_revenue_by_dimension: {
         Args: {
@@ -3530,8 +4839,9 @@ export type Database = {
           p_user_id: string
         }
         Returns: {
-          dimension_value: string
-          total_revenue: number
+          dimension_name: string
+          percentage: number
+          total_amount: number
           transaction_count: number
         }[]
       }
@@ -3547,12 +4857,14 @@ export type Database = {
         Returns: {
           account_name: string
           amount: number
+          bank_name: string
           client_name: string
           description: string
           id: string
           is_confirmed: boolean
           legacy_status: string
           policy_number: string
+          reconciled: boolean
           related_entity_id: string
           related_entity_type: string
           transaction_date: string
@@ -3572,6 +4884,26 @@ export type Database = {
             Args: { p_legacy_id?: string; p_transaction_id?: string }
             Returns: Json
           }
+      get_transactions_for_reconciliation: {
+        Args: { p_bank_account_id: string; p_include_unassigned?: boolean }
+        Returns: {
+          amount: number
+          bank_account_id: string
+          branch_name: string
+          customer_name: string
+          description: string
+          id: string
+          insurer_name: string
+          item_name: string
+          paid_amount: number
+          related_entity_type: string
+          remaining_amount: number
+          status: string
+          total_amount: number
+          transaction_date: string
+          type: string
+        }[]
+      }
       get_unbanked_transactions: {
         Args: { p_limit?: number; p_user_id: string }
         Returns: {
@@ -3581,6 +4913,19 @@ export type Database = {
           transaction_date: string
           transaction_id: string
           transaction_type: string
+        }[]
+      }
+      get_upcoming_payables: {
+        Args: { p_days_ahead?: number; p_user_id: string }
+        Returns: {
+          amount: number
+          days_until_due: number
+          description: string
+          due_date: string
+          entity_name: string
+          related_entity_id: string
+          related_entity_type: string
+          transaction_id: string
         }[]
       }
       get_upcoming_receivables: {
@@ -3599,10 +4944,12 @@ export type Database = {
       get_user_companies_with_ramos: {
         Args: never
         Returns: {
+          assistance_phone: string | null
           created_at: string | null
           id: string | null
           name: string | null
           ramos_count: number | null
+          service_phone: string | null
           updated_at: string | null
           user_id: string | null
         }[]
@@ -3687,6 +5034,7 @@ export type Database = {
           email: string
           id: string
           name: string
+          portal_first_access: boolean
           user_id: string
         }[]
       }
@@ -3694,8 +5042,36 @@ export type Database = {
         Args: { p_notes?: string; p_statement_entry_id: string }
         Returns: Json
       }
-      is_admin: { Args: { user_id?: string }; Returns: boolean }
+      import_bank_statement_batch: {
+        Args: {
+          p_bank_account_id: string
+          p_entries: Json
+          p_file_name: string
+          p_total_amount: number
+        }
+        Returns: Json
+      }
+      insert_portal_request: {
+        Args: {
+          p_brokerage_user_id: string
+          p_client_id: string
+          p_custom_fields: Json
+          p_disqualification_reason?: string
+          p_insurance_type: string
+          p_is_qualified?: boolean
+          p_qar_report: string
+          p_request_type: string
+        }
+        Returns: Json
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
       link_manual_transactions: { Args: { p_user_id: string }; Returns: string }
+      manual_reconcile_transaction:
+        | { Args: { p_transaction_id: string }; Returns: undefined }
+        | {
+            Args: { p_bank_account_id?: string; p_transaction_id: string }
+            Returns: undefined
+          }
       match_knowledge: {
         Args: {
           match_count?: number
@@ -3737,6 +5113,32 @@ export type Database = {
         }[]
       }
       promote_user_to_admin: { Args: { user_email: string }; Returns: boolean }
+      reconcile_insurance_aggregate_fifo: {
+        Args: {
+          p_insurance_company_id: string
+          p_statement_entry_id: string
+          p_target_bank_id?: string
+        }
+        Returns: Json
+      }
+      reconcile_transaction_partial:
+        | {
+            Args: {
+              p_amount_to_reconcile?: number
+              p_statement_entry_id: string
+              p_system_transaction_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_amount_to_reconcile?: number
+              p_statement_entry_id: string
+              p_system_transaction_id: string
+              p_target_bank_id?: string
+            }
+            Returns: Json
+          }
       reconcile_transactions: {
         Args: { p_statement_entry_id: string; p_system_transaction_id: string }
         Returns: Json
@@ -3766,6 +5168,8 @@ export type Database = {
               p_policy_id: string
               p_policy_number: string
               p_ramo_name: string
+              p_status?: string
+              p_transaction_date?: string
             }
             Returns: Json
           }
@@ -3777,6 +5181,7 @@ export type Database = {
           transaction_id: string
         }[]
       }
+      seed_user_defaults: { Args: { p_user_id: string }; Returns: undefined }
       settle_commission_transaction: {
         Args: {
           p_bank_account_id: string
@@ -3787,6 +5192,10 @@ export type Database = {
       }
       settle_due_commissions: { Args: never; Returns: string }
       settle_due_commissions_v2: { Args: never; Returns: string }
+      setup_default_crm_for_user: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       suggest_reconciliation_matches: {
@@ -3806,6 +5215,10 @@ export type Database = {
           system_description: string
           system_transaction_id: string
         }[]
+      }
+      unreconcile_transaction: {
+        Args: { p_transaction_id: string }
+        Returns: undefined
       }
       update_financial_account: {
         Args: {
@@ -3833,6 +5246,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      update_portal_client_password: {
+        Args: { p_client_id: string; p_new_password: string }
+        Returns: boolean
       }
       update_portal_profile: {
         Args: {
@@ -3869,6 +5286,11 @@ export type Database = {
       }
     }
     Enums: {
+      crm_ai_security_event_type:
+        | "pii_masked"
+        | "jailbreak_attempt"
+        | "unauthorized_access"
+        | "tool_rejection"
       financial_account_status: "active" | "archived"
       financial_account_type:
         | "asset"
@@ -4018,6 +5440,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      crm_ai_security_event_type: [
+        "pii_masked",
+        "jailbreak_attempt",
+        "unauthorized_access",
+        "tool_rejection",
+      ],
       financial_account_status: ["active", "archived"],
       financial_account_type: [
         "asset",

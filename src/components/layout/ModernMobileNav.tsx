@@ -41,15 +41,15 @@ export function ModernMobileNav() {
   // Get current active index based on current path
   const getCurrentActiveIndex = () => {
     const currentPath = location.pathname;
-    const activeItem = Object.entries(pathMapping).find(([, path]) => 
+    const activeItem = Object.entries(pathMapping).find(([, path]) =>
       currentPath === path || currentPath.startsWith(path + '/')
     );
-    
+
     if (activeItem) {
       const activeLabel = activeItem[0];
       return navigationItems.findIndex(item => item.label === activeLabel);
     }
-    
+
     return 0; // Default to Dashboard
   };
 
@@ -63,7 +63,7 @@ export function ModernMobileNav() {
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 md:hidden">
       <div className="max-w-sm mx-auto">
-        <GlassCard className="p-2 transition-all duration-300 hover:bg-white/15 hover:shadow-xl">
+        <GlassCard className="p-2 transition-all duration-300 hover:bg-muted hover:shadow-xl">
           <InteractiveMenu
             items={navigationItems}
             accentColor="hsl(var(--chart-1))"
@@ -95,7 +95,7 @@ export function EnhancedMobileFloatingNav() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50">
-      <GlassCard className="p-3 transition-all duration-300 hover:bg-white/15 hover:shadow-xl">
+      <GlassCard className="p-3 transition-all duration-300 hover:bg-muted hover:shadow-xl">
         <InteractiveMenu
           items={navigationItems}
           accentColor="hsl(var(--chart-1))"
@@ -140,7 +140,7 @@ export function CompactMobileNav() {
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50">
       <div className="max-w-xs mx-auto">
-        <GlassCard className="p-2 transition-all duration-300 hover:bg-white/15 hover:shadow-xl">
+        <GlassCard className="p-2 transition-all duration-300 hover:bg-muted hover:shadow-xl">
           <InteractiveMenu
             items={compactItems}
             accentColor="hsl(var(--chart-1))"

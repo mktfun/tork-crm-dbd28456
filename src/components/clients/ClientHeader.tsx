@@ -36,11 +36,13 @@ export function ClientHeader({
           Voltar
         </Button>
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center">
-            <User size={20} className="text-blue-400" />
+          <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+            <span className="text-xl font-bold text-primary">
+              {client.name.charAt(0).toUpperCase()}
+            </span>
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-white">{client.name}</h1>
+            <h1 className="text-3xl font-bold text-foreground">{client.name}</h1>
             <Badge variant="outline" className="mt-1">
               {activePolicies.length} {activePolicies.length === 1 ? 'seguro ativo' : 'seguros ativos'}
             </Badge>

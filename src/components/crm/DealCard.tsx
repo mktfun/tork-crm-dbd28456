@@ -1,7 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import { User, Phone, Calendar, DollarSign } from 'lucide-react';
+import { User, Phone, Calendar, DollarSign, Bot } from 'lucide-react';
+import { useGlassEffect } from '@/hooks/useGlassEffect';
 import { CRMDeal } from '@/hooks/useCRMDeals';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { format } from 'date-fns';
@@ -15,6 +16,7 @@ interface DealCardProps {
 }
 
 export function DealCard({ deal, isDragging, onClick, stageColor = '#3B82F6' }: DealCardProps) {
+  const glassRef = useGlassEffect<HTMLDivElement>();
   const {
     attributes,
     listeners,
@@ -23,6 +25,11 @@ export function DealCard({ deal, isDragging, onClick, stageColor = '#3B82F6' }: 
     transition,
     isDragging: isSortableDragging,
   } = useSortable({ id: deal.id });
+
+  const combinedRef = (node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    (glassRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+  };
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -35,7 +42,7 @@ export function DealCard({ deal, isDragging, onClick, stageColor = '#3B82F6' }: 
 
   return (
     <motion.div
-      ref={setNodeRef}
+      ref={combinedRef}
       style={style}
       {...attributes}
       {...listeners}
@@ -62,7 +69,24 @@ export function DealCard({ deal, isDragging, onClick, stageColor = '#3B82F6' }: 
         <h4 className="font-medium text-foreground line-clamp-2 flex-1 pr-2">
           {deal.title}
         </h4>
+        {deal.last_sync_source === 'chatwoot' && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-primary/15 text-primary text-[10px] font-semibold shrink-0">
+            <Bot className="h-3 w-3" />
+            IA
+          </span>
+        )}
       </div>
+
+      {/* Product Badge */}
+      {deal.product && (
+        <div className="mb-3">
+          <div 
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium shadow-sm border border-white/10 bg-secondary/40 text-foreground"
+          >
+            <span>{deal.product.name}</span>
+          </div>
+        </div>
+      )}
 
       {/* Client Info */}
       {deal.client && (

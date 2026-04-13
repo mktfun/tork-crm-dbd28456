@@ -53,7 +53,7 @@ export function Combobox({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "w-full justify-between bg-slate-900/50 border-slate-700 text-slate-50 hover:bg-slate-800/50",
+            "w-full justify-between",
             className
           )}
         >
@@ -61,14 +61,13 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-slate-900/95 backdrop-blur-lg border-slate-700 z-50">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 z-50">
         <Command className="bg-transparent">
           <CommandInput 
             placeholder={searchPlaceholder} 
-            className="text-slate-50 placeholder:text-slate-400"
           />
           <CommandList className="max-h-60 overflow-y-auto">
-            <CommandEmpty className="text-slate-400 py-6 text-center text-sm">
+            <CommandEmpty className="text-muted-foreground py-6 text-center text-sm">
               {emptyText}
             </CommandEmpty>
             <CommandGroup>
@@ -84,7 +83,7 @@ export function Combobox({
                     onValueChange(valueToSet === value ? "" : valueToSet)
                     setOpen(false)
                   }}
-                  className="text-slate-50 hover:bg-slate-800/50 data-[selected]:bg-slate-800/50"
+                  className="text-foreground"
                 >
                   <Check
                     className={cn(

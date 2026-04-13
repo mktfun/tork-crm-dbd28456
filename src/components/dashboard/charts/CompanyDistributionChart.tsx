@@ -50,7 +50,7 @@ export function CompanyDistributionChart({ data, dateRange, insight }: CompanyDi
 
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, payload }: any) => {
     if (percent < 0.05) return null; // Não mostrar labels para fatias menores que 5%
-    
+
     const RADIAN = Math.PI / 180;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
@@ -58,11 +58,11 @@ export function CompanyDistributionChart({ data, dateRange, insight }: CompanyDi
 
     if (viewMode === 'percentage') {
       return (
-        <text 
-          x={x} 
-          y={y} 
-          fill="white" 
-          textAnchor={x > cx ? 'start' : 'end'} 
+        <text
+          x={x}
+          y={y}
+          fill="white"
+          textAnchor={x > cx ? 'start' : 'end'}
           dominantBaseline="central"
           fontSize={12}
           fontWeight="bold"
@@ -74,16 +74,16 @@ export function CompanyDistributionChart({ data, dateRange, insight }: CompanyDi
     } else {
       // Mostrar valor em R$
       const value = payload.displayValue;
-      const formattedValue = value >= 1000 
+      const formattedValue = value >= 1000
         ? `R$ ${(value / 1000).toFixed(0)}k`
         : `R$ ${value.toFixed(0)}`;
-      
+
       return (
-        <text 
-          x={x} 
-          y={y} 
-          fill="white" 
-          textAnchor={x > cx ? 'start' : 'end'} 
+        <text
+          x={x}
+          y={y}
+          fill="white"
+          textAnchor={x > cx ? 'start' : 'end'}
           dominantBaseline="central"
           fontSize={11}
           fontWeight="bold"
@@ -102,10 +102,10 @@ export function CompanyDistributionChart({ data, dateRange, insight }: CompanyDi
       const valuePercentage = totalValue > 0 ? ((item.valor / totalValue) * 100).toFixed(1) : 0;
       const commissionPercentage = totalCommission > 0 ? (((item.valorComissao || 0) / totalCommission) * 100).toFixed(1) : 0;
       const policyPercentage = totalPolicies > 0 ? ((item.total / totalPolicies) * 100).toFixed(1) : 0;
-      
+
       return (
         <div className="bg-gray-900/95 backdrop-blur-sm p-3 border border-gray-700 rounded-lg shadow-lg">
-          <p className="font-semibold text-white mb-2">{item.seguradora}</p>
+          <p className="font-semibold text-foreground mb-2">{item.seguradora}</p>
           <div className="space-y-1 text-sm text-gray-200">
             <p>
               <span className="font-medium">Prêmio:</span> R$ {item.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({valuePercentage}%)
@@ -126,18 +126,18 @@ export function CompanyDistributionChart({ data, dateRange, insight }: CompanyDi
   // Legenda customizada compacta
   const CustomLegend = ({ payload }: any) => {
     const total = dataType === 'premio' ? totalValue : totalCommission;
-    
+
     return (
       <div className="flex flex-wrap justify-center gap-3 mt-4 max-w-full">
         {payload.map((entry: any, index: number) => {
           const percentage = total > 0 ? ((entry.payload.displayValue / total) * 100).toFixed(0) : 0;
           return (
             <div key={`legend-${index}`} className="flex items-center gap-2 min-w-0">
-              <div 
-                className="w-3 h-3 rounded-full flex-shrink-0" 
+              <div
+                className="w-3 h-3 rounded-full flex-shrink-0"
                 style={{ backgroundColor: entry.color }}
               />
-              <span className="text-xs text-white/90 font-medium truncate">
+              <span className="text-xs text-foreground font-medium truncate">
                 {entry.payload.seguradora} - {percentage}%
               </span>
             </div>
@@ -150,10 +150,10 @@ export function CompanyDistributionChart({ data, dateRange, insight }: CompanyDi
   return (
     <AppCard className="p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white">
+        <h3 className="text-lg font-semibold text-foreground">
           Seguradoras × Faturamento
         </h3>
-        
+
         {/* Controles de visualização */}
         <div className="flex items-center gap-2">
           {/* Toggle % / R$ */}
@@ -214,8 +214,8 @@ export function CompanyDistributionChart({ data, dateRange, insight }: CompanyDi
               dataKey="displayValue"
             >
               {chartData.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
+                <Cell
+                  key={`cell-${index}`}
                   fill={COLORS[index % COLORS.length]}
                   className="hover:opacity-80 transition-opacity duration-200"
                   style={{

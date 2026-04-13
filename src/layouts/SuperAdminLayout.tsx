@@ -16,8 +16,8 @@ export function SuperAdminLayout() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Skeleton className="h-12 w-64 bg-zinc-800" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Skeleton className="h-12 w-64 bg-card" />
       </div>
     );
   }
@@ -27,7 +27,7 @@ export function SuperAdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6">
         <Outlet />
       </div>

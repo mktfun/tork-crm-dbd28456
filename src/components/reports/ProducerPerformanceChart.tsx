@@ -19,13 +19,12 @@ interface ProducerPerformanceChartProps {
 }
 
 export function ProducerPerformanceChart({ data, insight }: ProducerPerformanceChartProps) {
-  // Tooltip customizado
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-gray-900/95 backdrop-blur-lg border border-gray-700 rounded-lg p-4 shadow-xl">
-          <p className="text-white font-semibold mb-2">{label}</p>
+        <div style={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))' }} className="backdrop-blur-lg border rounded-lg p-4 shadow-xl">
+          <p className="text-foreground font-semibold mb-2">{label}</p>
           <div className="space-y-1 text-sm">
             <p className="text-blue-400">
               📊 Volume Total: R$ {data.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -49,14 +48,16 @@ export function ProducerPerformanceChart({ data, insight }: ProducerPerformanceC
   if (data.length === 0) {
     return (
       <AppCard className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Users className="w-5 h-5 text-white" />
-          <h3 className="text-lg font-semibold text-white">
-            Performance por Produtor
-          </h3>
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Users className="w-5 h-5 text-primary" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground">Performance por Produtor</h3>
+          </div>
         </div>
         <div className="text-center py-8">
-          <p className="text-slate-400 text-sm">
+          <p className="text-muted-foreground text-sm">
             Nenhum produtor com atividade no período selecionado
           </p>
         </div>
@@ -66,38 +67,44 @@ export function ProducerPerformanceChart({ data, insight }: ProducerPerformanceC
 
   return (
     <AppCard className="p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Users className="w-5 h-5 text-white" />
-        <h3 className="text-lg font-semibold text-white">
-          Performance por Produtor
-        </h3>
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Users className="w-5 h-5 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold text-foreground">Performance por Produtor</h3>
+        </div>
       </div>
-      
+
       <div className="h-80 mb-4">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
-            layout="horizontal" 
+            layout="horizontal"
             margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-            <XAxis 
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+            <XAxis
               type="number"
-              tick={{ fill: '#9CA3AF', fontSize: 12 }}
-              axisLine={{ stroke: '#4B5563' }}
+              stroke="hsl(var(--muted-foreground))"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
               tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
             />
-            <YAxis 
+            <YAxis
               type="category"
               dataKey="nome"
-              tick={{ fill: '#9CA3AF', fontSize: 12 }}
-              axisLine={{ stroke: '#4B5563' }}
+              stroke="hsl(var(--muted-foreground))"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
               width={90}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Bar 
-              dataKey="valorTotal" 
-              fill="#3B82F6"
+            <Bar
+              dataKey="valorTotal"
+              fill="hsl(var(--primary))"
               radius={[0, 4, 4, 0]}
               name="Volume Total"
             />

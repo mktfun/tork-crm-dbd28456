@@ -49,9 +49,9 @@ export function MobileExtraScreensModal() {
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button 
-          variant="ghost" 
-          className="text-white hover:text-white hover:bg-white/10 p-2 rounded-lg transition-all duration-200"
+        <Button
+          variant="ghost"
+          className="text-foreground hover:text-foreground hover:bg-muted p-2 rounded-lg transition-all duration-200"
         >
           <Grid3X3 className="h-5 w-5" />
         </Button>
@@ -62,7 +62,7 @@ export function MobileExtraScreensModal() {
       >
         <div className="py-6">
           <SheetHeader className="mb-6">
-            <SheetTitle className="text-xl font-semibold text-white text-center">
+            <SheetTitle className="text-xl font-semibold text-foreground text-center">
               Todas as Telas
             </SheetTitle>
           </SheetHeader>
@@ -78,11 +78,11 @@ export function MobileExtraScreensModal() {
                   onClick={() => handleScreenClick(screen.path)}
                 >
                   <div className="mobile-extra-screen-icon p-3 rounded-full">
-                    <IconComponent className="h-6 w-6 text-white" />
+                    <IconComponent className="h-6 w-6 text-foreground" />
                   </div>
                   <div className="text-center">
-                    <div className="text-white font-medium text-sm">{screen.title}</div>
-                    <div className="text-white/60 text-xs mt-1">{screen.description}</div>
+                    <div className="text-foreground font-medium text-sm">{screen.title}</div>
+                    <div className="text-muted-foreground text-xs mt-1">{screen.description}</div>
                   </div>
                 </Button>
               );

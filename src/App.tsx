@@ -1,7 +1,8 @@
+import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryCache } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -17,9 +18,7 @@ import Clients from "./pages/Clients";
 import ClientDetails from "./pages/ClientDetails";
 import Appointments from "./pages/Appointments";
 import Financeiro from "./pages/Financeiro";
-// BancoDashboard removed - integrated into CaixaTab
-import Tesouraria from "./pages/Tesouraria";
-import Conciliacao from "./pages/Conciliacao";
+// Tesouraria and Conciliacao are now tabs in FinanceiroERP
 import Tasks from "./pages/Tasks";
 import Renovacoes from "./pages/Renovacoes";
 import Sinistros from "./pages/Sinistros";
@@ -41,7 +40,10 @@ import CRM from "./pages/CRM";
 import AIAutomation from "./pages/AIAutomation";
 import ChatTorkSettings from "./pages/settings/ChatTorkSettings";
 import PortalSettings from "./pages/settings/PortalSettings";
+import IntegrationSettings from "./pages/settings/IntegrationSettings";
+
 import Documentation from "./pages/Documentation";
+import PortalInbox from "./pages/PortalInbox";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
 import SuperAdmin from "./pages/SuperAdmin";
 import OrganizationDetails from "./pages/OrganizationDetails";
@@ -56,6 +58,37 @@ import PortalPolicies from "./pages/portal/PortalPolicies";
 import PortalCards from "./pages/portal/PortalCards";
 import PortalProfile from "./pages/portal/PortalProfile";
 import PortalNotFound from "./pages/portal/PortalNotFound";
+import PortalWizard from "./pages/portal/PortalWizard";
+import PortalSolicitacoes from "./pages/portal/PortalSolicitacoes";
+import PortalMobileStart from "./pages/portal/PortalMobileStart";
+import { supabase } from "./integrations/supabase/client";
+import { toast } from "sonner";
+
+// ==========================================
+// CAPACITOR MOBILE APP INTEGRATIONS
+// ==========================================
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
+
+// 1. Enforce Mobile CSS Rules if running natively
+if (Capacitor.isNativePlatform()) {
+  document.body.classList.add('is-mobile-app');
+
+  // Force StatusBar to adapt to dark backgrounds (white text)
+  StatusBar.setStyle({ style: Style.Dark }).catch(() => { });
+  StatusBar.setBackgroundColor({ color: '#09090b' }).catch(() => { }); // Tailwind zinc-950
+
+  // 2. Android Hardware Back Button Handler
+  CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+    if (!canGoBack) {
+      CapacitorApp.exitApp();
+    } else {
+      window.history.back();
+    }
+  });
+}
+// ==========================================
 
 // Helper to redirect legacy detail routes to dashboard namespace
 function ParamRedirect({ toBase }: { toBase: string }) {
@@ -65,12 +98,49 @@ function ParamRedirect({ toBase }: { toBase: string }) {
   return <Navigate to={to} replace />;
 }
 
-// Create query client with default options
+// Create query client with default options and global error handling
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error: any) => {
+      // Check for Supabase JWT expiration / unauthenticated errors
+      const errorMsg = error?.message?.toLowerCase() || '';
+      const errorCode = error?.code || '';
+
+      const isAuthError =
+        error?.status === 401 ||
+        error?.status === 403 ||
+        errorCode === 'PGRST301' ||
+        errorMsg.includes('jwt') ||
+        errorMsg.includes('jws') ||
+        errorMsg.includes('expired') ||
+        errorMsg.includes('unauthenticated');
+
+      if (isAuthError) {
+        console.warn('⚠️ JWT Expired or Unauthenticated. Forcing logout...');
+
+        // Ensure UI clears out and notifies user immediately
+        toast.error("Sua sessão expirou. Por favor, faça login novamente.");
+
+        // Clear local storage and sign out
+        supabase.auth.signOut().then(() => {
+          window.location.href = '/auth';
+        }).catch(() => {
+          localStorage.clear();
+          window.location.href = '/auth';
+        });
+      }
+    }
+  }),
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
+      retry: (failureCount, error: any) => {
+        // Don't retry auth errors, fail fast to trigger logout
+        const isAuthError = error?.status === 401 || error?.code === 'PGRST301' || error?.message?.toLowerCase().includes('jwt');
+        if (isAuthError) return false;
+
+        return failureCount < 1;
+      },
     },
   },
 });
@@ -78,113 +148,119 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <div className="min-h-screen">
-              <Routes>
-                {/* Rota principal - Landing page para não autenticados */}
-                <Route path="/" element={<Landing />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/auth/confirm" element={<AuthConfirm />} />
-                <Route path="/auth/reset-password" element={<AuthConfirm />} />
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <TooltipProvider>
+              <div className="min-h-screen">
+                <Routes>
+                  {/* Rota principal - Se mobile, bloqueia na tela do APP, senão vai pro Landing Site */}
+                  <Route path="/" element={Capacitor.isNativePlatform() ? <PortalMobileStart /> : <Landing />} />
+                  <Route path="/app" element={<PortalMobileStart />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/confirm" element={<AuthConfirm />} />
+                  <Route path="/auth/reset-password" element={<AuthConfirm />} />
 
-                {/* Redirects for legacy/direct route access */}
-                <Route path="/appointments" element={<Navigate to="/dashboard/appointments" replace />} />
-                <Route path="/policies" element={<Navigate to="/dashboard/policies" replace />} />
-                <Route path="/policies/:id" element={<ParamRedirect toBase="/dashboard/policies" />} />
-                <Route path="/clients" element={<Navigate to="/dashboard/clients" replace />} />
-                <Route path="/clients/:id" element={<ParamRedirect toBase="/dashboard/clients" />} />
-                <Route path="/tasks" element={<Navigate to="/dashboard/tasks" replace />} />
-                <Route path="/faturamento" element={<Navigate to="/dashboard/financeiro" replace />} />
-                <Route path="/renovacoes" element={<Navigate to="/dashboard/renovacoes" replace />} />
-                <Route path="/sinistros" element={<Navigate to="/dashboard/sinistros" replace />} />
-                <Route path="/reports" element={<Navigate to="/dashboard/reports" replace />} />
+                  {/* Redirects for legacy/direct route access */}
+                  <Route path="/appointments" element={<Navigate to="/dashboard/appointments" replace />} />
+                  <Route path="/policies" element={<Navigate to="/dashboard/policies" replace />} />
+                  <Route path="/policies/:id" element={<ParamRedirect toBase="/dashboard/policies" />} />
+                  <Route path="/clients" element={<Navigate to="/dashboard/clients" replace />} />
+                  <Route path="/clients/:id" element={<ParamRedirect toBase="/dashboard/clients" />} />
+                  <Route path="/tasks" element={<Navigate to="/dashboard/tasks" replace />} />
+                  <Route path="/faturamento" element={<Navigate to="/dashboard/financeiro" replace />} />
+                  <Route path="/renovacoes" element={<Navigate to="/dashboard/renovacoes" replace />} />
+                  <Route path="/sinistros" element={<Navigate to="/dashboard/sinistros" replace />} />
+                  <Route path="/reports" element={<Navigate to="/dashboard/reports" replace />} />
 
-                {/* Super Admin Login - Public route */}
-                <Route path="/super-admin/login" element={<SuperAdminLogin />} />
+                  {/* Super Admin Login - Public route */}
+                  <Route path="/super-admin/login" element={<SuperAdminLogin />} />
 
-                {/* Todas as rotas do sistema são protegidas */}
-                <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <RootLayout />
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<Dashboard />} />
-                  <Route path="policies" element={<Policies />} />
-                  <Route path="policies/:id" element={<PolicyDetails />} />
-                  <Route path="clients" element={<Clients />} />
-                  <Route path="clients/:id" element={<ClientDetails />} />
-                  <Route path="appointments" element={<Appointments />} />
-                  <Route path="financeiro" element={<Financeiro />} />
-                  {/* <Route path="financeiro/banco/:id" element={<BancoDashboard />} /> - removed, now inside tab */}
-                  <Route path="tesouraria" element={<Tesouraria />} />
-                  <Route path="conciliacao" element={<Conciliacao />} />
-                  <Route path="tasks" element={<Tasks />} />
-                  <Route path="renovacoes" element={<Renovacoes />} />
-                  <Route path="sinistros" element={<Sinistros />} />
-                  <Route path="reports" element={<Reports />} />
-                  <Route path="novidades" element={<Novidades />} />
-                  <Route path="crm" element={<CRM />} />
-                  <Route path="crm/automation" element={<AIAutomation />} />
-                  <Route path="documentacao" element={<Documentation />} />
+                  {/* Todas as rotas do sistema são protegidas */}
+                  <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                      <RootLayout />
+                    </ProtectedRoute>
+                  }>
+                    <Route index element={<Dashboard />} />
+                    <Route path="policies" element={<Policies />} />
+                    <Route path="policies/:id" element={<PolicyDetails />} />
+                    <Route path="clients" element={<Clients />} />
+                    <Route path="clients/:id" element={<ClientDetails />} />
+                    <Route path="appointments" element={<Appointments />} />
+                    <Route path="financeiro" element={<Financeiro />} />
+                    {/* Tesouraria and Conciliacao are now tabs in FinanceiroERP */}
+                    <Route path="tasks" element={<Tasks />} />
+                    <Route path="renovacoes" element={<Renovacoes />} />
+                    <Route path="sinistros" element={<Sinistros />} />
+                    <Route path="reports" element={<Reports />} />
+                    <Route path="novidades" element={<Novidades />} />
+                    <Route path="crm" element={<CRM />} />
+                    <Route path="crm/automation" element={<AIAutomation />} />
+                    <Route path="documentacao" element={<Documentation />} />
+                    <Route path="solicitacoes-portal" element={<PortalInbox />} />
+                    
 
-                  {/* Super Admin routes moved outside - see below */}
-                  <Route path="demo/mobile-menu" element={<ModernMobileMenuDemo />} />
+                    {/* Super Admin routes moved outside - see below */}
+                    <Route path="demo/mobile-menu" element={<ModernMobileMenuDemo />} />
 
-                  {/* Rotas de configurações com layout próprio */}
-                  <Route path="settings" element={<SettingsLayout />}>
-                    <Route index element={<Navigate to="/dashboard/settings/profile" replace />} />
-                    <Route path="profile" element={<ProfileSettings />} />
-                    <Route path="brokerages" element={<BrokerageSettings />} />
-                    <Route path="producers" element={<ProducerSettings />} />
-                    <Route path="companies" element={<CompanySettings />} />
-                    <Route path="ramos" element={<RamoSettings />} />
-                    <Route path="transactions" element={<TransactionSettings />} />
-                    <Route path="chat-tork" element={<ChatTorkSettings />} />
-                    <Route path="portal" element={<PortalSettings />} />
+                    {/* Rotas de configurações com layout próprio */}
+                    <Route path="settings" element={<SettingsLayout />}>
+                      <Route index element={<Navigate to="/dashboard/settings/profile" replace />} />
+                      <Route path="profile" element={<ProfileSettings />} />
+                      <Route path="brokerages" element={<BrokerageSettings />} />
+                      <Route path="producers" element={<ProducerSettings />} />
+                      <Route path="companies" element={<CompanySettings />} />
+                      <Route path="ramos" element={<RamoSettings />} />
+                      <Route path="transactions" element={<TransactionSettings />} />
+                      <Route path="integrations" element={<IntegrationSettings />} />
+                    </Route>
                   </Route>
-                </Route>
 
-                {/* Portal do Cliente - Rotas dinâmicas por corretora */}
-                {/* Legacy routes redirect to portal not found */}
-                <Route path="/portal" element={<PortalNotFound />} />
-                <Route path="/portal/*" element={<PortalNotFound />} />
+                  {/* Portal do Cliente - Rotas dinâmicas por corretora */}
+                  <Route path="/portal" element={<PortalMobileStart />} />
+                  <Route path="/portal/*" element={<PortalMobileStart />} />
 
-                {/* Dynamic portal routes with brokerage slug */}
-                <Route path="/:brokerageSlug/portal" element={<PortalLogin />} />
-                <Route path="/:brokerageSlug/portal/onboarding" element={<PortalOnboarding />} />
-                <Route path="/:brokerageSlug/portal/change-password" element={<PortalChangePassword />} />
-                <Route path="/:brokerageSlug/portal" element={<PortalLayout />}>
-                  <Route path="home" element={<PortalHome />} />
-                  <Route path="policies" element={<PortalPolicies />} />
-                  <Route path="cards" element={<PortalCards />} />
-                  <Route path="profile" element={<PortalProfile />} />
-                </Route>
+                  {/* Dynamic portal routes with brokerage slug */}
+                  <Route path="/:brokerageSlug/portal" element={<PortalLogin />} />
+                  <Route path="/:brokerageSlug/portal/onboarding" element={<PortalOnboarding />} />
+                  <Route path="/:brokerageSlug/portal/change-password" element={<PortalChangePassword />} />
+                  <Route path="/:brokerageSlug/portal" element={<PortalLayout />}>
+                    <Route path="home" element={<PortalHome />} />
+                    <Route path="policies" element={<PortalPolicies />} />
+                    <Route path="cards" element={<PortalCards />} />
+                    <Route path="profile" element={<PortalProfile />} />
+                    <Route path="wizard" element={<PortalWizard />} />
+                    <Route path="solicitacoes" element={<PortalSolicitacoes />} />
+                  </Route>
 
-                {/* Área Global de Administração - ISOLADA DO LAYOUT OPERACIONAL */}
-                <Route
-                  path="/dashboard/super-admin"
-                  element={
-                    <AdminProtectedRoute>
-                      <SuperAdminLayout />
-                    </AdminProtectedRoute>
-                  }
-                >
-                  <Route index element={<SuperAdmin />} />
-                  <Route path="organizations/:id" element={<OrganizationDetails />} />
-                </Route>
+                  {/* Área Global de Administração - ISOLADA DO LAYOUT OPERACIONAL */}
+                  <Route
+                    path="/dashboard/super-admin"
+                    element={
+                      <AdminProtectedRoute>
+                        <SuperAdminLayout />
+                      </AdminProtectedRoute>
+                    }
+                  >
+                    <Route index element={<SuperAdmin />} />
+                    <Route path="organizations/:id" element={<OrganizationDetails />} />
+                  </Route>
 
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </div>
+                  {/* Rota pública para Landing Page B2C (JJSeguros) */}
+                  <Route path="/quote/:slug" element={<div className="min-h-screen flex items-center justify-center bg-background"><p className="text-muted-foreground">Landing Page — em breve</p></div>} />
 
-            {/* Toast components */}
-            <Toaster />
-            <Sonner />
-          </TooltipProvider>
-        </AuthProvider>
-      </QueryClientProvider>
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </div>
+
+              {/* Toast components */}
+              <Toaster />
+              <Sonner position="top-center" />
+            </TooltipProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

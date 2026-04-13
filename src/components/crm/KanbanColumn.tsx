@@ -7,6 +7,7 @@ import { Plus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { CRMStage, CRMDeal } from '@/hooks/useCRMDeals';
 import { DealCard } from './DealCard';
 import { Button } from '@/components/ui/button';
+import { AppCard } from '@/components/ui/app-card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,11 +67,12 @@ export function KanbanColumn({
       layoutId={isDragging ? undefined : `column-${stage.id}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: isDragging ? 0.5 : 1, y: 0 }}
-      className={`flex-shrink-0 w-80 ${isDragging ? 'z-50' : ''}`}
+      id={`kanban-column-${stage.id}`}
+      className={`flex-shrink-0 w-80 flex flex-col h-full ${isDragging ? 'z-50' : ''}`}
     >
       {/* Column Header - drag handle is the colored area */}
-      <div 
-        className="glass-component rounded-xl p-4 mb-3 cursor-grab active:cursor-grabbing"
+      <AppCard 
+        className="rounded-xl p-4 mb-3 cursor-grab active:cursor-grabbing"
         style={{ borderTop: `3px solid ${stage.color}` }}
         {...attributes}
         {...listeners}
@@ -119,13 +121,13 @@ export function KanbanColumn({
             {formatCurrency(totalValue)}
           </p>
         )}
-      </div>
+      </AppCard>
 
       {/* Column Body */}
       <div
         ref={setDroppableRef}
         className={`
-          min-h-[400px] rounded-xl p-2 transition-all duration-200
+          flex-1 overflow-y-auto no-scrollbar rounded-xl p-2 transition-all duration-200
           ${isOver ? 'bg-primary/10 ring-2 ring-dashed ring-primary/30' : 'bg-transparent'}
         `}
       >

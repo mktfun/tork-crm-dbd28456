@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -13,16 +13,15 @@ import {
   CalendarClock,
   Landmark,
   Clock,
-  Info,
   LineChart,
-  GitCompare
+  GitCompare,
+  Calendar,
+  CreditCard,
+  ArrowUpRight,
+  ChevronRight,
 } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { CashFlowChart } from '@/components/financeiro/CashFlowChart';
 import { DreTable } from '@/components/financeiro/DreTable';
@@ -30,195 +29,107 @@ import { ImportTransactionsModal } from '@/components/financeiro/ImportTransacti
 import { ImportReceiptsModal } from '@/components/financeiro/ImportReceiptsModal';
 import { ConfiguracoesTab } from '@/components/financeiro/ConfiguracoesTab';
 import { DateRangeFilter } from '@/components/financeiro/DateRangeFilter';
-import { ReceitasTab } from '@/components/financeiro/ReceitasTab';
-import { DespesasTab } from '@/components/financeiro/DespesasTab';
+import { TransacoesTab } from '@/components/financeiro/TransacoesTab';
 import { CaixaTab } from '@/components/financeiro/CaixaTab';
 import { TesourariaTab } from '@/components/financeiro/TesourariaTab';
 import { ProvisoesTab } from '@/components/financeiro/ProvisoesTab';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
-import { ReconciliationPage } from '@/components/financeiro/reconciliation';
-import { ModuloFaturamento } from '@/components/financeiro/dashboard/ModuloFaturamento';
+import { ReconciliationPage } from '@/features/finance/components/reconciliation';
+import { MetasCard } from '@/components/financeiro/faturamento/MetasCard';
 import { ModuloTesouraria } from '@/components/financeiro/dashboard/ModuloTesouraria';
 import { ModuloMultiBancos } from '@/components/financeiro/dashboard/ModuloMultiBancos';
+import { RecentTransactionsCard } from '@/components/financeiro/dashboard/RecentTransactionsCard';
+import { GlassKpiCard } from '@/components/financeiro/shared/GlassKpiCard';
+import { PageDebugger } from '@/components/shared/PageDebugger';
 import {
   useFinancialAccountsWithDefaults,
-  useRecentTransactions,
   useCashFlowData,
   useFinancialSummary,
-  useTotalPendingReceivables,
-  usePendingThisMonth
 } from '@/hooks/useFinanceiro';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import { parseLocalDate } from '@/utils/dateUtils';
+
 import { cn } from '@/lib/utils';
-import { ptBR } from 'date-fns/locale';
 
-// ============ KPI CONFIGURATION - 4 KPIS SIMPLES ============
-
-const FIXED_KPIS = [
-  { id: 'totalIncome', label: 'Recebido no Mês' },
-  { id: 'totalExpense', label: 'Despesas do Mês' },
-  { id: 'pendingThisMonth', label: 'Vencendo este Mês' },
-  { id: 'totalPending', label: 'Total Geral a Receber' },
-] as const;
+// ============ HELPERS ============
 
 function formatCurrency(value: number): string {
+  const safeValue = typeof value === 'number' && !isNaN(value) ? value : 0;
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL'
-  }).format(value);
+  }).format(safeValue);
 }
 
-// ============ 3 KPIs GLOBAIS NO HEADER ============
-
-interface GlobalKpiCardProps {
-  title: string;
-  value: number;
-  icon: React.ElementType;
-  variant: 'primary' | 'success' | 'danger' | 'warning' | 'info';
-  isLoading?: boolean;
-  subtitle?: string;
-  tooltip?: string;
+function calcTrend(current: number, previous: number): { value: number; label: string } | null {
+  if (!previous || previous === 0) return null;
+  const pct = Math.round(((current - previous) / previous) * 100);
+  if (pct === 0) return null;
+  return { value: pct, label: 'vs anterior' };
 }
 
-function GlobalKpiCard({ title, value, icon: Icon, variant, isLoading, subtitle, tooltip }: GlobalKpiCardProps) {
-  const styles = {
-    primary: 'from-primary/10 to-primary/5 border-primary/20',
-    success: 'from-emerald-500/10 to-emerald-600/5 border-emerald-500/20',
-    danger: 'from-rose-500/10 to-rose-600/5 border-rose-500/20',
-    warning: 'from-amber-500/10 to-amber-600/5 border-amber-500/20',
-    info: 'from-sky-500/10 to-sky-600/5 border-sky-500/20',
-  };
-  const iconStyles = {
-    primary: 'bg-primary/20 text-primary',
-    success: 'bg-emerald-500/20 text-emerald-500',
-    danger: 'bg-rose-500/20 text-rose-500',
-    warning: 'bg-amber-500/20 text-amber-500',
-    info: 'bg-sky-500/20 text-sky-500',
-  };
-  const valueStyles = {
-    primary: 'text-foreground',
-    success: 'text-emerald-500',
-    danger: 'text-rose-500',
-    warning: 'text-amber-500',
-    info: 'text-sky-500',
-  };
-
-  const cardContent = (
-    <Card className={cn('bg-gradient-to-br border', styles[variant])}>
-      <CardContent className="p-5">
-        <div className="flex items-center gap-4">
-          <div className={cn('p-3 rounded-lg', iconStyles[variant])}>
-            <Icon className="w-5 h-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1">
-              <p className="text-sm text-muted-foreground">{title}</p>
-              {tooltip && (
-                <Info className="w-3.5 h-3.5 text-muted-foreground/50" />
-              )}
-            </div>
-            {isLoading ? (
-              <Skeleton className="h-7 w-24 mt-1" />
-            ) : (
-              <>
-                <p className={cn('text-xl font-bold', valueStyles[variant])}>
-                  {formatCurrency(value)}
-                </p>
-                {subtitle && (
-                  <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  if (tooltip) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            {cardContent}
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-xs">
-            <p className="text-sm">{tooltip}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
-
-  return cardContent;
-}
-
-// ============ SIMPLE 4 KPI SECTION ============
+// ============ KPI SECTION ============
 
 interface KpiSectionProps {
-  summary: {
-    totalIncome?: number;
-    totalExpense?: number;
-  } | null | undefined;
-  pendingThisMonth: { total_amount: number; pending_count: number } | undefined;
-  totalPending: { total_amount: number; pending_count: number } | undefined;
-  isLoading: boolean;
+  startDate: string;
+  endDate: string;
 }
 
-function KpiSection({ summary, pendingThisMonth, totalPending, isLoading }: KpiSectionProps) {
-  const kpis = [
-    {
-      title: 'Recebido no Mês',
-      value: summary?.totalIncome ?? 0,
-      icon: TrendingUp,
-      variant: 'success' as const,
-      tooltip: 'Receitas confirmadas no período selecionado. Apenas transações com status "completed" são contabilizadas.',
-    },
-    {
-      title: 'Despesas do Mês',
-      value: summary?.totalExpense ?? 0,
-      icon: TrendingDown,
-      variant: 'danger' as const,
-      tooltip: 'Despesas confirmadas no período selecionado. Apenas transações com status "completed" são contabilizadas.',
-    },
-    {
-      title: 'Vencendo este Mês',
-      value: pendingThisMonth?.total_amount ?? 0,
-      icon: CalendarClock,
-      variant: 'warning' as const,
-      subtitle: pendingThisMonth?.pending_count ? `${pendingThisMonth.pending_count} parcelas` : undefined,
-      tooltip: 'Receitas pendentes (a receber) com vencimento no mês atual. Baseado na data de vencimento (due_date).',
-    },
-    {
-      title: 'Total Geral a Receber',
-      value: totalPending?.total_amount ?? 0,
-      icon: Clock,
-      variant: 'info' as const,
-      subtitle: totalPending?.pending_count ? `${totalPending.pending_count} parcelas` : undefined,
-      tooltip: 'Total histórico de receitas pendentes (a receber), independente da data. Não é filtrado pelo período selecionado.',
-    },
-  ];
+function KpiSection({ startDate, endDate }: KpiSectionProps) {
+  const { data: summary, isLoading } = useFinancialSummary(startDate, endDate);
+  const navigate = useNavigate();
+
+  const current = summary?.current;
+  const previous = summary?.previous;
+
+  // Detect if period is longer than ~35 days to use "no Período" instead of "no Mês"
+  const periodDays = Math.abs(
+    (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const periodLabel = periodDays > 35 ? 'no Período' : 'no Mês';
+  const periodLabelDo = periodDays > 35 ? 'do Período' : 'do Mês';
+  const periodLabelEste = periodDays > 35 ? 'no Período' : 'este Mês';
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {kpis.map((kpi) => (
-        <GlobalKpiCard
-          key={kpi.title}
-          title={kpi.title}
-          value={kpi.value}
-          icon={kpi.icon}
-          variant={kpi.variant}
-          isLoading={isLoading}
-          subtitle={kpi.subtitle}
-          tooltip={kpi.tooltip}
-        />
-      ))}
+      <GlassKpiCard
+        title={`Recebido ${periodLabel}`}
+        value={formatCurrency(current?.totalIncome ?? 0)}
+        icon={TrendingUp}
+        iconClassName="text-emerald-400 drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]"
+        isLoading={isLoading}
+        trend={calcTrend(current?.totalIncome ?? 0, previous?.totalIncome ?? 0)}
+        onClick={() => navigate('/dashboard/financeiro?tab=transacoes&type=revenue')}
+      />
+      <GlassKpiCard
+        title={`Despesas ${periodLabelDo}`}
+        value={formatCurrency(current?.totalExpense ?? 0)}
+        icon={TrendingDown}
+        iconClassName="text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.4)]"
+        isLoading={isLoading}
+        trend={calcTrend(current?.totalExpense ?? 0, previous?.totalExpense ?? 0)}
+        onClick={() => navigate('/dashboard/financeiro?tab=transacoes&type=expense')}
+      />
+      <GlassKpiCard
+        title={`Vencendo ${periodLabelEste}`}
+        value={formatCurrency(current?.pendingIncome ?? 0)}
+        icon={CalendarClock}
+        iconClassName="text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.4)]"
+        isLoading={isLoading}
+        onClick={() => navigate('/dashboard/financeiro?tab=tesouraria&status=pending')}
+      />
+      <GlassKpiCard
+        title="Total Geral a Receber"
+        value={formatCurrency(current?.operationalPendingIncome ?? 0)}
+        icon={Clock}
+        iconClassName="text-sky-400 drop-shadow-[0_0_6px_rgba(56,189,248,0.4)]"
+        isLoading={isLoading}
+        onClick={() => navigate('/dashboard/financeiro?tab=tesouraria&view=operational')}
+      />
     </div>
   );
 }
 
-// ============ VISÃO GERAL (APENAS GRÁFICO) ============
+// ============ VISÃO GERAL ============
 
 interface VisaoGeralProps {
   dateRange: DateRange | undefined;
@@ -257,30 +168,14 @@ function VisaoGeral({ dateRange, onNavigate, onTabChange }: VisaoGeralProps) {
 
   return (
     <div className="space-y-6">
-      {/* Módulos do Dashboard Executivo */}
+      <CashFlowChart data={cashFlowData} isLoading={cashFlowLoading} granularity="day" />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Linha 1: Tesouraria (Largura Total) */}
-        <div className="col-span-1 lg:col-span-2 h-full">
-          <ModuloTesouraria onClick={() => onTabChange('tesouraria')} />
+        <div onClick={() => onTabChange('transacoes')} className="cursor-pointer transition-transform hover:scale-[1.01]">
+          <MetasCard />
         </div>
-
-        {/* Linha 2: Coluna Esquerda - Faturamento */}
-        <div className="h-full">
-          <ModuloFaturamento onClick={() => onTabChange('receitas')} />
-        </div>
-
-        {/* Linha 2: Coluna Direita - Bancos */}
-        <div className="h-full">
-          <ModuloMultiBancos onClick={() => onTabChange('caixa')} />
-        </div>
+        <ModuloMultiBancos onClick={() => onTabChange('caixa')} />
       </div>
-
-      {/* Gráfico de Fluxo de Caixa */}
-      <CashFlowChart
-        data={cashFlowData}
-        isLoading={cashFlowLoading}
-        granularity="day"
-      />
+      <ModuloTesouraria onClick={() => onTabChange('tesouraria')} />
     </div>
   );
 }
@@ -301,276 +196,141 @@ function DreTab() {
   );
 }
 
-// ============ ÚLTIMAS MOVIMENTAÇÕES (COMPACTO NO FINAL) ============
-
-interface RecentMovementsProps {
-  onViewDetails: (id: string) => void;
-}
-
-function RecentMovements({ onViewDetails }: RecentMovementsProps) {
-  const { data: transactions = [], isLoading } = useRecentTransactions();
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <CalendarClock className="w-4 h-4" />
-            Últimas Movimentações
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (transactions.length === 0) {
-    return null;
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <CalendarClock className="w-4 h-4" />
-            Últimas Movimentações
-          </CardTitle>
-          <Badge variant="secondary" className="text-xs">
-            {transactions.length} recentes
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-          {transactions.slice(0, 8).map((tx) => {
-            const txDate = parseLocalDate(String(tx.transaction_date));
-            // ✅ Usar status real da RPC (não inferir por reference_number)
-            const isPending = tx.status === 'pending';
-
-            return (
-              <div
-                key={tx.id}
-                className={cn(
-                  "p-3 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer",
-                  isPending && "border-l-2 border-amber-500/50"
-                )}
-                onClick={() => onViewDetails(tx.id)}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-medium truncate">{tx.description}</p>
-                      {isPending && (
-                        <Badge variant="outline" className="text-amber-500 border-amber-500/30 text-[10px] px-1 py-0 h-4 flex-shrink-0">
-                          Pendente
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {format(txDate, "dd/MM", { locale: ptBR })}
-                    </p>
-                  </div>
-                  <p className={cn(
-                    "text-sm font-semibold flex-shrink-0",
-                    tx.total_amount > 0 ? 'text-emerald-500' : 'text-rose-500'
-                  )}>
-                    {tx.total_amount > 0 ? '+' : ''}{formatCurrency(Math.abs(tx.total_amount))}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 // ============ MAIN COMPONENT ============
 
 export default function FinanceiroERP() {
   usePageTitle('Financeiro');
   const [searchParams, setSearchParams] = useSearchParams();
-
-  // Estado global de filtro de datas
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
-  });
-
-  // Estado para controle da aba e detalhes
-  const [activeTab, setActiveTab] = useState('visao-geral');
-  const [detailsTransactionId, setDetailsTransactionId] = useState<string | null>(null);
-  const [isLegacyLookup, setIsLegacyLookup] = useState(false);
   const navigate = useNavigate();
 
-  // Datas normalizadas para queries
-  const { startDate, endDate } = useMemo(() => {
-    const from = dateRange?.from || startOfMonth(new Date());
-    const to = dateRange?.to || endOfMonth(new Date());
-    return {
-      startDate: format(startOfDay(from), 'yyyy-MM-dd'),
-      endDate: format(endOfDay(to), 'yyyy-MM-dd')
-    };
-  }, [dateRange]);
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'visao-geral');
 
-  // KPIs globais - apenas transações EFETIVADAS (completed)
-  const { data: summary, isLoading: summaryLoading } = useFinancialSummary(startDate, endDate);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  });
 
-  // KPIs adicionais - pendentes
-  const { data: pendingThisMonth, isLoading: pendingThisMonthLoading } = usePendingThisMonth();
-  const { data: totalPending, isLoading: totalPendingLoading } = useTotalPendingReceivables();
+  const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : format(startOfMonth(new Date()), 'yyyy-MM-dd');
+  const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
-  // Deep link: verificar parâmetros da URL ao carregar
-  useEffect(() => {
-    const transactionId = searchParams.get('transactionId');
-    const legacyId = searchParams.get('legacyId');
-    const tabParam = searchParams.get('tab');
+  // Controle do Modal de Detalhes (Sheet)
+  const detailsTransactionId = searchParams.get('details');
+  const isLegacyLookup = searchParams.get('lookup') === 'legacy';
 
-    if (transactionId || legacyId) {
-      setDetailsTransactionId(transactionId || legacyId);
-      setIsLegacyLookup(!!legacyId && !transactionId);
-      setActiveTab('receitas');
-    } else if (tabParam) {
-      setActiveTab(tabParam);
-    }
-  }, [searchParams]);
-
-  // Limpar URL quando fechar a gaveta
-  const handleCloseDetails = () => {
-    setDetailsTransactionId(null);
-    setIsLegacyLookup(false);
-
-    if (searchParams.has('transactionId') || searchParams.has('legacyId')) {
-      searchParams.delete('transactionId');
-      searchParams.delete('legacyId');
-      setSearchParams(searchParams, { replace: true });
-    }
+  const handleViewTransactionDetails = (id: string, legacy = false) => {
+    setSearchParams(prev => {
+      prev.set('details', id);
+      if (legacy) prev.set('lookup', 'legacy');
+      return prev;
+    });
   };
 
-  const handleViewTransactionDetails = (id: string) => {
-    setDetailsTransactionId(id);
-    setIsLegacyLookup(false);
+  const handleCloseDetails = () => {
+    setSearchParams(prev => {
+      prev.delete('details');
+      prev.delete('lookup');
+      return prev;
+    });
   };
 
   return (
-    <div className="space-y-6">
-      {/* Action Bar (Header removido - agora está na página pai Financeiro.tsx) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-2">
-        <DateRangeFilter value={dateRange} onChange={setDateRange} />
-        <ImportReceiptsModal />
-        <ImportTransactionsModal />
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 h-full">
+      <div className="max-w-[1600px] mx-auto space-y-6">
+        {/* Action Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-2">
+          <DateRangeFilter value={dateRange} onChange={setDateRange} />
+          <ImportReceiptsModal />
+          <ImportTransactionsModal />
+        </div>
+
+        {/* KPIs - Glass Design */}
+        <KpiSection startDate={startDate} endDate={endDate} />
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="bg-muted/50 backdrop-blur-md border border-border/50 p-1 rounded-xl">
+            <TabsTrigger value="visao-geral" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <BarChart3 className="w-4 h-4" />
+              Visão Geral
+            </TabsTrigger>
+            <TabsTrigger value="caixa" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <Landmark className="w-4 h-4" />
+              Bancos
+            </TabsTrigger>
+            <TabsTrigger value="tesouraria" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <Wallet className="w-4 h-4" />
+              Tesouraria
+            </TabsTrigger>
+            <TabsTrigger value="transacoes" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <Wallet className="w-4 h-4" />
+              Transações
+            </TabsTrigger>
+            <TabsTrigger value="provisoes" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <LineChart className="w-4 h-4" />
+              Provisões
+            </TabsTrigger>
+            <TabsTrigger value="dre" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <FileSpreadsheet className="w-4 h-4" />
+              DRE
+            </TabsTrigger>
+            <TabsTrigger value="conciliacao" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <GitCompare className="w-4 h-4" />
+              Conciliação
+            </TabsTrigger>
+            <TabsTrigger value="config" className="gap-2 data-[state=active]:bg-muted data-[state=active]:text-foreground">
+              <Settings className="w-4 h-4" />
+              Configurações
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="visao-geral">
+            <VisaoGeral
+              dateRange={dateRange}
+              onNavigate={(path) => navigate(path)}
+              onTabChange={setActiveTab}
+            />
+            <div className="mt-6">
+              <RecentTransactionsCard onViewDetails={handleViewTransactionDetails} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="caixa">
+            <CaixaTab dateRange={dateRange} />
+          </TabsContent>
+
+          <TabsContent value="tesouraria">
+            <TesourariaTab dateRange={dateRange} />
+          </TabsContent>
+
+          <TabsContent value="transacoes">
+            <TransacoesTab dateRange={dateRange} />
+          </TabsContent>
+
+          <TabsContent value="provisoes">
+            <ProvisoesTab dateRange={dateRange} />
+          </TabsContent>
+
+          <TabsContent value="dre">
+            <DreTab />
+          </TabsContent>
+
+          <TabsContent value="conciliacao">
+            <ReconciliationPage />
+          </TabsContent>
+
+          <TabsContent value="config">
+            <ConfiguracoesTab />
+          </TabsContent>
+        </Tabs>
+
+        <TransactionDetailsSheet
+          transactionId={detailsTransactionId}
+          isLegacyId={isLegacyLookup}
+          open={!!detailsTransactionId}
+          onClose={handleCloseDetails}
+        />
+
+        {import.meta.env.DEV && <PageDebugger context={activeTab} />}
       </div>
-
-      {/* KPIs Fixos - 4 Cards Simples */}
-      <KpiSection
-        summary={summary}
-        pendingThisMonth={pendingThisMonth}
-        totalPending={totalPending}
-        isLoading={summaryLoading || pendingThisMonthLoading || totalPendingLoading}
-      />
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-muted/50">
-          <TabsTrigger value="visao-geral" className="gap-2">
-            <BarChart3 className="w-4 h-4" />
-            Visão Geral
-          </TabsTrigger>
-          <TabsTrigger value="caixa" className="gap-2">
-            <Landmark className="w-4 h-4" />
-            Bancos
-          </TabsTrigger>
-          <TabsTrigger value="tesouraria" className="gap-2">
-            <Wallet className="w-4 h-4" />
-            Tesouraria
-          </TabsTrigger>
-          <TabsTrigger value="receitas" className="gap-2">
-            <TrendingUp className="w-4 h-4" />
-            Receitas
-          </TabsTrigger>
-          <TabsTrigger value="despesas" className="gap-2">
-            <TrendingDown className="w-4 h-4" />
-            Despesas
-          </TabsTrigger>
-          <TabsTrigger value="provisoes" className="gap-2">
-            <LineChart className="w-4 h-4" />
-            Provisões
-          </TabsTrigger>
-          <TabsTrigger value="dre" className="gap-2">
-            <FileSpreadsheet className="w-4 h-4" />
-            DRE
-          </TabsTrigger>
-
-          <TabsTrigger value="conciliacao" className="gap-2">
-            <GitCompare className="w-4 h-4" />
-            Conciliação
-          </TabsTrigger>
-          <TabsTrigger value="config" className="gap-2">
-            <Settings className="w-4 h-4" />
-            Configurações
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="visao-geral">
-          <VisaoGeral
-            dateRange={dateRange}
-            onNavigate={(path) => navigate(path)}
-            onTabChange={setActiveTab}
-          />
-          <div className="mt-6">
-            <RecentMovements onViewDetails={handleViewTransactionDetails} />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="caixa">
-          <CaixaTab dateRange={dateRange} />
-        </TabsContent>
-
-        <TabsContent value="tesouraria">
-          <TesourariaTab dateRange={dateRange} />
-        </TabsContent>
-
-        <TabsContent value="receitas">
-          <ReceitasTab dateRange={dateRange} />
-        </TabsContent>
-
-        <TabsContent value="despesas">
-          <DespesasTab dateRange={dateRange} />
-        </TabsContent>
-
-        <TabsContent value="provisoes">
-          <ProvisoesTab dateRange={dateRange} />
-        </TabsContent>
-
-        <TabsContent value="dre">
-          <DreTab />
-        </TabsContent>
-
-
-
-        <TabsContent value="conciliacao">
-          <ReconciliationPage />
-        </TabsContent>
-
-        <TabsContent value="config">
-          <ConfiguracoesTab />
-        </TabsContent>
-      </Tabs>
-
-
-      {/* Deep Link Details Sheet */}
-      <TransactionDetailsSheet
-        transactionId={detailsTransactionId}
-        isLegacyId={isLegacyLookup}
-        open={!!detailsTransactionId}
-        onClose={handleCloseDetails}
-      />
     </div>
   );
 }

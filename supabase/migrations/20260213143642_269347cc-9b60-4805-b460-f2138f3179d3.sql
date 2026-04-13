@@ -1,0 +1,1 @@
+ALTER TABLE public.crm_settings ADD COLUMN IF NOT EXISTS n8n_webhook_url text;

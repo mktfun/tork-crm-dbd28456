@@ -45,6 +45,7 @@ export function useRealtimeClients() {
           // Invalida as queries de clientes, forçando a UI a buscar os dados mais recentes
           queryClient.invalidateQueries({ queryKey: ['clients'] });
           queryClient.invalidateQueries({ queryKey: ['all-clients'] });
+          queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
         }
       )
       .subscribe((status) => {

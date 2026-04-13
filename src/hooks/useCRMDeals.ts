@@ -20,6 +20,7 @@ export interface CRMDeal {
   user_id: string;
   client_id: string | null;
   stage_id: string;
+  product_id: string | null;
   chatwoot_conversation_id: number | null;
   title: string;
   value: number;
@@ -35,6 +36,10 @@ export interface CRMDeal {
     name: string;
     phone: string;
     email: string;
+  };
+  product?: {
+    id: string;
+    name: string;
   };
 }
 
@@ -258,7 +263,8 @@ export function useCRMDeals(pipelineId: string | null = null) {
         .from('crm_deals')
         .select(`
           *,
-          client:clientes(id, name, phone, email)
+          client:clientes(id, name, phone, email),
+          product:crm_products(id, name)
         `)
         .eq('user_id', user!.id);
 
@@ -287,7 +293,6 @@ export function useCRMDeals(pipelineId: string | null = null) {
           event: '*',
           schema: 'public',
           table: 'crm_deals',
-          filter: `user_id=eq.${user.id}`
         },
         (payload) => {
           console.log('CRM Deal change:', payload);
@@ -309,6 +314,7 @@ export function useCRMDeals(pipelineId: string | null = null) {
           title: deal.title!,
           stage_id: deal.stage_id!,
           client_id: deal.client_id || null,
+          product_id: (deal as any).product_id || null,
           value: deal.value || 0,
           expected_close_date: deal.expected_close_date || null,
           notes: deal.notes || null,
@@ -316,7 +322,7 @@ export function useCRMDeals(pipelineId: string | null = null) {
           user_id: user!.id,
           sync_token: crypto.randomUUID(),
           last_sync_source: 'crm' as const
-        })
+        } as any)
         .select()
         .single();
 
@@ -356,6 +362,11 @@ export function useCRMDeals(pipelineId: string | null = null) {
       console.log('📝 Updating Deal:', data.id, 'stage_id:', data.stage_id);
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
       
+      if (!data.chatwoot_conversation_id) {
+        console.log('⏭️ Sem conversa Tork vinculada, sync ignorado');
+        return;
+      }
+
       // Sync com Tork se a etapa mudou
       if (stageChanged && data.stage_id) {
         console.log('🔄 Stage changed! Syncing to Tork:', { deal_id: data.id, new_stage_id: data.stage_id });
@@ -376,7 +387,7 @@ export function useCRMDeals(pipelineId: string | null = null) {
         );
       }
       
-      // Always create audit note for any update (non-blocking)
+      // Audit note for any update (non-blocking)
       if (data.client_id) {
         supabase.functions.invoke('chatwoot-sync', {
           body: { action: 'sync_deal_attributes', deal_id: data.id }
@@ -394,35 +405,37 @@ export function useCRMDeals(pipelineId: string | null = null) {
   });
 
   const deleteDeal = useMutation({
-    mutationFn: async (deal: { id: string; title: string; client_id: string | null }) => {
+    mutationFn: async (deal: { id: string; title: string; client_id: string | null; chatwoot_conversation_id?: number | null }) => {
       const { error } = await supabase
         .from('crm_deals')
         .delete()
         .eq('id', deal.id);
 
       if (error) throw error;
-      return deal; // Return for onSuccess
+      return deal;
     },
     onSuccess: async (deletedDeal) => {
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
       toast.success('Negócio removido');
       
-      // Sync deletion to Tork (non-blocking)
-      if (deletedDeal.client_id) {
-        supabase.functions.invoke('chatwoot-sync', {
-          body: {
-            action: 'delete_deal',
-            deal_title: deletedDeal.title,
-            client_id: deletedDeal.client_id
-          }
-        }).then(response => {
-          if (response.data?.success) {
-            toast.success('Histórico atualizado no Tork', { id: 'tork-delete' });
-          }
-        }).catch(err => {
-          console.warn('Failed to sync deletion to Tork:', err);
-        });
+      if (!deletedDeal.chatwoot_conversation_id || !deletedDeal.client_id) {
+        console.log('⏭️ Sem conversa Tork vinculada, sync de exclusão ignorado');
+        return;
       }
+
+      supabase.functions.invoke('chatwoot-sync', {
+        body: {
+          action: 'delete_deal',
+          deal_title: deletedDeal.title,
+          client_id: deletedDeal.client_id
+        }
+      }).then(response => {
+        if (response.data?.success) {
+          toast.success('Histórico atualizado no Tork', { id: 'tork-delete' });
+        }
+      }).catch(err => {
+        console.warn('Failed to sync deletion to Tork:', err);
+      });
     },
     onError: (error: any) => {
       toast.error('Erro ao remover negócio');
@@ -454,7 +467,11 @@ export function useCRMDeals(pipelineId: string | null = null) {
       console.log('🚀 Moving Deal:', data.id, 'to Stage:', data.stage_id);
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
       
-      // Validar que stage_id existe antes de sincronizar
+      if (!data.chatwoot_conversation_id) {
+        console.log('⏭️ Sem conversa Tork vinculada, sync ignorado');
+        return;
+      }
+
       if (!data.stage_id) {
         console.error('❌ stage_id is undefined! Cannot sync to Tork.');
         return;
@@ -462,7 +479,6 @@ export function useCRMDeals(pipelineId: string | null = null) {
       
       console.log('📦 Invoking tork-sync:', { deal_id: data.id, new_stage_id: data.stage_id, sync_token: newSyncToken });
       
-      // Sync com Tork com feedback visual
       toast.promise(
         supabase.functions.invoke('chatwoot-sync', {
           body: {

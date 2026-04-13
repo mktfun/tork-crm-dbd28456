@@ -1,0 +1,1 @@
+DELETE FROM producers WHERE id = '86d040a4-a7b5-468b-a711-89b2a19261d5';

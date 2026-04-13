@@ -30,7 +30,7 @@ export default function PortalOnboarding() {
   const [client, setClient] = useState<ClientData | null>(null);
   const [currentPassword, setCurrentPassword] = useState('123456');
   const [slug, setSlug] = useState('');
-  
+
   // Form data
   const [cpf, setCpf] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -39,26 +39,24 @@ export default function PortalOnboarding() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  
+
   const navigate = useNavigate();
 
   useEffect(() => {
     const storedClient = sessionStorage.getItem('portal_client');
     const storedSlug = sessionStorage.getItem('portal_brokerage_slug');
-    
+
     if (!storedClient || !storedSlug) {
       navigate('/');
       return;
     }
-    
+
     setSlug(storedSlug);
     const clientData = JSON.parse(storedClient);
     setClient(clientData);
-    
-    // Store current password for RPC validation
+
     setCurrentPassword(clientData.portal_password || '123456');
-    
-    // Pre-fill existing data
+
     if (clientData.cpf_cnpj) setCpf(formatCpf(clientData.cpf_cnpj));
     if (clientData.birth_date) setBirthDate(clientData.birth_date);
     if (clientData.phone) setPhone(formatPhone(clientData.phone));
@@ -92,13 +90,13 @@ export default function PortalOnboarding() {
     const digits = cpf.replace(/\D/g, '');
     if (digits.length !== 11) return false;
     if (/^(\d)\1+$/.test(digits)) return false;
-    
+
     let sum = 0;
     for (let i = 0; i < 9; i++) sum += parseInt(digits[i]) * (10 - i);
     let check = 11 - (sum % 11);
     if (check >= 10) check = 0;
     if (check !== parseInt(digits[9])) return false;
-    
+
     sum = 0;
     for (let i = 0; i < 10; i++) sum += parseInt(digits[i]) * (11 - i);
     check = 11 - (sum % 11);
@@ -108,7 +106,7 @@ export default function PortalOnboarding() {
 
   const handleNext = () => {
     setError('');
-    
+
     if (step === 1) {
       const normalizedCpf = cpf.replace(/\D/g, '');
       if (!normalizedCpf || normalizedCpf.length < 11) {
@@ -120,7 +118,7 @@ export default function PortalOnboarding() {
         return;
       }
     }
-    
+
     if (step === 2) {
       if (!phone || phone.replace(/\D/g, '').length < 10) {
         setError('Telefone é obrigatório');
@@ -131,7 +129,7 @@ export default function PortalOnboarding() {
         return;
       }
     }
-    
+
     setStep(step + 1);
   };
 
@@ -142,7 +140,7 @@ export default function PortalOnboarding() {
 
   const handleSubmit = async () => {
     setError('');
-    
+
     if (!password || password.length < 6) {
       setError('A senha deve ter pelo menos 6 caracteres');
       return;
@@ -157,24 +155,22 @@ export default function PortalOnboarding() {
 
     try {
       const normalizedCpf = cpf.replace(/\D/g, '');
-      
-      // Check if CPF already exists in another client
-      const { data: existingClients, error: checkError } = await supabase
-        .from('clientes')
-        .select('id, name')
-        .eq('user_id', client.user_id)
-        .neq('id', client.id)
-        .or(`cpf_cnpj.ilike.%${normalizedCpf}%`);
+
+      const { data: dupCheck, error: checkError } = await supabase.rpc('check_portal_cpf_duplicate' as any, {
+        p_client_id: client.id,
+        p_user_id: client.user_id,
+        p_cpf: normalizedCpf
+      });
 
       if (checkError) throw checkError;
 
-      if (existingClients && existingClients.length > 0) {
-        setError(`Este CPF já está cadastrado para "${existingClients[0].name}". Entre em contato com a corretora.`);
+      const dupResult = dupCheck as any;
+      if (dupResult?.duplicate) {
+        setError(`Este CPF já está cadastrado para "${dupResult.name}". Entre em contato com a corretora.`);
         setIsLoading(false);
         return;
       }
 
-      // Use RPC to update (bypasses RLS)
       const { data: result, error: rpcError } = await supabase.rpc('update_portal_profile', {
         p_client_id: client.id,
         p_verify_password: currentPassword,
@@ -193,14 +189,13 @@ export default function PortalOnboarding() {
       }
 
       const response = result as unknown as UpdateProfileResponse;
-      
+
       if (!response?.success) {
         setError(response?.error || 'Erro ao salvar dados');
         setIsLoading(false);
         return;
       }
 
-      // Update session storage with new data
       const updatedClient = {
         ...client,
         cpf_cnpj: normalizedCpf,
@@ -214,7 +209,7 @@ export default function PortalOnboarding() {
 
       toast.success('Cadastro atualizado com sucesso!');
       navigate(`/${slug}/portal/home`);
-      
+
     } catch (err) {
       console.error('Onboarding error:', err);
       setError('Erro ao salvar dados. Tente novamente.');
@@ -230,42 +225,41 @@ export default function PortalOnboarding() {
   ];
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#050505] p-4">
-      <Card className="w-full max-w-lg bg-[#0A0A0A] border-white/5 backdrop-blur-xl shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-lg bg-card border-border backdrop-blur-xl shadow-2xl">
         <CardHeader className="text-center space-y-2">
           <div className="w-16 h-16 bg-gradient-to-br from-[#D4AF37] to-[#C5A028] rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-lg shadow-[#D4AF37]/20">
             <Shield className="w-8 h-8 text-black" />
           </div>
-          <CardTitle className="text-2xl text-white font-light tracking-wide">Atualize seus dados</CardTitle>
-          <CardDescription className="text-zinc-500">
+          <CardTitle className="text-2xl text-foreground font-light tracking-wide">Atualize seus dados</CardTitle>
+          <CardDescription className="text-muted-foreground">
             Complete seu cadastro para continuar
           </CardDescription>
-          
+
           {/* Progress Steps */}
           <div className="flex justify-center gap-2 pt-4">
             {steps.map((s) => (
               <div key={s.number} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
-                  step >= s.number 
-                    ? 'bg-gradient-to-br from-[#D4AF37] to-[#C5A028] text-black shadow-lg shadow-[#D4AF37]/20' 
-                    : 'bg-zinc-800 text-zinc-500 border border-white/10'
-                }`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${step >= s.number
+                    ? 'bg-gradient-to-br from-[#D4AF37] to-[#C5A028] text-black shadow-lg shadow-[#D4AF37]/20'
+                    : 'bg-muted text-muted-foreground border border-border'
+                  }`}>
                   {step > s.number ? <Check className="w-4 h-4" /> : s.number}
                 </div>
                 {s.number < 3 && (
-                  <div className={`w-8 h-0.5 mx-1 ${step > s.number ? 'bg-[#D4AF37]' : 'bg-zinc-800'}`} />
+                  <div className={`w-8 h-0.5 mx-1 ${step > s.number ? 'bg-[#D4AF37]' : 'bg-muted'}`} />
                 )}
               </div>
             ))}
           </div>
         </CardHeader>
-        
+
         <CardContent className="space-y-4">
           {/* Step 1: Identification */}
           {step === 1 && (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="space-y-2">
-                <Label htmlFor="cpf" className="text-zinc-400 text-sm font-light">CPF *</Label>
+                <Label htmlFor="cpf" className="text-muted-foreground text-sm font-light">CPF *</Label>
                 <Input
                   id="cpf"
                   type="text"
@@ -273,17 +267,17 @@ export default function PortalOnboarding() {
                   value={cpf}
                   onChange={(e) => { setCpf(formatCpf(e.target.value)); setError(''); }}
                   maxLength={14}
-                  className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
+                  className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="birthDate" className="text-zinc-400 text-sm font-light">Data de Nascimento</Label>
+                <Label htmlFor="birthDate" className="text-muted-foreground text-sm font-light">Data de Nascimento</Label>
                 <Input
                   id="birthDate"
                   type="date"
                   value={birthDate}
                   onChange={(e) => setBirthDate(e.target.value)}
-                  className="bg-zinc-950/50 border-white/10 text-white focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
+                  className="bg-muted/50 border-input text-foreground focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
                 />
               </div>
             </div>
@@ -291,9 +285,9 @@ export default function PortalOnboarding() {
 
           {/* Step 2: Contact */}
           {step === 2 && (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-zinc-400 text-sm font-light">Celular (WhatsApp) *</Label>
+                <Label htmlFor="phone" className="text-muted-foreground text-sm font-light">Celular (WhatsApp) *</Label>
                 <Input
                   id="phone"
                   type="text"
@@ -301,18 +295,18 @@ export default function PortalOnboarding() {
                   value={phone}
                   onChange={(e) => { setPhone(formatPhone(e.target.value)); setError(''); }}
                   maxLength={15}
-                  className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
+                  className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-zinc-400 text-sm font-light">E-mail *</Label>
+                <Label htmlFor="email" className="text-muted-foreground text-sm font-light">E-mail *</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="seu@email.com"
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setError(''); }}
-                  className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
+                  className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
                 />
               </div>
             </div>
@@ -320,27 +314,27 @@ export default function PortalOnboarding() {
 
           {/* Step 3: Security */}
           {step === 3 && (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-zinc-400 text-sm font-light">Nova Senha *</Label>
+                <Label htmlFor="password" className="text-muted-foreground text-sm font-light">Nova Senha *</Label>
                 <Input
                   id="password"
                   type="password"
                   placeholder="Mínimo 6 caracteres"
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                  className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
+                  className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-zinc-400 text-sm font-light">Confirmar Senha *</Label>
+                <Label htmlFor="confirmPassword" className="text-muted-foreground text-sm font-light">Confirmar Senha *</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
                   placeholder="Repita a senha"
                   value={confirmPassword}
                   onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
-                  className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
+                  className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
                 />
               </div>
             </div>
@@ -348,33 +342,33 @@ export default function PortalOnboarding() {
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-              <p className="text-red-400 text-sm text-center">{error}</p>
+              <p className="text-red-500 dark:text-red-400 text-sm text-center">{error}</p>
             </div>
           )}
 
           {/* Navigation Buttons */}
           <div className="flex gap-3 pt-2">
             {step > 1 && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={handleBack}
-                className="flex-1 border-white/10 text-zinc-400 hover:bg-zinc-800 hover:text-white h-12"
+                className="flex-1 border-border text-muted-foreground hover:bg-accent hover:text-foreground h-12"
               >
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 Voltar
               </Button>
             )}
-            
+
             {step < 3 ? (
-              <Button 
+              <Button
                 onClick={handleNext}
-                className="flex-1 bg-white text-black font-medium hover:bg-zinc-200 h-12"
+                className="flex-1 bg-foreground text-background font-medium hover:bg-foreground/90 h-12"
               >
                 Próximo
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             ) : (
-              <Button 
+              <Button
                 onClick={handleSubmit}
                 disabled={isLoading}
                 className="flex-1 bg-gradient-to-r from-[#D4AF37] to-[#C5A028] text-black hover:from-[#E5C048] hover:to-[#D4AF37] h-12 font-medium"

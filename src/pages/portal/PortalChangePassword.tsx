@@ -61,7 +61,6 @@ export default function PortalChangePassword() {
       return;
     }
 
-    // Verify current password matches stored password
     if (currentPassword !== storedPassword && currentPassword !== '123456') {
       setError('Senha atual incorreta');
       return;
@@ -91,7 +90,6 @@ export default function PortalChangePassword() {
         return;
       }
 
-      // Update session with new password
       const clientData = sessionStorage.getItem('portal_client');
       if (clientData) {
         const client = JSON.parse(clientData);
@@ -112,32 +110,32 @@ export default function PortalChangePassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#050505] p-4">
-      <Card className="w-full max-w-md bg-[#0A0A0A] border-white/5 backdrop-blur-xl shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md bg-card border-border backdrop-blur-xl shadow-2xl">
         <CardHeader className="text-center space-y-2">
           <div className="w-16 h-16 bg-gradient-to-br from-[#D4AF37] to-[#C5A028] rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-lg shadow-[#D4AF37]/20">
             <KeyRound className="w-8 h-8 text-black" />
           </div>
-          <CardTitle className="text-2xl text-white font-light tracking-wide">Alterar Senha</CardTitle>
-          <CardDescription className="text-zinc-500">
+          <CardTitle className="text-2xl text-foreground font-light tracking-wide">Alterar Senha</CardTitle>
+          <CardDescription className="text-muted-foreground">
             Digite sua senha atual e a nova senha
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="currentPassword" className="text-zinc-400 text-sm font-light">Senha Atual</Label>
+            <Label htmlFor="currentPassword" className="text-muted-foreground text-sm font-light">Senha Atual</Label>
             <Input
               id="currentPassword"
               type={showPassword ? 'text' : 'password'}
               placeholder="Digite sua senha atual"
               value={currentPassword}
               onChange={(e) => { setCurrentPassword(e.target.value); setError(''); }}
-              className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
+              className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="newPassword" className="text-zinc-400 text-sm font-light">Nova Senha</Label>
+            <Label htmlFor="newPassword" className="text-muted-foreground text-sm font-light">Nova Senha</Label>
             <div className="relative">
               <Input
                 id="newPassword"
@@ -145,12 +143,12 @@ export default function PortalChangePassword() {
                 placeholder="Mínimo 6 caracteres"
                 value={newPassword}
                 onChange={(e) => { setNewPassword(e.target.value); setError(''); }}
-                className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 pr-10 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
+                className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 pr-10 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -158,20 +156,20 @@ export default function PortalChangePassword() {
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword" className="text-zinc-400 text-sm font-light">Confirmar Nova Senha</Label>
+            <Label htmlFor="confirmPassword" className="text-muted-foreground text-sm font-light">Confirmar Nova Senha</Label>
             <Input
               id="confirmPassword"
               type={showPassword ? 'text' : 'password'}
               placeholder="Digite novamente"
               value={confirmPassword}
               onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
-              className="bg-zinc-950/50 border-white/10 text-white placeholder:text-zinc-600 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
+              className="bg-muted/50 border-input text-foreground placeholder:text-muted-foreground/50 focus:border-[#D4AF37]/50 focus:ring-[#D4AF37]/20 h-12"
             />
           </div>
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-              <p className="text-red-400 text-sm text-center">{error}</p>
+              <p className="text-red-500 dark:text-red-400 text-sm text-center">{error}</p>
             </div>
           )}
 
@@ -193,7 +191,7 @@ export default function PortalChangePassword() {
           <Button 
             variant="outline"
             onClick={() => navigate(`/${slug}/portal/profile`)}
-            className="w-full border-white/10 text-zinc-400 hover:bg-zinc-800 hover:text-white h-12"
+            className="w-full border-border text-muted-foreground hover:bg-accent hover:text-foreground h-12"
           >
             Cancelar
           </Button>

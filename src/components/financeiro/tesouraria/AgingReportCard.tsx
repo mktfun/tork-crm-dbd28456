@@ -1,12 +1,20 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { AppCard } from "@/components/ui/app-card";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, AlertCircle } from "lucide-react";
 import { useAgingReport } from "@/hooks/useFinanceiro";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export function AgingReportCard() {
-  const { data: buckets, isLoading, error } = useAgingReport();
+interface AgingReportCardProps {
+  defaultType?: 'receivables' | 'payables';
+}
+
+export function AgingReportCard({ defaultType = 'receivables' }: AgingReportCardProps) {
+  const [type, setType] = useState<'receivables' | 'payables'>(defaultType);
+  const { data: buckets, isLoading, error } = useAgingReport(type);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -19,11 +27,16 @@ export function AgingReportCard() {
 
   if (isLoading) {
     return (
-      <Card>
+      <AppCard>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
-            <CardTitle className="text-base">Relatório de Aging</CardTitle>
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-semibold">Relatório de Aging</CardTitle>
+              <CardDescription>Faturas e recebíveis em atraso</CardDescription>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -37,17 +50,22 @@ export function AgingReportCard() {
             </div>
           ))}
         </CardContent>
-      </Card>
+      </AppCard>
     );
   }
 
   if (error) {
     return (
-      <Card>
+      <AppCard>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
-            <CardTitle className="text-base">Relatório de Aging</CardTitle>
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-semibold">Relatório de Aging</CardTitle>
+              <CardDescription>Faturas e recebíveis em atraso</CardDescription>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -58,17 +76,34 @@ export function AgingReportCard() {
             </AlertDescription>
           </Alert>
         </CardContent>
-      </Card>
+      </AppCard>
     );
   }
 
   if (!buckets || buckets.length === 0) {
     return (
-      <Card>
+      <AppCard>
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
-            <CardTitle className="text-base">Relatório de Aging</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-semibold">Relatório de Aging</CardTitle>
+                <CardDescription>Faturas e recebíveis em atraso</CardDescription>
+              </div>
+            </div>
+            <Tabs value={type} onValueChange={(v) => v && setType(v as 'receivables' | 'payables')} className="w-auto">
+              <TabsList className="bg-foreground/5 backdrop-blur-md border border-foreground/10 p-1 rounded-xl h-9">
+                <TabsTrigger value="receivables" className="text-xs px-3 h-7 data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">
+                  A Receber
+                </TabsTrigger>
+                <TabsTrigger value="payables" className="text-xs px-3 h-7 data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">
+                  A Pagar
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </CardHeader>
         <CardContent>
@@ -78,16 +113,33 @@ export function AgingReportCard() {
             <p className="text-xs mt-1">Parabéns! Suas contas estão em dia.</p>
           </div>
         </CardContent>
-      </Card>
+      </AppCard>
     );
   }
 
   return (
-    <Card>
+    <AppCard>
       <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-amber-500" />
-          <CardTitle className="text-base">Relatório de Aging</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-semibold">Relatório de Aging</CardTitle>
+              <CardDescription>Faturas e recebíveis em atraso</CardDescription>
+            </div>
+          </div>
+          <Tabs value={type} onValueChange={(v) => v && setType(v as 'receivables' | 'payables')} className="w-auto">
+            <TabsList className="bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-xl h-9">
+              <TabsTrigger value="receivables" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                A Receber
+              </TabsTrigger>
+              <TabsTrigger value="payables" className="text-xs px-3 h-7 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+                A Pagar
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -106,11 +158,11 @@ export function AgingReportCard() {
                   </span>
                 </div>
               </div>
-              <Progress 
-                value={percentage} 
-                className="h-2" 
-                style={{ 
-                  ['--progress-background' as any]: bucket.bucketColor 
+              <Progress
+                value={percentage}
+                className="h-2"
+                style={{
+                  ['--progress-background' as any]: bucket.bucketColor
                 }}
               />
             </div>
@@ -119,12 +171,12 @@ export function AgingReportCard() {
         <div className="pt-4 border-t">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Total em Atraso</span>
-            <span className="text-lg font-bold text-red-600">
+            <span className="text-lg font-bold text-destructive">
               {formatCurrency(totalAmount)}
             </span>
           </div>
         </div>
       </CardContent>
-    </Card>
+    </AppCard>
   );
 }

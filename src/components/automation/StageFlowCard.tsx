@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Bot, Zap, Sparkles, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Bot, Zap, Sparkles, RotateCcw, ChevronDown, ChevronUp, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { VibeSelector, VibeId, getVibePreset, VIBE_CONFIG } from './VibeSelector';
+import { VibeSelector, VibeId, VIBE_CONFIG } from './VibeSelector';
+import { AI_PERSONA_PRESETS } from './aiPresets';
 import { ConfigSourceBadge } from './ConfigSourceBadge';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -26,6 +28,10 @@ interface AiSetting {
   ai_custom_rules?: string | null;
   is_active?: boolean | null;
   max_messages_before_human?: number | null;
+  follow_up_enabled?: boolean | null;
+  follow_up_interval_minutes?: number | null;
+  follow_up_max_attempts?: number | null;
+  follow_up_message?: string | null;
 }
 
 interface StageFlowCardProps {
@@ -45,20 +51,15 @@ interface StageFlowCardProps {
   isSaving?: boolean;
 }
 
-// Infer vibe from persona XML
+// Deterministic vibe inference via exact xmlPrompt match
 function inferVibeFromPersona(persona: string | null | undefined): VibeId | null {
   if (!persona) return null;
-  
-  if (persona.includes('SDR') || persona.includes('CNPJ') || persona.includes('ping-pong') || persona.includes('fechar')) {
-    return 'proactive';
-  }
-  if (persona.includes('técnico') || persona.includes('especialista') || persona.includes('diagnóstico')) {
-    return 'technical';
-  }
-  if (persona.includes('resolvedor') || persona.includes('acolhimento') || persona.includes('suporte')) {
-    return 'supportive';
-  }
-  
+  // Match direto por ID curto (novo formato)
+  const validIds: VibeId[] = ['proactive', 'technical', 'supportive_sales', 'supportive'];
+  if (validIds.includes(persona as VibeId)) return persona as VibeId;
+  // Fallback: match por xmlPrompt (dados legados)
+  const match = AI_PERSONA_PRESETS.find(p => p.xmlPrompt === persona);
+  if (match && match.id in VIBE_CONFIG) return match.id as VibeId;
   return null;
 }
 
@@ -81,42 +82,83 @@ export function StageFlowCard({
   const [isExpanded, setIsExpanded] = useState(isSelected);
   const [selectedVibe, setSelectedVibe] = useState<VibeId | null>(inferVibeFromPersona(currentPersona));
   const [mission, setMission] = useState(currentObjective || '');
+  const [followUpInterval, setFollowUpInterval] = useState(aiSetting?.follow_up_interval_minutes ?? 60);
+  const [followUpMaxAttempts, setFollowUpMaxAttempts] = useState(aiSetting?.follow_up_max_attempts ?? 3);
+  const [followUpMessage, setFollowUpMessage] = useState(aiSetting?.follow_up_message ?? '');
+  
   const debouncedMission = useDebounce(mission, 1500);
+  const debouncedInterval = useDebounce(followUpInterval, 1500);
+  const debouncedMaxAttempts = useDebounce(followUpMaxAttempts, 1500);
+  const debouncedFollowUpMessage = useDebounce(followUpMessage, 1500);
+  
+  const userSelectedRef = useRef(false);
+  const missionFocusedRef = useRef(false);
+  const followUpFocusedRef = useRef(false);
   
   // Sync expanded state with selection
   useEffect(() => {
     if (isSelected) setIsExpanded(true);
   }, [isSelected]);
   
-  // Sync mission with external data
+  // Sync mission with external data — skip if user is typing
   useEffect(() => {
-    setMission(currentObjective || '');
+    if (!missionFocusedRef.current) {
+      setMission(currentObjective || '');
+    }
   }, [currentObjective]);
-  
-  // Sync vibe with external data
+
+  // Sync follow-up fields with external data — skip if user is typing
   useEffect(() => {
-    setSelectedVibe(inferVibeFromPersona(currentPersona));
+    if (!followUpFocusedRef.current) {
+      setFollowUpInterval(aiSetting?.follow_up_interval_minutes ?? 60);
+      setFollowUpMaxAttempts(aiSetting?.follow_up_max_attempts ?? 3);
+      setFollowUpMessage(aiSetting?.follow_up_message ?? '');
+    }
+  }, [aiSetting?.follow_up_interval_minutes, aiSetting?.follow_up_max_attempts, aiSetting?.follow_up_message]);
+  
+  // Sync vibe with external data — skip when change came from user click
+  useEffect(() => {
+    if (userSelectedRef.current) {
+      userSelectedRef.current = false;
+      return;
+    }
+    const inferred = inferVibeFromPersona(currentPersona);
+    setSelectedVibe(prev => prev === inferred ? prev : inferred);
   }, [currentPersona]);
   
   // Auto-save mission on debounce
   useEffect(() => {
     if (debouncedMission && debouncedMission !== currentObjective) {
-      onSaveConfig({
-        stage_id: stage.id,
-        ai_objective: debouncedMission,
-      });
+      onSaveConfig({ stage_id: stage.id, ai_objective: debouncedMission });
     }
   }, [debouncedMission]);
+
+  // Auto-save follow-up fields on debounce
+  useEffect(() => {
+    if (debouncedInterval !== (aiSetting?.follow_up_interval_minutes ?? 60)) {
+      onSaveConfig({ stage_id: stage.id, follow_up_interval_minutes: debouncedInterval });
+    }
+  }, [debouncedInterval]);
+
+  useEffect(() => {
+    if (debouncedMaxAttempts !== (aiSetting?.follow_up_max_attempts ?? 3)) {
+      onSaveConfig({ stage_id: stage.id, follow_up_max_attempts: debouncedMaxAttempts });
+    }
+  }, [debouncedMaxAttempts]);
+
+  useEffect(() => {
+    if (debouncedFollowUpMessage !== (aiSetting?.follow_up_message ?? '')) {
+      onSaveConfig({ stage_id: stage.id, follow_up_message: debouncedFollowUpMessage });
+    }
+  }, [debouncedFollowUpMessage]);
   
   const handleVibeChange = useCallback((vibeId: VibeId) => {
+    userSelectedRef.current = true;
     setSelectedVibe(vibeId);
-    const preset = getVibePreset(vibeId);
-    if (preset) {
-      onSaveConfig({
-        stage_id: stage.id,
-        ai_persona: preset.xmlPrompt,
-      });
-    }
+    onSaveConfig({
+      stage_id: stage.id,
+      ai_persona: vibeId,
+    });
   }, [stage.id, onSaveConfig]);
   
   const handleToggleExpand = () => {
@@ -130,17 +172,15 @@ export function StageFlowCard({
     <div
       className={cn(
         'relative rounded-xl border transition-all duration-200',
-        'bg-card/50 backdrop-blur-sm',
+        'bg-card border-border',
         isSelected 
           ? 'border-primary/40 ring-1 ring-primary/20' 
-          : 'border-border hover:border-muted-foreground/30',
+          : 'hover:border-muted-foreground/30',
         isActive 
-          ? 'shadow-[0_0_20px_rgba(16,185,129,0.1)]' 
+          ? 'shadow-sm' 
           : ''
       )}
     >
-      {/* Connecting line to next stage */}
-      <div className="absolute left-6 -bottom-4 w-px h-4 bg-border" />
       
       {/* Stage color indicator */}
       <div 
@@ -199,7 +239,7 @@ export function StageFlowCard({
           
           <div className="flex items-center gap-2">
             <span className={cn(
-              'text-xs font-medium',
+              'text-xs font-medium w-10 text-center',
               isActive ? 'text-emerald-400' : 'text-muted-foreground'
             )}>
               {isActive ? 'IA' : 'Manual'}
@@ -224,8 +264,8 @@ export function StageFlowCard({
         <div className="px-4 pb-4 pt-0 space-y-4 border-t border-border/50">
           {/* Vibe Selector */}
           <div className="pt-4">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-              Vibe do Agente
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+              Vibe do agente
             </label>
             <VibeSelector
               value={selectedVibe}
@@ -236,12 +276,14 @@ export function StageFlowCard({
           
           {/* Mission */}
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-              Missão Principal
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+              Missão principal
             </label>
             <Textarea
               value={mission}
               onChange={(e) => setMission(e.target.value)}
+              onFocus={() => { missionFocusedRef.current = true; }}
+              onBlur={() => { missionFocusedRef.current = false; }}
               placeholder="Ex: Descobrir CNPJ e quantidade de vidas"
               className="min-h-[60px] bg-secondary/50 border-border/50 text-sm resize-none"
               disabled={isSaving}
@@ -249,6 +291,67 @@ export function StageFlowCard({
             <p className="text-[10px] text-muted-foreground mt-1">
               Salva automaticamente • Variáveis: {'{{deal_title}}'}, {'{{pipeline_name}}'}
             </p>
+          </div>
+
+          {/* Follow-up Section */}
+          <div className="space-y-3 p-3 rounded-lg bg-secondary/30 border border-border/50">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Bell className="h-3.5 w-3.5" />
+                Follow-up automático
+              </label>
+              <Switch
+                checked={aiSetting?.follow_up_enabled ?? false}
+                onCheckedChange={(checked) => onSaveConfig({
+                  stage_id: stage.id,
+                  follow_up_enabled: checked,
+                })}
+                disabled={isSaving}
+                className="data-[state=checked]:bg-amber-500 scale-90"
+              />
+            </div>
+            {aiSetting?.follow_up_enabled && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-muted-foreground">Intervalo (min)</label>
+                    <Input
+                      type="number"
+                      min={5}
+                      value={followUpInterval}
+                      onChange={(e) => setFollowUpInterval(parseInt(e.target.value) || 60)}
+                      onFocus={() => { followUpFocusedRef.current = true; }}
+                      onBlur={() => { followUpFocusedRef.current = false; }}
+                      className="h-7 text-xs bg-background/50"
+                      disabled={isSaving}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground">Max tentativas</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={followUpMaxAttempts}
+                      onChange={(e) => setFollowUpMaxAttempts(parseInt(e.target.value) || 3)}
+                      onFocus={() => { followUpFocusedRef.current = true; }}
+                      onBlur={() => { followUpFocusedRef.current = false; }}
+                      className="h-7 text-xs bg-background/50"
+                      disabled={isSaving}
+                    />
+                  </div>
+                </div>
+                <Textarea
+                  value={followUpMessage}
+                  onChange={(e) => setFollowUpMessage(e.target.value)}
+                  onFocus={() => { followUpFocusedRef.current = true; }}
+                  onBlur={() => { followUpFocusedRef.current = false; }}
+                  placeholder="Mensagem personalizada (opcional). Padrão: templates automáticos."
+                  className="min-h-[40px] text-xs bg-background/50 border-border/50 resize-none"
+                  disabled={isSaving}
+                />
+              </div>
+            )}
           </div>
           
           {/* Actions */}

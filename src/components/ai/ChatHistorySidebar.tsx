@@ -48,7 +48,7 @@ export function ChatHistorySidebar({
             className={cn(
               "absolute left-0 top-0 bottom-0 z-50",
               "w-[280px] flex flex-col",
-              "bg-background/95 backdrop-blur-xl",
+              "bg-background/80 backdrop-blur-xl",
               "border-r border-white/10"
             )}
           >

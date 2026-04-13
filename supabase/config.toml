@@ -1,46 +1,102 @@
 project_id = "jaouwhckqqnaxqyfvgyq"
 
 [functions.ai-assistant]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-sandbox]
-verify_jwt = false
+verify_jwt = true
 
 [functions.analyze-policy]
-verify_jwt = false
+verify_jwt = true
 
 [functions.analyze-receipt]
-verify_jwt = false
+verify_jwt = true
 
 [functions.auto-changelog]
-verify_jwt = false
+verify_jwt = true
 
 [functions.backfill-commissions]
-verify_jwt = false
+verify_jwt = true
 
 [functions.chatwoot-sync]
-verify_jwt = false
+verify_jwt = true
 
 [functions.chatwoot-webhook]
 verify_jwt = false
 
 [functions.create-next-appointment]
-verify_jwt = false
+verify_jwt = true
 
 [functions.enrich-old-transactions]
-verify_jwt = false
+verify_jwt = true
 
 [functions.extract-quote-data]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-card-pdf]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-embeddings]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ocr-bulk-analyze]
-verify_jwt = false
+verify_jwt = true
 
 [functions.analyze-policy-mistral]
+verify_jwt = true
+
+[functions.generate-summary]
+verify_jwt = true
+
+[functions.admin-dispatcher]
+verify_jwt = true
+
+[functions.chatwoot-dispatcher]
 verify_jwt = false
+
+[functions.check-followups]
+verify_jwt = false
+
+[functions.google-auth-callback]
+enabled = true
+verify_jwt = true
+import_map = "./functions/google-auth-callback/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/google-auth-callback/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/google-auth-callback/*.html" ]
+
+[functions.google-sync]
+enabled = true
+verify_jwt = true
+import_map = "./functions/google-sync/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/google-sync/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/google-sync/*.html" ]
+
+[functions.google-sync-immediate]
+enabled = true
+verify_jwt = true
+import_map = "./functions/google-sync-immediate/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/google-sync-immediate/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/google-sync-immediate/*.html" ]
+
+[functions.google-auth-url]
+enabled = true
+verify_jwt = true
+import_map = "./functions/google-auth-url/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/google-auth-url/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/google-auth-url/*.html" ]

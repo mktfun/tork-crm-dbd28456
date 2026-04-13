@@ -15,10 +15,10 @@ export function ListaAgendamentosDia() {
   const isToday = (dateString: string): boolean => {
     const targetDate = new Date(dateString);
     const today = new Date();
-    
+
     targetDate.setHours(0, 0, 0, 0);
     today.setHours(0, 0, 0, 0);
-    
+
     return targetDate.getTime() === today.getTime();
   };
 
@@ -34,8 +34,8 @@ export function ListaAgendamentosDia() {
 
   // Filtrar próximos agendamentos
   const upcomingAppointments = appointments
-    .filter(appointment => 
-      appointment.status === 'Pendente' && 
+    .filter(appointment =>
+      appointment.status === 'Pendente' &&
       isFutureOrToday(appointment.date)
     )
     .sort((a, b) => {
@@ -46,8 +46,8 @@ export function ListaAgendamentosDia() {
 
   // Filtrar tarefas pendentes do dia de hoje
   const todayTasks = tasks
-    .filter(task => 
-      task.status === 'Pendente' && 
+    .filter(task =>
+      task.status === 'Pendente' &&
       isToday(task.dueDate)
     )
     .sort((a, b) => a.title.localeCompare(b.title));
@@ -83,9 +83,9 @@ export function ListaAgendamentosDia() {
     } else if (targetDate.getTime() === tomorrow.getTime()) {
       return 'Amanhã';
     } else {
-      return date.toLocaleDateString('pt-BR', { 
-        day: '2-digit', 
-        month: '2-digit' 
+      return date.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit'
       });
     }
   };
@@ -126,7 +126,7 @@ export function ListaAgendamentosDia() {
   return (
     <div className="space-y-3">
       {upcomingAppointments.slice(0, 3).map((appointment) => (
-        <div 
+        <div
           key={`appointment-${appointment.id}`}
           className="rounded-md border border-slate-700 bg-slate-800/50 p-3 hover:bg-slate-800/70 transition-all cursor-pointer group"
           onClick={() => handleAppointmentClick(appointment.id)}
@@ -138,18 +138,18 @@ export function ListaAgendamentosDia() {
             </span>
             <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-slate-300 transition-colors ml-auto" />
           </div>
-          
+
           <div className="flex items-center gap-2 mb-1">
             <User className="w-4 h-4 text-slate-400" />
-            <span className="font-medium text-white text-sm">{getClientName(appointment.client_id)}</span>
+            <span className="font-medium text-foreground text-sm">{getClientName(appointment.client_id)}</span>
           </div>
-          
+
           <p className="text-sm text-slate-400 truncate">{appointment.title}</p>
         </div>
       ))}
 
       {todayTasks.slice(0, 2).map((task) => (
-        <div 
+        <div
           key={`task-${task.id}`}
           className="rounded-md border border-orange-600/50 bg-orange-900/30 p-3 hover:bg-orange-900/40 transition-all cursor-pointer group"
           onClick={() => handleTaskClick(task.id)}
@@ -161,18 +161,18 @@ export function ListaAgendamentosDia() {
             </span>
             <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-slate-300 transition-colors ml-auto" />
           </div>
-          
+
           <div className="flex items-center gap-2 mb-1">
             <User className="w-4 h-4 text-slate-400" />
-            <span className="font-medium text-white text-sm">
+            <span className="font-medium text-foreground text-sm">
               {task.clientId ? getClientName(task.clientId) : 'Sem cliente'}
             </span>
           </div>
-          
+
           <p className="text-sm text-slate-400 truncate">{task.title}</p>
         </div>
       ))}
-      
+
       {(upcomingAppointments.length > 3 || todayTasks.length > 2) && (
         <div className="text-center pt-2">
           <p className="text-xs text-slate-500">

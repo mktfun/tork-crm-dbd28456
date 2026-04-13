@@ -12,6 +12,7 @@ interface FiltrosGlobais {
   ramos: string[];
   produtorIds: string[];
   statusIds: string[];
+  onlyConciled?: boolean;
 }
 
 interface ReportOptions {
@@ -29,7 +30,7 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
         .from('ramos')
         .select('id, nome')
         .order('nome');
-      
+
       if (error) throw error;
       return data || [];
     }
@@ -42,7 +43,7 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
         .from('companies')
         .select('id, name')
         .order('name');
-      
+
       if (error) throw error;
       return data || [];
     }
@@ -52,16 +53,28 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
   const {
     apolices: apolicesFiltradas,
     clientes: clientesFiltrados,
-    transacoes: transacoesFiltradas,
+    transacoes: transacoesRaw,
     statusDisponiveis,
     produtores,
-    totalGanhos,
-    totalPerdas,
-    saldoLiquido,
+    totalGanhos: totalGanhosRaw,
+    totalPerdas: totalPerdasRaw,
+    saldoLiquido: saldoLiquidoRaw,
     isLoading: supabaseLoading,
     temDados,
     temFiltrosAtivos
   } = useSupabaseReports(filtros);
+
+  // Aplicar filtro onlyConciled no frontend (transactions não tem coluna reconciled)
+  const transacoesFiltradas = useMemo(() => {
+    if (!filtros.onlyConciled || !transacoesRaw) return transacoesRaw;
+    return transacoesRaw.filter((t: any) => t.status === 'PAGO' || t.status === 'REALIZADO');
+  }, [transacoesRaw, filtros.onlyConciled]);
+
+  // KPIs financeiros vêm diretamente do hook (que usa get_financial_summary RPC)
+  // Isso garante que os valores reflitam conciliações de financial_transactions
+  const totalGanhos = totalGanhosRaw;
+  const totalPerdas = totalPerdasRaw;
+  const saldoLiquido = saldoLiquidoRaw;
 
   // 🛡️ GUARD: Verificar se TODOS os dados críticos estão prontos
   const isDataReady = Boolean(
@@ -98,14 +111,14 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
     [...apolicesNovas, ...apolicesRenovadas].forEach(policy => {
       // Usar start_date (data de vigência) em vez de created_at
       const dataPolicy = parseISO(policy.start_date);
-      const chave = usarGranularidadeDiaria 
+      const chave = usarGranularidadeDiaria
         ? format(dataPolicy, 'dd/MM', { locale: ptBR })
         : format(startOfMonth(dataPolicy), 'MMM/yy', { locale: ptBR });
-      
+
       if (!dadosAgrupados[chave]) {
         dadosAgrupados[chave] = { novas: 0, renovadas: 0 };
       }
-      
+
       if (policy.status === 'Renovada') {
         dadosAgrupados[chave].renovadas += 1;
       } else {
@@ -124,14 +137,14 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
     const totalNovas = apolicesNovas.length;
     const totalRenovadas = apolicesRenovadas.length;
     const totalApolices = totalNovas + totalRenovadas;
-    
+
     let insight = '';
     if (totalApolices === 0) {
       insight = 'Nenhuma apólice encontrada no período selecionado.';
     } else {
       const percentualNovas = ((totalNovas / totalApolices) * 100).toFixed(0);
       const percentualRenovadas = ((totalRenovadas / totalApolices) * 100).toFixed(0);
-      
+
       if (totalNovas > totalRenovadas) {
         insight = `Crescimento positivo: ${percentualNovas}% são apólices novas vs. ${percentualRenovadas}% renovações. Foco na aquisição está funcionando!`;
       } else if (totalRenovadas > totalNovas) {
@@ -220,7 +233,7 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
   const dadosRenovacoesPorStatus = useMemo(() => {
     const apolicesComRenovacao = apolicesFiltradas.filter(policy => policy.renewal_status);
     const statusCount = new Map();
-    
+
     apolicesComRenovacao.forEach(policy => {
       const status = policy.renewal_status || 'Pendente';
       statusCount.set(status, (statusCount.get(status) || 0) + 1);
@@ -240,7 +253,7 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
       const renovadas = statusCount.get('Renovada') || 0;
       const pendentes = statusCount.get('Pendente') || 0;
       const taxaRenovacao = ((renovadas / total) * 100).toFixed(0);
-      
+
       if (renovadas > 0) {
         insight = `Taxa de renovação: ${taxaRenovacao}% (${renovadas}/${total} apólices). ${pendentes} ainda pendentes.`;
       } else {
@@ -282,11 +295,11 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
     [...apolicesVencidas, ...apolicesVencendoEm30, ...apolicesVencendoEm60, ...apolicesVencendoEm90].forEach(policy => {
       const vencimento = parseISO(policy.expiration_date);
       const chave = format(startOfMonth(vencimento), 'MMM/yy', { locale: ptBR });
-      
+
       if (!dadosAgrupados[chave]) {
         dadosAgrupados[chave] = { vencidas: 0, em30: 0, em60: 0, em90: 0 };
       }
-      
+
       const dataVencimento = parseISO(policy.expiration_date);
       if (isBefore(dataVencimento, hoje)) {
         dadosAgrupados[chave].vencidas += 1;
@@ -312,7 +325,7 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
     const totalVencidas = apolicesVencidas.length;
     const totalVencendoEm30 = apolicesVencendoEm30.length;
     const totalCriticas = totalVencidas + totalVencendoEm30;
-    
+
     let insight = '';
     if (totalCriticas === 0) {
       insight = 'Nenhuma apólice com vencimento crítico nos próximos 30 dias.';
@@ -370,10 +383,10 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
       // Agrupar itens pequenos (menos de 5% do total) em "Outros" - APENAS para gráficos
       const totalValue = distribution.reduce((sum, item) => sum + item.valor, 0);
       const threshold = totalValue * 0.05;
-      
+
       const mainItems = distribution.filter(item => item.valor >= threshold);
       const smallItems = distribution.filter(item => item.valor < threshold);
-      
+
       if (smallItems.length > 0 && mainItems.length > 0) {
         const othersData = smallItems.reduce(
           (acc, item) => ({
@@ -407,43 +420,43 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
       console.warn('⚠️ [companyDistribution] Aguardando dados: transações ou seguradoras');
       return [];
     }
-    
+
     // Filtrar apenas transações de receita pagas
-    const filteredTransactions = transacoesFiltradas.filter(t => 
-      t.nature === 'RECEITA' && 
+    const filteredTransactions = transacoesFiltradas.filter(t =>
+      t.nature === 'RECEITA' &&
       (t.status === 'PAGO' || t.status === 'REALIZADO')
     );
-    
+
     // Agrupar por company_id COM SUPORTE A PRÊMIO E COMISSÃO
     const companyData: { [key: string]: { count: number; premium: number; commission: number } } = {};
-    
+
     filteredTransactions.forEach(t => {
       const companyId = t.company_id || 'Não informado';
-      
+
       // ✅ SOLUÇÃO CORRETA: Usar premiumValue e commissionValue
       const premiumValue = t.premiumValue || t.amount || 0;
       const commissionValue = t.commissionValue || t.amount || 0;
-      
+
       if (!companyData[companyId]) {
         companyData[companyId] = { count: 0, premium: 0, commission: 0 };
       }
-      
+
       companyData[companyId].count += 1;
       companyData[companyId].premium += premiumValue;
       companyData[companyId].commission += commissionValue;
     });
-    
+
     // ✅ CORREÇÃO: Helper usando dados locais do hook
     const getCompanyName = (companyId: string) => {
       if (companyId === 'Não informado') return 'Não informado';
       const company = seguradoras.find(c => c.id === companyId);
       return company?.name || 'Não informado';
     };
-    
+
     // Converter para array e mapear nomes das seguradoras COM PRÊMIO E COMISSÃO
     let distribution = Object.entries(companyData).map(([companyId, data]) => {
       const avgCommissionRate = data.premium > 0 ? (data.commission / data.premium) * 100 : 0;
-      
+
       return {
         seguradora: getCompanyName(companyId),
         total: data.count,
@@ -452,19 +465,19 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
         taxaMediaComissao: avgCommissionRate
       };
     }).sort((a, b) => b.valor - a.valor);
-    
+
     // 🎯 SE limitResults=false, retorna lista completa SEM agrupamento
     if (!limitResults) {
       return distribution;
     }
-    
+
     // Agrupar itens pequenos em "Outros" (< 5% do total) - APENAS para gráficos
     const totalValue = distribution.reduce((sum, item) => sum + item.valor, 0);
     const threshold = totalValue * 0.05;
-    
+
     const mainItems = distribution.filter(item => item.valor >= threshold);
     const smallItems = distribution.filter(item => item.valor < threshold);
-    
+
     if (smallItems.length > 0 && mainItems.length > 0) {
       const othersData = smallItems.reduce(
         (acc, item) => ({
@@ -476,10 +489,10 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
         }),
         { seguradora: 'Outros', total: 0, valor: 0, valorComissao: 0, taxaMediaComissao: 0 }
       );
-      
+
       distribution = [...mainItems.slice(0, 7), othersData];
     }
-    
+
     return distribution;
   }, [transacoesFiltradas, seguradoras, limitResults]);
 
@@ -495,11 +508,11 @@ export function useFilteredDataForReports(filtros: FiltrosGlobais, options: Repo
   return {
     apolicesFiltradas,
     clientesFiltrados,
-    transacoesFiltradas,
-    seguradoras,
-    ramosDisponiveis: ramos,
-    statusDisponiveis,
-    produtores,
+    transacoesFiltradas: transacoesFiltradas || [],
+    seguradoras: seguradoras || [],
+    ramosDisponiveis: ramos || [],
+    statusDisponiveis: statusDisponiveis || [],
+    produtores: produtores || [],
     dadosEvolucaoCarteira,
     dadosPerformanceProdutor,
     dadosRenovacoesPorStatus,

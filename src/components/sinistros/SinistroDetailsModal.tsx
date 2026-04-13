@@ -12,9 +12,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 // import { Separator } from '@/components/ui/separator';
-import { 
-  Loader2, 
-  Eye, 
+import {
+  Loader2,
+  Eye,
   Edit,
   Save,
   X,
@@ -122,7 +122,7 @@ interface SinistroDetailsModalProps {
 export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }: SinistroDetailsModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
-  
+
   const updateSinistro = useUpdateSinistro();
   const { data: activities = [] } = useSinistroActivities(sinistro?.id || '');
   const { data: documents = [] } = useSinistroDocuments(sinistro?.id || '');
@@ -166,7 +166,7 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
       };
 
       await updateSinistro.mutateAsync(submitData);
-      
+
       setIsEditing(false);
       onSuccess?.();
     } catch (error) {
@@ -192,7 +192,7 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
               {sinistro.claim_number || `Sinistro #${sinistro.id.slice(-8)}`}
             </DialogTitle>
             <div className="flex items-center gap-2">
-              <Badge className={`${getStatusColor(sinistro.status)} text-white flex items-center gap-1`}>
+              <Badge className={`${getStatusColor(sinistro.status)} text-foreground flex items-center gap-1`}>
                 {getStatusIcon(sinistro.status)}
                 {sinistro.status}
               </Badge>
@@ -224,35 +224,35 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
               {/* Informações Principais */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                     <FileText className="w-5 h-5" />
                     Informações do Sinistro
                   </h3>
-                  
+
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-white/60">Cliente:</span>
-                      <p className="text-white font-medium">{sinistro.client_name || 'N/A'}</p>
+                      <span className="text-muted-foreground">Cliente:</span>
+                      <p className="text-foreground font-medium">{sinistro.client_name || 'N/A'}</p>
                     </div>
                     <div>
-                      <span className="text-white/60">Apólice:</span>
-                      <p className="text-white font-medium">{sinistro.policy_number || 'N/A'}</p>
+                      <span className="text-muted-foreground">Apólice:</span>
+                      <p className="text-foreground font-medium">{sinistro.policy_number || 'N/A'}</p>
                     </div>
                     <div>
-                      <span className="text-white/60">Tipo:</span>
-                      <p className="text-white font-medium">{sinistro.claim_type}</p>
+                      <span className="text-muted-foreground">Tipo:</span>
+                      <p className="text-foreground font-medium">{sinistro.claim_type}</p>
                     </div>
                     <div>
-                      <span className="text-white/60">Data Ocorrência:</span>
-                      <p className="text-white font-medium">{formatDate(sinistro.occurrence_date)}</p>
+                      <span className="text-muted-foreground">Data Ocorrência:</span>
+                      <p className="text-foreground font-medium">{formatDate(sinistro.occurrence_date)}</p>
                     </div>
                     <div>
-                      <span className="text-white/60">Data Registro:</span>
-                      <p className="text-white font-medium">{formatDate(sinistro.report_date)}</p>
+                      <span className="text-muted-foreground">Data Registro:</span>
+                      <p className="text-foreground font-medium">{formatDate(sinistro.report_date)}</p>
                     </div>
                     <div>
-                      <span className="text-white/60">Seguradora:</span>
-                      <p className="text-white font-medium">
+                      <span className="text-muted-foreground">Seguradora:</span>
+                      <p className="text-foreground font-medium">
                         {sinistro.company_name || sinistro.insurance_company || 'N/A'}
                       </p>
                     </div>
@@ -260,8 +260,8 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
 
                   {sinistro.location_occurrence && (
                     <div>
-                      <span className="text-white/60 text-sm">Local da Ocorrência:</span>
-                      <p className="text-white/80 text-sm flex items-center gap-1 mt-1">
+                      <span className="text-muted-foreground text-sm">Local da Ocorrência:</span>
+                      <p className="text-muted-foreground text-sm flex items-center gap-1 mt-1">
                         <MapPin className="w-4 h-4" />
                         {sinistro.location_occurrence}
                       </p>
@@ -270,27 +270,26 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
                 </div>
 
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                     <User className="w-5 h-5" />
                     Responsáveis
                   </h3>
-                  
+
                   <div className="space-y-3 text-sm">
                     <div>
-                      <span className="text-white/60">Produtor:</span>
-                      <p className="text-white font-medium">{sinistro.producer_name || 'Não atribuído'}</p>
+                      <span className="text-muted-foreground">Produtor:</span>
+                      <p className="text-foreground font-medium">{sinistro.producer_name || 'Não atribuído'}</p>
                     </div>
                     <div>
-                      <span className="text-white/60">Corretora:</span>
-                      <p className="text-white font-medium">{sinistro.brokerage_name || 'N/A'}</p>
+                      <span className="text-muted-foreground">Corretora:</span>
+                      <p className="text-foreground font-medium">{sinistro.brokerage_name || 'N/A'}</p>
                     </div>
                     <div>
-                      <span className="text-white/60">Prioridade:</span>
-                      <Badge variant="outline" className={`${
-                        sinistro.priority === 'Alta' ? 'border-orange-500 text-orange-400' :
+                      <span className="text-muted-foreground">Prioridade:</span>
+                      <Badge variant="outline" className={`${sinistro.priority === 'Alta' ? 'border-orange-500 text-orange-400' :
                         sinistro.priority === 'Urgente' ? 'border-red-500 text-red-400' :
-                        'border-gray-500 text-gray-400'
-                      }`}>
+                          'border-gray-500 text-muted-foreground'
+                        }`}>
                         {sinistro.priority || 'Média'}
                       </Badge>
                     </div>
@@ -298,7 +297,7 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
                 </div>
               </div>
 
-              <div className="border-t border-white/10 my-6" />
+              <div className="border-t border-border my-6" />
 
               {/* Formulário de Edição ou Visualização */}
               <Form {...form}>
@@ -314,7 +313,7 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
                           {isEditing ? (
                             <Textarea className="min-h-[100px]" {...field} />
                           ) : (
-                            <div className="p-3 bg-white/5 rounded-lg text-white/80">
+                            <div className="p-3 bg-card rounded-lg text-muted-foreground">
                               {field.value}
                             </div>
                           )}
@@ -335,7 +334,7 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
                           {isEditing ? (
                             <Textarea {...field} />
                           ) : (
-                            <div className="p-3 bg-white/5 rounded-lg text-white/80">
+                            <div className="p-3 bg-card rounded-lg text-muted-foreground">
                               {field.value || 'Não informado'}
                             </div>
                           )}
@@ -403,16 +402,16 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
 
                       {/* Botões de Ação */}
                       <div className="flex justify-end gap-3 pt-4">
-                        <Button 
-                          type="button" 
-                          variant="outline" 
+                        <Button
+                          type="button"
+                          variant="outline"
                           onClick={() => setIsEditing(false)}
                           disabled={updateSinistro.isPending}
                         >
                           Cancelar
                         </Button>
-                        <Button 
-                          type="submit" 
+                        <Button
+                          type="submit"
                           disabled={updateSinistro.isPending}
                           className="bg-blue-600 hover:bg-blue-700"
                         >
@@ -445,8 +444,8 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
                   onSuccess={onSuccess}
                 />
 
-                <div className="border-t border-white/10 pt-6">
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+                <div className="border-t border-border pt-6">
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
                     <Paperclip className="w-5 h-5" />
                     Documentos Anexados
                   </h3>
@@ -461,12 +460,12 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
                   ) : (
                     <div className="grid gap-3">
                       {documents.map((doc) => (
-                        <div key={doc.id} className="bg-white/5 rounded-lg p-4 flex items-center justify-between">
+                        <div key={doc.id} className="bg-card rounded-lg p-4 flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <FileText className="w-5 h-5 text-blue-400" />
                             <div>
-                              <p className="text-white font-medium">{doc.file_name}</p>
-                              <p className="text-xs text-white/60">{doc.document_type}</p>
+                              <p className="text-foreground font-medium">{doc.file_name}</p>
+                              <p className="text-xs text-muted-foreground">{doc.document_type}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -486,14 +485,14 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
             </TabsContent>
 
             <TabsContent value="financeiro" className="space-y-4 p-1">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                 <DollarSign className="w-5 h-5" />
                 Informações Financeiras
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white/5 rounded-lg p-4">
-                  <h4 className="text-white/60 text-sm mb-2">Valor Solicitado</h4>
+                <div className="bg-card rounded-lg p-4">
+                  <h4 className="text-muted-foreground text-sm mb-2">Valor Solicitado</h4>
                   <p className="text-2xl font-bold text-blue-400">
                     {sinistro.claim_amount?.toLocaleString('pt-BR', {
                       style: 'currency',
@@ -501,9 +500,9 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
                     }) || 'N/A'}
                   </p>
                 </div>
-                
-                <div className="bg-white/5 rounded-lg p-4">
-                  <h4 className="text-white/60 text-sm mb-2">Valor Aprovado</h4>
+
+                <div className="bg-card rounded-lg p-4">
+                  <h4 className="text-muted-foreground text-sm mb-2">Valor Aprovado</h4>
                   <p className="text-2xl font-bold text-green-400">
                     {sinistro.approved_amount?.toLocaleString('pt-BR', {
                       style: 'currency',
@@ -511,9 +510,9 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
                     }) || 'N/A'}
                   </p>
                 </div>
-                
-                <div className="bg-white/5 rounded-lg p-4">
-                  <h4 className="text-white/60 text-sm mb-2">Franquia</h4>
+
+                <div className="bg-card rounded-lg p-4">
+                  <h4 className="text-muted-foreground text-sm mb-2">Franquia</h4>
                   <p className="text-2xl font-bold text-orange-400">
                     {sinistro.deductible_amount?.toLocaleString('pt-BR', {
                       style: 'currency',
@@ -524,16 +523,16 @@ export function SinistroDetailsModal({ sinistro, open, onOpenChange, onSuccess }
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white/5 rounded-lg p-4">
-                  <h4 className="text-white/60 text-sm mb-2">Prazo de Análise</h4>
-                  <p className="text-white">
+                <div className="bg-card rounded-lg p-4">
+                  <h4 className="text-muted-foreground text-sm mb-2">Prazo de Análise</h4>
+                  <p className="text-foreground">
                     {sinistro.analysis_deadline ? formatDate(sinistro.analysis_deadline) : 'Não definido'}
                   </p>
                 </div>
-                
-                <div className="bg-white/5 rounded-lg p-4">
-                  <h4 className="text-white/60 text-sm mb-2">Data de Pagamento</h4>
-                  <p className="text-white">
+
+                <div className="bg-card rounded-lg p-4">
+                  <h4 className="text-muted-foreground text-sm mb-2">Data de Pagamento</h4>
+                  <p className="text-foreground">
                     {sinistro.payment_date ? formatDate(sinistro.payment_date) : 'Não realizado'}
                   </p>
                 </div>

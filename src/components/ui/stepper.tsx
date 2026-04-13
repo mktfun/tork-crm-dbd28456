@@ -1,9 +1,17 @@
 import React from 'react';
-import { Check } from 'lucide-react';
+import { Check, User, Building2, DollarSign, Users2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+export interface Step {
+  id: string;
+  title: string;
+  description?: string;
+}
+
+const STEP_ICONS = [User, Building2, DollarSign, Users2];
+
 interface StepperProps {
-  steps: string[];
+  steps: string[] | Step[];
   currentStep: number;
   className?: string;
 }
@@ -15,47 +23,51 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
         const stepNumber = index + 1;
         const isCompleted = stepNumber < currentStep;
         const isActive = stepNumber === currentStep;
-        
+        const Icon = STEP_ICONS[index] ?? User;
+        const label = typeof step === 'string' ? step : step.title;
+
         return (
           <div key={index} className="flex items-center">
-            {/* Step Circle */}
             <div className="flex flex-col items-center">
               <div
                 className={cn(
-                  "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300",
-                  isCompleted 
-                    ? "bg-zinc-700 border-zinc-700 text-zinc-100" 
-                    : isActive 
-                      ? "bg-zinc-900 border-zinc-500 text-zinc-100" 
-                      : "bg-zinc-900/50 border-zinc-800 text-zinc-500"
+                  "flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full transition-all duration-500",
+                  isCompleted
+                    ? "bg-foreground text-background"
+                    : isActive
+                      ? "bg-card shadow-[0_4px_12px_rgba(0,0,0,0.1)] text-foreground"
+                      : "bg-muted text-muted-foreground"
                 )}
               >
                 {isCompleted ? (
-                  <Check className="h-5 w-5" strokeWidth={3} />
+                  <Check className="h-5 w-5 animate-in zoom-in-50 duration-200" strokeWidth={3} />
                 ) : (
-                  <span className="text-sm font-semibold">{stepNumber}</span>
+                  <Icon className="h-4 w-4" />
                 )}
               </div>
-              
-              {/* Step Label */}
               <span
                 className={cn(
-                  "mt-2 text-xs font-medium transition-colors duration-200 whitespace-nowrap",
-                  isActive ? "text-zinc-100" : isCompleted ? "text-zinc-300" : "text-zinc-500"
+                  "mt-2 text-[10px] sm:text-xs font-medium transition-colors duration-200 max-w-[56px] sm:max-w-none text-center leading-tight truncate",
+                  isActive
+                    ? "text-foreground font-semibold"
+                    : isCompleted
+                      ? "text-foreground"
+                      : "text-muted-foreground"
                 )}
               >
-                {step}
+                {label}
               </span>
             </div>
-            
-            {/* Connector Line */}
             {index < steps.length - 1 && (
-              <div
-                className={cn(
-                  "h-0.5 w-12 sm:w-20 mx-2 sm:mx-4 transition-colors duration-300",
-                  stepNumber < currentStep ? "bg-zinc-600" : "bg-zinc-800"
-                )}
-              />
+              <div className="relative h-1 w-10 sm:w-16 mx-2 sm:mx-3">
+                <div className="absolute inset-0 bg-muted rounded-full" />
+                <div
+                  className={cn(
+                    "absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-in-out",
+                    stepNumber < currentStep ? "w-full bg-foreground" : "w-0 bg-foreground"
+                  )}
+                />
+              </div>
             )}
           </div>
         );

@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { 
-  Landmark, 
-  Tags, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Loader2, 
+import {
+  Landmark,
+  Tags,
+  Plus,
+  Edit2,
+  Trash2,
+  Loader2,
   ShieldCheck,
   Zap,
-  Target
+  Target,
+  RotateCcw
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +30,7 @@ import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { useSupabaseBrokerages } from '@/hooks/useSupabaseBrokerages';
 import { FinancialAccount, FinancialAccountType } from '@/types/financeiro';
 import { toast } from '@/hooks/use-toast';
+import { createAccount } from '@/services/financialService';
 
 // ============ AUTOMATION SECTION ============
 
@@ -162,7 +164,7 @@ function AutomationSection() {
             )}
             <div className="bg-muted/50 p-3 rounded-md">
               <p className="text-sm text-muted-foreground">
-                <strong>Como funciona:</strong> Todo dia às 3h da manhã, o sistema verifica as comissões 
+                <strong>Como funciona:</strong> Todo dia às 3h da manhã, o sistema verifica as comissões
                 pendentes e as marca como pagas conforme suas configurações.
               </p>
             </div>
@@ -179,7 +181,7 @@ function CommissionTargetSection({ assetAccounts }: { assetAccounts: FinancialAc
   const { brokerages, updateBrokerage, addBrokerage, loading } = useSupabaseBrokerages();
   const [saving, setSaving] = useState(false);
   const [initializing, setInitializing] = useState(false);
-  
+
   // Auto-criar corretora se não existir
   useEffect(() => {
     const initBrokerage = async () => {
@@ -196,7 +198,7 @@ function CommissionTargetSection({ assetAccounts }: { assetAccounts: FinancialAc
     };
     initBrokerage();
   }, [loading, brokerages.length, initializing, addBrokerage]);
-  
+
   const brokerage = brokerages[0];
   const settings = brokerage?.financial_settings || {};
 
@@ -247,13 +249,13 @@ function CommissionTargetSection({ assetAccounts }: { assetAccounts: FinancialAc
             <SelectTrigger id="commission-account" className="mt-1">
               <SelectValue placeholder="Selecione uma conta" />
             </SelectTrigger>
-            <SelectContent 
+            <SelectContent
               className="z-50 bg-popover border shadow-lg"
               onCloseAutoFocus={(e) => e.preventDefault()}
             >
               {assetAccounts.map((acc) => (
-                <SelectItem 
-                  key={acc.id} 
+                <SelectItem
+                  key={acc.id}
                   value={acc.id}
                   onPointerDown={(e) => e.stopPropagation()}
                 >
@@ -303,15 +305,15 @@ interface AccountListProps {
   isLoading: boolean;
 }
 
-function AccountListSection({ 
-  title, 
-  description, 
-  icon: Icon, 
-  accounts, 
+function AccountListSection({
+  title,
+  description,
+  icon: Icon,
+  accounts,
   accountType,
-  onEdit, 
+  onEdit,
   onDelete,
-  isLoading 
+  isLoading
 }: AccountListProps) {
   const [showModal, setShowModal] = useState(false);
 
@@ -343,7 +345,7 @@ function AccountListSection({
           <ScrollArea className="h-[280px]">
             <div className="space-y-2">
               {accounts.map((account) => (
-                <div 
+                <div
                   key={account.id}
                   className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                 >
@@ -361,20 +363,20 @@ function AccountListSection({
                       <p className="text-xs text-muted-foreground">{account.code}</p>
                     )}
                   </div>
-                  
+
                   {!account.isSystem && (
                     <div className="flex items-center gap-1 ml-2">
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         className="h-8 w-8"
                         onClick={() => onEdit(account)}
                       >
                         <Edit2 className="w-4 h-4" />
                       </Button>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={() => onDelete(account)}
                       >
@@ -388,7 +390,7 @@ function AccountListSection({
           </ScrollArea>
         )}
       </CardContent>
-      
+
       <AccountFormModal
         open={showModal}
         onOpenChange={setShowModal}
@@ -398,14 +400,143 @@ function AccountListSection({
   );
 }
 
+// ============ CATEGORIES SECTION WITH SEED ============
+
+const STANDARD_CATEGORIES: { name: string; type: FinancialAccountType }[] = [
+  { name: 'Despesas Administrativas', type: 'expense' },
+  { name: 'Marketing', type: 'expense' },
+  { name: 'Pessoal', type: 'expense' },
+  { name: 'Impostos e Taxas', type: 'expense' },
+  { name: 'Receita de Vendas', type: 'revenue' },
+  { name: 'Receita de Serviços', type: 'revenue' },
+  { name: 'Comissões', type: 'revenue' },
+];
+
+interface CategoriesSectionProps {
+  accounts: FinancialAccount[];
+  onEdit: (account: FinancialAccount) => void;
+  onDelete: (account: FinancialAccount) => void;
+  isLoading: boolean;
+}
+
+function CategoriesSection({ accounts, onEdit, onDelete, isLoading }: CategoriesSectionProps) {
+  const [showModal, setShowModal] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+
+  const handleSeedDefaults = async () => {
+    setSeeding(true);
+    try {
+      const existingNames = new Set(accounts.map(a => a.name.toLowerCase().trim()));
+      const missing = STANDARD_CATEGORIES.filter(c => !existingNames.has(c.name.toLowerCase()));
+      if (missing.length === 0) {
+        toast({ title: 'Tudo certo!', description: 'Todas as categorias padrão já existem.' });
+        return;
+      }
+      for (const cat of missing) {
+        await createAccount({ name: cat.name, type: cat.type });
+      }
+      toast({ title: 'Categorias restauradas', description: `${missing.length} categorias padrão criadas.` });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível criar as categorias.', variant: 'destructive' });
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  return (
+    <Card className="flex-1">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Tags className="w-5 h-5 text-muted-foreground" />
+            <CardTitle className="text-lg">Categorias</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1 text-xs"
+              onClick={handleSeedDefaults}
+              disabled={seeding || isLoading}
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              {seeding ? 'Criando...' : 'Restaurar Padrões'}
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowModal(true)}>
+              <Plus className="w-4 h-4" />
+              Adicionar
+            </Button>
+          </div>
+        </div>
+        <CardDescription>Despesas e receitas para classificação</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : accounts.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <p>Nenhuma categoria cadastrada.</p>
+          </div>
+        ) : (
+          <ScrollArea className="h-[280px]">
+            <div className="space-y-2">
+              {accounts.map((account) => (
+                <div
+                  key={account.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium truncate">{account.name}</p>
+                      <Badge variant="secondary" className="text-xs">
+                        {account.type === 'expense' ? 'Despesa' : 'Receita'}
+                      </Badge>
+                      {account.isSystem && (
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <ShieldCheck className="w-3 h-3" />
+                          Sistema
+                        </Badge>
+                      )}
+                    </div>
+                    {account.code && (
+                      <p className="text-xs text-muted-foreground">{account.code}</p>
+                    )}
+                  </div>
+                  {!account.isSystem && (
+                    <div className="flex items-center gap-1 ml-2">
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onEdit(account)}>
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(account)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+      </CardContent>
+      <AccountFormModal
+        open={showModal}
+        onOpenChange={setShowModal}
+        accountType="expense"
+      />
+    </Card>
+  );
+}
+
 // ============ MAIN COMPONENT ============
 
 export function ConfiguracoesTab() {
   const { data: accounts = [], isLoading } = useFinancialAccountsWithDefaults();
-  
+
   const [editingAccount, setEditingAccount] = useState<FinancialAccount | null>(null);
   const [deleteAccount, setDeleteAccount] = useState<FinancialAccount | null>(null);
-  
+
   // Filtrar contas por tipo
   const assetAccounts = accounts.filter(a => a.type === 'asset');
   const expenseAccounts = accounts.filter(a => a.type === 'expense');
@@ -432,9 +563,9 @@ export function ConfiguracoesTab() {
 
       {/* Tabs */}
       <Tabs defaultValue="automacao" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="automacao">Automação</TabsTrigger>
-          <TabsTrigger value="plano-contas">Plano de Contas</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 bg-foreground/5 backdrop-blur-md border border-foreground/10 p-1 rounded-xl">
+          <TabsTrigger value="automacao" className="data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">Automação</TabsTrigger>
+          <TabsTrigger value="plano-contas" className="data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground">Plano de Contas</TabsTrigger>
         </TabsList>
 
         {/* Tab: Automação */}
@@ -446,23 +577,10 @@ export function ConfiguracoesTab() {
         {/* Tab: Plano de Contas */}
         <TabsContent value="plano-contas" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <AccountListSection
-              title="Contas Bancárias"
-              description="Caixas, bancos e contas de pagamento"
-              icon={Landmark}
-              accounts={assetAccounts}
-              accountType="asset"
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              isLoading={isLoading}
-            />
-            
-            <AccountListSection
-              title="Categorias"
-              description="Despesas e receitas para classificação"
-              icon={Tags}
+            <BankAccountsSection />
+
+            <CategoriesSection
               accounts={categoryAccounts}
-              accountType="expense"
               onEdit={handleEdit}
               onDelete={handleDelete}
               isLoading={isLoading}

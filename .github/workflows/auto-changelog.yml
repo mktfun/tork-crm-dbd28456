@@ -11,6 +11,8 @@ jobs:
   generate-changelog:
     if: github.event_name == 'push' || (github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - name: Checkout code
@@ -36,7 +38,11 @@ jobs:
         VERSION_NUM=$(echo $LATEST_TAG | sed 's/v//')
         
         # Get commits since last tag
-        COMMITS=$(git log $LATEST_TAG..HEAD --oneline --no-merges)
+        if [ "$LATEST_TAG" = "v0.0.0" ]; then
+          COMMITS=$(git log HEAD --oneline --no-merges)
+        else
+          COMMITS=$(git log $LATEST_TAG..HEAD --oneline --no-merges)
+        fi
         
         # Determine version bump based on commit messages
         if echo "$COMMITS" | grep -q "^[a-f0-9]* \(feat\|feature\):"; then
@@ -65,7 +71,11 @@ jobs:
         LATEST_TAG="${{ steps.get_tag.outputs.latest_tag }}"
         
         # Get commits since last tag
-        COMMITS=$(git log $LATEST_TAG..HEAD --pretty=format:"%s" --no-merges)
+        if [ "$LATEST_TAG" = "v0.0.0" ]; then
+          COMMITS=$(git log HEAD --pretty=format:"%s" --no-merges)
+        else
+          COMMITS=$(git log $LATEST_TAG..HEAD --pretty=format:"%s" --no-merges)
+        fi
         
         if [ -z "$COMMITS" ]; then
           echo "No new commits found"
@@ -125,20 +135,23 @@ jobs:
 
     - name: Call Supabase Edge Function
       if: steps.changelog.outputs.title != ''
+      env:
+        VERSION: ${{ steps.version.outputs.new_version }}
+        TITLE: ${{ steps.changelog.outputs.title }}
+        DESCRIPTION: ${{ steps.changelog.outputs.description }}
+        CATEGORY: ${{ steps.changelog.outputs.category }}
+        PRIORITY: ${{ steps.changelog.outputs.priority }}
+        REPO: ${{ github.repository }}
+        COMMIT: ${{ github.sha }}
+        AUTHOR: ${{ github.actor }}
       run: |
+        PAYLOAD=$(jq -n \
+          '{version: env.VERSION, title: env.TITLE, description: env.DESCRIPTION, category: env.CATEGORY, priority: env.PRIORITY, repo: env.REPO, commit: env.COMMIT, author: env.AUTHOR}')
+        
         curl -X POST "https://jaouwhckqqnaxqyfvgyq.supabase.co/functions/v1/auto-changelog" \
           -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
           -H "Content-Type: application/json" \
-          -d '{
-            "version": "${{ steps.version.outputs.new_version }}",
-            "title": "${{ steps.changelog.outputs.title }}",
-            "description": "${{ steps.changelog.outputs.description }}",
-            "category": "${{ steps.changelog.outputs.category }}",
-            "priority": "${{ steps.changelog.outputs.priority }}",
-            "repo": "${{ github.repository }}",
-            "commit": "${{ github.sha }}",
-            "author": "${{ github.actor }}"
-          }'
+          -d "$PAYLOAD"
 
     - name: Create Git Tag
       if: steps.changelog.outputs.title != ''

@@ -11,12 +11,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
-import { 
-  Loader2, 
-  Plus, 
-  Calendar, 
-  AlertTriangle, 
-  MapPin, 
+import {
+  Loader2,
+  Plus,
+  Calendar,
+  AlertTriangle,
+  MapPin,
   ChevronRight,
   ChevronLeft,
   FileText,
@@ -66,17 +66,17 @@ const sinistroSchema = z.object({
   policy_id: z.string().optional(), // Agora opcional
   client_id: z.string().optional(),
   company_id: z.string().optional(),
-  
+
   // Passo 2
   occurrence_date: z.string().min(1, 'Data da ocorrência é obrigatória'),
   claim_type: z.string().min(1, 'Tipo do sinistro é obrigatório'),
   description: z.string().min(10, 'Descrição deve ter pelo menos 10 caracteres'),
   priority: z.string().optional(),
-  
+
   // Passo 3
   location_occurrence: z.string().optional(),
   circumstances: z.string().optional(),
-  
+
   // Passo 4
   police_report_number: z.string().optional(),
   claim_amount: z.string().optional(),
@@ -87,7 +87,7 @@ type SinistroFormData = z.infer<typeof sinistroSchema>;
 
 const claimTypes = [
   'Colisão',
-  'Roubo', 
+  'Roubo',
   'Furto',
   'Incêndio',
   'Danos Elétricos',
@@ -100,7 +100,7 @@ const claimTypes = [
 ];
 
 const priorities = [
-  { value: 'Baixa', label: 'Baixa', color: 'text-gray-400' },
+  { value: 'Baixa', label: 'Baixa', color: 'text-muted-foreground' },
   { value: 'Média', label: 'Média', color: 'text-blue-400' },
   { value: 'Alta', label: 'Alta', color: 'text-orange-400' },
   { value: 'Urgente', label: 'Urgente', color: 'text-red-400' },
@@ -115,7 +115,7 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
   const [open, setOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  
+
   const createSinistro = useCreateSinistro();
   const { clients = [] } = useClients();
   const { policies = [] } = usePolicies();
@@ -189,7 +189,7 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
       };
 
       await createSinistro.mutateAsync(submitData);
-      
+
       // Reset em ordem correta
       setCurrentStep(1);
       setCompletedSteps([]);
@@ -213,8 +213,8 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
           <div className="space-y-6">
             <div className="text-center">
               <AlertTriangle className="w-12 h-12 text-orange-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Informações Básicas</h3>
-              <p className="text-white/60">Quando e que tipo de sinistro aconteceu?</p>
+              <h3 className="text-xl font-semibold text-foreground mb-2">Informações Básicas</h3>
+              <p className="text-muted-foreground">Quando e que tipo de sinistro aconteceu?</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -287,12 +287,12 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
             />
 
             {/* Seção de Vinculação Opcional */}
-            <div className="border-t border-white/10 pt-4">
-              <h4 className="text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
+            <div className="border-t border-border pt-4">
+              <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 Vincular Apólice (Opcional)
               </h4>
-              <p className="text-xs text-white/60 mb-3">
+              <p className="text-xs text-muted-foreground mb-3">
                 Você pode vincular este sinistro a uma apólice específica ou fazer isso posteriormente.
               </p>
 
@@ -332,14 +332,14 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
                     <h4 className="font-medium text-blue-400 mb-2 text-sm">Apólice Selecionada</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                       <div>
-                        <span className="text-white/60">Cliente:</span>
-                        <p className="text-white font-medium">
+                        <span className="text-muted-foreground">Cliente:</span>
+                        <p className="text-foreground font-medium">
                           {clients.find(c => c.id === selectedPolicy.clientId)?.name || 'N/A'}
                         </p>
                       </div>
                       <div>
-                        <span className="text-white/60">Seguradora:</span>
-                        <p className="text-white font-medium">{selectedPolicy.companies?.name || 'Seguradora não especificada'}</p>
+                        <span className="text-muted-foreground">Seguradora:</span>
+                        <p className="text-foreground font-medium">{selectedPolicy.companies?.name || 'Seguradora não especificada'}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -354,8 +354,8 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
           <div className="space-y-6">
             <div className="text-center">
               <FileText className="w-12 h-12 text-blue-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Descrição Detalhada</h3>
-              <p className="text-white/60">Conte-nos detalhadamente o que aconteceu</p>
+              <h3 className="text-xl font-semibold text-foreground mb-2">Descrição Detalhada</h3>
+              <p className="text-muted-foreground">Conte-nos detalhadamente o que aconteceu</p>
             </div>
 
             <FormField
@@ -378,7 +378,7 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
 
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
               <h4 className="font-medium text-blue-400 mb-2">💡 Dicas para uma boa descrição</h4>
-              <ul className="text-sm text-white/80 space-y-1">
+              <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Relate os fatos em ordem cronológica</li>
                 <li>• Descreva as condições climáticas e do local</li>
                 <li>• Mencione se havia testemunhas</li>
@@ -394,8 +394,8 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
           <div className="space-y-6">
             <div className="text-center">
               <MapPin className="w-12 h-12 text-green-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Local e Circunstâncias</h3>
-              <p className="text-white/60">Onde e como aconteceu (opcional)</p>
+              <h3 className="text-xl font-semibold text-foreground mb-2">Local e Circunstâncias</h3>
+              <p className="text-muted-foreground">Onde e como aconteceu (opcional)</p>
             </div>
 
             <FormField
@@ -422,10 +422,10 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
                 <FormItem>
                   <FormLabel>Circunstâncias Detalhadas</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Detalhe as circunstâncias, condições climáticas, testemunhas, condições do local, etc..."
                       className="min-h-[120px]"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -440,8 +440,8 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
           <div className="space-y-6">
             <div className="text-center">
               <DollarSign className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Valores e Documentos</h3>
-              <p className="text-white/60">Informações financeiras e documentais</p>
+              <h3 className="text-xl font-semibold text-foreground mb-2">Valores e Documentos</h3>
+              <p className="text-muted-foreground">Informações financeiras e documentais</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -452,11 +452,11 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
                   <FormItem>
                     <FormLabel>Valor Estimado (R$)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="0,00" 
-                        {...field} 
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0,00"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -471,11 +471,11 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
                   <FormItem>
                     <FormLabel>Franquia (R$)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="0,00" 
-                        {...field} 
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0,00"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -500,14 +500,14 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
 
             <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
               <h4 className="font-medium text-yellow-400 mb-2">📋 Documentos Necessários</h4>
-              <ul className="text-sm text-white/80 space-y-1">
+              <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Boletim de Ocorrência (se aplicável)</li>
                 <li>• Fotos dos danos</li>
                 <li>• Documentos do veículo/bem</li>
                 <li>• Orçamentos de reparo</li>
                 <li>• Relatórios técnicos</li>
               </ul>
-              <p className="text-xs text-white/60 mt-2">
+              <p className="text-xs text-muted-foreground mt-2">
                 Você poderá anexar os documentos após o registro inicial
               </p>
             </div>
@@ -520,25 +520,25 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
           <div className="space-y-6">
             <div className="text-center">
               <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Confirme os Dados</h3>
-              <p className="text-white/60">Revise as informações antes de registrar</p>
+              <h3 className="text-xl font-semibold text-foreground mb-2">Confirme os Dados</h3>
+              <p className="text-muted-foreground">Revise as informações antes de registrar</p>
             </div>
 
             <div className="space-y-4">
-              <Card className="bg-white/5">
+              <Card className="bg-card">
                 <CardContent className="p-4">
-                  <h4 className="font-medium text-white mb-3 flex items-center gap-2">
+                  <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
                     <FileText className="w-4 h-4" />
                     Apólice e Cliente
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                     <div>
-                      <span className="text-white/60">Apólice:</span>
-                      <p className="text-white">{selectedPolicy?.policyNumber}</p>
+                      <span className="text-muted-foreground">Apólice:</span>
+                      <p className="text-foreground">{selectedPolicy?.policyNumber}</p>
                     </div>
                     <div>
-                      <span className="text-white/60">Cliente:</span>
-                      <p className="text-white">
+                      <span className="text-muted-foreground">Cliente:</span>
+                      <p className="text-foreground">
                         {clients.find(c => c.id === formData.client_id)?.name}
                       </p>
                     </div>
@@ -546,43 +546,43 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/5">
+              <Card className="bg-card">
                 <CardContent className="p-4">
-                  <h4 className="font-medium text-white mb-3 flex items-center gap-2">
+                  <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4" />
                     Detalhes da Ocorrência
                   </h4>
                   <div className="space-y-2 text-sm">
                     <div>
-                      <span className="text-white/60">Tipo:</span>
-                      <span className="text-white ml-2">{formData.claim_type}</span>
+                      <span className="text-muted-foreground">Tipo:</span>
+                      <span className="text-foreground ml-2">{formData.claim_type}</span>
                     </div>
                     <div>
-                      <span className="text-white/60">Data:</span>
-                      <span className="text-white ml-2">
+                      <span className="text-muted-foreground">Data:</span>
+                      <span className="text-foreground ml-2">
                         {formData.occurrence_date && new Date(formData.occurrence_date).toLocaleDateString('pt-BR')}
                       </span>
                     </div>
                     <div>
-                      <span className="text-white/60">Descrição:</span>
-                      <p className="text-white/80 text-xs mt-1">{formData.description}</p>
+                      <span className="text-muted-foreground">Descrição:</span>
+                      <p className="text-muted-foreground text-xs mt-1">{formData.description}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               {(formData.claim_amount || formData.deductible_amount) && (
-                <Card className="bg-white/5">
+                <Card className="bg-card">
                   <CardContent className="p-4">
-                    <h4 className="font-medium text-white mb-3 flex items-center gap-2">
+                    <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
                       <DollarSign className="w-4 h-4" />
                       Valores
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                       {formData.claim_amount && (
                         <div>
-                          <span className="text-white/60">Valor Estimado:</span>
-                          <p className="text-white font-medium">
+                          <span className="text-muted-foreground">Valor Estimado:</span>
+                          <p className="text-foreground font-medium">
                             {parseFloat(formData.claim_amount).toLocaleString('pt-BR', {
                               style: 'currency',
                               currency: 'BRL'
@@ -592,8 +592,8 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
                       )}
                       {formData.deductible_amount && (
                         <div>
-                          <span className="text-white/60">Franquia:</span>
-                          <p className="text-white font-medium">
+                          <span className="text-muted-foreground">Franquia:</span>
+                          <p className="text-foreground font-medium">
                             {parseFloat(formData.deductible_amount).toLocaleString('pt-BR', {
                               style: 'currency',
                               currency: 'BRL'
@@ -624,17 +624,17 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
           </Button>
         )}
       </DialogTrigger>
-      
+
       <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Shield className="w-5 h-5" />
             Registrar Novo Sinistro
           </DialogTitle>
-          
+
           {/* Progress Bar */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm text-white/60">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>Passo {currentStep} de {steps.length}</span>
               <span>{Math.round(progress)}% concluído</span>
             </div>
@@ -647,18 +647,16 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
               const Icon = step.icon;
               const isCompleted = completedSteps.includes(step.id);
               const isCurrent = step.id === currentStep;
-              
+
               return (
                 <div key={step.id} className="flex flex-col items-center space-y-1">
-                  <div className={`p-2 rounded-full transition-colors ${
-                    isCompleted ? 'bg-green-500' :
-                    isCurrent ? 'bg-blue-500' : 'bg-white/10'
-                  }`}>
+                  <div className={`p-2 rounded-full transition-colors ${isCompleted ? 'bg-green-500' :
+                    isCurrent ? 'bg-blue-500' : 'bg-secondary'
+                    }`}>
                     <Icon className="w-4 h-4" />
                   </div>
-                  <span className={`text-xs text-center max-w-16 ${
-                    isCurrent ? 'text-white' : 'text-white/60'
-                  }`}>
+                  <span className={`text-xs text-center max-w-16 ${isCurrent ? 'text-foreground' : 'text-muted-foreground'
+                    }`}>
                     {step.title}
                   </span>
                 </div>
@@ -675,9 +673,9 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
 
             {/* Navigation Buttons */}
             <div className="flex justify-between items-center pt-6 flex-shrink-0">
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={prevStep}
                 disabled={currentStep === 1}
               >
@@ -686,16 +684,16 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
               </Button>
 
               <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setOpen(false)}
                 >
                   Cancelar
                 </Button>
 
                 {currentStep < steps.length ? (
-                  <Button 
+                  <Button
                     type="button"
                     onClick={nextStep}
                     disabled={!validateCurrentStep()}
@@ -705,8 +703,8 @@ export function SinistroOnboarding({ children, onSuccess }: SinistroOnboardingPr
                     <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 ) : (
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={createSinistro.isPending}
                     className="bg-green-600 hover:bg-green-700"
                   >

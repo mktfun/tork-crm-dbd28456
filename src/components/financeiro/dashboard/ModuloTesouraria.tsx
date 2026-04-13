@@ -1,19 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpCircle, ArrowDownCircle, Wallet, Calendar, ArrowRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAgingReport, useUpcomingReceivables, usePendingTotals } from "@/hooks/useFinanceiro";
-import { format } from "date-fns";
+import { useAgingReport, useUpcomingReceivables, useFinancialSummary } from "@/hooks/useFinanceiro";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { GlassKpiCard } from "@/components/financeiro/shared/GlassKpiCard";
 
 const AgingBar = ({ item }: { item: any }) => (
   <div className="space-y-1">
     <div className="flex items-center justify-between text-xs">
-      <span className="text-zinc-400">{item.bucketRange}</span>
-      <span className="text-zinc-300 font-medium">
+      <span className="text-muted-foreground">{item.bucketRange}</span>
+      <span className="text-foreground/80 font-medium">
         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.bucketAmount)}
       </span>
     </div>
-    <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
+    <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
       <div
         className={cn("h-full rounded-full transition-all")}
         style={{ width: `${Math.min(100, (item.bucketCount / 10) * 100)}%`, backgroundColor: item.bucketColor }}
@@ -29,20 +30,27 @@ interface ModuloTesourariaProps {
 export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
   const { data: agingData, isLoading: isLoadingAging } = useAgingReport();
   const { data: upcomingData, isLoading: isLoadingUpcoming } = useUpcomingReceivables(30);
-  const { data: totalsData, isLoading: isLoadingTotals } = usePendingTotals();
 
-  const isLoading = isLoadingAging || isLoadingUpcoming || isLoadingTotals;
+  const now = new Date();
+  const startDate = format(startOfMonth(now), 'yyyy-MM-dd');
+  const endDate = format(endOfMonth(now), 'yyyy-MM-dd');
+  const { data: summary, isLoading: isLoadingSummary } = useFinancialSummary(startDate, endDate);
+
+  const isLoading = isLoadingAging || isLoadingUpcoming || isLoadingSummary;
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   return (
     <Card
       className={cn(
-        "h-full bg-zinc-900/50 border-zinc-800 transition-all duration-200",
-        onClick && "cursor-pointer hover:bg-zinc-900/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
+        "h-full bg-card/50 border-border transition-all duration-200",
+        onClick && "cursor-pointer hover:bg-card/70 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10"
       )}
       onClick={onClick}
     >
       <CardHeader className="pb-2">
-        <CardTitle className="text-white flex items-center justify-between text-base">
+        <CardTitle className="text-foreground flex items-center justify-between text-base">
           <span className="flex items-center gap-2">
             <Wallet className="h-5 w-5 text-primary" />
             Tesouraria & Contas
@@ -61,38 +69,29 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Coluna Esquerda: Liquidez */}
             <div className="space-y-4">
-              {/* Cards de Saldo */}
+              {/* Cards Glass de Saldo */}
               <div className="grid grid-cols-2 gap-3">
-                {/* A Receber */}
-                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3">
-                  <div className="flex items-center gap-2 text-emerald-500 mb-1">
-                    <ArrowUpCircle className="h-4 w-4" />
-                    <span className="text-xs font-medium">A Receber</span>
-                  </div>
-                  <p className="text-lg font-bold text-emerald-400">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalsData?.receivable || 0)}
-                  </p>
-                  <p className="text-xs text-zinc-500">Total Aberto</p>
-                </div>
-
-                {/* A Pagar */}
-                <div className="rounded-lg bg-rose-500/10 border border-rose-500/20 p-3">
-                  <div className="flex items-center gap-2 text-rose-500 mb-1">
-                    <ArrowDownCircle className="h-4 w-4" />
-                    <span className="text-xs font-medium">A Pagar</span>
-                  </div>
-                  <p className="text-lg font-bold text-rose-400">
-                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalsData?.payable || 0)}
-                  </p>
-                  <p className="text-xs text-zinc-500">Total Aberto</p>
-                </div>
+                <GlassKpiCard
+                  title="A Receber"
+                  value={formatCurrency(summary?.current?.operationalPendingIncome || 0)}
+                  subtitle="Vencidos + 30 dias"
+                  icon={ArrowUpCircle}
+                  iconClassName="text-emerald-400 drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]"
+                />
+                <GlassKpiCard
+                  title="A Pagar"
+                  value={formatCurrency(summary?.current?.operationalPendingExpense || 0)}
+                  subtitle="Vencidos + 30 dias"
+                  icon={ArrowDownCircle}
+                  iconClassName="text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.4)]"
+                />
               </div>
 
               {/* Próximos Vencimentos */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-4 w-4 text-zinc-500" />
-                  <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Próximos Vencimentos
                   </h4>
                 </div>
@@ -100,25 +99,25 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
                   {upcomingData && upcomingData.length > 0 ? upcomingData.slice(0, 5).map((tx, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between py-1.5 border-b border-zinc-800 last:border-0"
+                      className="flex items-center justify-between py-1.5 border-b border-border last:border-0"
                     >
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                        <span className="text-xs text-zinc-300 truncate max-w-[120px]" title={tx.description}>
+                        <span className="text-xs text-foreground/80 truncate max-w-[120px]" title={tx.description}>
                           {tx.description}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="text-zinc-500">
+                        <span className="text-muted-foreground">
                           {format(new Date(tx.dueDate), 'dd/MM', { locale: ptBR })}
                         </span>
                         <span className="font-medium text-emerald-400">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(tx.amount)}
+                          {formatCurrency(tx.amount)}
                         </span>
                       </div>
                     </div>
                   )) : (
-                    <p className="text-xs text-zinc-500 py-2 text-center">Nenhum recebimento previsto.</p>
+                    <p className="text-xs text-muted-foreground py-2 text-center">Nenhum recebimento previsto.</p>
                   )}
                 </div>
               </div>
@@ -126,18 +125,16 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
 
             {/* Coluna Direita: Aging Report */}
             <div className="space-y-3">
-              <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wide">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Inadimplência por Período
               </h4>
               <div className="space-y-3">
                 {agingData && agingData.length > 0 ? agingData.map((item, index) => (
                   <AgingBar key={index} item={item} />
                 )) : (
-                  <p className="text-xs text-zinc-500 py-2 text-center">Nenhuma inadimplência registrada.</p>
+                  <p className="text-xs text-muted-foreground py-2 text-center">Nenhuma inadimplência registrada.</p>
                 )}
               </div>
-
-              {/* Resumo Aging (Opcional, removido hardcoded 5%) */}
             </div>
           </div>
         )}

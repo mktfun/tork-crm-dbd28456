@@ -1,0 +1,1 @@
+ALTER TABLE appointments ADD COLUMN ramo_id UUID REFERENCES public.ramos(id);

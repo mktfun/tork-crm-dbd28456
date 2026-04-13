@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { DateRange } from 'react-day-picker';
+import { cn } from '@/lib/utils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useCompanyNames } from '@/hooks/useCompanyNames';
 import { useClients } from '@/hooks/useAppData';
@@ -7,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Plus, FileText, DollarSign, TrendingUp, AlertCircle, Download, Sparkles, SlidersHorizontal, X } from 'lucide-react';
+import { Calendar, Plus, FileText, DollarSign, TrendingUp, AlertCircle, Download, Sparkles, SlidersHorizontal, X, Building2, Clock } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { formatDate, parseLocalDate } from '@/utils/dateUtils';
 import { PolicyFilters } from '@/hooks/useFilteredPolicies';
@@ -28,6 +30,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerClose } from '@/components/ui/drawer';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
+import { AppCard } from '@/components/ui/app-card';
+import { PolicyDateFilterBar, PeriodType } from '@/components/policies/PolicyDateFilterBar';
 
 export default function Policies() {
   const { clients } = useClients();
@@ -41,6 +45,8 @@ export default function Policies() {
   const [isAIImportModalOpen, setIsAIImportModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [periodType, setPeriodType] = useState<PeriodType>('expiration_date');
 
   // Estado de paginação e filtros
   const [page, setPage] = useState(1);
@@ -148,14 +154,14 @@ export default function Policies() {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusVariant = (status: string): string => {
     switch (status) {
-      case 'Ativa': return 'bg-green-600';
-      case 'Orçamento': return 'bg-blue-600';
-      case 'Aguardando Apólice': return 'bg-yellow-600';
-      case 'Cancelada': return 'bg-red-600';
-      case 'Renovada': return 'bg-purple-600';
-      default: return 'bg-gray-600';
+      case 'Ativa': return 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+      case 'Orçamento': return 'bg-blue-500/15 text-blue-400 border border-blue-500/30';
+      case 'Aguardando Apólice': return 'bg-amber-500/15 text-amber-400 border border-amber-500/30';
+      case 'Cancelada': return 'bg-destructive/15 text-destructive border border-destructive/30';
+      case 'Renovada': return 'bg-purple-500/15 text-purple-400 border border-purple-500/30';
+      default: return 'bg-muted text-muted-foreground border border-border';
     }
   };
 
@@ -163,24 +169,24 @@ export default function Policies() {
   const AdvancedFiltersContent = () => (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between mb-2">
-        <h4 className="font-medium text-white">Filtros Avançados</h4>
+        <h4 className="font-medium text-foreground">Filtros Avançados</h4>
         {activeFilterCount > 0 && (
-          <Button variant="ghost" size="sm" onClick={resetFilters} className="text-slate-400 hover:text-white">
+          <Button variant="ghost" size="sm" onClick={resetFilters} className="text-muted-foreground hover:text-foreground">
             <X className="w-4 h-4 mr-1" />
             Limpar ({activeFilterCount})
           </Button>
         )}
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Seguradora */}
         <div>
-          <Label htmlFor="insuranceCompany" className="text-slate-300 text-sm">Seguradora</Label>
+          <Label htmlFor="insuranceCompany" className="text-muted-foreground text-sm">Seguradora</Label>
           <Select
             value={filters.insuranceCompany}
             onValueChange={(value) => setFilters({ ...filters, insuranceCompany: value })}
           >
-            <SelectTrigger className="bg-slate-800 border-slate-700 text-white mt-1">
+            <SelectTrigger className="bg-card border-border text-foreground mt-1">
               <SelectValue placeholder="Todas" />
             </SelectTrigger>
             <SelectContent>
@@ -194,12 +200,12 @@ export default function Policies() {
 
         {/* Ramo */}
         <div>
-          <Label htmlFor="ramo" className="text-slate-300 text-sm">Ramo</Label>
+          <Label htmlFor="ramo" className="text-muted-foreground text-sm">Ramo</Label>
           <Select
             value={filters.ramo}
             onValueChange={(value) => setFilters({ ...filters, ramo: value })}
           >
-            <SelectTrigger className="bg-slate-800 border-slate-700 text-white mt-1">
+            <SelectTrigger className="bg-card border-border text-foreground mt-1">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
@@ -213,12 +219,12 @@ export default function Policies() {
 
         {/* Produtor */}
         <div>
-          <Label htmlFor="producer" className="text-slate-300 text-sm">Produtor</Label>
+          <Label htmlFor="producer" className="text-muted-foreground text-sm">Produtor</Label>
           <Select
             value={filters.producerId}
             onValueChange={(value) => setFilters({ ...filters, producerId: value })}
           >
-            <SelectTrigger className="bg-slate-800 border-slate-700 text-white mt-1">
+            <SelectTrigger className="bg-card border-border text-foreground mt-1">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
@@ -232,7 +238,7 @@ export default function Policies() {
 
         {/* Período de Vencimento */}
         <div>
-          <Label htmlFor="period" className="text-slate-300 text-sm">Vencimento</Label>
+          <Label htmlFor="period" className="text-muted-foreground text-sm">Vencimento</Label>
           <Select
             value={filters.period}
             onValueChange={(value) => setFilters({
@@ -242,7 +248,7 @@ export default function Policies() {
               customEnd: value !== 'custom' ? null : filters.customEnd
             })}
           >
-            <SelectTrigger className="bg-slate-800 border-slate-700 text-white mt-1">
+            <SelectTrigger className="bg-card border-border text-foreground mt-1">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
@@ -257,11 +263,11 @@ export default function Policies() {
 
         {/* Data Início */}
         <div>
-          <Label htmlFor="customStart" className="text-slate-300 text-sm">Vencimento (Início)</Label>
+          <Label htmlFor="customStart" className="text-muted-foreground text-sm">Vencimento (Início)</Label>
           <Input
             type="date"
             id="customStart"
-            className="bg-slate-800 border-slate-700 text-white mt-1"
+            className="bg-card border-border text-foreground mt-1"
             value={filters.customStart || ''}
             onChange={(e) => setFilters(prev => ({
               ...prev,
@@ -273,11 +279,11 @@ export default function Policies() {
 
         {/* Data Fim */}
         <div>
-          <Label htmlFor="customEnd" className="text-slate-300 text-sm">Vencimento (Fim)</Label>
+          <Label htmlFor="customEnd" className="text-muted-foreground text-sm">Vencimento (Fim)</Label>
           <Input
             type="date"
             id="customEnd"
-            className="bg-slate-800 border-slate-700 text-white mt-1"
+            className="bg-card border-border text-foreground mt-1"
             value={filters.customEnd || ''}
             onChange={(e) => setFilters(prev => ({
               ...prev,
@@ -289,12 +295,12 @@ export default function Policies() {
 
         {/* Itens por página */}
         <div className="md:col-span-2">
-          <Label htmlFor="limit" className="text-slate-300 text-sm">Itens por página</Label>
+          <Label htmlFor="limit" className="text-muted-foreground text-sm">Itens por página</Label>
           <Select
             value={String(limit)}
             onValueChange={(value) => setLimit(Number(value))}
           >
-            <SelectTrigger className="bg-slate-800 border-slate-700 text-white mt-1">
+            <SelectTrigger className="bg-card border-border text-foreground mt-1">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -310,192 +316,265 @@ export default function Policies() {
   );
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Seção de KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard
-          title="Apólices Ativas"
-          value={kpis.totalActive}
-          icon={FileText}
-          isLoading={kpisLoading}
-        />
-        <KpiCard
-          title="Prêmio Total"
-          value={kpis.totalPremium.toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-          })}
-          icon={DollarSign}
-          isLoading={kpisLoading}
-        />
-        <KpiCard
-          title="Comissão Estimada"
-          value={kpis.estimatedCommission.toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-          })}
-          icon={TrendingUp}
-          subtitle="Anual"
-          isLoading={kpisLoading}
-        />
-        <KpiCard
-          title="Vencendo em 30 dias"
-          value={kpis.expiringSoon}
-          icon={AlertCircle}
-          variant={kpis.expiringSoon > 0 ? 'warning' : 'default'}
-          isLoading={kpisLoading}
-        />
-      </div>
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 h-full">
+      <div className="max-w-[1600px] mx-auto space-y-6">
+        {/* Seção de KPIs */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard
+            title="Apólices Ativas"
+            value={kpis.totalActive}
+            icon={FileText}
+            isLoading={kpisLoading}
+          />
+          <KpiCard
+            title="Prêmio Total"
+            value={kpis.totalPremium.toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+            })}
+            icon={DollarSign}
+            isLoading={kpisLoading}
+          />
+          <KpiCard
+            title="Comissão Estimada"
+            value={kpis.estimatedCommission.toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+            })}
+            icon={TrendingUp}
+            subtitle="Anual"
+            isLoading={kpisLoading}
+          />
+          <KpiCard
+            title="Vencendo em 30 dias"
+            value={kpis.expiringSoon}
+            icon={AlertCircle}
+            variant={kpis.expiringSoon > 0 ? 'warning' : 'default'}
+            isLoading={kpisLoading}
+          />
+        </div>
 
-      {/* Header e Filtros */}
-      <div className="flex flex-col gap-4">
-        {/* Linha 1: Título e Ações */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="text-2xl font-bold text-white">
-            Apólices <span className="text-sm text-slate-400">({totalCount} total)</span>
-          </div>
+        {/* Filtros Avançados de Data */}
+        <PolicyDateFilterBar
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          periodType={periodType}
+          onPeriodTypeChange={setPeriodType}
+        />
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Grupo de Export - menor destaque */}
-            <div className="flex gap-1">
-              <Button
-                onClick={handleExportCSV}
-                disabled={isExporting}
-                variant="outline"
-                size="sm"
-                className="bg-slate-800 hover:bg-slate-700 text-white border-slate-700"
-              >
-                <Download className="w-4 h-4" />
-                <span className="hidden lg:inline ml-2">{isExporting ? 'Exportando...' : 'CSV'}</span>
-              </Button>
-              <ExportPoliciesModal filters={filters} disabled={isLoading} />
+        {/* Header e Filtros */}
+        <div className="flex flex-col gap-4">
+          {/* Linha 1: Título e Ações */}
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="text-2xl font-bold text-foreground">
+              Apólices <span className="text-sm text-muted-foreground">({totalCount} total)</span>
             </div>
-            
-            {/* Separador visual */}
-            <div className="h-6 w-px bg-slate-700 hidden md:block" />
-            
-            {/* Ações Principais */}
-            <Button 
-              onClick={() => setIsAIImportModalOpen(true)}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border-0"
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Grupo de Export - menor destaque */}
+              <div className="flex gap-1">
+                <Button
+                  onClick={handleExportCSV}
+                  disabled={isExporting}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card bg-muted/80 text-foreground border-border"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="hidden lg:inline ml-2">{isExporting ? 'Exportando...' : 'CSV'}</span>
+                </Button>
+                <ExportPoliciesModal filters={filters} disabled={isLoading} />
+              </div>
+
+              {/* Separador visual */}
+              <div className="h-6 w-px bg-border hidden md:block" />
+
+              {/* Ações Principais */}
+              <Button
+                onClick={() => setIsAIImportModalOpen(true)}
+                variant="outline"
+                className="bg-muted/80 border-border text-foreground hover:bg-muted hover:text-foreground gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-primary" />
+                Importar via IA
+              </Button>
+
+              <Button
+                onClick={() => setIsNewPolicyModalOpen(true)}
+                variant="default"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Apólice
+              </Button>
+            </div>
+          </div>
+
+          {/* Linha 2: Busca + Status + Filtros Avançados */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Busca */}
+            <div className="flex-1 max-w-md">
+              <Input
+                type="search"
+                placeholder="Buscar por apólice ou cliente..."
+                className="bg-card border-border text-foreground w-full"
+                value={filters.searchTerm}
+                onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
+              />
+            </div>
+
+            {/* Status - visível por padrão */}
+            <Select
+              value={filters.status}
+              onValueChange={(value) => setFilters({ ...filters, status: value })}
             >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Importar Lote (OCR)
-            </Button>
-            
-            <Button 
-              onClick={() => setIsNewPolicyModalOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Apólice
-            </Button>
+              <SelectTrigger className="bg-card border-border text-foreground w-[180px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os Status</SelectItem>
+                <SelectItem value="Orçamento">Orçamento</SelectItem>
+                <SelectItem value="Aguardando Apólice">Aguardando Apólice</SelectItem>
+                <SelectItem value="Ativa">Ativa</SelectItem>
+                <SelectItem value="Cancelada">Cancelada</SelectItem>
+                <SelectItem value="Renovada">Renovada</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Filtros Avançados - Popover no Desktop, Drawer no Mobile */}
+            {isMobile ? (
+              <Drawer open={isAdvancedFiltersOpen} onOpenChange={setIsAdvancedFiltersOpen}>
+                <DrawerTrigger asChild>
+                  <Button variant="outline" className="relative bg-card border-border text-foreground bg-muted/80">
+                    <SlidersHorizontal className="w-4 h-4 mr-2" />
+                    Filtros
+                    {activeFilterCount > 0 && (
+                      <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center bg-purple-500 text-foreground text-xs">
+                        {activeFilterCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DrawerTrigger>
+                <DrawerContent className="bg-popover border-border">
+                  <DrawerHeader>
+                    <DrawerTitle className="text-foreground">Filtros Avançados</DrawerTitle>
+                  </DrawerHeader>
+                  <AdvancedFiltersContent />
+                  <div className="p-4 pt-0">
+                    <DrawerClose asChild>
+                      <Button className="w-full" variant="default">
+                        Aplicar Filtros
+                      </Button>
+                    </DrawerClose>
+                  </div>
+                </DrawerContent>
+              </Drawer>
+            ) : (
+              <Popover open={isAdvancedFiltersOpen} onOpenChange={setIsAdvancedFiltersOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="relative bg-card border-border text-foreground bg-muted/80">
+                    <SlidersHorizontal className="w-4 h-4 mr-2" />
+                    Filtros
+                    {activeFilterCount > 0 && (
+                      <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center bg-purple-500 text-foreground text-xs">
+                        {activeFilterCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[500px] bg-popover border-border p-0" align="end">
+                  <AdvancedFiltersContent />
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
         </div>
 
-        {/* Linha 2: Busca + Status + Filtros Avançados */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Busca */}
-          <div className="flex-1 max-w-md">
-            <Input
-              type="search"
-              placeholder="Buscar por apólice ou cliente..."
-              className="bg-slate-800 border-slate-700 text-white w-full"
-              value={filters.searchTerm}
-              onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
-            />
-          </div>
-
-          {/* Status - visível por padrão */}
-          <Select
-            value={filters.status}
-            onValueChange={(value) => setFilters({ ...filters, status: value })}
-          >
-            <SelectTrigger className="bg-slate-800 border-slate-700 text-white w-[180px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os Status</SelectItem>
-              <SelectItem value="Orçamento">Orçamento</SelectItem>
-              <SelectItem value="Aguardando Apólice">Aguardando Apólice</SelectItem>
-              <SelectItem value="Ativa">Ativa</SelectItem>
-              <SelectItem value="Cancelada">Cancelada</SelectItem>
-              <SelectItem value="Renovada">Renovada</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Filtros Avançados - Popover no Desktop, Drawer no Mobile */}
-          {isMobile ? (
-            <Drawer open={isAdvancedFiltersOpen} onOpenChange={setIsAdvancedFiltersOpen}>
-              <DrawerTrigger asChild>
-                <Button variant="outline" className="relative bg-slate-800 border-slate-700 text-white hover:bg-slate-700">
-                  <SlidersHorizontal className="w-4 h-4 mr-2" />
-                  Filtros
-                  {activeFilterCount > 0 && (
-                    <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center bg-purple-500 text-white text-xs">
-                      {activeFilterCount}
-                    </Badge>
-                  )}
-                </Button>
-              </DrawerTrigger>
-              <DrawerContent className="bg-slate-900 border-slate-700">
-                <DrawerHeader>
-                  <DrawerTitle className="text-white">Filtros Avançados</DrawerTitle>
-                </DrawerHeader>
-                <AdvancedFiltersContent />
-                <div className="p-4 pt-0">
-                  <DrawerClose asChild>
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                      Aplicar Filtros
-                    </Button>
-                  </DrawerClose>
+        {/* Lista de Apólices */}
+        <div className="grid gap-4">
+          {isLoading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="bg-card border border-border rounded-lg p-6 animate-pulse"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-5 bg-muted rounded w-48" />
+                      <div className="h-5 bg-muted rounded w-16" />
+                    </div>
+                    <div className="grid grid-cols-4 gap-4">
+                      {Array.from({ length: 4 }).map((_, j) => (
+                        <div key={j} className="space-y-1">
+                          <div className="h-3 bg-muted rounded w-16" />
+                          <div className="h-4 bg-muted/70 rounded w-24" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="space-y-1 text-right">
+                      <div className="h-3 bg-muted rounded w-12 ml-auto" />
+                      <div className="h-5 bg-muted rounded w-24" />
+                      <div className="h-3 bg-muted rounded w-16 ml-auto" />
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <div className="h-3 bg-muted rounded w-16 ml-auto" />
+                      <div className="h-4 bg-muted rounded w-20" />
+                      <div className="h-3 bg-muted rounded w-12 ml-auto" />
+                    </div>
+                  </div>
                 </div>
-              </DrawerContent>
-            </Drawer>
-          ) : (
-            <Popover open={isAdvancedFiltersOpen} onOpenChange={setIsAdvancedFiltersOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="relative bg-slate-800 border-slate-700 text-white hover:bg-slate-700">
-                  <SlidersHorizontal className="w-4 h-4 mr-2" />
-                  Filtros
-                  {activeFilterCount > 0 && (
-                    <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center bg-purple-500 text-white text-xs">
-                      {activeFilterCount}
-                    </Badge>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[500px] bg-slate-900 border-slate-700 p-0" align="end">
-                <AdvancedFiltersContent />
-              </PopoverContent>
-            </Popover>
-          )}
-        </div>
-      </div>
+              </div>
+            ))
+          ) : filteredPolicies.map(policy => {
+            const client = clients.find(c => c.id === policy.clientId);
+            const producer = producers.find(p => p.id === policy.producerId);
+            const daysRemaining = differenceInDays(parseLocalDate(policy.expirationDate), new Date());
+            const isExpiringSoon = daysRemaining <= 30 && daysRemaining >= 0;
+            const policyRamos = (policy as typeof policy & { ramos?: { nome: string } }).ramos;
 
-      {/* Lista de Apólices */}
-      <div className="grid gap-4">
-        {filteredPolicies.map(policy => {
-          const client = clients.find(c => c.id === policy.clientId);
-          const producer = producers.find(p => p.id === policy.producerId);
-          const isExpiringSoon = differenceInDays(parseLocalDate(policy.expirationDate), new Date()) <= 30;
+            return (
+              <AppCard
+                key={policy.id}
+                className="p-5 cursor-pointer hover:scale-[1.01]"
+                onClick={() => navigate(`/dashboard/policies/${policy.id}`)}
+              >
+                {/* ─── Linha 1: Identificação ─── */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+                  <div className="space-y-1 min-w-0 flex-1">
+                    {/* Breadcrumb: ramo · seguradora */}
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-medium">
+                        {policyRamos?.nome || policy.type || 'Seguro'}
+                      </Badge>
+                      <span>·</span>
+                      <span className="flex items-center gap-1">
+                        <Building2 className="w-3 h-3" />
+                        {policy.companies?.name || 'Seguradora'}
+                      </span>
+                      {policy.insuredAsset && (
+                        <>
+                          <span>·</span>
+                          <span className="truncate max-w-[200px]">{policy.insuredAsset}</span>
+                        </>
+                      )}
+                    </div>
 
-          return (
-            <div
-              key={policy.id}
-              className="bg-slate-800 border border-slate-700 rounded-lg p-6 hover:bg-slate-750 transition-colors cursor-pointer"
-              onClick={() => navigate(`/dashboard/policies/${policy.id}`)}
-            >
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="flex-1 space-y-3">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <h3 className="text-lg font-semibold text-white">
-                        {client?.name?.split(' ')[0] || 'Cliente'} - {(policy as typeof policy & { ramos?: { nome: string } }).ramos?.nome || policy.type || 'Seguro'}
-                        {policy.insuredAsset && ` (${policy.insuredAsset.split(' ').slice(0, 3).join(' ')})`} - {policy.companies?.name?.split(' ')[0] || 'Cia'}
-                      </h3>
-                    <Badge
-                      className={getStatusColor(policy.status) + " text-white"}
-                    >
+                    {/* Nome do cliente — destaque principal */}
+                    <h3 className="text-lg font-semibold text-foreground leading-tight">
+                      {client?.name || 'Cliente não encontrado'}
+                    </h3>
+
+                    {/* Número da apólice */}
+                    <p className="text-xs text-muted-foreground font-mono">
+                      {policy.policyNumber || `ORÇ-${policy.id.slice(-8)}`}
+                    </p>
+                  </div>
+
+                  {/* Badges de status — lado direito */}
+                  <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                    <Badge className={cn("font-medium text-xs", getStatusVariant(policy.status))}>
                       {policy.status}
                     </Badge>
                     <AutoRenewalIndicator
@@ -504,105 +583,126 @@ export default function Policies() {
                       status={policy.status}
                     />
                     {isExpiringSoon && policy.status === 'Ativa' && (
-                      <Badge variant="destructive" className="animate-pulse">
-                        Vence em breve!
+                      <Badge className="bg-destructive/10 text-destructive border border-destructive/30 text-xs">
+                        {daysRemaining}d p/ vencer
                       </Badge>
                     )}
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                {/* ─── Linha 2: Metadados + Financeiro ─── */}
+                <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pt-3 border-t border-border">
+                  {/* Lado esquerdo: campos de info */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm flex-1">
                     <div>
-                      <p className="text-slate-400">Cliente</p>
-                      <p className="text-white font-medium">{client?.name || 'Cliente não encontrado'}</p>
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Cliente</p>
+                      <p className="text-foreground font-medium truncate">
+                        {client?.name?.split(' ').slice(0, 2).join(' ') || '—'}
+                      </p>
                     </div>
-
                     <div>
-                      <p className="text-slate-400">Seguradora</p>
-                      <p className="text-white">{policy.companies?.name || 'Não especificada'}</p>
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Seguradora</p>
+                      <p className="text-foreground truncate">
+                        {policy.companies?.name?.split(' ')[0] || '—'}
+                      </p>
                     </div>
-
                     <div>
-                      <p className="text-slate-400">Ramo</p>
-                      <p className="text-white">{(policy as typeof policy & { ramos?: { nome: string } }).ramos?.nome || policy.type || 'Não especificado'}</p>
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Ramo</p>
+                      <p className="text-foreground">
+                        {policyRamos?.nome || policy.type || '—'}
+                      </p>
                     </div>
-
                     {producer && (
                       <div>
-                        <p className="text-slate-400">Produtor</p>
-                        <p className="text-white">{producer.name}</p>
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Produtor</p>
+                        <p className="text-foreground truncate">{producer.name}</p>
                       </div>
                     )}
                   </div>
-                </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                  <div className="text-right">
-                    <p className="text-slate-400 text-sm">Prêmio</p>
-                    <p className="text-white font-semibold text-lg">
-                      {policy.premiumValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </p>
-                    <p className="text-green-400 text-xs">
-                      {policy.commissionRate}% comissão
-                    </p>
-                  </div>
+                  {/* Lado direito: bloco financeiro + datas */}
+                  <div className="flex items-end gap-5 flex-shrink-0">
+                    {/* Prêmio */}
+                    <div className="text-right">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Prêmio</p>
+                      <p className="text-foreground font-bold text-lg leading-tight">
+                        {policy.premiumValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </p>
+                      <p className="text-muted-foreground text-xs">
+                        {policy.commissionRate}% comissão
+                      </p>
+                    </div>
 
-                  <div className="text-right">
-                    <p className="text-slate-400 text-sm">Vencimento</p>
-                    <p className={`font-medium ${isExpiringSoon ? 'text-red-400' : 'text-white'}`}>
-                      {formatDate(policy.expirationDate)}
-                    </p>
-                    <p className="text-slate-500 text-xs">
-                      {differenceInDays(parseLocalDate(policy.expirationDate), new Date())} dias
-                    </p>
+                    {/* Vencimento */}
+                    <div className="text-right">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Vencimento</p>
+                      <p className={`font-medium leading-tight ${isExpiringSoon ? 'text-amber-500' : daysRemaining < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                        {formatDate(policy.expirationDate)}
+                      </p>
+                      <p className={`text-xs flex items-center justify-end gap-1 ${
+                        daysRemaining < 0 ? 'text-destructive' : daysRemaining <= 30 ? 'text-amber-500' : 'text-emerald-500'
+                      }`}>
+                        <Clock className="w-3 h-3" />
+                        {daysRemaining < 0
+                          ? `${Math.abs(daysRemaining)}d vencida`
+                          : `${daysRemaining}d restantes`}
+                      </p>
+                    </div>
                   </div>
                 </div>
+              </AppCard>
+            );
+          })}
+          {!isLoading && filteredPolicies.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              Nenhuma apólice encontrada com os filtros selecionados.
+            </div>
+          )}
+        </div>
+
+        {/* Controles de Paginação */}
+        <PaginationControls
+          currentPage={page}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          onPageChange={(newPage) => setPage(newPage)}
+          isLoading={isLoading}
+        />
+
+        {/* Modais */}
+
+        {/* Modal Nova Apólice */}
+        {isNewPolicyModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
+            <div className="bg-background w-full sm:max-w-2xl sm:rounded-[2rem] rounded-t-[2rem] rounded-b-none border-0 shadow-[0_-20px_60px_rgba(0,0,0,0.2)] max-h-[92vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-muted/30 flex-shrink-0">
+                <h2 className="text-xl font-bold text-foreground tracking-tight">Nova Apólice</h2>
+                <Button
+                  onClick={handleCloseNewPolicyModal}
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full hover:bg-muted"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <PolicyFormModal
+                  onClose={handleCloseNewPolicyModal}
+                  onPolicyAdded={() => { }}
+                />
               </div>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Controles de Paginação */}
-      <PaginationControls
-        currentPage={page}
-        totalPages={totalPages}
-        totalCount={totalCount}
-        onPageChange={(newPage) => setPage(newPage)}
-        isLoading={isLoading}
-      />
-
-      {/* Modais */}
-
-
-      {/* Modal Nova Apólice */}
-      {isNewPolicyModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
-          <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-white">Nova Apólice</h2>
-              <Button
-                onClick={handleCloseNewPolicyModal}
-                variant="ghost"
-                size="sm"
-                className="text-slate-400 hover:text-white"
-              >
-                ×
-              </Button>
-            </div>
-            <PolicyFormModal
-              onClose={handleCloseNewPolicyModal}
-              onPolicyAdded={() => { }}
-            />
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Modal Importação via IA */}
-      <ImportPoliciesModal
-        open={isAIImportModalOpen}
-        onOpenChange={setIsAIImportModalOpen}
-      />
+        {/* Modal Importação via IA */}
+        <ImportPoliciesModal
+          open={isAIImportModalOpen}
+          onOpenChange={setIsAIImportModalOpen}
+        />
 
+      </div>
     </div>
   );
 }

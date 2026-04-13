@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Shield, FileText, CreditCard, Calendar, AlertCircle, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Badge } from '@/components/ui/badge';
+import { Shield, FileText, CreditCard, Calendar, AlertCircle, Loader2, Plus, FileEdit, AlertTriangle, Inbox, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 interface Policy {
   id: string;
@@ -31,6 +32,8 @@ interface ClientData {
   user_id: string;
 }
 
+const springTransition = { type: 'spring' as const, stiffness: 400, damping: 30 };
+
 export default function PortalHome() {
   const navigate = useNavigate();
   const [policies, setPolicies] = useState<Policy[]>([]);
@@ -46,18 +49,16 @@ export default function PortalHome() {
   useEffect(() => {
     const clientData = sessionStorage.getItem('portal_client');
     const storedSlug = sessionStorage.getItem('portal_brokerage_slug');
-    
+
     if (clientData && storedSlug) {
       const client: ClientData = JSON.parse(clientData);
       setClientName(client.name || '');
       setSlug(storedSlug);
-      // Busca híbrida: client_id + CPF + email
       fetchPoliciesHybrid(client);
       fetchPortalConfig(client.user_id);
     }
   }, []);
 
-  // BUSCA HÍBRIDA: client_id + CPF + email (resolve problema de clientes sem CPF)
   const fetchPoliciesHybrid = async (client: ClientData) => {
     try {
       const { data, error } = await supabase
@@ -81,6 +82,8 @@ export default function PortalHome() {
     }
   };
 
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+
   const fetchPortalConfig = async (userId: string) => {
     try {
       const { data } = await supabase
@@ -92,9 +95,9 @@ export default function PortalHome() {
 
       if (data) {
         setPortalConfig({
-          show_policies: data.portal_show_policies ?? true,
-          show_cards: data.portal_show_cards ?? true,
-          allow_profile_edit: data.portal_allow_profile_edit ?? true,
+          show_policies: (data as any).portal_show_policies ?? true,
+          show_cards: (data as any).portal_show_cards ?? true,
+          allow_profile_edit: (data as any).portal_allow_profile_edit ?? true,
         });
       }
     } catch (err) {
@@ -102,133 +105,172 @@ export default function PortalHome() {
     }
   };
 
+  const handleWhatsApp = () => {
+    if (!whatsappNumber) return;
+    const cleanNumber = whatsappNumber.replace(/\D/g, '');
+    window.open(`https://wa.me/55${cleanNumber}`);
+  };
+
   const getExpirationBadge = (expirationDate: string) => {
     const days = differenceInDays(new Date(expirationDate), new Date());
-    
+
     if (days < 0) {
-      return <Badge className="bg-red-500/10 text-red-400 border-red-500/20">Vencida</Badge>;
+      return <Badge className="bg-red-500/10 text-red-500 dark:text-red-400 border-red-500/20">Vencida</Badge>;
     } else if (days <= 30) {
-      return <Badge className="bg-zinc-400/10 text-zinc-300 border-zinc-400/20">Vence em {days} dias</Badge>;
+      return <Badge className="bg-muted text-muted-foreground border-border">Vence em {days} dias</Badge>;
     } else {
-      return <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Vigente</Badge>;
+      return <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">Vigente</Badge>;
     }
   };
 
-  const hasQuickActions = portalConfig.show_policies || portalConfig.show_cards;
-
   return (
-    <div className="space-y-4">
-      {/* Welcome Card - Black & Silver */}
-      <Card className="bg-gradient-to-br from-zinc-900/80 to-zinc-950 border-white/[0.06]">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-zinc-800 rounded-xl flex items-center justify-center shadow-lg border border-white/[0.06]">
-              <Shield className="w-6 h-6 text-zinc-300" />
-            </div>
-            <div>
-              <h2 className="text-white font-light text-lg tracking-wide">Bem-vindo(a)!</h2>
-              <p className="text-zinc-500 text-sm">{clientName}</p>
+    <div className="space-y-6">
+      {/* Horizontal Action Pills */}
+      <div>
+        <p className="text-muted-foreground text-sm mb-3">O que você precisa solicitar?</p>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            transition={springTransition}
+            onClick={() => navigate(`/${slug}/portal/wizard?type=cotacao`)}
+            className="bg-foreground text-background rounded-full px-5 py-2.5 text-[0.9rem] font-medium shadow-sm flex-shrink-0"
+          >
+            Nova Cotação
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            transition={springTransition}
+            onClick={() => navigate(`/${slug}/portal/wizard?type=endosso`)}
+            className="bg-card text-foreground rounded-full px-5 py-2.5 text-[0.9rem] font-medium shadow-sm flex-shrink-0 hover:bg-muted/50 transition-colors"
+          >
+            Endosso
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            transition={springTransition}
+            onClick={() => navigate(`/${slug}/portal/wizard?type=sinistro`)}
+            className="bg-card text-foreground rounded-full px-5 py-2.5 text-[0.9rem] font-medium shadow-sm flex-shrink-0 hover:bg-muted/50 transition-colors"
+          >
+            Sinistro
+          </motion.button>
+        </div>
+      </div>
+
+      {/* Hero Card — TripGlide style */}
+      <motion.button
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.98 }}
+        transition={springTransition}
+        onClick={() => navigate(`/${slug}/portal/wizard?type=cotacao`)}
+        className="relative w-full rounded-3xl overflow-hidden shadow-md text-left"
+        style={{ height: '280px' }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-foreground/85 to-foreground" />
+        <div className="relative h-full flex flex-col justify-between p-6">
+          <div>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.4 }}
+            >
+              <p className="text-background/60 text-sm font-medium tracking-wide uppercase">Cobertura Completa</p>
+              <h3 className="text-background text-2xl font-bold mt-1 tracking-tight">Proteger seu Bem</h3>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="mt-3"
+            >
+              <Shield className="w-10 h-10 text-background/20" />
+            </motion.div>
+          </div>
+          <div className="flex items-center justify-between bg-background/15 backdrop-blur-md rounded-full px-4 py-3">
+            <span className="text-background text-sm font-medium">Fazer cotação agora</span>
+            <div className="w-8 h-8 rounded-full bg-background/20 flex items-center justify-center">
+              <ChevronRight className="w-4 h-4 text-background" />
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </motion.button>
 
-      {/* Quick Actions - Black & Silver */}
-      {hasQuickActions && (
-        <div className="grid grid-cols-2 gap-3">
-          {portalConfig.show_policies && (
-            <Button 
-              variant="outline" 
-              className="h-auto py-4 flex flex-col items-center gap-2 bg-black/70 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
-              onClick={() => navigate(`/${slug}/portal/policies`)}
+      {/* Seguros Ativos — Neobank list style */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-foreground font-semibold text-base">Apólices Ativas</h3>
+          <button
+            onClick={() => navigate(`/${slug}/portal/policies`)}
+            className="text-foreground text-sm font-medium underline underline-offset-4 decoration-muted-foreground/30 hover:decoration-foreground transition-colors"
+          >
+            Ver todas
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="bg-card rounded-3xl shadow-sm p-8 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+          </div>
+        ) : policies.length === 0 ? (
+          <div className="bg-card rounded-3xl shadow-sm p-8 text-center">
+            <AlertCircle className="w-10 h-10 text-muted-foreground/40 mx-auto mb-2" />
+            <p className="text-muted-foreground text-sm">Nenhum seguro ativo encontrado.</p>
+          </div>
+        ) : (
+          <div className="bg-card rounded-3xl shadow-sm overflow-hidden">
+            {policies.slice(0, 3).map((policy, idx) => (
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                transition={springTransition}
+                key={policy.id}
+                onClick={() => navigate(`/${slug}/portal/policies`)}
+                className={cn(
+                  'flex justify-between items-center p-5 text-left w-full transition-colors hover:bg-muted/30',
+                  idx !== Math.min(policies.length, 3) - 1 && 'border-b border-muted/50'
+                )}
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center flex-shrink-0">
+                    <Shield className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground text-sm truncate">
+                      {policy.insured_asset || 'Apólice sem nome'}
+                    </p>
+                    <p className="text-muted-foreground text-xs mt-0.5">
+                      Vence: {format(new Date(policy.expiration_date), 'dd MMM yyyy', { locale: ptBR })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {getExpirationBadge(policy.expiration_date)}
+                  <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+                </div>
+              </motion.button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Help — flat */}
+      <div className="flex items-start gap-3 py-3">
+        <AlertCircle className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <p className="text-foreground text-sm font-medium">Precisa de ajuda?</p>
+          <p className="text-muted-foreground text-xs mt-0.5 mb-3">
+            Entre em contato com sua corretora para dúvidas sobre apólices ou sinistros.
+          </p>
+          {whatsappNumber && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleWhatsApp}
+              className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border-emerald-200"
             >
-              <FileText className="w-6 h-6 text-zinc-400" />
-              <span className="text-sm text-white font-light">Meus Seguros</span>
-            </Button>
-          )}
-          {portalConfig.show_cards && (
-            <Button 
-              variant="outline" 
-              className="h-auto py-4 flex flex-col items-center gap-2 bg-black/70 border-white/[0.06] hover:bg-zinc-900/50 hover:border-zinc-600/30"
-              onClick={() => navigate(`/${slug}/portal/cards`)}
-            >
-              <CreditCard className="w-6 h-6 text-zinc-400" />
-              <span className="text-sm text-white font-light">Carteirinhas</span>
+              Pedir Ajuda no WhatsApp
             </Button>
           )}
         </div>
-      )}
-
-      {/* Active Policies - Black & Silver */}
-      <Card className="bg-black/70 border-white/[0.06] backdrop-blur-2xl">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg text-white font-light flex items-center gap-2 tracking-wide">
-            <Shield className="w-5 h-5 text-zinc-400" />
-            Seguros Ativos
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 text-zinc-400 animate-spin" />
-            </div>
-          ) : policies.length === 0 ? (
-            <div className="text-center py-8">
-              <AlertCircle className="w-10 h-10 text-zinc-600 mx-auto mb-2" />
-              <p className="text-zinc-500 font-light">Nenhum seguro ativo encontrado.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {policies.slice(0, 3).map((policy) => (
-                <div 
-                  key={policy.id} 
-                  className="flex justify-between items-center p-3 bg-zinc-900/50 rounded-lg border border-white/[0.06]"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-light text-white truncate">
-                      {policy.insured_asset || 'Apólice'}
-                    </p>
-                    <div className="flex items-center gap-2 text-sm text-zinc-500">
-                      <Calendar className="w-3 h-3" />
-                      <span>
-                        Vence: {format(new Date(policy.expiration_date), 'dd/MM/yyyy', { locale: ptBR })}
-                      </span>
-                    </div>
-                  </div>
-                  {getExpirationBadge(policy.expiration_date)}
-                </div>
-              ))}
-              
-              {policies.length > 3 && (
-                <Button 
-                  variant="ghost" 
-                  className="w-full text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-                  onClick={() => navigate(`/${slug}/portal/policies`)}
-                >
-                  Ver todos ({policies.length})
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Help Card - Black & Silver */}
-      <Card className="bg-black/70 border-white/[0.06] backdrop-blur-2xl">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-zinc-900 rounded-lg flex items-center justify-center flex-shrink-0 border border-white/[0.06]">
-              <AlertCircle className="w-5 h-5 text-zinc-500" />
-            </div>
-            <div>
-              <h3 className="font-light text-white">Precisa de ajuda?</h3>
-              <p className="text-sm text-zinc-500 mt-1">
-                Entre em contato com sua corretora para dúvidas sobre suas apólices ou sinistros.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }

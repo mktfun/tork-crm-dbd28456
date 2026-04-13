@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { Policy } from '@/types';
+import { addDays } from 'date-fns';
 
 export const DEFAULT_TRANSACTION_TYPES = {
   COMMISSION: 'commission-default',
@@ -10,7 +11,7 @@ export const DEFAULT_TRANSACTION_TYPES = {
 
 export async function ensureDefaultTransactionTypes(userId: string) {
   console.log('🔧 Ensuring default transaction types for user:', userId);
-  
+
   // Check if default commission type exists
   const { data: existingCommission } = await supabase
     .from('transaction_types')
@@ -67,7 +68,7 @@ export async function ensureDefaultTransactionTypes(userId: string) {
 // 🔧 Função robusta para obter ou criar o ID do tipo de transação "Comissão"
 export async function getCommissionTypeId(userId: string): Promise<string> {
   console.log('🔍 Buscando tipo de transação "Comissão" para usuário:', userId);
-  
+
   // 1. Tenta buscar o tipo de forma determinística
   const { data: existingType, error: fetchError } = await supabase
     .from('transaction_types')
@@ -112,7 +113,7 @@ export async function getCommissionTypeId(userId: string): Promise<string> {
 // 🎯 **FUNÇÃO CENTRALIZADA ÚNICA** - Function to generate commission transaction for a policy
 export async function gerarTransacaoDeComissao(policy: Policy) {
   console.log('💰 [CENTRALIZADA] Generating commission transaction for policy:', policy.policyNumber);
-  
+
   if (!policy.userId) {
     console.error('❌ No user ID found for policy');
     throw new Error('Apólice ou ID do usuário inválido.');
@@ -138,7 +139,7 @@ export async function gerarTransacaoDeComissao(policy: Policy) {
 
   // Get the commission transaction type ID
   const commissionTypeId = await getCommissionTypeId(policy.userId);
-  
+
   if (!commissionTypeId) {
     console.error('❌ No commission transaction type found for user');
     throw new Error('Tipo de transação "Comissão" não encontrado');
@@ -146,7 +147,7 @@ export async function gerarTransacaoDeComissao(policy: Policy) {
 
   // Calculate commission amount
   const commissionAmount = (policy.premiumValue * policy.commissionRate) / 100;
-  
+
   if (commissionAmount <= 0) {
     console.log('⚠️ Commission amount is zero or negative, skipping transaction creation');
     return null;
@@ -160,11 +161,11 @@ export async function gerarTransacaoDeComissao(policy: Policy) {
       client_id: policy.clientId,
       policy_id: policy.id,
       type_id: commissionTypeId,
-      description: `Comissão da apólice ${policy.policyNumber}`,
+      description: `Comissão da apólice ${policy.policyNumber && policy.policyNumber.trim() !== '' ? policy.policyNumber.trim() : (policy.id ? policy.id.slice(0, 8) : 'Nova')}`,
       amount: commissionAmount,
       date: new Date().toISOString().split('T')[0],
       transaction_date: new Date().toISOString().split('T')[0],
-      due_date: policy.expirationDate,
+      due_date: policy.startDate ? addDays(new Date(policy.startDate), 30).toISOString().split('T')[0] : policy.expirationDate,
       status: 'PENDENTE',
       nature: 'RECEITA', // 🔧 CORRIGIDO: usar RECEITA para respeitar o CHECK constraint
       company_id: policy.insuranceCompany?.toString() || null, // 🔧 Converter UUID para string
@@ -185,33 +186,33 @@ export async function gerarTransacaoDeComissao(policy: Policy) {
 
 // 🆕 Função para criar comissão no ERP moderno (partidas dobradas)
 export async function gerarTransacaoDeComissaoERP(
-  policy: Policy, 
-  clientName?: string, 
+  policy: Policy,
+  clientName?: string,
   ramoName?: string
 ): Promise<{ transaction_id: string; reference_number: string; success: boolean } | null> {
   console.log('🚀 [ERP] Disparando criação de comissão para apólice:', policy.id, 'Status: pending');
   console.log('💰 [ERP] Gerando comissão no ERP moderno para apólice:', policy.policyNumber);
-  
+
   // 🛡️ Validação de UUID antes de enviar
   const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
   if (!policy.id || !uuidRegex.test(policy.id)) {
     console.error('❌ [ERP] ID da apólice inválido (não é UUID):', policy.id);
     return null;
   }
-  
+
   const commissionAmount = (policy.premiumValue * policy.commissionRate) / 100;
-  
+
   if (commissionAmount <= 0) {
     console.log('⚠️ [ERP] Valor de comissão zero ou negativo, pulando criação');
     return null;
   }
 
   // 🔧 Fallbacks robustos para evitar "undefined" na descrição
-  const safeClientName = (clientName && clientName.trim() !== '' && clientName !== 'undefined') 
-    ? clientName.trim() 
+  const safeClientName = (clientName && clientName.trim() !== '' && clientName !== 'undefined')
+    ? clientName.trim()
     : 'Cliente';
-  const safeRamoName = (ramoName && ramoName.trim() !== '' && ramoName !== 'undefined') 
-    ? ramoName.trim() 
+  const safeRamoName = (ramoName && ramoName.trim() !== '' && ramoName !== 'undefined')
+    ? ramoName.trim()
     : 'Seguro';
   const safePolicyNumber = (policy.policyNumber && policy.policyNumber.trim() !== '' && policy.policyNumber !== 'undefined')
     ? policy.policyNumber.trim()
@@ -224,7 +225,9 @@ export async function gerarTransacaoDeComissaoERP(
     p_ramo_name: safeRamoName,
     p_policy_number: safePolicyNumber,
     p_commission_amount: commissionAmount,
-    p_transaction_date: policy.startDate || new Date().toISOString().split('T')[0],
+    p_transaction_date: policy.startDate
+      ? addDays(new Date(policy.startDate), 30).toISOString().split('T')[0]
+      : addDays(new Date(), 30).toISOString().split('T')[0],
     p_status: 'pending'
   });
 

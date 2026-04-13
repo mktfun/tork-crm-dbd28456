@@ -52,9 +52,9 @@ export function AniversariantesModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-slate-900 border-slate-800">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
+          <DialogTitle className="text-foreground flex items-center gap-2">
             <Cake className="h-5 w-5 text-yellow-400" />
             Aniversariantes de Hoje ({aniversariantes.length})
           </DialogTitle>
@@ -68,13 +68,13 @@ export function AniversariantesModal({
             </div>
           ) : (
             aniversariantes.map((cliente) => (
-              <div key={cliente.id} className="border border-slate-800 rounded-lg p-4 bg-slate-900/50">
+              <div key={cliente.id} className="border border-border rounded-lg p-4 bg-card/50">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 bg-yellow-500/20 rounded-full">
                     <Cake className="h-4 w-4 text-yellow-400" />
                   </div>
                   <div>
-                    <h3 className="font-medium text-white">{cliente.nome}</h3>
+                    <h3 className="font-medium text-foreground">{cliente.nome}</h3>
                     <p className="text-sm text-slate-400">{cliente.telefone}</p>
                   </div>
                 </div>

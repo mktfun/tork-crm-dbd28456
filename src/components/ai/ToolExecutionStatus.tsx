@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Loader2, AlertCircle, ChevronDown, ChevronUp, Database, Search, FileText, Calendar, Users, TrendingUp, Building2, Layers, GitBranch, UserPlus, Edit, Trash2, Move } from 'lucide-react';
+import { CheckCircle, Loader2, AlertCircle, ChevronDown, ChevronUp, Database, Search, FileText, Calendar, Users, TrendingUp, Building2, Layers, GitBranch, UserPlus, Edit, Trash2, Move, Plus } from 'lucide-react';
 
 export interface ToolStep {
   label: string;
@@ -106,6 +106,12 @@ export const TOOL_DISPLAY_CONFIG: Record<string, {
     description: '⚙️ Atualizando etapa no Kanban...',
     steps: ['Identificando deal', 'Validando destino', 'Executando movimentação']
   },
+  move_lead_to_status: {
+    name: 'Mover Lead (Status)',
+    icon: Move,
+    description: '⚙️ Atualizando status no Kanban...',
+    steps: ['Identificando lead', 'Resolvendo nome da etapa', 'Executando movimentação']
+  },
   create_client: {
     name: 'Criar Cliente',
     icon: UserPlus,
@@ -140,6 +146,60 @@ export const TOOL_DISPLAY_CONFIG: Record<string, {
     name: 'Excluir Apólice',
     icon: Trash2,
     description: '🗑️ Removendo apólice...',
+    steps: ['Verificando dependências', 'Executando exclusão']
+  },
+  create_client_v2: {
+    name: 'Criar Cliente (v2)',
+    icon: UserPlus,
+    description: '👤 Registrando novo cliente com validação...',
+    steps: ['Validando dados', 'Verificando duplicados', 'Inserindo registro', 'Confirmando criação']
+  },
+  update_client_v2: {
+    name: 'Atualizar Cliente (v2)',
+    icon: Edit,
+    description: '✏️ Atualizando dados com auditoria...',
+    steps: ['Localizando registro', 'Aplicando alterações', 'Confirmando update']
+  },
+  delete_client_v2: {
+    name: 'Excluir Cliente (v2)',
+    icon: Trash2,
+    description: '🗑️ Removendo cliente (soft delete)...',
+    steps: ['Verificando dependências', 'Marcando como inativo']
+  },
+  create_policy_v2: {
+    name: 'Criar Apólice (v2)',
+    icon: FileText,
+    description: '📝 Gerando nova apólice com validação...',
+    steps: ['Validando dados', 'Criando apólice', 'Confirmando registro']
+  },
+  update_policy_v2: {
+    name: 'Atualizar Apólice (v2)',
+    icon: Edit,
+    description: '✏️ Atualizando apólice...',
+    steps: ['Localizando apólice', 'Aplicando alterações', 'Confirmando update']
+  },
+  delete_policy_v2: {
+    name: 'Excluir Apólice (v2)',
+    icon: Trash2,
+    description: '🗑️ Removendo apólice...',
+    steps: ['Verificando dependências', 'Executando exclusão']
+  },
+  create_deal: {
+    name: 'Criar Deal',
+    icon: Plus,
+    description: '➕ Criando novo deal no Kanban...',
+    steps: ['Validando dados', 'Criando deal', 'Posicionando no funil']
+  },
+  update_deal: {
+    name: 'Atualizar Deal',
+    icon: Edit,
+    description: '✏️ Atualizando deal...',
+    steps: ['Localizando deal', 'Aplicando alterações', 'Confirmando update']
+  },
+  delete_deal: {
+    name: 'Excluir Deal',
+    icon: Trash2,
+    description: '🗑️ Removendo deal...',
     steps: ['Verificando dependências', 'Executando exclusão']
   }
 };

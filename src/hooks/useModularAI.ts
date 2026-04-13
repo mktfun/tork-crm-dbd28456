@@ -77,13 +77,13 @@ export function useAIPrompts(configId?: string) {
         queryFn: async () => {
             if (!configId) return [];
             const { data, error } = await supabase
-                .from('crm_ai_prompts')
+                .from('crm_ai_prompts' as any)
                 .select('*')
                 .eq('config_id', configId)
                 .order('position', { ascending: true });
 
             if (error) throw error;
-            return data as AIPrompt[];
+            return (data as any[]) as AIPrompt[];
         },
         enabled: !!configId,
     });
@@ -100,7 +100,7 @@ export function useAIPrompts(configId?: string) {
                 position: prompt.position ?? 0,
             };
             const { error } = await supabase
-                .from('crm_ai_prompts')
+                .from('crm_ai_prompts' as any)
                 .upsert(promptData)
                 .select();
             if (error) throw error;
@@ -114,7 +114,7 @@ export function useAIPrompts(configId?: string) {
 
     const deletePrompt = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase.from('crm_ai_prompts').delete().eq('id', id);
+            const { error } = await supabase.from('crm_ai_prompts' as any).delete().eq('id', id);
             if (error) throw error;
         },
         onSuccess: () => {

@@ -226,11 +226,34 @@ export interface FinancialSummary {
   /** Saldo atual total em caixa (não filtrado por período) */
   cashBalance: number;
   
+  /** Total global de receitas pendentes (sem filtro de período) */
+  globalPendingIncome?: number;
+  
+  /** Total global de despesas pendentes (sem filtro de período) */
+  globalPendingExpense?: number;
+  
+  /** Quantidade global de transações pendentes (sem filtro de período) */
+  globalPendingCount?: number;
+  
+  /** Receitas pendentes operacionais (vencidas + próximos 30 dias) */
+  operationalPendingIncome?: number;
+  
+  /** Despesas pendentes operacionais (vencidas + próximos 30 dias) */
+  operationalPendingExpense?: number;
+  
   /** Data inicial do período (para referência) */
   periodStart?: string;
   
   /** Data final do período (para referência) */
   periodEnd?: string;
+}
+
+/**
+ * Wrapper com comparação de período anterior
+ */
+export interface FinancialSummaryWithComparison {
+  current: FinancialSummary;
+  previous: FinancialSummary;
 }
 
 // ============ TIPOS PARA DRE (FASE 4) ============

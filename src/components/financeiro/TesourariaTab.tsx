@@ -1,8 +1,9 @@
-import { DateRange } from "react-day-picker";
-import { Wallet } from "lucide-react";
-import { ReceivablesList } from "./tesouraria/ReceivablesList";
-import { AgingReportCard } from "./tesouraria/AgingReportCard";
 import { AccountsPayableReceivableTable } from "./tesouraria/AccountsPayableReceivableTable";
+import { AgingReportCard } from "./tesouraria/AgingReportCard";
+import { UpcomingTransactionsList } from "./tesouraria/UpcomingTransactionsList";
+import { ReceivablesBySeguradora } from "./tesouraria/ReceivablesBySeguradora";
+import { Wallet } from "lucide-react";
+import { DateRange } from "react-day-picker";
 
 interface TesourariaTabProps {
   dateRange: DateRange | undefined;
@@ -10,7 +11,7 @@ interface TesourariaTabProps {
 
 export function TesourariaTab({ dateRange }: TesourariaTabProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="p-2 bg-primary/10 rounded-lg">
@@ -24,13 +25,16 @@ export function TesourariaTab({ dateRange }: TesourariaTabProps) {
         </div>
       </div>
 
-      {/* Grid de Cards Superiores */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ReceivablesList daysAhead={30} />
-        <AgingReportCard />
+      {/* KPI Cards Unified */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <UpcomingTransactionsList daysAhead={30} />
+        <AgingReportCard defaultType="receivables" />
       </div>
 
-      {/* Tabela de Contas a Pagar e Receber */}
+      {/* A Receber por Seguradora */}
+      <ReceivablesBySeguradora />
+
+      {/* Main Table */}
       <AccountsPayableReceivableTable />
     </div>
   );

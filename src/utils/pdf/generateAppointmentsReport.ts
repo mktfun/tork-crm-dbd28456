@@ -15,6 +15,7 @@ export interface AppointmentRow {
   clientPhone: string | null;
   clientEmail: string | null;
   policyNumber: string | null;
+  ramoName: string | null;
 }
 
 export interface AppointmentsReportOptions {
@@ -52,7 +53,7 @@ const formatPhone = (phone: string | null): string => {
 // Agrupar agendamentos por data
 const groupAppointmentsByDate = (appointments: AppointmentRow[]): Map<string, AppointmentRow[]> => {
   const grouped = new Map<string, AppointmentRow[]>();
-  
+
   appointments.forEach(apt => {
     const dateKey = apt.date;
     if (!grouped.has(dateKey)) {
@@ -60,7 +61,7 @@ const groupAppointmentsByDate = (appointments: AppointmentRow[]): Map<string, Ap
     }
     grouped.get(dateKey)!.push(apt);
   });
-  
+
   return grouped;
 };
 
@@ -74,8 +75,8 @@ const formatDayHeader = (dateStr: string): string => {
   }
 };
 
-export const generateAppointmentsReport = async ({ 
-  appointments, 
+export const generateAppointmentsReport = async ({
+  appointments,
   period,
   options = { groupByDay: true, showNotes: true }
 }: ReportData): Promise<void> => {
@@ -128,12 +129,13 @@ export const generateAppointmentsReport = async ({
   yPos += 4;
 
   // CONFIGURAÇÃO DE COLUNAS (Portrait = 180mm máx)
-  // [ ] Hora | Compromisso | Contato
+  // [ ] Hora | Compromisso | Ramo | Contato
   const colWidths = {
     checkbox: 8,
-    time: 16,
-    details: showNotes ? 90 : 100,
-    contact: showNotes ? 66 : 56
+    time: 14,
+    details: showNotes ? 72 : 80,
+    ramo: 24,
+    contact: showNotes ? 62 : 54
   };
 
   // Função para renderizar uma seção de tabela
@@ -152,46 +154,49 @@ export const generateAppointmentsReport = async ({
     const tableData = data.map(apt => {
       // Coluna 1: Checkbox visual (quadrado vazio)
       const checkbox = '☐';
-      
+
       // Coluna 2: Hora
       const time = apt.time?.substring(0, 5) || '--:--';
-      
+
       // Coluna 3: Detalhes do compromisso
-      let details = apt.title || 'Sem título';
-      if (apt.clientName) {
-        details += `\n👤 ${apt.clientName}`;
+      let details = apt.clientName || apt.title || 'Sem título';
+      if (apt.clientName && apt.title && !apt.title.includes(apt.clientName)) {
+        details += `\n${apt.title}`;
       }
       if (apt.policyNumber) {
         details += ` • Apólice ${apt.policyNumber}`;
       }
       if (showNotes && apt.notes) {
-        const truncatedNotes = apt.notes.length > 80 
-          ? apt.notes.substring(0, 77) + '...' 
+        const truncatedNotes = apt.notes.length > 80
+          ? apt.notes.substring(0, 77) + '...'
           : apt.notes;
-        details += `\n📝 ${truncatedNotes}`;
+        details += `\n${truncatedNotes}`;
       }
-      
-      // Coluna 4: Contato
+
+      // Coluna 4: Ramo
+      const ramo = apt.ramoName || '-';
+
+      // Coluna 5: Contato
       let contact = '';
       if (apt.clientPhone) {
-        contact = `📞 ${formatPhone(apt.clientPhone)}`;
+        contact = formatPhone(apt.clientPhone);
       }
       if (apt.clientEmail) {
-        const email = apt.clientEmail.length > 25 
-          ? apt.clientEmail.substring(0, 22) + '...' 
+        const email = apt.clientEmail.length > 25
+          ? apt.clientEmail.substring(0, 22) + '...'
           : apt.clientEmail;
-        contact += contact ? `\n✉ ${email}` : `✉ ${email}`;
+        contact += contact ? `\n${email}` : email;
       }
       if (!contact) {
         contact = '-';
       }
 
-      return [checkbox, time, details, contact];
+      return [checkbox, time, details, ramo, contact];
     });
 
     autoTable(doc, {
       startY,
-      head: [['', 'HORA', 'COMPROMISSO', 'CONTATO']],
+      head: [['', 'HORA', 'COMPROMISSO', 'RAMO', 'CONTATO']],
       body: tableData,
       theme: 'striped',
       styles: {
@@ -216,30 +221,36 @@ export const generateAppointmentsReport = async ({
         fillColor: colors.tableAlt
       },
       columnStyles: {
-        0: { 
-          cellWidth: colWidths.checkbox, 
-          halign: 'center', 
+        0: {
+          cellWidth: colWidths.checkbox,
+          halign: 'center',
           valign: 'middle',
           fontSize: 14,
           fontStyle: 'normal'
         },
-        1: { 
-          cellWidth: colWidths.time, 
-          halign: 'center', 
+        1: {
+          cellWidth: colWidths.time,
+          halign: 'center',
           fontStyle: 'bold',
           fontSize: 9
         },
-        2: { 
-          cellWidth: colWidths.details, 
-          halign: 'left' 
+        2: {
+          cellWidth: colWidths.details,
+          halign: 'left'
         },
-        3: { 
-          cellWidth: colWidths.contact, 
+        3: {
+          cellWidth: colWidths.ramo,
+          halign: 'center',
+          fontSize: 7,
+          fontStyle: 'bold'
+        },
+        4: {
+          cellWidth: colWidths.contact,
           halign: 'left',
           fontSize: 7
         }
       },
-      didParseCell: function(data) {
+      didParseCell: function (data) {
         // Destacar checkbox column
         if (data.section === 'body' && data.column.index === 0) {
           data.cell.styles.textColor = colors.text.secondary;
@@ -259,17 +270,17 @@ export const generateAppointmentsReport = async ({
     // Agrupar por dia
     const grouped = groupAppointmentsByDate(sortedAppointments);
     const sortedDates = Array.from(grouped.keys()).sort();
-    
+
     sortedDates.forEach((dateKey, index) => {
       const dayAppointments = grouped.get(dateKey)!;
       const dayHeader = formatDayHeader(dateKey);
-      
+
       // Verificar se precisa de nova página
       if (yPos > 240) {
         doc.addPage();
         yPos = 20;
       }
-      
+
       yPos = renderTable(dayAppointments, yPos, index > 0 || sortedDates.length > 1 ? dayHeader : undefined);
       yPos += 6;
     });
@@ -280,19 +291,19 @@ export const generateAppointmentsReport = async ({
 
   // Área de anotações no final (opcional)
   const finalY = (doc as any).lastAutoTable?.finalY || yPos;
-  
+
   if (finalY < 230) {
     const notesAreaY = finalY + 12;
-    
+
     doc.setDrawColor(colors.border);
     doc.setLineWidth(0.3);
     doc.line(margin, notesAreaY, pageWidth - margin, notesAreaY);
-    
+
     doc.setFontSize(8);
     doc.setTextColor(colors.text.secondary);
     doc.setFont('helvetica', 'bold');
     doc.text('ANOTAÇÕES', margin, notesAreaY + 6);
-    
+
     // Linhas pontilhadas para anotações manuais
     doc.setDrawColor(colors.border);
     doc.setLineDashPattern([1, 1], 0);
@@ -308,7 +319,7 @@ export const generateAppointmentsReport = async ({
   // Observações personalizadas do usuário
   if (notes && notes.trim()) {
     const currentFinalY = (doc as any).lastAutoTable?.finalY || 200;
-    
+
     if (currentFinalY < 250) {
       doc.setFontSize(7);
       doc.setTextColor(colors.text.secondary);
@@ -322,11 +333,11 @@ export const generateAppointmentsReport = async ({
   drawPDFFooter(doc);
 
   // Salvar arquivo
-  const dateStr = period.from 
+  const dateStr = period.from
     ? format(period.from, 'dd-MM-yyyy', { locale: ptBR })
     : format(new Date(), 'dd-MM-yyyy', { locale: ptBR });
   const safeTitle = title.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
   const fileName = `Agenda_${safeTitle}_${dateStr}.pdf`;
-  
+
   doc.save(fileName);
 };

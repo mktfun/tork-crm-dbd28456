@@ -1,7 +1,6 @@
 import React from 'react';
-import { Plus, Settings, Dna } from 'lucide-react';
+import { Plus, Dna } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StageFlowCard } from './StageFlowCard';
 import {
@@ -34,6 +33,10 @@ interface AiSetting {
   ai_custom_rules?: string | null;
   is_active?: boolean | null;
   max_messages_before_human?: number | null;
+  follow_up_enabled?: boolean | null;
+  follow_up_interval_minutes?: number | null;
+  follow_up_max_attempts?: number | null;
+  follow_up_message?: string | null;
 }
 
 interface PipelineDefault {
@@ -94,30 +97,10 @@ export function SalesFlowTimeline({
   }).length;
 
   return (
-    <div className="flex flex-col h-full bg-card/30 rounded-xl border border-border">
-      {/* Header */}
-      <div className="flex flex-col gap-3 p-4 border-b border-border/50">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Fluxo de Vendas</h2>
-            <p className="text-xs text-muted-foreground">
-              {stages.length} etapas • {activeCount} com IA ativa
-            </p>
-          </div>
-          
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onAddPipeline}
-            className="gap-1"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Funil
-          </Button>
-        </div>
-        
-        {/* Pipeline selector */}
-        <div className="flex items-center gap-2">
+    <div className="flex flex-col">
+      {/* Header — select + action icons in 1 line */}
+      <TooltipProvider>
+        <div className="flex items-center gap-2 p-4 border-b border-border/50">
           <Select
             value={selectedPipelineId || undefined}
             onValueChange={onSelectPipeline}
@@ -128,77 +111,59 @@ export function SalesFlowTimeline({
             <SelectContent>
               {pipelines.map((pipeline) => (
                 <SelectItem key={pipeline.id} value={pipeline.id}>
-                  {pipeline.name}
-                  {pipeline.is_default && " ★"}
+                  {pipeline.name}{pipeline.is_default && ' ★'}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shrink-0"
-                  onClick={onOpenPipelineDefaults}
-                  disabled={!selectedPipeline}
-                >
-                  <Dna className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                DNA Padrão do Funil
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 shrink-0"
-                  onClick={onEditPipeline}
-                  disabled={!selectedPipeline}
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Configurar Funil
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                onClick={onOpenPipelineDefaults}
+                disabled={!selectedPipeline}
+              >
+                <Dna className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Configurar persona padrão de IA para este funil</TooltipContent>
+          </Tooltip>
         </div>
+      </TooltipProvider>
+
+      {/* Stage count bar */}
+      <div className="px-4 py-1.5 border-b border-border/30 bg-muted/20">
+        <p className="text-[11px] text-muted-foreground">
+          {stages.length} etapas • {activeCount} com IA ativa
+        </p>
       </div>
       
       {/* Stages timeline */}
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-4">
-          {sortedStages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center mb-3">
-                <Plus className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <h3 className="text-sm font-medium text-foreground mb-1">
-                Nenhuma etapa criada
-              </h3>
-              <p className="text-xs text-muted-foreground mb-4 max-w-[200px]">
-                Crie etapas para configurar a IA em cada fase do funil
-              </p>
-              <Button size="sm" onClick={onAddStage}>
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Criar Primeira Etapa
-              </Button>
+      <div className="p-4 space-y-0">
+        {sortedStages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center mb-3">
+              <Plus className="h-6 w-6 text-muted-foreground" />
             </div>
-          ) : (
-            <>
-              {sortedStages.map((stage, index) => (
+            <h3 className="text-sm font-medium text-foreground mb-1">
+              Nenhuma etapa criada
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4 max-w-[200px]">
+              Crie etapas para configurar a IA em cada fase do funil
+            </p>
+            <Button size="sm" onClick={onAddStage}>
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Criar Primeira Etapa
+            </Button>
+          </div>
+        ) : (
+          <>
+            {sortedStages.map((stage, index) => (
+              <React.Fragment key={stage.id}>
                 <StageFlowCard
-                  key={stage.id}
                   stage={stage}
                   aiSetting={aiSettingsMap.get(stage.id) || null}
                   pipelineDefault={pipelineDefault}
@@ -210,9 +175,16 @@ export function SalesFlowTimeline({
                   onResetToDefault={onResetStageToDefault}
                   isSaving={isSaving}
                 />
-              ))}
-              
-              {/* Add stage button */}
+                {index < sortedStages.length - 1 && (
+                  <div className="flex justify-center py-1">
+                    <div className="w-px h-4 bg-border/50" />
+                  </div>
+                )}
+              </React.Fragment>
+            ))}
+            
+            {/* Add stage button */}
+            <div className="pt-4">
               <Button
                 variant="outline"
                 className="w-full border-dashed"
@@ -221,10 +193,10 @@ export function SalesFlowTimeline({
                 <Plus className="h-4 w-4 mr-2" />
                 Adicionar Etapa
               </Button>
-            </>
-          )}
-        </div>
-      </ScrollArea>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

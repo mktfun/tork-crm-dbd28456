@@ -22,22 +22,26 @@ export function GraficoComissaoDinamico({ data }: GraficoComissaoDinamicoProps) 
     <div className="h-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
           <XAxis 
             dataKey="periodo" 
             stroke="hsl(var(--muted-foreground))"
             fontSize={12}
+            tickLine={false}
+            axisLine={false}
           />
           <YAxis 
             tickFormatter={(value) => formatCurrency(value)} 
             stroke="hsl(var(--muted-foreground))"
             fontSize={12}
+            tickLine={false}
+            axisLine={false}
           />
           <Tooltip 
             formatter={(value: number) => [formatCurrency(value), 'Comissão']}
             labelFormatter={(label) => `Período: ${label}`}
             contentStyle={{ 
-              backgroundColor: 'rgba(5, 5, 5, 0.8)',
+              backgroundColor: 'hsl(var(--card))',
               borderColor: 'hsl(var(--border))',
               borderRadius: '6px',
               color: 'hsl(var(--foreground))'

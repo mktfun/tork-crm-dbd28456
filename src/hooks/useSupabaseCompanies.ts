@@ -32,6 +32,8 @@ export function useSupabaseCompanies() {
       const formattedCompanies: CompanyWithRamosCount[] = data?.map((company: any) => ({
         id: company.id,
         name: company.name,
+        service_phone: company.service_phone || '',
+        assistance_phone: company.assistance_phone || '',
         createdAt: company.created_at,
         ramos_count: company.ramos_count || 0,
       })) || [];
@@ -52,6 +54,7 @@ export function useSupabaseCompanies() {
         .insert({
           user_id: user.id,
           name: companyData.name,
+          service_phone: companyData.service_phone,
         })
         .select()
         .single();
@@ -76,6 +79,7 @@ export function useSupabaseCompanies() {
         .from('companies')
         .update({
           name: updates.name,
+          service_phone: updates.service_phone,
         })
         .eq('id', id)
         .eq('user_id', user.id)
@@ -97,7 +101,7 @@ export function useSupabaseCompanies() {
   const deleteCompanyMutation = useMutation({
     mutationFn: async (id: string) => {
       console.log('🗑️ Iniciando exclusão da seguradora:', id);
-      
+
       if (!user) {
         console.error('❌ Usuário não autenticado');
         throw new Error('User not authenticated');
@@ -135,7 +139,7 @@ export function useSupabaseCompanies() {
         console.error('❌ Erro ao verificar apólices:', apolicesError);
         throw new Error('Erro ao verificar apólices: ' + apolicesError.message);
       }
-      
+
       if (apolicesCount !== null && apolicesCount > 0) {
         console.log('❌ Exclusão bloqueada por apólices:', apolicesCount);
         throw new Error(`Esta seguradora não pode ser excluída pois possui ${apolicesCount} apólices ativas.`);
@@ -155,7 +159,7 @@ export function useSupabaseCompanies() {
         console.error('❌ Erro ao verificar ramos:', ramosError);
         throw new Error('Erro ao verificar ramos associados: ' + ramosError.message);
       }
-      
+
       if (ramosCount !== null && ramosCount > 0) {
         console.log('❌ Exclusão bloqueada por ramos:', ramosCount);
         throw new Error(`Esta seguradora não pode ser excluída pois está associada a ${ramosCount} ramos.`);
@@ -192,7 +196,7 @@ export function useSupabaseCompanies() {
     loading,
     error,
     addCompany: addCompanyMutation.mutateAsync,
-    updateCompany: (id: string, updates: Partial<Company>) => 
+    updateCompany: (id: string, updates: Partial<Company>) =>
       updateCompanyMutation.mutateAsync({ id, updates }),
     deleteCompany: deleteCompanyMutation.mutateAsync,
     isAdding: addCompanyMutation.isPending,

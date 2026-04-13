@@ -13,7 +13,7 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "border border-border bg-card/50 backdrop-blur-sm hover:bg-muted/50 hover:border-border/80 text-foreground transition-colors",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
@@ -24,6 +24,8 @@ const buttonVariants = cva(
         silverOutline: "bg-transparent border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl",
         silverGhost: "bg-transparent hover:bg-white/5 text-zinc-400 hover:text-zinc-200 rounded-xl",
         premium: "bg-black/70 backdrop-blur-xl border border-white/10 text-white hover:bg-black/80 hover:border-white/20 rounded-xl",
+        cta: "bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-lg hover:shadow-xl rounded-xl",
+        "outline-subtle": "border border-border/50 bg-transparent hover:bg-muted/30 text-muted-foreground hover:text-foreground rounded-xl",
       },
       size: {
         default: "h-10 px-4 py-2",

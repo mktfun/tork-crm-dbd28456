@@ -1,31 +1,39 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* TORK CRM - Dark Premium Theme (Zinc-based Fintech Style) */
-    --background: 240 10% 3.9%;       /* zinc-950: #09090b */
-    --foreground: 0 0% 98%;           /* White: #fafafa */
-    --card: 240 6% 10%;               /* zinc-900: #18181b */
-    --card-foreground: 0 0% 98%;
-    --popover: 240 6% 10%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 217 91% 60%;           /* blue-500: #3b82f6 - Cor de destaque vibrante */
+    /* ── LIGHT THEME — TripGlide / Neobank ── */
+    --background: 210 7% 96%;
+    /* #f5f6f7 — ice background */
+    --foreground: 210 11% 15%;
+    /* #212529 — night text */
+    --card: 0 0% 100%;
+    /* #ffffff — pure white cards */
+    --card-foreground: 210 11% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 11% 15%;
+    --primary: 217 91% 60%;
+    /* blue-500 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 16%;          /* zinc-800: #27272a */
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 64%;   /* zinc-400: #a1a1aa - Texto metálico */
+    --secondary: 210 4% 93%;
+    /* light grey */
+    --secondary-foreground: 210 11% 15%;
+    --muted: 210 4% 91%;
+    /* #e8e9ea */
+    --muted-foreground: 210 5% 46%;
+    /* #6c757d */
     --accent: 217 91% 60%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
+    --border: 210 4% 93%;
+    /* near-invisible border */
+    --input: 210 4% 91%;
     --ring: 217 91% 60%;
-    --chart-1: 217 91% 60%;           /* blue-500 */
+    --chart-1: 217 91% 60%;
     --chart-2: 160 60% 45%;
     --chart-3: 38 92% 50%;
     --chart-4: 280 65% 60%;
@@ -38,19 +46,24 @@
   }
 
   .dark {
-    /* TORK CRM - Dark Premium Theme (Zinc-based Fintech Style) */
-    --background: 240 10% 3.9%;       /* zinc-950: #09090b */
-    --foreground: 0 0% 98%;           /* White: #fafafa */
-    --card: 240 6% 10%;               /* zinc-900: #18181b */
+    /* ── DARK PREMIUM THEME (Zinc Fintech) ── */
+    --background: 240 10% 3.9%;
+    /* zinc-950 */
+    --foreground: 0 0% 98%;
+    /* #fafafa */
+    --card: 240 6% 10%;
+    /* zinc-900 */
     --card-foreground: 0 0% 98%;
     --popover: 240 6% 10%;
     --popover-foreground: 0 0% 98%;
-    --primary: 217 91% 60%;           /* blue-500: #3b82f6 */
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 16%;          /* zinc-800: #27272a */
+    --secondary: 240 4% 16%;
+    /* zinc-800 */
     --secondary-foreground: 0 0% 98%;
     --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 64%;   /* zinc-400: #a1a1aa */
+    --muted-foreground: 240 5% 64%;
+    /* zinc-400 */
     --accent: 217 91% 60%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 62.8% 30.6%;
@@ -70,20 +83,22 @@
   * {
     @apply border-border;
   }
-  
-  html, body {
+
+  html,
+  body {
     height: 100%;
     width: 100%;
     overflow-x: hidden;
     margin: 0;
     padding: 0;
   }
-  
+
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Instrument Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
-  
+
   #root {
     height: 100%;
     width: 100%;
@@ -96,18 +111,18 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+    background: hsl(var(--muted) / 0.3);
     border-radius: 4px;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: hsl(var(--muted-foreground) / 0.3);
     border-radius: 4px;
     transition: background 0.2s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: hsl(var(--muted-foreground) / 0.5);
   }
 
   ::-webkit-scrollbar-corner {
@@ -117,8 +132,12 @@
   /* Firefox scrollbar styling */
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--muted) / 0.3);
   }
+
+  /* No scrollbar utility */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
 /*
@@ -140,22 +159,20 @@ DEPENDÊNCIAS CRÍTICAS:
 */
 
 .glass-component {
-  /* 🎯 FUNDO ZINC-900 PREMIUM COM TRANSPARÊNCIA */
-  background: rgba(24, 24, 27, 0.65);
+  /* REACTIVE GLASS — adapts to light/dark via CSS vars */
+  background: hsl(var(--card) / 0.65);
 
-  /* 🎯 BLUR CRÍTICO PARA EFEITO GLASS - NÃO ALTERAR */
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
 
-  /* 🎯 BORDAS GLASS PREMIUM - MAIS SUTIS */
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Border: foreground at low alpha = white glow in dark, dark edge in light */
+  border: 1px solid hsl(var(--foreground) / 0.08);
 
-  /* 🎯 SOMBRA PROFUNDA PARA PREMIUM FEEL */
-  box-shadow: 
+  /* Shadow: always dark for depth + subtle foreground inset highlight */
+  box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    inset 0 1px 0 hsl(var(--foreground) / 0.05);
 
-  /* 🎯 ESTRUTURA BÁSICA - NÃO ALTERAR */
   border-radius: 16px;
   position: relative;
   overflow: hidden;
@@ -175,7 +192,7 @@ DEPENDÊNCIAS CRÍTICAS:
   height: 300px;
 
   /* 🎯 GRADIENTE RADIAL MÁGICO - NÃO ALTERAR */
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 70%);
+  background: radial-gradient(circle, hsl(var(--foreground) / 0.08) 0%, hsl(var(--foreground) / 0) 70%);
 
   opacity: 0;
   transition: opacity 0.4s ease;
@@ -188,13 +205,13 @@ DEPENDÊNCIAS CRÍTICAS:
 
 /* 🔒🔒🔒 FIM DA SEÇÃO PROTEGIDA 🔒🔒🔒 */
 
-/* ENTERPRISE SIDEBAR SYSTEM - TORK CRM FLAT DARK THEME */
+/* ENTERPRISE SIDEBAR SYSTEM — REACTIVE */
 .glass-sidebar-premium {
-  background: #09090b; /* zinc-950 solid */
-  border-right: 1px solid #27272a; /* zinc-800 */
+  background: hsl(var(--background));
+  border-right: 1px solid hsl(var(--border));
 }
 
-/* ENTERPRISE MENU ITEMS - Clean and Simple */
+/* ENTERPRISE MENU ITEMS */
 .glass-menu-item {
   position: relative;
   transition: all 0.2s ease;
@@ -202,11 +219,11 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 .glass-menu-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: hsl(var(--muted) / 0.5);
 }
 
 .glass-menu-item.active {
-  background: #27272a; /* zinc-800 solid */
+  background: hsl(var(--secondary));
 }
 
 .glass-menu-item.active::after {
@@ -216,14 +233,14 @@ DEPENDÊNCIAS CRÍTICAS:
   top: 25%;
   bottom: 25%;
   width: 3px;
-  background: #3b82f6; /* primary blue */
+  background: hsl(var(--primary));
   border-radius: 0 2px 2px 0;
 }
 
 /* SIDEBAR HEADER */
 .glass-sidebar-header {
   padding: 1.5rem 1rem;
-  border-bottom: 1px solid #27272a;
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 /* SIDEBAR FOOTER */
@@ -231,21 +248,21 @@ DEPENDÊNCIAS CRÍTICAS:
   margin: 1rem;
   padding: 1rem;
   border-radius: 8px;
-  background: #18181b; /* zinc-900 */
-  border: 1px solid #27272a;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
 }
 
 /* TOGGLE BUTTON */
 .glass-toggle-btn {
-  background: #27272a;
-  border: 1px solid #3f3f46;
+  background: hsl(var(--secondary));
+  border: 1px solid hsl(var(--border));
   border-radius: 6px;
   padding: 0.5rem;
   transition: all 0.2s ease;
 }
 
 .glass-toggle-btn:hover {
-  background: #3f3f46;
+  background: hsl(var(--muted));
 }
 
 /* ICON STYLES */
@@ -278,13 +295,13 @@ DEPENDÊNCIAS CRÍTICAS:
 
 /* GLASS BACKGROUND UTILITIES */
 .glass-bg {
-  background: #18181b;
-  border: 1px solid #27272a;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
 }
 
 .glass-card {
-  background: #18181b;
-  border: 1px solid #27272a;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
 }
 
 
@@ -294,6 +311,7 @@ DEPENDÊNCIAS CRÍTICAS:
     opacity: 0;
     transform: translateY(20px) scale(0.9);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -305,6 +323,7 @@ DEPENDÊNCIAS CRÍTICAS:
     opacity: 0;
     transform: translateY(8px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -334,216 +353,127 @@ DEPENDÊNCIAS CRÍTICAS:
 /* ESTILIZAÇÃO DARK MODE PARA O FULLCALENDAR */
 .fc {
   --fc-border-color: hsl(var(--border));
-  --fc-today-bg-color: hsl(var(--accent) / 0.3);
+  --fc-today-bg-color: hsl(var(--primary) / 0.05);
   color: hsl(var(--foreground));
 }
+
 .fc .fc-col-header-cell-cushion {
   color: hsl(var(--muted-foreground));
   font-weight: 600;
   text-decoration: none;
 }
-.fc .fc-daygrid-day-number, .fc .fc-list-day-text, .fc .fc-list-day-side-text {
+
+.fc .fc-daygrid-day-number,
+.fc .fc-list-day-text,
+.fc .fc-list-day-side-text {
   color: hsl(var(--foreground));
   text-decoration: none;
 }
+
 .fc .fc-day-other .fc-daygrid-day-number {
   color: hsl(var(--muted-foreground) / 0.5);
 }
+
+/* Washed pastel events — no solid blocks */
 .fc .fc-daygrid-event {
-  background-color: hsl(var(--primary) / 0.2);
-  border: 1px solid hsl(var(--primary) / 0.5);
-  padding: 2px 4px;
+  background-color: transparent;
+  border: none;
+  padding: 1px 2px;
   border-radius: var(--radius);
   font-size: 0.75rem;
   font-weight: 500;
-  color: hsl(var(--primary-foreground));
 }
+
 .fc .fc-event-title {
-  color: hsl(var(--primary-foreground));
+  color: inherit;
 }
+
+/* Today cell: subtle primary highlight */
+.fc .fc-day-today {
+  background-color: hsl(var(--primary) / 0.05) !important;
+  border: 1px solid hsl(var(--primary) / 0.2) !important;
+}
+
 .fc-theme-standard .fc-scrollgrid {
   border: 1px solid hsl(var(--border));
 }
-.fc-theme-standard th, .fc-theme-standard td {
+
+.fc-theme-standard th,
+.fc-theme-standard td {
   border: 1px solid hsl(var(--border));
 }
+
 .fc .fc-list-event:hover td {
   background-color: hsl(var(--accent) / 0.3);
 }
 
-/* SISTEMA PREMIUM DE CABEÇALHOS DA AGENDA - VERSÃO GLASSMORPHISM 3.0 */
+/* FullCalendar List View — Theme-Aware Styles */
 .fc-theme-standard .fc-list-day-cushion {
-  /* Glassmorphism Premium com Gradiente Duplo */
-  background: linear-gradient(
-    135deg,
-    rgba(40, 50, 80, 0.95) 0%,
-    rgba(30, 40, 70, 0.85) 50%,
-    rgba(35, 45, 75, 0.90) 100%
-  ) !important;
-  
-  /* Backdrop Filter Premium */
-  -webkit-backdrop-filter: blur(16px) saturate(150%) !important;
-  backdrop-filter: blur(16px) saturate(150%) !important;
-  
-  /* Bordas com Efeito Holográfico */
-  border: 1px solid transparent !important;
-  border-image: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.3) 0%,
-    rgba(100, 200, 255, 0.2) 50%,
-    rgba(255, 255, 255, 0.1) 100%
-  ) 1 !important;
-  
-  /* Sombras Múltiplas para Profundidade */
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
-    0 4px 16px rgba(100, 200, 255, 0.1) !important;
-  
-  /* Espaçamento Premium */
-  padding: 16px 20px !important;
+  background: hsl(var(--muted)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  padding: 12px 16px !important;
   margin: 0 !important;
-  
-  /* Transições Suaves */
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  
-  /* Posicionamento Relativo para Efeitos */
-  position: relative !important;
-  overflow: hidden !important;
+  transition: background 0.2s ease !important;
 }
 
-/* Efeito de Brilho Holográfico no Hover */
-.fc-theme-standard .fc-list-day-cushion::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: -100% !important;
-  width: 100% !important;
-  height: 100% !important;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.1),
-    transparent
-  ) !important;
-  transition: left 0.6s ease !important;
-  pointer-events: none !important;
-}
-
-.fc-theme-standard .fc-list-day-cushion:hover::before {
-  left: 100% !important;
-}
-
-/* Efeito de Hover Premium */
 .fc-theme-standard .fc-list-day-cushion:hover {
-  background: linear-gradient(
-    135deg,
-    rgba(50, 60, 90, 0.95) 0%,
-    rgba(40, 50, 80, 0.90) 50%,
-    rgba(45, 55, 85, 0.95) 100%
-  ) !important;
-  
-  box-shadow: 
-    0 12px 40px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.15),
-    0 6px 24px rgba(100, 200, 255, 0.15) !important;
-  
-  transform: translateY(-1px) !important;
+  background: hsl(var(--muted) / 0.8) !important;
 }
 
-/* Tipografia Premium para Dias da Semana */
 .fc-theme-standard .fc-list-day-text {
-  color: #f1f5f9 !important; /* Branco Premium */
+  color: hsl(var(--foreground)) !important;
   font-weight: 700 !important;
   font-size: 1rem !important;
   text-transform: capitalize !important;
   letter-spacing: 0.025em !important;
-  
-  /* Sombra de Texto Premium */
-  text-shadow: 
-    0 2px 4px rgba(0, 0, 0, 0.5),
-    0 0 8px rgba(100, 200, 255, 0.3) !important;
-  
-  /* Filtro para Brilho */
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.1)) !important;
 }
 
-/* Tipografia Premium para Datas */
 .fc-theme-standard .fc-list-day-side-text {
-  color: #e2e8f0 !important; /* Cinza Claro Premium */
+  color: hsl(var(--muted-foreground)) !important;
   font-weight: 600 !important;
   font-size: 0.95rem !important;
-  
-  /* Sombra de Texto Sutil */
-  text-shadow: 
-    0 1px 3px rgba(0, 0, 0, 0.4),
-    0 0 6px rgba(100, 200, 255, 0.2) !important;
-  
-  /* Efeito de Opacidade Dinâmica */
-  opacity: 0.9 !important;
-  transition: opacity 0.3s ease !important;
 }
 
-/* Hover Effect para Texto da Data */
 .fc-theme-standard .fc-list-day-cushion:hover .fc-list-day-side-text {
-  opacity: 1 !important;
-  color: #f8fafc !important;
+  color: hsl(var(--foreground)) !important;
 }
 
-/* Animação de Entrada para Cabeçalhos */
-.fc-theme-standard .fc-list-day-cushion {
-  animation: slideInFromLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-@keyframes slideInFromLeft {
-  0% {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Responsividade Premium */
+/* Responsiveness */
 @media (max-width: 768px) {
   .fc-theme-standard .fc-list-day-cushion {
-    padding: 12px 16px !important;
+    padding: 10px 14px !important;
   }
-  
   .fc-theme-standard .fc-list-day-text {
     font-size: 0.9rem !important;
   }
-  
   .fc-theme-standard .fc-list-day-side-text {
     font-size: 0.85rem !important;
   }
 }
 
-/* Integração com Eventos */
+/* List Events */
 .fc .fc-list-event {
-  background: rgba(15, 23, 42, 0.6) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-  transition: all 0.3s ease !important;
+  background: hsl(var(--card)) !important;
+  border-bottom: 1px solid hsl(var(--border) / 0.5) !important;
+  transition: background 0.2s ease !important;
 }
 
 .fc .fc-list-event:hover {
-  background: rgba(30, 41, 59, 0.8) !important;
-  transform: translateX(4px) !important;
+  background: hsl(var(--muted)) !important;
 }
 
-/* Melhorias para Eventos na Lista */
 .fc .fc-list-event-title {
-  color: #e2e8f0 !important;
+  color: hsl(var(--foreground)) !important;
   font-weight: 500 !important;
 }
 
 .fc .fc-list-event-time {
-  color: #94a3b8 !important;
+  color: hsl(var(--muted-foreground)) !important;
   font-weight: 600 !important;
+}
+
+.fc-theme-standard .fc-list-empty {
+  background: hsl(var(--background)) !important;
 }
 
 /* Optimized animations for Auth page */
@@ -551,12 +481,15 @@ DEPENDÊNCIAS CRÍTICAS:
   0% {
     transform: translate(0px, 0px) scale(1);
   }
+
   33% {
     transform: translate(30px, -50px) scale(1.1);
   }
+
   66% {
     transform: translate(-20px, 20px) scale(0.9);
   }
+
   100% {
     transform: translate(0px, 0px) scale(1);
   }
@@ -613,10 +546,13 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 @keyframes glow-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.4;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.7;
     transform: scale(1.02);
@@ -643,18 +579,24 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 @keyframes iconBounce {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   20% {
     transform: translateY(-0.3em);
   }
+
   40% {
     transform: translateY(0);
   }
+
   60% {
     transform: translateY(-0.1em);
   }
+
   80% {
     transform: translateY(0);
   }
@@ -840,22 +782,18 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 .mobile-extra-screen-icon {
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.2) 0%,
-    rgba(147, 51, 234, 0.2) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(59, 130, 246, 0.2) 0%,
+      rgba(147, 51, 234, 0.2) 100%);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .mobile-extra-screen-item:hover .mobile-extra-screen-icon {
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.3) 0%,
-    rgba(147, 51, 234, 0.3) 100%
-  );
+  background: linear-gradient(135deg,
+      rgba(59, 130, 246, 0.3) 0%,
+      rgba(147, 51, 234, 0.3) 100%);
   box-shadow:
     0 4px 16px rgba(59, 130, 246, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -868,22 +806,23 @@ DEPENDÊNCIAS CRÍTICAS:
 
 /* Silver Glow Effects */
 .silver-glow {
-  box-shadow: 0 0 40px -10px rgba(255,255,255,0.1);
+  box-shadow: 0 0 40px -10px rgba(255, 255, 255, 0.1);
 }
 
 .silver-glow-hover:hover {
-  box-shadow: 0 0 50px -8px rgba(255,255,255,0.2);
+  box-shadow: 0 0 50px -8px rgba(255, 255, 255, 0.2);
 }
 
 /* Metallic Border Effect */
 .metallic-border {
   position: relative;
 }
+
 .metallic-border::before {
   content: '';
   position: absolute;
   inset: -1px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent 50%, rgba(255,255,255,0.05));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), transparent 50%, rgba(255, 255, 255, 0.05));
   border-radius: inherit;
   pointer-events: none;
 }
@@ -896,8 +835,13 @@ DEPENDÊNCIAS CRÍTICAS:
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 /* Noise Texture - Subtle diagonal lines */
@@ -916,21 +860,23 @@ DEPENDÊNCIAS CRÍTICAS:
   background-color: #000000;
   position: relative;
 }
+
 .premium-black-bg::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at center, rgba(39,39,42,0.25) 0%, transparent 55%);
+  background: radial-gradient(ellipse at center, rgba(39, 39, 42, 0.25) 0%, transparent 55%);
   pointer-events: none;
 }
 
 /* Silver Button Glow */
 .silver-button-glow {
-  box-shadow: 0 0 20px -5px rgba(255,255,255,0.3);
+  box-shadow: 0 0 20px -5px rgba(255, 255, 255, 0.3);
   transition: all 0.3s ease;
 }
+
 .silver-button-glow:hover {
-  box-shadow: 0 0 30px -5px rgba(255,255,255,0.5);
+  box-shadow: 0 0 30px -5px rgba(255, 255, 255, 0.5);
 }
 
 /* Premium Card Glass Effect - Black & Silver */
@@ -938,8 +884,39 @@ DEPENDÊNCIAS CRÍTICAS:
   background: rgba(0, 0, 0, 0.70);
   backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 
-    0 0 60px -15px rgba(255,255,255,0.07),
-    inset 0 1px 0 0 rgba(255,255,255,0.05),
-    inset 1px 0 0 0 rgba(255,255,255,0.03);
+  box-shadow:
+    0 0 60px -15px rgba(255, 255, 255, 0.07),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
+    inset 1px 0 0 0 rgba(255, 255, 255, 0.03);
 }
+
+/* ============================================
+   CAPACITOR MOBILE APP PROTECTIONS
+   ============================================ */
+
+:root {
+  /* Dynamic Safe Area Variables for Notches / Dynamic Island */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+/* Base body lock to prevent site-like behavior in WebViews */
+body.is-mobile-app {
+  /* Prevent pull-to-refresh and top/bottom overscroll elasticity */
+  overscroll-behavior-y: none;
+  
+  /* Prevent accidental text selection which breaks app illusion */
+  user-select: none;
+  -webkit-user-select: none;
+  
+  /* Remove the ugly tap highlight color on mobile browsers */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Standardize safe area padding helpers */
+.safe-area-pt { padding-top: max(16px, var(--sat)); }
+.safe-area-pb { padding-bottom: max(16px, var(--sab)); }
+.safe-area-mt { margin-top: max(16px, var(--sat)); }
+.safe-area-mb { margin-bottom: max(16px, var(--sab)); }

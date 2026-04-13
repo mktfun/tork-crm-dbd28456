@@ -13,7 +13,7 @@ export function GlassCard({ className, children, ...props }: GlassCardProps) {
     <div
       className={cn(
         // O VIDRO PERFEITO: transparência + desfoque + bordas sutis
-        "rounded-xl border border-white/10 bg-white/10 backdrop-blur-lg shadow-lg",
+        "rounded-xl border border-foreground/10 bg-foreground/10 backdrop-blur-lg shadow-lg",
         // Padding padrão e overflow controlado
         "p-4",
         className

@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useCRMDeals, useCRMStages } from '@/hooks/useCRMDeals';
+import { useCRMPipelines } from '@/hooks/useCRMPipelines';
 import type { CRMStage } from '@/hooks/useCRMDeals';
 import { ClientSearchCombobox, type ClientOption } from './ClientSearchCombobox';
+import { ProductSelect } from './ProductSelect';
 import {
   Dialog,
   DialogContent,
@@ -22,47 +24,60 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Save, Sparkles } from 'lucide-react';
+import { Loader2, Save, Briefcase, User, LayoutDashboard, ListTodo, Package, DollarSign, Calendar, AlignLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface NewDealModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultStageId?: string | null;
+  defaultClientId?: string;
+  defaultTitle?: string;
+  defaultNotes?: string;
 }
 
-export function NewDealModal({ open, onOpenChange, defaultStageId }: NewDealModalProps) {
+export function NewDealModal({ open, onOpenChange, defaultStageId, defaultClientId, defaultTitle, defaultNotes }: NewDealModalProps) {
   const { user } = useAuth();
-  const { stages, isLoading: loadingStages } = useCRMStages();
-  const { createDeal, deals } = useCRMDeals();
+  const { pipelines, isLoading: loadingPipelines } = useCRMPipelines();
+  const [pipelineId, setPipelineId] = useState<string>('');
+  const { stages, isLoading: loadingStages } = useCRMStages(pipelineId || null);
+  const { createDeal, deals } = useCRMDeals(pipelineId || null);
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [loadingClients, setLoadingClients] = useState(false);
-  const [autoFillApplied, setAutoFillApplied] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
     client_id: '',
     stage_id: '',
+    product_id: '',
     value: '',
     expected_close_date: '',
     notes: ''
   });
 
+  // Auto-select default pipeline when pipelines load
+  useEffect(() => {
+    if (pipelines.length > 0 && !pipelineId) {
+      const defaultPipeline = pipelines.find(p => p.is_default) || pipelines[0];
+      setPipelineId(defaultPipeline.id);
+    }
+  }, [pipelines]);
+
   // Reset form when modal opens
   useEffect(() => {
     if (open) {
       setFormData({
-        title: '',
-        client_id: '',
+        title: defaultTitle || '',
+        client_id: defaultClientId || '',
         stage_id: defaultStageId || '',
+        product_id: '',
         value: '',
         expected_close_date: '',
-        notes: ''
+        notes: defaultNotes || ''
       });
-      setAutoFillApplied(false);
     }
-  }, [open, defaultStageId]);
+  }, [open, defaultStageId, defaultClientId, defaultTitle, defaultNotes]);
 
   // Fetch clients when modal opens
   useEffect(() => {
@@ -70,13 +85,6 @@ export function NewDealModal({ open, onOpenChange, defaultStageId }: NewDealModa
       fetchClients();
     }
   }, [open, user]);
-
-  // Auto-fill from last policy when client is selected
-  useEffect(() => {
-    if (formData.client_id && user && !autoFillApplied) {
-      fetchLastPolicyAndAutoFill(formData.client_id);
-    }
-  }, [formData.client_id, user]);
 
   const fetchClients = async () => {
     setLoadingClients(true);
@@ -89,7 +97,23 @@ export function NewDealModal({ open, onOpenChange, defaultStageId }: NewDealModa
         .limit(500);
 
       if (error) throw error;
-      setClients(data || []);
+      
+      let clientList = data || [];
+      
+      // If defaultClientId exists but isn't in the list, fetch individually
+      if (defaultClientId && !clientList.find(c => c.id === defaultClientId)) {
+        const { data: singleClient } = await supabase
+          .from('clientes')
+          .select('id, name, phone, email')
+          .eq('id', defaultClientId)
+          .single();
+        
+        if (singleClient) {
+          clientList = [singleClient, ...clientList];
+        }
+      }
+      
+      setClients(clientList);
     } catch (error) {
       console.error('Error fetching clients:', error);
     } finally {
@@ -97,50 +121,8 @@ export function NewDealModal({ open, onOpenChange, defaultStageId }: NewDealModa
     }
   };
 
-  const fetchLastPolicyAndAutoFill = async (clientId: string) => {
-    try {
-      const { data: policy, error } = await supabase
-        .from('apolices')
-        .select('premium_value, expiration_date')
-        .eq('client_id', clientId)
-        .eq('user_id', user!.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching last policy:', error);
-        return;
-      }
-
-      if (policy) {
-        // Calculate suggested close date (expiration + 30 days or today + 30 days)
-        let suggestedDate = '';
-        if (policy.expiration_date) {
-          const expirationDate = new Date(policy.expiration_date);
-          expirationDate.setDate(expirationDate.getDate() + 30);
-          suggestedDate = expirationDate.toISOString().split('T')[0];
-        }
-
-        setFormData(prev => ({
-          ...prev,
-          value: policy.premium_value?.toString() || prev.value,
-          expected_close_date: suggestedDate || prev.expected_close_date
-        }));
-        setAutoFillApplied(true);
-        toast.info('Dados da última apólice carregados automaticamente', {
-          icon: <Sparkles className="h-4 w-4" />,
-          duration: 3000
-        });
-      }
-    } catch (error) {
-      console.error('Error in auto-fill:', error);
-    }
-  };
-
   // Sync deal attributes to Chatwoot in background (non-blocking)
   const syncChatwootInBackground = async (dealId: string) => {
-    // Toast imediato de "sincronizando"
     toast.loading('Sincronizando negócio com Chat Tork...', { id: 'chattork-sync' });
     
     try {
@@ -168,24 +150,21 @@ export function NewDealModal({ open, onOpenChange, defaultStageId }: NewDealModa
 
     setLoading(true);
     try {
-      // Calculate position for new deal
       const dealsInStage = deals.filter(d => d.stage_id === formData.stage_id);
       const position = dealsInStage.length;
 
-      // 1. Create deal in Supabase FIRST
       const newDeal = await createDeal.mutateAsync({
         title: formData.title,
         client_id: formData.client_id || null,
         stage_id: formData.stage_id,
+        product_id: formData.product_id && formData.product_id !== 'none' ? formData.product_id : null,
         value: parseFloat(formData.value) || 0,
         expected_close_date: formData.expected_close_date || null,
         notes: formData.notes || null,
         position
-      });
+      } as any);
 
-      // 2. Sync to Chatwoot in background (non-blocking)
       if (formData.client_id) {
-        // Fire and forget - don't await
         syncChatwootInBackground(newDeal.id);
       }
 
@@ -197,129 +176,194 @@ export function NewDealModal({ open, onOpenChange, defaultStageId }: NewDealModa
     }
   };
 
-  const handleClientChange = (clientId: string) => {
-    // Reset auto-fill flag when client changes
-    if (clientId !== formData.client_id) {
-      setAutoFillApplied(false);
-    }
-    setFormData({ ...formData, client_id: clientId });
+  const handlePipelineChange = (value: string) => {
+    setPipelineId(value);
+    setFormData(prev => ({ ...prev, stage_id: '' }));
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Novo Negócio</DialogTitle>
-          <DialogDescription>Adicione um novo negócio ao seu funil de vendas.</DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden bg-background/95 backdrop-blur-xl border-border/50 shadow-2xl">
+        <div className="px-6 py-5 border-b border-border/50 bg-muted/20">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-primary" />
+              Novo Negócio
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Preencha os detalhes abaixo para adicionar um novo negócio ao seu funil.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Título *</Label>
-            <Input
-              id="title"
-              placeholder="Ex: Renovação Auto - João Silva"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              required
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left Column - Main Info */}
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="title" className="flex items-center gap-2 text-sm font-medium">
+                  <Briefcase className="w-4 h-4 text-muted-foreground" />
+                  Título do Negócio <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="title"
+                  placeholder="Ex: Renovação Auto - João Silva"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  required
+                  className="bg-background/50 focus:bg-background transition-colors"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="client">Cliente</Label>
-            <ClientSearchCombobox
-              clients={clients}
-              value={formData.client_id}
-              onValueChange={handleClientChange}
-              isLoading={loadingClients}
-              placeholder="Buscar por nome, telefone ou email..."
-            />
-            {autoFillApplied && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Sparkles className="h-3 w-3" />
-                Valor e data preenchidos da última apólice
-              </p>
-            )}
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="client" className="flex items-center gap-2 text-sm font-medium">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  Cliente
+                </Label>
+                <ClientSearchCombobox
+                  clients={clients}
+                  value={formData.client_id}
+                  onValueChange={(clientId) => setFormData({ ...formData, client_id: clientId })}
+                  isLoading={loadingClients}
+                  placeholder="Buscar por nome, telefone ou email..."
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="stage">Etapa *</Label>
-            <Select
-              value={formData.stage_id}
-              onValueChange={(value) => setFormData({ ...formData, stage_id: value })}
-              required
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={loadingStages ? "Carregando..." : "Selecione a etapa"} />
-              </SelectTrigger>
-              <SelectContent>
-                {loadingStages ? (
-                  <SelectItem value="loading" disabled>
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Carregando etapas...
-                    </div>
-                  </SelectItem>
-                ) : !stages || stages.length === 0 ? (
-                  <SelectItem value="empty" disabled>
-                    Nenhuma etapa encontrada
-                  </SelectItem>
-                ) : (
-                  stages.map((stage: CRMStage) => (
-                    <SelectItem key={stage.id} value={stage.id}>
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: stage.color }}
-                        />
-                        {stage.name}
-                      </div>
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="value">Valor (R$)</Label>
-              <Input
-                id="value"
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                value={formData.value}
-                onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-              />
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <Package className="w-4 h-4 text-muted-foreground" />
+                  Produto
+                </Label>
+                <ProductSelect
+                  value={formData.product_id}
+                  onValueChange={(value) => setFormData({ ...formData, product_id: value })}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="date">Previsão Fechamento</Label>
-              <Input
-                id="date"
-                type="date"
-                value={formData.expected_close_date}
-                onChange={(e) => setFormData({ ...formData, expected_close_date: e.target.value })}
-              />
+
+            {/* Right Column - Pipeline & Details */}
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm font-medium">
+                    <LayoutDashboard className="w-4 h-4 text-muted-foreground" />
+                    Funil <span className="text-destructive">*</span>
+                  </Label>
+                  <Select value={pipelineId} onValueChange={handlePipelineChange}>
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder={loadingPipelines ? "Carregando..." : "Selecione"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pipelines.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}{p.is_default ? ' (padrão)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="stage" className="flex items-center gap-2 text-sm font-medium">
+                    <ListTodo className="w-4 h-4 text-muted-foreground" />
+                    Etapa <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={formData.stage_id}
+                    onValueChange={(value) => setFormData({ ...formData, stage_id: value })}
+                    required
+                  >
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder={loadingStages ? "Carregando..." : "Selecione"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loadingStages ? (
+                        <SelectItem value="loading" disabled>
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Carregando...
+                          </div>
+                        </SelectItem>
+                      ) : !stages || stages.length === 0 ? (
+                        <SelectItem value="empty" disabled>
+                          Nenhuma etapa
+                        </SelectItem>
+                      ) : (
+                        stages.map((stage: CRMStage) => (
+                          <SelectItem key={stage.id} value={stage.id}>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="h-2.5 w-2.5 rounded-full shadow-sm"
+                                style={{ backgroundColor: stage.color }}
+                              />
+                              <span className="truncate max-w-[120px]">{stage.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="value" className="flex items-center gap-2 text-sm font-medium">
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                    Valor (R$)
+                  </Label>
+                  <Input
+                    id="value"
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={formData.value}
+                    onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                    className="bg-background/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="date" className="flex items-center gap-2 text-sm font-medium">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    Previsão
+                  </Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={formData.expected_close_date}
+                    onChange={(e) => setFormData({ ...formData, expected_close_date: e.target.value })}
+                    className="bg-background/50"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes" className="flex items-center gap-2 text-sm font-medium">
+                  <AlignLeft className="w-4 h-4 text-muted-foreground" />
+                  Observações
+                </Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Anotações adicionais sobre o negócio..."
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  rows={3}
+                  className="bg-background/50 resize-none"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Observações</Label>
-            <Textarea
-              id="notes"
-              placeholder="Anotações sobre o negócio..."
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex justify-end gap-3 pt-6 border-t border-border/50 mt-6">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="hover:bg-muted/50">
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || loadingStages || !formData.title || !formData.stage_id}>
+            <Button 
+              type="submit" 
+              disabled={loading || loadingStages || !formData.title || !formData.stage_id}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-all"
+            >
               {loading ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (

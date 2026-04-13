@@ -1,0 +1,21 @@
+# Checklist: Implementação do Admin Test Mode & Feedback RAG
+
+- [x] **1. Migração de Banco de Dados:**
+  - Rodar o comando CLI `supabase migration new setup_ai_feedback_loop`
+  - Incluir query de criação da tabela `admin_test_sessions` com ID, brokerage_id, phone e status.
+  - Incluir query de criação da tabela `ai_feedbacks` com ID, brokerage_id, type e feedback_text.
+- [x] **2. Interceptador `index.ts`:**
+  - Importar sendChatwootMessage.
+  - Checkar ativações e feedbacks pendentes antes do routing admin.
+  - Tratar comando `/teste` para alternar estados e interagir no Chatwoot.
+  - Sobrescrever `senderRole = null` quando em modo active, permitindo prosseguimento contínuo.
+- [x] **3. Feedback RAG Inteligente para SDR (`buildPrompt.ts`):**
+  - Adicionar parâmetro `brokerageId` no buildSystemPrompt.
+  - Consultar `ai_feedbacks` em lote ordenado para `brokerageId` com `type='sdr'`.
+  - Realizar append das strings de regras geradas no final do output do template do prompt de sistema da SDR.
+- [x] **4. Feedback RAG Inteligente de Análises (`processAdminLogic.ts`):**
+  - Declarar handler para `/feedback <msg>`. Salvar em BD, enviar notificação.
+  - Injeção SQL de `type='mentor'` no `executeAIAssistant` como system message.
+  - Atualizar `/help` com os novos comandos.
+- [x] **5. Commit e Deploy:**
+  - Commit, push e deploy da Edge Function.
