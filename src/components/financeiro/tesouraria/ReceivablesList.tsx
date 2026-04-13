@@ -1,11 +1,19 @@
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar, AlertCircle } from "lucide-react";
-import { useUpcomingReceivables } from "@/hooks/useFinanceiro";
+import { Calendar, AlertCircle, Building2, ChevronRight } from "lucide-react";
+import { useUpcomingReceivables, UpcomingReceivable } from "@/hooks/useFinanceiro";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { cn } from "@/lib/utils";
 
 interface ReceivablesListProps {
   daysAhead?: number;
@@ -29,28 +37,41 @@ export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
     };
   };
 
+  // Agrupamento por Seguradora (FIFO)
+  const groupedReceivables = useMemo(() => {
+    if (!receivables) return {};
+    
+    const groups: Record<string, UpcomingReceivable[]> = {};
+    
+    receivables.forEach(r => {
+      const name = r.entityName || "Outros";
+      if (!groups[name]) groups[name] = [];
+      groups[name].push(r);
+    });
+
+    // Ordenar cada grupo por data de vencimento (FIFO - mais antiga primeiro)
+    Object.keys(groups).forEach(name => {
+      groups[name].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    });
+
+    return groups;
+  }, [receivables]);
+
   const totalAmount = receivables?.reduce((sum, r) => sum + Number(r.amount), 0) || 0;
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="border-none shadow-sm bg-background/50 backdrop-blur-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-muted-foreground" />
-            <CardTitle className="text-base">Recebíveis (Próximos {daysAhead} dias)</CardTitle>
+            <Calendar className="w-5 h-5 text-primary" />
+            <CardTitle className="text-base font-semibold">Recebíveis (Próximos {daysAhead} dias)</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                <Skeleton className="w-[50px] h-[60px] rounded-lg" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-3 w-20" />
-                </div>
-                <Skeleton className="h-5 w-24" />
-              </div>
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-xl" />
             ))}
           </div>
         </CardContent>
@@ -60,15 +81,15 @@ export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
 
   if (error) {
     return (
-      <Card>
+      <Card className="border-destructive/20">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-muted-foreground" />
-            <CardTitle className="text-base">Recebíveis (Próximos {daysAhead} dias)</CardTitle>
+            <Calendar className="w-5 h-5 text-destructive" />
+            <CardTitle className="text-base">Recebíveis</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="bg-destructive/5 border-destructive/10">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               Erro ao carregar recebíveis: {error.message}
@@ -81,18 +102,18 @@ export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
 
   if (!receivables || receivables.length === 0) {
     return (
-      <Card>
+      <Card className="border-dashed bg-muted/20">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-muted-foreground" />
-            <CardTitle className="text-base">Recebíveis (Próximos {daysAhead} dias)</CardTitle>
+            <CardTitle className="text-base">Recebíveis</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Nenhum recebível previsto</p>
-            <p className="text-xs mt-1">Não há receitas a receber nos próximos {daysAhead} dias.</p>
+          <div className="text-center py-10 text-muted-foreground">
+            <Building2 className="w-10 h-10 mx-auto mb-3 opacity-20" />
+            <p className="text-sm font-medium">Nenhum recebível previsto</p>
+            <p className="text-xs mt-1">Tudo em dia nos próximos {daysAhead} dias.</p>
           </div>
         </CardContent>
       </Card>
@@ -100,56 +121,91 @@ export function ReceivablesList({ daysAhead = 30 }: ReceivablesListProps) {
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-muted-foreground" />
-          <CardTitle className="text-base">Recebíveis (Próximos {daysAhead} dias)</CardTitle>
+    <Card className="border-none shadow-sm bg-background/40 backdrop-blur-md overflow-hidden">
+      <CardHeader className="pb-3 bg-muted/10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-primary/10 rounded-lg">
+              <Building2 className="w-4 h-4 text-primary" />
+            </div>
+            <CardTitle className="text-base font-bold">Quanto falta receber</CardTitle>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground font-medium">Total Consolidado</p>
+            <p className="text-lg font-black text-emerald-600 tabular-nums">
+              {formatCurrency(totalAmount)}
+            </p>
+          </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-[400px] pr-4">
-          <div className="space-y-3">
-            {receivables.map((receivable) => {
-              const { day, month } = formatDate(receivable.dueDate);
+      <CardContent className="p-0">
+        <ScrollArea className="h-[450px]">
+          <Accordion type="multiple" className="w-full px-4 pt-2">
+            {Object.entries(groupedReceivables).map(([insurer, items], idx) => {
+              const insurerTotal = items.reduce((sum, item) => sum + item.amount, 0);
+              
               return (
-                <div
-                  key={receivable.transactionId}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex flex-col items-center justify-center bg-primary/10 rounded-lg p-2 min-w-[50px]">
-                    <span className="text-2xl font-bold text-primary">{day}</span>
-                    <span className="text-xs text-muted-foreground uppercase">{month}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate" title={receivable.entityName}>
-                      {receivable.entityName}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate" title={receivable.description}>
-                      {receivable.description}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Em {receivable.daysUntilDue} {receivable.daysUntilDue === 1 ? 'dia' : 'dias'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-emerald-600">
-                      {formatCurrency(Number(receivable.amount))}
-                    </p>
-                  </div>
-                </div>
+                <AccordionItem value={`item-${idx}`} key={insurer} className="border-b border-muted/30 last:border-0">
+                  <AccordionTrigger className="hover:no-underline py-4 group">
+                    <div className="flex items-center justify-between w-full pr-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-muted/50 flex items-center justify-center font-bold text-muted-foreground group-data-[state=open]:bg-primary/10 group-data-[state=open]:text-primary transition-colors">
+                          {insurer.substring(0, 1).toUpperCase()}
+                        </div>
+                        <div className="text-left">
+                          <p className="font-bold text-sm text-foreground">{insurer}</p>
+                          <p className="text-xs text-muted-foreground">{items.length} pendências</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={cn(
+                          "font-bold tabular-nums",
+                          insurerTotal > 0 ? "text-emerald-600" : "text-muted-foreground"
+                        )}>
+                          {formatCurrency(insurerTotal)}
+                        </p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-2 pl-12 pb-2">
+                      <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60 mb-2">
+                        Fluxo FIFO (Mais antigas primeiro)
+                      </p>
+                      {items.map((item) => {
+                        const { day, month } = formatDate(item.dueDate);
+                        return (
+                          <div
+                            key={item.transactionId}
+                            className="flex items-center justify-between p-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors border border-transparent hover:border-muted/50"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="text-center min-w-[35px]">
+                                <p className="text-xs font-black text-muted-foreground">{day}</p>
+                                <p className="text-[9px] uppercase font-bold text-muted-foreground/50">{month}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-foreground/80 truncate max-w-[150px]">
+                                  {item.description}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  Vence em {item.daysUntilDue} dias
+                                </p>
+                              </div>
+                            </div>
+                            <p className="text-xs font-bold tabular-nums text-foreground/70">
+                              {formatCurrency(item.amount)}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
               );
             })}
-          </div>
+          </Accordion>
         </ScrollArea>
-        <div className="mt-4 pt-4 border-t">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Total a Receber</span>
-            <span className="text-lg font-bold text-emerald-600">
-              {formatCurrency(totalAmount)}
-            </span>
-          </div>
-        </div>
       </CardContent>
     </Card>
   );

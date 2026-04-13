@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Switch } from '@/components/ui/switch';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { TrendingUp, Loader2, Calendar } from 'lucide-react';
+import { TrendingUp, Loader2, Calendar, Info, Building2, User, Tag, CheckCircle2, Landmark } from 'lucide-react';
 
 import {
   Dialog,
@@ -26,7 +26,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Separator } from '@/components/ui/separator';
 
 import { useFinancialAccountsWithDefaults } from '@/hooks/useFinanceiro';
 import { useBankAccounts } from '@/hooks/useBancos';
@@ -34,6 +35,7 @@ import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
 import { useSupabaseCompanies } from '@/hooks/useSupabaseCompanies';
 import { useSupabaseProducers } from '@/hooks/useSupabaseProducers';
 import { registerRevenue } from '@/services/financialService';
+import { cn } from '@/lib/utils';
 
 const revenueSchema = z.object({
   description: z.string().min(3, 'Descrição deve ter pelo menos 3 caracteres'),
@@ -127,79 +129,96 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2 border-emerald-500/20 bg-emerald-500/5 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600 font-bold">
             <TrendingUp className="w-4 h-4" />
-            Receita
+            Nova Receita
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-emerald-500" />
-            Receita
-          </DialogTitle>
-          <DialogDescription>
-            Registre uma receita avulsa no sistema financeiro
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden border-none shadow-2xl bg-background/95 backdrop-blur-xl">
+        <div className="bg-emerald-600 p-6 flex items-center gap-4 text-white">
+          <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">Registrar Receita</DialogTitle>
+            <DialogDescription className="text-emerald-100/80 font-medium">
+              Lançamento manual de crédito no sistema financeiro
+            </DialogDescription>
+          </div>
+        </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+            
+            {/* Status Switcher - Liquid Glass Style */}
             <FormField
               control={form.control}
               name="isConfirmed"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mb-4">
+                <FormItem className="flex flex-row items-center justify-between rounded-2xl bg-emerald-500/5 border border-emerald-500/10 p-4 shadow-inner">
                   <div className="space-y-0.5">
-                    <FormLabel>Status: Recebido</FormLabel>
-                    <DialogDescription>
-                      A receita já entrou na conta?
-                    </DialogDescription>
+                    <FormLabel className="text-sm font-black text-emerald-600 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" /> STATUS: {field.value ? 'RECEBIDO' : 'PENDENTE'}
+                    </FormLabel>
+                    <FormDescription className="text-xs font-medium text-emerald-600/60">
+                      O valor já foi conciliado ou está disponível na conta?
+                    </FormDescription>
                   </div>
                   <FormControl>
                     <Switch
                       checked={field.value}
                       onCheckedChange={field.onChange}
+                      className="data-[state=checked]:bg-emerald-600"
                     />
                   </FormControl>
                 </FormItem>
               )}
             />
 
-            {/* Descrição */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descrição</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: Comissão extraordinária Porto Seguro" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Descrição Principal */}
+              <div className="md:col-span-2">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Descrição do Lançamento</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Ex: Comissão extraordinária Porto Seguro" 
+                          className="bg-muted/30 border-muted/50 focus:bg-background transition-all font-semibold"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage className="text-[10px] font-bold" />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-            {/* Valor e Data */}
-            <div className="grid grid-cols-2 gap-4">
+              {/* Valor e Data */}
               <FormField
                 control={form.control}
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Valor (R$)</FormLabel>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Valor (R$)</FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0,00"
-                        {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                      />
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">R$</span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          className="pl-10 bg-muted/30 border-muted/50 focus:bg-background transition-all font-black text-emerald-600 text-lg"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
                     </FormControl>
-                    <FormMessage />
+                    <FormMessage className="text-[10px] font-bold" />
                   </FormItem>
                 )}
               />
@@ -209,133 +228,101 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
                 name="transactionDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Data</FormLabel>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Data do Lançamento</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input type="date" className="pl-10 bg-muted/30 border-muted/50 focus:bg-background transition-all font-semibold" {...field} />
+                      </div>
                     </FormControl>
-                    <FormMessage />
+                    <FormMessage className="text-[10px] font-bold" />
+                  </FormItem>
+                )}
+              />
+
+              {/* Categoria e Banco */}
+              <FormField
+                control={form.control}
+                name="revenueAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <Tag className="w-3 h-3" /> Categoria
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="bg-muted/30 border-muted/50 font-semibold">
+                          <SelectValue placeholder="Selecione a categoria" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {revenueAccounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id} className="font-medium">
+                            {account.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage className="text-[10px] font-bold" />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="bankAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <Landmark className="w-3 h-3" /> Conta Destino
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="bg-muted/30 border-muted/50 font-semibold">
+                          <SelectValue placeholder="Selecione o banco" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum banco</SelectItem>
+                        {banks.map((bank) => (
+                          <SelectItem key={bank.id} value={bank.id} className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <span>{bank.icon}</span>
+                              <span>{bank.bankName}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage className="text-[10px] font-bold" />
                   </FormItem>
                 )}
               />
             </div>
 
-            {/* Categoria de Receita */}
-            <FormField
-              control={form.control}
-              name="revenueAccountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Categoria de Receita</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a categoria" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {revenueAccounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <Separator className="bg-muted/50" />
 
-
-
-            {/* Banco (opcional) */}
-            <FormField
-              control={form.control}
-              name="bankAccountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Banco (Opcional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o banco" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum banco</SelectItem>
-                      {banks.map((bank) => (
-                        <SelectItem key={bank.id} value={bank.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{bank.icon}</span>
-                            <span>{bank.bankName}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Referência (opcional) */}
-            <FormField
-              control={form.control}
-              name="referenceNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Número de Referência (opcional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: NF-12345" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Observações (opcional) */}
-            <FormField
-              control={form.control}
-              name="memo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Observações (opcional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Notas adicionais sobre esta receita"
-                      className="resize-none"
-                      rows={2}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Novos Campos Opcionais: Ramo, Seguradora, Produtor */}
+            {/* Campos de Contexto (Opcionais) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="ramoId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Ramo (Opcional)</FormLabel>
+                    <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Ramo</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || "none"}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
+                        <SelectTrigger className="bg-muted/10 border-muted/30 text-xs font-bold h-8">
+                          <SelectValue placeholder="Opcional" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">Nenhum</SelectItem>
                         {ramos.map((ramo) => (
-                          <SelectItem key={ramo.id} value={ramo.id}>
-                            {ramo.nome}
-                          </SelectItem>
+                          <SelectItem key={ramo.id} value={ramo.id} className="text-xs">{ramo.nome}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -345,23 +332,22 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
                 name="insuranceCompanyId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Seguradora (Opcional)</FormLabel>
+                    <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-1">
+                      <Building2 className="w-2.5 h-2.5" /> Seguradora
+                    </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || "none"}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
+                        <SelectTrigger className="bg-muted/10 border-muted/30 text-xs font-bold h-8">
+                          <SelectValue placeholder="Opcional" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">Nenhuma</SelectItem>
                         {companies.map((company) => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.name}
-                          </SelectItem>
+                          <SelectItem key={company.id} value={company.id} className="text-xs">{company.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -371,47 +357,80 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
                 name="producerId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Produtor (Opcional)</FormLabel>
+                    <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-1">
+                      <User className="w-2.5 h-2.5" /> Produtor
+                    </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || "none"}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
+                        <SelectTrigger className="bg-muted/10 border-muted/30 text-xs font-bold h-8">
+                          <SelectValue placeholder="Opcional" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">Nenhum</SelectItem>
                         {producers.map((producer) => (
-                          <SelectItem key={producer.id} value={producer.id}>
-                            {producer.name}
-                          </SelectItem>
+                          <SelectItem key={producer.id} value={producer.id} className="text-xs">{producer.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
-            {/* Botões */}
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancelar
+            {/* Referência e Notas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="referenceNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Nº Documento / Referência</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: NF-12345" className="bg-muted/20 border-muted/30 text-xs font-semibold" {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="memo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Observações Internas</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Notas adicionais sobre esta receita..."
+                        className="resize-none bg-muted/20 border-muted/30 text-xs font-medium"
+                        rows={2}
+                        {...field}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Botões - Liquid Glass */}
+            <div className="flex justify-end gap-3 pt-4 border-t border-muted/50">
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)} className="font-bold text-muted-foreground hover:text-foreground">
+                Descartar
               </Button>
               <Button
                 type="submit"
-                className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 rounded-xl shadow-lg shadow-emerald-600/20"
                 disabled={isSubmitting || loadingAccounts}
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Salvando...
+                    SALVANDO...
                   </>
                 ) : (
                   <>
                     <TrendingUp className="w-4 h-4" />
-                    Adicionar
+                    CONFIRMAR RECEITA
                   </>
                 )}
               </Button>
