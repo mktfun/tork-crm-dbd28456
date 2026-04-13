@@ -41,7 +41,7 @@ export function RootLayout() {
 
           {/* ÁREA PRINCIPAL ONDE AS PÁGINAS VÃO APARECER */}
           <main className={cn(
-            "flex-1 overflow-hidden",
+            "flex-1 overflow-y-auto",
             isMobile && "pb-20"
           )}>
             <Outlet />
