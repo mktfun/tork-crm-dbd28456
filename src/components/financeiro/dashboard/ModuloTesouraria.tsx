@@ -34,8 +34,7 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
   const now = new Date();
   const startDate = format(startOfMonth(now), 'yyyy-MM-dd');
   const endDate = format(endOfMonth(now), 'yyyy-MM-dd');
-  const { data: summaryData, isLoading: isLoadingSummary } = useFinancialSummary(startDate, endDate);
-  const summary = summaryData as any;
+  const { data: summary, isLoading: isLoadingSummary } = useFinancialSummary(startDate, endDate);
 
   const isLoading = isLoadingAging || isLoadingUpcoming || isLoadingSummary;
 
@@ -74,14 +73,14 @@ export const ModuloTesouraria = ({ onClick }: ModuloTesourariaProps) => {
               <div className="grid grid-cols-2 gap-3">
                 <GlassKpiCard
                   title="A Receber"
-                  value={formatCurrency((summary as any)?.current?.operationalPendingIncome || 0)}
+                  value={formatCurrency(summary?.current?.operationalPendingIncome || 0)}
                   subtitle="Vencidos + 30 dias"
                   icon={ArrowUpCircle}
                   iconClassName="text-emerald-400 drop-shadow-[0_0_6px_rgba(34,197,94,0.4)]"
                 />
                 <GlassKpiCard
                   title="A Pagar"
-                  value={formatCurrency((summary as any)?.current?.operationalPendingExpense || 0)}
+                  value={formatCurrency(summary?.current?.operationalPendingExpense || 0)}
                   subtitle="Vencidos + 30 dias"
                   icon={ArrowDownCircle}
                   iconClassName="text-rose-400 drop-shadow-[0_0_6px_rgba(244,63,94,0.4)]"

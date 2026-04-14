@@ -362,7 +362,7 @@ export async function getCashFlowData(params: {
 export async function getFinancialSummary(params: {
   startDate: string;
   endDate: string;
-}): Promise<FinancialSummary> {
+}): Promise<FinancialSummaryWithComparison> {
   const { data, error } = await supabase.rpc('get_financial_summary', {
     p_start_date: params.startDate,
     p_end_date: params.endDate
@@ -370,15 +370,25 @@ export async function getFinancialSummary(params: {
 
   if (error) throw error;
 
-  const row = data as any || {};
-  return {
+  const result = data as any || {};
+  
+  const mapSummary = (row: any): FinancialSummary => ({
     totalIncome: Number(row.totalIncome) || 0,
     totalExpense: Number(row.totalExpense) || 0,
     netResult: Number(row.netResult) || 0,
     pendingIncome: Number(row.pendingIncome) || 0,
     pendingExpense: Number(row.pendingExpense) || 0,
     transactionCount: Number(row.transactionCount) || 0,
-    cashBalance: Number(row.cashBalance) || 0
+    cashBalance: Number(row.cashBalance) || 0,
+    operationalPendingIncome: Number(row.operationalPendingIncome) || 0,
+    operationalPendingExpense: Number(row.operationalPendingExpense) || 0,
+    globalPendingIncome: Number(row.globalPendingIncome) || 0,
+    globalPendingExpense: Number(row.globalPendingExpense) || 0
+  });
+
+  return {
+    current: mapSummary(result.current || {}),
+    previous: mapSummary(result.previous || {})
   };
 }
 
