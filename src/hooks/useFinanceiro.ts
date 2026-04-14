@@ -544,23 +544,11 @@ export function useAgingReport(type: 'receivables' | 'payables' = 'receivables')
   return useQuery({
     queryKey: ['aging-report', type],
     queryFn: async (): Promise<AgingBucket[]> => {
-      // Nota: o RPC get_aging_report precisaria aceitar um parametro type.
-      // Assumindo que o RPC será atualizado ou já aceita, mas baseado no prompt:
-      // "Adicione uma prop defaultType... Passe o type para o hook"
-      // Se o RPC não aceitar, teremos que filtrar no client ou assumir que o RPC já faz isso.
-      // Como não tenho acesso ao SQL agora e devo seguir o prompt, vou passar o parametro.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       const { data, error } = await supabase.rpc('get_aging_report', {
-        p_user_id: (await supabase.auth.getUser()).data.user?.id,
-        // p_type: type // Supondo que o RPC aceita isso. Se der erro, corrigirei.
-        // O prompt não pediu pra alterar SQL, apenas "Tornar o Relatório de Aging Dinâmico".
-        // Se o RPC atual só retorna receivables, precisaria de um 'get_aging_report_payables' ou parametro.
-        // Vou assumir que o RPC atual é só receivables e tentar passar o parametro.
-        // Se falhar, vou simular com filtro de transactions se necessário, mas o ideal é RPC.
-        // Pelo padrão do projeto, provavelmente o RPC precisaria ser ajustado.
-        // Mas como não posso mexer no DB sem permissão explícita/ferramenta,
-        // vou enviar o parametro e se o RPC ignorar, paciência (ou erro).
-        // EDIT: O prompt diz "Tornar o Relatório de Aging Dinâmico".
-        // Vou adicionar o parametro p_type se possível.
+        p_user_id: user.id,
         p_type: type
       });
 
@@ -586,8 +574,11 @@ export function useUpcomingReceivables(daysAhead: number = 30) {
   return useQuery({
     queryKey: ['upcoming-receivables', daysAhead],
     queryFn: async (): Promise<UpcomingReceivable[]> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       const { data, error } = await supabase.rpc('get_upcoming_receivables', {
-        p_user_id: (await supabase.auth.getUser()).data.user?.id,
+        p_user_id: user.id,
         p_days_ahead: daysAhead
       });
 
@@ -617,8 +608,11 @@ export function useUpcomingPayables(daysAhead: number = 30) {
   return useQuery({
     queryKey: ['upcoming-payables', daysAhead],
     queryFn: async (): Promise<UpcomingReceivable[]> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       const { data, error } = await supabase.rpc('get_upcoming_payables', {
-        p_user_id: (await supabase.auth.getUser()).data.user?.id,
+        p_user_id: user.id,
         p_days_ahead: daysAhead
       });
 
