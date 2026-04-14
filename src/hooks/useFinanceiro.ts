@@ -200,10 +200,27 @@ export function useFinancialSummary(startDate: string, endDate: string) {
 /**
  * Hook para buscar dados do DRE (Demonstrativo de Resultado)
  */
-export function useDreData(year?: number, startDate?: string, endDate?: string) {
+export function useDreData(year?: number) {
   return useQuery({
-    queryKey: ['dre-data', year, startDate, endDate],
-    queryFn: () => financialService.getDreData(year, startDate, endDate)
+    queryKey: ['dre-data', year],
+    queryFn: () => financialService.getDreData(year)
+  });
+}
+
+/**
+ * Hook para auditoria do DRE - busca transações de uma categoria/mês
+ */
+export function useDreAudit(
+  category: string,
+  month: number,
+  year: number,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: ['dre-audit', category, month, year],
+    queryFn: () => financialService.getDreAuditTransactions(category, month, year),
+    enabled: options?.enabled ?? true,
+    staleTime: 2 * 60 * 1000,
   });
 }
 

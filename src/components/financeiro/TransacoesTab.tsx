@@ -64,7 +64,8 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
     const { data: allExpenses = [], isLoading: loadingExpenses } = useRecentTransactions('expense');
 
     // Summary e CashFlow
-    const { data: summary } = useFinancialSummary(startDate, endDate);
+    const { data: summaryData } = useFinancialSummary(startDate, endDate);
+    const summary = summaryData as any;
     const { data: cashFlowData = [], isLoading: loadingCashFlow } = useCashFlowData(startDate, endDate);
 
     // ========== FILTERED TRANSACTIONS ==========
@@ -74,9 +75,9 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
     const displayTransactions = useMemo((): Transaction[] => {
         if (transactionType === 'receitas') {
             if (statusFilter === 'pendente') {
-                return allRevenue.filter(tx => !tx.reconciled);
+                return allRevenue.filter(tx => !(tx as any).reconciled);
             } else {
-                return periodRevenue.filter(tx => tx.reconciled);
+                return periodRevenue.filter(tx => (tx as any).reconciled);
             }
         } else {
             const txDate = (tx: any) => tx.transaction_date ? new Date(tx.transaction_date) : null;
@@ -89,14 +90,14 @@ export function TransacoesTab({ dateRange }: TransacoesTabProps) {
 
             if (statusFilter === 'pendente') {
                 return allExpenses
-                    .filter(tx => !tx.reconciled)
+                    .filter(tx => !(tx as any).reconciled)
                     .map(tx => ({
                         ...tx,
                         amount: tx.total_amount ?? 0
                     }));
             } else {
                 return allExpenses
-                    .filter(tx => tx.reconciled && inPeriod(txDate(tx)))
+                    .filter(tx => (tx as any).reconciled && inPeriod(txDate(tx)))
                     .map(tx => ({
                         ...tx,
                         amount: tx.total_amount ?? 0

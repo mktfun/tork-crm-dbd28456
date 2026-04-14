@@ -410,6 +410,29 @@ export async function getDreData(year?: number): Promise<DreRow[]> {
   }));
 }
 
+/**
+ * Busca transações de auditoria para uma linha do DRE
+ */
+export async function getDreAuditTransactions(
+  category: string,
+  month: number,
+  year: number
+): Promise<any[]> {
+  const startDate = new Date(year, month - 1, 1).toISOString();
+  const endDate = new Date(year, month, 0).toISOString();
+
+  const { data, error } = await supabase
+    .from('financial_movements' as any)
+    .select('*, bank_accounts(bank_name)')
+    .eq('category_name', category) // assumindo que category é o nome da conta
+    .gte('transaction_date', startDate)
+    .lte('transaction_date', endDate)
+    .order('transaction_date', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
 // ============ IMPORTAÇÃO EM MASSA ============
 
 export async function bulkImportTransactions(

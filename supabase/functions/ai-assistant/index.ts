@@ -621,7 +621,7 @@ serve(async (req) => {
     let response = await fetch(aiBaseUrl, {
       method: 'POST',
       headers: { 'Authorization': aiAuthHeader, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: aiModelName, messages: aiMessages, tools: TOOLS, tool_choice: 'auto' }),
+      body: JSON.stringify({ model: aiModelName, messages: aiMessages }),
       signal: controller.signal,
     });
 

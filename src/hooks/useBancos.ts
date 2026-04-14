@@ -487,3 +487,46 @@ export function useBankBalanceHistory(
     enabled: !!bankAccountId && !!startDate && !!endDate
   });
 }
+
+/**
+ * Hook para contar quantos registros estão vinculados a um banco
+ */
+export function useBankLinkedDataCount(bankAccountId: string | null) {
+  return useQuery({
+    queryKey: ['bank-linked-count', bankAccountId],
+    queryFn: async () => {
+      if (!bankAccountId) return 0;
+      
+      const { data, error } = await supabase.rpc('get_bank_linked_count' as any, {
+        p_bank_account_id: bankAccountId
+      });
+
+      if (error) throw error;
+      return Number(data || 0);
+    },
+    enabled: !!bankAccountId
+  });
+}
+
+/**
+ * Hook para migrar transações de um banco para outro e deletar o antigo
+ */
+export function useMigrateAndDeleteBank() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ sourceBankId, targetBankId }: { sourceBankId: string, targetBankId: string | null }) => {
+      const { data, error } = await supabase.rpc('migrate_and_delete_bank' as any, {
+        p_source_bank_id: sourceBankId,
+        p_target_bank_id: targetBankId
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bank-accounts-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
+    }
+  });
+}

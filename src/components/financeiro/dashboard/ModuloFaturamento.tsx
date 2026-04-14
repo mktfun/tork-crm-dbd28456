@@ -76,7 +76,8 @@ export const ModuloFaturamento = ({ onClick, dateRange }: ModuloFaturamentoProps
   const startDate = format(startOfDay(from), 'yyyy-MM-dd');
   const endDate = format(endOfDay(to), 'yyyy-MM-dd');
 
-  const { data: summary, isLoading } = useFinancialSummary(startDate, endDate);
+  const { data: summaryData, isLoading } = useFinancialSummary(startDate, endDate);
+  const summary = summaryData as any;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -109,12 +110,12 @@ export const ModuloFaturamento = ({ onClick, dateRange }: ModuloFaturamentoProps
     );
   }
 
-  const faturamentoMes = summary?.current?.totalIncome || 0;
-  const operacoes = summary?.current?.transactionCount || 0;
+  const faturamentoMes = (summary as any)?.current?.totalIncome || 0;
+  const operacoes = (summary as any)?.current?.transactionCount || 0;
   const ticketMedio = operacoes > 0 ? faturamentoMes / operacoes : 0;
 
   // Trend calculation
-  const prevIncome = summary?.previous?.totalIncome || 0;
+  const prevIncome = (summary as any)?.previous?.totalIncome || 0;
   const incomeTrend = prevIncome > 0 ? ((faturamentoMes - prevIncome) / prevIncome) * 100 : undefined;
 
   return (

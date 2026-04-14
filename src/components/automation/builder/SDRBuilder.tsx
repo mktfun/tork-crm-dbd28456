@@ -363,7 +363,7 @@ function SDRBuilderContent() {
                       <label className="text-sm font-medium">Público-Alvo</label>
                       <select 
                         className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        value={selectedNode.data.config?.target_audience || 'Todos'}
+                        value={(selectedNode.data.config as any)?.target_audience || 'Todos'}
                         onChange={(e) => updateNodeData('target_audience', e.target.value)}
                       >
                         <option value="Todos">Todos os Contatos</option>
@@ -376,7 +376,7 @@ function SDRBuilderContent() {
                       <label className="text-sm font-medium">Regra de Etapa (Funil)</label>
                       <select 
                         className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                        value={selectedNode.data.config?.stage_rule || 'Qualquer Etapa'}
+                        value={(selectedNode.data.config as any)?.stage_rule || 'Qualquer Etapa'}
                         onChange={(e) => updateNodeData('stage_rule', e.target.value)}
                       >
                         <option value="Qualquer Etapa">Qualquer Etapa / Situação</option>
@@ -397,7 +397,7 @@ function SDRBuilderContent() {
                       <Input 
                         placeholder="Ex: Pediu cotação?" 
                         className="bg-background/50"
-                        value={selectedNode.data.config?.condition || ''}
+                        value={(selectedNode.data.config as any)?.condition || ''}
                         onChange={(e) => updateNodeData('condition', e.target.value)}
                       />
                     </div>
@@ -413,7 +413,7 @@ function SDRBuilderContent() {
                       <Textarea 
                         placeholder="Escreva a resposta..." 
                         className="resize-none h-24 bg-background/50"
-                        value={selectedNode.data.config?.message_template || ''}
+                        value={(selectedNode.data.config as any)?.message_template || ''}
                         onChange={(e) => updateNodeData('message_template', e.target.value)}
                       />
                     </div>
@@ -430,7 +430,7 @@ function SDRBuilderContent() {
                         <label className="text-sm font-medium text-foreground">Etapa de Destino</label>
                         <select 
                           className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                          value={selectedNode.data.config?.target_stage || ''}
+                          value={(selectedNode.data.config as any)?.target_stage || ''}
                           onChange={(e) => updateNodeData('target_stage', e.target.value)}
                         >
                           <option value="">Selecione...</option>
@@ -446,10 +446,10 @@ function SDRBuilderContent() {
                         <label className="text-sm font-medium text-foreground">Status do Negócio</label>
                         <div className="flex items-center gap-4 mt-2">
                           <label className="flex items-center gap-2 text-sm cursor-pointer">
-                            <input type="radio" name="close_status" value="won" checked={selectedNode.data.config?.close_status === 'won'} onChange={(e) => updateNodeData('close_status', e.target.value)} /> Ganho
+                            <input type="radio" name="close_status" value="won" checked={(selectedNode.data.config as any)?.close_status === 'won'} onChange={(e) => updateNodeData('close_status', e.target.value)} /> Ganho
                           </label>
                           <label className="flex items-center gap-2 text-sm cursor-pointer">
-                            <input type="radio" name="close_status" value="lost" checked={selectedNode.data.config?.close_status === 'lost'} onChange={(e) => updateNodeData('close_status', e.target.value)} /> Perda
+                            <input type="radio" name="close_status" value="lost" checked={(selectedNode.data.config as any)?.close_status === 'lost'} onChange={(e) => updateNodeData('close_status', e.target.value)} /> Perda
                           </label>
                         </div>
                       </div>
@@ -461,7 +461,7 @@ function SDRBuilderContent() {
                         <Textarea 
                           placeholder="Foque em..." 
                           className="resize-none h-32 bg-background/50"
-                          value={selectedNode.data.config?.prompt_override || ''}
+                          value={(selectedNode.data.config as any)?.prompt_override || ''}
                           onChange={(e) => updateNodeData('prompt_override', e.target.value)}
                         />
                       </div>
@@ -474,7 +474,7 @@ function SDRBuilderContent() {
                           <Textarea 
                             placeholder="Ex: Aguarde um momento, um consultor vai te atender." 
                             className="resize-none h-20 bg-background/50"
-                            value={selectedNode.data.config?.client_message || ''}
+                            value={(selectedNode.data.config as any)?.client_message || ''}
                             onChange={(e) => updateNodeData('client_message', e.target.value)}
                           />
                         </div>
@@ -483,7 +483,7 @@ function SDRBuilderContent() {
                           <Textarea 
                             placeholder="Ex: O cliente solicitou ajuda humana." 
                             className="resize-none h-20 bg-background/50"
-                            value={selectedNode.data.config?.internal_alert || ''}
+                            value={(selectedNode.data.config as any)?.internal_alert || ''}
                             onChange={(e) => updateNodeData('internal_alert', e.target.value)}
                           />
                         </div>
@@ -492,7 +492,7 @@ function SDRBuilderContent() {
                           <Input 
                             placeholder="+5511999999999" 
                             className="bg-background/50"
-                            value={selectedNode.data.config?.human_phone || ''}
+                            value={(selectedNode.data.config as any)?.human_phone || ''}
                             onChange={(e) => updateNodeData('human_phone', e.target.value)}
                           />
                         </div>
@@ -500,7 +500,7 @@ function SDRBuilderContent() {
                           <label className="text-sm font-medium text-foreground">Pausa da IA (Horas)</label>
                           <select 
                             className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                            value={selectedNode.data.config?.pause_duration || '24'}
+                            value={(selectedNode.data.config as any)?.pause_duration || '24'}
                             onChange={(e) => updateNodeData('pause_duration', e.target.value)}
                           >
                             <option value="1">1 hora</option>
