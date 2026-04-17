@@ -133,7 +133,7 @@ export async function executeTriageAction(
       await supabase.from('crm_deals').insert({
         client_id: clientId,
         stage_id: stage_id,
-        title: \`Lead Triagem: \${classification.product}\`,
+        title: `Lead Triagem: ${classification.product}`,
         value: 0
       })
     }
@@ -153,7 +153,7 @@ export async function executeTriageAction(
     const { data: profile } = await supabase.from('profiles').select('chatwoot_api_token, chatwoot_account_id').eq('id', userId).single()
     if (profile?.chatwoot_api_token) {
        const cwUrl = Deno.env.get('CHATWOOT_API_URL') || 'https://chat.tork.services'
-       await fetch(\`\${cwUrl}/api/v1/accounts/\${profile.chatwoot_account_id}/conversations/\${conversationId}/labels\`, {
+       await fetch(`${cwUrl}/api/v1/accounts/${profile.chatwoot_account_id}/conversations/${conversationId}/labels`, {
          method: 'POST',
          headers: { 'api_access_token': profile.chatwoot_api_token, 'Content-Type': 'application/json' },
          body: JSON.stringify({ labels: ['off'] })
@@ -167,7 +167,7 @@ export async function executeTriageAction(
       // Isso deveria passar pela API de WPP conectada.
       // Vou simplificar inserindo um warning na pipeline de history ou mandando via evolutionAPI configurada
       // Mas para nao quebrar, por enquanto faremos um record de alert_log ou apenas console (conforme escopo atual permite) 
-      console.log(\`🔔 ALERTA DE ADMIN ENVIADO PARA \${adminAlertPhone}: Novo lead \${contactName} para \${classification.product}\`)
+      console.log(`🔔 ALERTA DE ADMIN ENVIADO PARA ${adminAlertPhone}: Novo lead ${contactName} para ${classification.product}`)
     }
 
   } catch (e) {
