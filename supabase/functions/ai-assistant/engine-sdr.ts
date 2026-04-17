@@ -43,7 +43,8 @@ export async function processSDRFlow(
   let maxSteps = 5; 
   let finalResponse = null;
 
-  const geminiKey = Deno.env.get('GOOGLE_AI_API_KEY');
+  const lovableKey = Deno.env.get('LOVABLE_API_KEY');
+  const geminiKey = Deno.env.get('GOOGLE_AI_API_KEY') || lovableKey;
 
   while (currentNode && maxSteps > 0) {
     maxSteps--;
@@ -138,6 +139,24 @@ async function evaluateCondition(userMsg: string, condition: string, apiKey?: st
   if (!apiKey) return true; // Fallback se sem chave
 
   try {
+    // Tenta via Lovable Gateway (OpenAI-compatible) primeiro
+    const isLovableKey = apiKey.startsWith('sk-') || (!apiKey.startsWith('AIza'));
+    if (isLovableKey) {
+      const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'google/gemini-2.0-flash',
+          messages: [{ role: 'user', content: `Responda apenas "TRUE" ou "FALSE". Condição: "${condition}". Mensagem do usuário: "${userMsg}"` }],
+          max_tokens: 10
+        })
+      });
+      const data = await res.json();
+      const text = data.choices?.[0]?.message?.content?.trim().toUpperCase();
+      console.log(`[SDR-LLM] Decisão (Lovable): ${text}`);
+      return text === 'TRUE';
+    }
+    // Fallback: Gemini direto
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       body: JSON.stringify({
@@ -163,16 +182,38 @@ async function generateResponseWithInstruction(userMsg: string, instruction: str
   if (!apiKey) return "Estou processando sua solicitação...";
 
   try {
+    const isLovableKey = apiKey.startsWith('sk-') || (!apiKey.startsWith('AIza'));
+
+    if (isLovableKey) {
+      // Via Lovable Gateway (OpenAI-compatible)
+      const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'google/gemini-2.0-flash',
+          messages: [
+            { role: 'system', content: SDR_SYSTEM_PROMPT },
+            { role: 'system', content: `SUA INSTRUÇÃO ATUAL: ${instruction}` },
+            ...history.slice(-6).map((m: any) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : m.text || '' })),
+            { role: 'user', content: userMsg }
+          ],
+          max_tokens: 500
+        })
+      });
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || "Não entendi. Pode repetir?";
+    }
+
+    // Fallback: Gemini direto (se for chave AIza...)
     const messages = [
       { role: 'user', parts: [{ text: `${SDR_SYSTEM_PROMPT}\n\nSUA INSTRUÇÃO ATUAL: ${instruction}\n\nMENSAGEM DO USUÁRIO: ${userMsg}` }] }
     ];
-
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       body: JSON.stringify({ contents: messages })
     });
     const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Desculpe, tive um problema ao processar seu pedido.";
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Não entendi. Pode repetir?";
   } catch (e) {
     console.error('[SDR-LLM] Erro na instrução:', e);
     return "Um erro ocorreu na inteligência do fluxo.";
