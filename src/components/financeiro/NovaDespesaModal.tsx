@@ -72,6 +72,32 @@ export function NovaDespesaModal() {
   const { companies = [] } = useSupabaseCompanies();
   const { producers = [] } = useSupabaseProducers();
 
+  const flattenedExpenseAccounts = useMemo(() => {
+    const accountMap = new Map();
+    expenseAccounts.forEach(a => accountMap.set(a.id, { ...a, children: [] }));
+    const roots: any[] = [];
+    expenseAccounts.forEach(a => {
+      if (a.parentId && accountMap.has(a.parentId)) {
+        accountMap.get(a.parentId).children.push(accountMap.get(a.id));
+      } else {
+        roots.push(accountMap.get(a.id));
+      }
+    });
+
+    const flatten = (nodes: any[], level = 0): any[] => {
+      let result: any[] = [];
+      nodes.forEach(node => {
+        result.push({ ...node, level });
+        if (node.children.length > 0) {
+          result = result.concat(flatten(node.children, level + 1));
+        }
+      });
+      return result;
+    };
+
+    return flatten(roots);
+  }, [expenseAccounts]);
+
   const banks = bankSummary?.accounts?.filter(b => b.isActive) || [];
 
   const { mutate: createMovement, isPending: isCreating } = useCreateFinancialMovement();
@@ -320,9 +346,12 @@ export function NovaDespesaModal() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {expenseAccounts.map((account) => (
-                          <SelectItem key={account.id} value={account.id} className="font-medium">
-                            {account.name}
+                        {flattenedExpenseAccounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id} className="font-medium p-0">
+                            <div className="flex items-center w-full py-1.5 pr-2" style={{ paddingLeft: `${(account.level * 1.5) + 0.5}rem` }}>
+                              {account.level > 0 && <span className="text-muted-foreground ml-1 mr-1">↳</span>}
+                              {account.name}
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>

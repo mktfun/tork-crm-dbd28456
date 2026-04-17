@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -68,6 +68,33 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
 
   // Filtrar contas por tipo - apenas categorias de receita
   const revenueAccounts = accounts.filter(a => a.type === 'revenue');
+
+  const flattenedRevenueAccounts = useMemo(() => {
+    const accountMap = new Map();
+    revenueAccounts.forEach(a => accountMap.set(a.id, { ...a, children: [] }));
+    const roots: any[] = [];
+    revenueAccounts.forEach(a => {
+      if (a.parentId && accountMap.has(a.parentId)) {
+        accountMap.get(a.parentId).children.push(accountMap.get(a.id));
+      } else {
+        roots.push(accountMap.get(a.id));
+      }
+    });
+
+    const flatten = (nodes: any[], level = 0): any[] => {
+      let result: any[] = [];
+      nodes.forEach(node => {
+        result.push({ ...node, level });
+        if (node.children.length > 0) {
+          result = result.concat(flatten(node.children, level + 1));
+        }
+      });
+      return result;
+    };
+
+    return flatten(roots);
+  }, [revenueAccounts]);
+
   const banks = bankSummary?.accounts?.filter(b => b.isActive) || [];
 
   const form = useForm<RevenueFormData>({
@@ -256,9 +283,12 @@ export function NovaReceitaModal({ trigger }: NovaReceitaModalProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {revenueAccounts.map((account) => (
-                          <SelectItem key={account.id} value={account.id} className="font-medium">
-                            {account.name}
+                        {flattenedRevenueAccounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id} className="font-medium p-0">
+                            <div className="flex items-center w-full py-1.5 pr-2" style={{ paddingLeft: `${(account.level * 1.5) + 0.5}rem` }}>
+                              {account.level > 0 && <span className="text-muted-foreground ml-1 mr-1">↳</span>}
+                              {account.name}
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>

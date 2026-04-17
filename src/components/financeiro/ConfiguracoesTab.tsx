@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Landmark,
   Tags,
@@ -419,9 +419,41 @@ interface CategoriesSectionProps {
   isLoading: boolean;
 }
 
+interface FlattenedAccount extends FinancialAccount {
+  level: number;
+}
+
 function CategoriesSection({ accounts, onEdit, onDelete, isLoading }: CategoriesSectionProps) {
   const [showModal, setShowModal] = useState(false);
   const [seeding, setSeeding] = useState(false);
+
+  // Construir hierarquia de visualização
+  const flattenedAccounts = useMemo(() => {
+    const accountMap = new Map<string, FinancialAccount & { children: any[] }>();
+    accounts.forEach(a => accountMap.set(a.id, { ...a, children: [] }));
+    
+    const roots: any[] = [];
+    accounts.forEach(a => {
+      if (a.parentId && accountMap.has(a.parentId)) {
+        accountMap.get(a.parentId)!.children.push(accountMap.get(a.id)!);
+      } else {
+        roots.push(accountMap.get(a.id)!);
+      }
+    });
+
+    const flatten = (nodes: any[], level = 0): FlattenedAccount[] => {
+      let result: FlattenedAccount[] = [];
+      nodes.forEach(node => {
+        result.push({ ...node, level });
+        if (node.children.length > 0) {
+          result = result.concat(flatten(node.children, level + 1));
+        }
+      });
+      return result;
+    };
+
+    return flatten(roots);
+  }, [accounts]);
 
   const handleSeedDefaults = async () => {
     setSeeding(true);
@@ -482,13 +514,15 @@ function CategoriesSection({ accounts, onEdit, onDelete, isLoading }: Categories
         ) : (
           <ScrollArea className="h-[280px]">
             <div className="space-y-2">
-              {accounts.map((account) => (
+              {flattenedAccounts.map((account) => (
                 <div
                   key={account.id}
                   className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                  style={{ marginLeft: `${account.level * 1.5}rem` }}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
+                      {account.level > 0 && <span className="text-muted-foreground ml-1 mr-1">↳</span>}
                       <p className="font-medium truncate">{account.name}</p>
                       <Badge variant="secondary" className="text-xs">
                         {account.type === 'expense' ? 'Despesa' : 'Receita'}

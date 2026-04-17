@@ -15,13 +15,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
-import { useCreateAccount, useUpdateAccount } from '@/hooks/useFinanceiro';
+import { useCreateAccount, useUpdateAccount, useFinancialAccountsWithDefaults } from '@/hooks/useFinanceiro';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FinancialAccount, FinancialAccountType, ACCOUNT_TYPE_LABELS } from '@/types/financeiro';
 
 interface FormData {
   name: string;
   code: string;
   description: string;
+  parentId: string;
 }
 
 interface Props {
@@ -37,13 +39,19 @@ export function AccountFormModal({ open, onOpenChange, account, accountType }: P
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
   
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
+  const { data: allAccounts = [] } = useFinancialAccountsWithDefaults();
+  const parentCandidates = allAccounts.filter(a => a.type === accountType && a.id !== account?.id);
+
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       name: '',
       code: '',
-      description: ''
+      description: '',
+      parentId: 'none'
     }
   });
+
+  const parentIdValue = watch('parentId');
 
   // Reset form quando o modal abrir/fechar ou mudar conta
   useEffect(() => {
@@ -51,22 +59,25 @@ export function AccountFormModal({ open, onOpenChange, account, accountType }: P
       reset({
         name: account.name,
         code: account.code || '',
-        description: account.description || ''
+        description: account.description || '',
+        parentId: account.parentId || 'none'
       });
     } else if (open) {
-      reset({ name: '', code: '', description: '' });
+      reset({ name: '', code: '', description: '', parentId: 'none' });
     }
   }, [open, account, reset]);
 
   const onSubmit = async (data: FormData) => {
     try {
+      const finalParentId = data.parentId === 'none' ? null : data.parentId;
       if (isEditing && account) {
         await updateAccount.mutateAsync({
           accountId: account.id,
           updates: {
             name: data.name,
             code: data.code || undefined,
-            description: data.description || undefined
+            description: data.description || undefined,
+            parentId: finalParentId
           }
         });
         toast.success('Conta atualizada com sucesso!');
@@ -75,7 +86,8 @@ export function AccountFormModal({ open, onOpenChange, account, accountType }: P
           name: data.name,
           type: accountType,
           code: data.code || undefined,
-          description: data.description || undefined
+          description: data.description || undefined,
+          parentId: finalParentId || undefined
         });
         toast.success('Conta criada com sucesso!');
       }
@@ -143,6 +155,26 @@ export function AccountFormModal({ open, onOpenChange, account, accountType }: P
               {...register('description')}
             />
           </div>
+
+          {(accountType === 'expense' || accountType === 'revenue') && (
+            <div className="space-y-2">
+              <Label>Categoria Mãe (opcional)</Label>
+              <Select value={parentIdValue || 'none'} onValueChange={(val) => setValue('parentId', val)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a categoria mãe" />
+                </SelectTrigger>
+                <SelectContent className="z-50 bg-popover border shadow-lg max-h-[200px]">
+                  <SelectItem value="none">Nenhuma (Categoria Principal)</SelectItem>
+                  {parentCandidates.map(acc => (
+                    <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Selecione para criar uma subcategoria
+              </p>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4">
             <Button

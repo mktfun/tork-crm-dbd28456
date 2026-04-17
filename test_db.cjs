@@ -24,10 +24,10 @@ async function run() {
 
         console.log("\n=== FINANCIAL TRANSACTIONS (March 2026) ===");
         const res2 = await client.query(`
-            SELECT type, status, reconciled, COUNT(*) as count, SUM(total_amount) as sum_amount
+            SELECT type, status, reconciled, bank_account_id IS NULL as unbanked, COUNT(*) as count, SUM(total_amount) as sum_amount
             FROM financial_transactions
             WHERE transaction_date >= '2026-03-01' AND transaction_date <= '2026-03-31'
-            GROUP BY type, status, reconciled
+            GROUP BY type, status, reconciled, bank_account_id IS NULL
         `);
         console.dir(res2.rows, { depth: null });
 
