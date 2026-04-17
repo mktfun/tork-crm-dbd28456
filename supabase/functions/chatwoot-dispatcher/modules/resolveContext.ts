@@ -1,13 +1,18 @@
 import { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 
-// Normaliza formato brasileiro ignorando o 9º Dígito Móvel.
-// Transforma e.g. "11979699832" em "1179699832" para cruzamentos infalíveis.
-const normalizeTo10Digits = (phoneStr: string) => {
+// Normaliza e fornece duas variações de cruzamento: com e sem o 9º dígito móvel.
+// Retorna array para cruzamento resiliente.
+const getPhoneVariations = (phoneStr: string) => {
   const digits = (phoneStr || '').replace(/\D/g, '').replace(/^55/, '')
+  const variations = [digits]
+  
   if (digits.length === 11 && digits[2] === '9') {
-    return digits.slice(0, 2) + digits.slice(3)
+    variations.push(digits.slice(0, 2) + digits.slice(3)) // Remove o '9'
+  } else if (digits.length === 10) {
+    variations.push(digits.slice(0, 2) + '9' + digits.slice(2)) // Adiciona o '9'
   }
-  return digits.slice(-10)
+  
+  return variations
 }
 
 export async function resolveContext(
@@ -23,6 +28,14 @@ export async function resolveContext(
   let crmUserRole: string | null = null
   let senderRole: string | null = null
   let aiEnabled = true
+
+  // Verificação de Labels do Chatwoot (AI OFF toggle bidirecional)
+  const labels = conversation?.labels || []
+  const hasOffLabel = labels.some((l: string) => l.toLowerCase() === 'off' || l.toLowerCase() === 'bot-off' || l.toLowerCase() === 'ai-off')
+  if (hasOffLabel) {
+    console.log('🔇 Chatwoot label "off" detected. AI processing aborted at context level.')
+    aiEnabled = false
+  }
 
   // 1. Resolve user from assignee email
   if (assigneeEmail) {
@@ -102,7 +115,8 @@ export async function resolveContext(
   const normalizedPhone = senderPhoneTrimmed.startsWith('55') ? senderPhoneTrimmed.slice(2) : senderPhoneTrimmed
   
   if (normalizedPhone.length >= 10 && senderRole !== 'admin') {
-    const normalizedSender = normalizeTo10Digits(normalizedPhone)
+    const senderVariations = getPhoneVariations(normalizedPhone)
+
     
     // NUNCA promover para admin se não soubermos a qual brokerage a conversa pertence
     if (brokerageId) {
@@ -113,8 +127,8 @@ export async function resolveContext(
         .not('phone', 'is', null)
 
       const matchedProducer = producers?.find((p: any) => {
-        const pNorm = normalizeTo10Digits(p.phone)
-        return pNorm.length === 10 && pNorm === normalizedSender
+        const pVariations = getPhoneVariations(p.phone)
+        return senderVariations.some(sv => pVariations.includes(sv))
       })
 
       if (matchedProducer) {
@@ -128,8 +142,8 @@ export async function resolveContext(
           .not('phone', 'is', null)
 
         const matchedBrokerage = brokerages?.find((b: any) => {
-          const bNorm = normalizeTo10Digits(b.phone)
-          return bNorm.length === 10 && bNorm === normalizedSender
+          const bVariations = getPhoneVariations(b.phone)
+          return senderVariations.some(sv => bVariations.includes(sv))
         })
 
         if (matchedBrokerage) {
@@ -151,7 +165,8 @@ export async function resolveContext(
     let fetchedClient: any = null
     
     if (contactPhone) {
-      const normalizedContactPhone = normalizeTo10Digits(contactPhone)
+      const normalizedContactPhone = contactPhone.startsWith('55') ? contactPhone.slice(2) : contactPhone
+      const senderVariations = getPhoneVariations(normalizedContactPhone)
       
       let clientQuery = supabase.from('clientes').select('id, name, ai_enabled, phone').not('phone', 'is', null)
       if (userId) clientQuery = clientQuery.eq('user_id', userId)
@@ -159,8 +174,8 @@ export async function resolveContext(
       const { data: allClients } = await clientQuery
       
       fetchedClient = allClients?.find((c: any) => {
-        const cNorm = normalizeTo10Digits(c.phone)
-        return cNorm.length === 10 && cNorm === normalizedContactPhone
+        const cVariations = getPhoneVariations(c.phone)
+        return senderVariations.some(sv => cVariations.includes(sv))
       })
     }
     

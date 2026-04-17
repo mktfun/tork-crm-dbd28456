@@ -178,6 +178,26 @@ function SDRBuilderContent() {
     const trigger_config = triggerNode?.data.config || {};
 
     try {
+      if (isActive && trigger_config?.target_audience) {
+        const conflicting = workflows.find(w => 
+          w.is_active && 
+          w.id !== activeWorkflowId && 
+          w.trigger_config?.target_audience === trigger_config.target_audience
+        );
+        
+        if (conflicting) {
+          await upsertWorkflow.mutateAsync({
+             id: conflicting.id,
+             name: conflicting.name,
+             is_active: false,
+             nodes: conflicting.nodes,
+             edges: conflicting.edges,
+             trigger_config: conflicting.trigger_config
+          });
+          toast.info(`Workflow '${conflicting.name}' desativado automaticamente para evitar conflito de gatilho.`);
+        }
+      }
+
       const result = await upsertWorkflow.mutateAsync({
         id: activeWorkflowId || undefined,
         name: workflowName,

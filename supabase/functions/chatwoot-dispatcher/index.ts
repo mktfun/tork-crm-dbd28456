@@ -6,6 +6,8 @@ import { sendChatwootMessage } from '../_shared/chatwoot.ts'
 
 import { resolveContext } from './modules/resolveContext.ts'
 import { resolveDeal } from './modules/resolveDeal.ts'
+import { handleTriagem, executeTriageAction } from './modules/triageHandler.ts'
+import { getActiveSDRWorkflow, processSDRFlow } from '../ai-assistant/engine-sdr.ts'
 import { evaluateObjectiveCompletion } from './modules/evaluateStageCompletion.ts'
 import { buildSystemPrompt } from './modules/buildPrompt.ts'
 import { dispatchToN8n } from './modules/dispatchToN8n.ts'
@@ -245,6 +247,64 @@ async function processWebhook(body: any) {
     const isIncomingMessage = true
     console.log(`🔍 Webhook shape: message_type=${body.message_type}, sender.type=${sender?.type}, clientId=${clientId}, conversation=${conversation?.id}`)
 
+    // 8.5 Load Conversation History early to be used by all sub-systems
+    const history = brokerageId ? await getHistory(supabase, { conversationId: conversation.id, brokerageId, limit: 15 }) : []
+
+    // 8.6 Fetch Chatwoot creds + admin alert phone early
+    let toolCtxChatwootUrl: string | null = null
+    let toolCtxChatwootToken: string | null = null
+    let toolCtxChatwootAccountId: string | null = null
+    let toolCtxAdminAlertPhone: string | null = null
+    if (brokerageId) {
+      const { data: brokCreds } = await supabase
+        .from('brokerages')
+        .select('chatwoot_url, chatwoot_token, chatwoot_account_id, admin_alert_phone')
+        .eq('id', brokerageId)
+        .maybeSingle()
+      toolCtxChatwootUrl = brokCreds?.chatwoot_url || null
+      toolCtxChatwootToken = brokCreds?.chatwoot_token || null
+      toolCtxChatwootAccountId = brokCreds?.chatwoot_account_id || null
+      toolCtxAdminAlertPhone = (brokCreds as any)?.admin_alert_phone || null
+    }
+
+    // ============================================
+    // STEP 1: SDR ENGINE (Workflow Prioritário)
+    // ============================================
+    if (senderRole !== 'admin' && userId) {
+      const activeWorkflow = await getActiveSDRWorkflow(supabase, userId, sender)
+      if (activeWorkflow) {
+        let triggerMatch = true
+        const audience = activeWorkflow.trigger_config?.target_audience
+        if (audience === 'clients_only' && !clientId) triggerMatch = false
+        if (audience === 'unknown_only' && clientId) triggerMatch = false
+        
+        // Match found — Hand over to SDR Engine
+        if (triggerMatch) {
+          console.log(`🚀 Executing SDR Engine for workflow ID: ${activeWorkflow.id}`)
+          const sdrResult = await processSDRFlow(activeWorkflow, rawCleanContent, history, supabase, userId)
+          if (sdrResult && sdrResult.content) {
+            await sendChatwootMessage(supabase, brokerageId, conversation.id, sdrResult.content)
+            
+            // Save history
+            if (brokerageId) {
+              await saveHistory(supabase, {
+                conversationId: conversation.id, brokerageId, contactPhone, clientId,
+                role: 'user', content: rawCleanContent || '[Media]', messageType: mediaResult.messageType,
+                chatwootMessageId: body.id, queueMessageId: queueId
+              })
+              await saveHistory(supabase, {
+                conversationId: conversation.id, brokerageId, contactPhone, clientId,
+                role: 'assistant', content: sdrResult.content, messageType: 'text',
+                queueMessageId: queueId
+              })
+            }
+            await updateQueueStatus(supabase, queueId, 'completed', { notes: 'SDR engine response sent.' })
+            return
+          }
+        }
+      }
+    }
+
     let {
       currentDeal, currentStage, stageAiSettings, autoCreatedDeal,
       autoCreatedProductId, autoCreatedProductName, clientJustResponded
@@ -270,6 +330,42 @@ async function processWebhook(body: any) {
       autoCreatedProductName,
     })
 
+    // ============================================
+    // STEP 3: MODO TRIAGEM (Sem Workflow & Sem Deal)
+    // ============================================
+    if (!currentDeal && senderRole !== 'admin' && userId) {
+      console.log('🤖 Triagem mode engaged (no active deal or workflow)')
+      const { response: triageResponse, classification } = await handleTriagem(
+        supabase, history, sender?.name || 'Cliente', contactPhone || '',
+        conversation.id, userId, brokerageId as string, toolCtxAdminAlertPhone
+      )
+      
+      if (classification) {
+        console.log(`✅ Triagem complete: product=${classification.product}, pipeline=${classification.pipeline}`)
+        await executeTriageAction(
+          supabase, classification, contactPhone || '', sender?.name || 'Cliente',
+          brokerageId as string, userId, conversation.id, toolCtxAdminAlertPhone
+        )
+      }
+
+      await sendChatwootMessage(supabase, brokerageId, conversation.id, triageResponse)
+      
+      if (brokerageId) {
+        await saveHistory(supabase, {
+          conversationId: conversation.id, brokerageId, contactPhone, clientId,
+          role: 'user', content: rawCleanContent || '[Media]', messageType: mediaResult.messageType,
+          chatwootMessageId: body.id, queueMessageId: queueId
+        })
+        await saveHistory(supabase, {
+          conversationId: conversation.id, brokerageId, contactPhone, clientId,
+          role: 'assistant', content: triageResponse, messageType: 'text',
+          queueMessageId: queueId
+        })
+      }
+      await updateQueueStatus(supabase, queueId, 'completed', { notes: 'Triage response sent.' })
+      return
+    }
+
     // Inject client context at the start of the system prompt
     const finalSystemPrompt = clientContextForPrompt
       ? `${clientContextForPrompt}\n---\n\n${promptResult.systemPrompt}`
@@ -278,26 +374,6 @@ async function processWebhook(body: any) {
     if (!promptResult.aiIsActive && senderRole !== 'admin') {
       console.log('🚫 AI inactive for this user config')
       return
-    }
-
-    // 8.5 Load Conversation History (Isolated)
-    const history = brokerageId ? await getHistory(supabase, { conversationId: conversation.id, brokerageId, limit: 15 }) : []
-
-    // 8.6 Fetch Chatwoot creds + admin alert phone for ToolContext
-    let toolCtxChatwootUrl: string | null = null
-    let toolCtxChatwootToken: string | null = null
-    let toolCtxChatwootAccountId: string | null = null
-    let toolCtxAdminAlertPhone: string | null = null
-    if (brokerageId) {
-      const { data: brokCreds } = await supabase
-        .from('brokerages')
-        .select('chatwoot_url, chatwoot_token, chatwoot_account_id, admin_alert_phone')
-        .eq('id', brokerageId)
-        .maybeSingle()
-      toolCtxChatwootUrl = brokCreds?.chatwoot_url || null
-      toolCtxChatwootToken = brokCreds?.chatwoot_token || null
-      toolCtxChatwootAccountId = brokCreds?.chatwoot_account_id || null
-      toolCtxAdminAlertPhone = (brokCreds as any)?.admin_alert_phone || null
     }
 
     // 9. Run AI Edge Agent Loop locally (Tool Calling & Generation)
