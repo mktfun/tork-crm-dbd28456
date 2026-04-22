@@ -9,7 +9,13 @@ import {
   ShieldCheck,
   Zap,
   Target,
-  RotateCcw
+  RotateCcw,
+  ChevronDown,
+  ChevronRight,
+  TrendingUp,
+  TrendingDown,
+  FolderOpen,
+  Folder
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -427,33 +433,26 @@ function CategoriesSection({ accounts, onEdit, onDelete, isLoading }: Categories
   const [showModal, setShowModal] = useState(false);
   const [seeding, setSeeding] = useState(false);
 
-  // Construir hierarquia de visualização
-  const flattenedAccounts = useMemo(() => {
-    const accountMap = new Map<string, FinancialAccount & { children: any[] }>();
-    accounts.forEach(a => accountMap.set(a.id, { ...a, children: [] }));
-    
-    const roots: any[] = [];
-    accounts.forEach(a => {
-      if (a.parentId && accountMap.has(a.parentId)) {
-        accountMap.get(a.parentId)!.children.push(accountMap.get(a.id)!);
-      } else {
-        roots.push(accountMap.get(a.id)!);
-      }
-    });
-
-    const flatten = (nodes: any[], level = 0): FlattenedAccount[] => {
-      let result: FlattenedAccount[] = [];
-      nodes.forEach(node => {
-        result.push({ ...node, level });
-        if (node.children.length > 0) {
-          result = result.concat(flatten(node.children, level + 1));
-        }
-      });
-      return result;
-    };
-
-    return flatten(roots);
+  // Construir hierarquia agrupada: pais com filhos
+  const groupedAccounts = useMemo(() => {
+    const parents = accounts.filter(a => !a.parentId);
+    return parents.map(parent => ({
+      ...parent,
+      children: accounts.filter(a => a.parentId === parent.id)
+    }));
   }, [accounts]);
+
+  // Estado de which groups are collapsed (por id do pai)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const toggleCollapse = (id: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleSeedDefaults = async () => {
     setSeeding(true);
@@ -482,6 +481,7 @@ function CategoriesSection({ accounts, onEdit, onDelete, isLoading }: Categories
           <div className="flex items-center gap-2">
             <Tags className="w-5 h-5 text-muted-foreground" />
             <CardTitle className="text-lg">Categorias</CardTitle>
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{accounts.length}</span>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -500,7 +500,7 @@ function CategoriesSection({ accounts, onEdit, onDelete, isLoading }: Categories
             </Button>
           </div>
         </div>
-        <CardDescription>Despesas e receitas para classificação</CardDescription>
+        <CardDescription>Despesas e receitas para classificação — clique em um grupo para expandir</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -512,44 +512,114 @@ function CategoriesSection({ accounts, onEdit, onDelete, isLoading }: Categories
             <p>Nenhuma categoria cadastrada.</p>
           </div>
         ) : (
-          <ScrollArea className="h-[280px]">
-            <div className="space-y-2">
-              {flattenedAccounts.map((account) => (
-                <div
-                  key={account.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                  style={{ marginLeft: `${account.level * 1.5}rem` }}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {account.level > 0 && <span className="text-muted-foreground ml-1 mr-1">↳</span>}
-                      <p className="font-medium truncate">{account.name}</p>
-                      <Badge variant="secondary" className="text-xs">
-                        {account.type === 'expense' ? 'Despesa' : 'Receita'}
-                      </Badge>
-                      {account.isSystem && (
-                        <Badge variant="secondary" className="text-xs gap-1">
-                          <ShieldCheck className="w-3 h-3" />
-                          Sistema
+          <ScrollArea className="h-[360px]">
+            <div className="space-y-2 pr-1">
+              {groupedAccounts.map((parent) => {
+                const isCollapsed = collapsed.has(parent.id);
+                const isExpense = parent.type === 'expense';
+                const childCount = parent.children.length;
+
+                return (
+                  <div key={parent.id} className="rounded-lg border border-border overflow-hidden">
+                    {/* Header do grupo PAI */}
+                    <button
+                      type="button"
+                      className={`w-full flex items-center justify-between p-3 text-left transition-colors hover:bg-muted/40 ${
+                        isExpense ? 'bg-rose-500/5' : 'bg-emerald-500/5'
+                      }`}
+                      onClick={() => childCount > 0 && toggleCollapse(parent.id)}
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {childCount > 0 ? (
+                          isCollapsed
+                            ? <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                            : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                        ) : (
+                          isExpense
+                            ? <Folder className="w-4 h-4 text-rose-400 shrink-0" />
+                            : <Folder className="w-4 h-4 text-emerald-400 shrink-0" />
+                        )}
+                        <span className="font-medium text-sm truncate">{parent.name}</span>
+                        {parent.code && (
+                          <span className="text-xs text-muted-foreground font-mono">{parent.code}</span>
+                        )}
+                        <Badge
+                          className={`text-xs shrink-0 ${
+                            isExpense
+                              ? 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/30'
+                              : 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30'
+                          }`}
+                          variant="outline"
+                        >
+                          {isExpense ? <TrendingDown className="w-3 h-3 mr-1" /> : <TrendingUp className="w-3 h-3 mr-1" />}
+                          {isExpense ? 'Despesa' : 'Receita'}
                         </Badge>
+                        {childCount > 0 && (
+                          <span className="text-xs text-muted-foreground ml-1">
+                            {childCount} subcategoria{childCount !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {parent.isSystem && (
+                          <Badge variant="secondary" className="text-xs gap-1 shrink-0">
+                            <ShieldCheck className="w-3 h-3" />
+                            Sistema
+                          </Badge>
+                        )}
+                      </div>
+                      {!parent.isSystem && (
+                        <div className="flex items-center gap-1 ml-2" onClick={e => e.stopPropagation()}>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEdit(parent)}>
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(parent)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       )}
-                    </div>
-                    {account.code && (
-                      <p className="text-xs text-muted-foreground">{account.code}</p>
+                    </button>
+
+                    {/* Subcategorias (filhas) */}
+                    {!isCollapsed && childCount > 0 && (
+                      <div className="border-t border-border">
+                        {parent.children.map((child, idx) => (
+                          <div
+                            key={child.id}
+                            className={`flex items-center justify-between pl-8 pr-3 py-2.5 hover:bg-muted/30 transition-colors ${
+                              idx < parent.children.length - 1 ? 'border-b border-border/50' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <div className={`w-0.5 h-4 rounded-full shrink-0 ${
+                                isExpense ? 'bg-rose-300 dark:bg-rose-600' : 'bg-emerald-300 dark:bg-emerald-600'
+                              }`} />
+                              <span className="text-sm truncate">{child.name}</span>
+                              {child.code && (
+                                <span className="text-xs text-muted-foreground font-mono">{child.code}</span>
+                              )}
+                              {child.isSystem && (
+                                <Badge variant="secondary" className="text-xs gap-1">
+                                  <ShieldCheck className="w-3 h-3" />
+                                  Sistema
+                                </Badge>
+                              )}
+                            </div>
+                            {!child.isSystem && (
+                              <div className="flex items-center gap-1 ml-2">
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEdit(child)}>
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(child)}>
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {!account.isSystem && (
-                    <div className="flex items-center gap-1 ml-2">
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onEdit(account)}>
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(account)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </ScrollArea>
         )}

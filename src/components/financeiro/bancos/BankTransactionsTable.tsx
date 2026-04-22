@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ArrowDownRight, ArrowUpRight, Landmark } from "lucide-react";
+import { parseDateOnly } from "@/lib/utils";
 
 export interface TableTransaction {
   id: string;
@@ -43,7 +44,9 @@ export function BankTransactionsTable({
 
   const formatDate = (dateString: string) => {
     try {
-      return format(new Date(dateString), "dd/MM/yyyy", { locale: ptBR });
+      const parsed = parseDateOnly(dateString);
+      if (!parsed) return dateString;
+      return format(parsed, "dd/MM/yyyy", { locale: ptBR });
     } catch (e) {
       return dateString;
     }

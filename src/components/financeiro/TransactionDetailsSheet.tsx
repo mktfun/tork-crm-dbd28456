@@ -560,7 +560,12 @@ export function TransactionDetailsSheet({ transactionId, isLegacyId = false, ope
                 {/* Metadados Técnicos */}
                 <Separator />
                 <div className="space-y-2 text-xs text-muted-foreground">
-                  <p><strong>Criado em:</strong> {safeFormatDate(transaction.createdAt, 'dd/MM/yyyy HH:mm')}</p>
+                  <p><strong>Criado em:</strong> {(() => {
+                    try {
+                      const d = parseISO(transaction.createdAt);
+                      return isValid(d) ? format(d, 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '---';
+                    } catch { return '---'; }
+                  })()}</p>
                   <p><strong>Origem:</strong> {originLabel}</p>
                   <p className="font-mono break-all"><strong>ID:</strong> {transaction.id}</p>
                   {transaction.isVoid && transaction.voidReason && (

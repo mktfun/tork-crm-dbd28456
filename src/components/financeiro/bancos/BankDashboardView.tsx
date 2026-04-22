@@ -265,7 +265,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                                     id: tx.transactionId,
                                     date: tx.transactionDate,
                                     bankName: tx.bankName || undefined,
-                                    type: (tx.accountType === 'revenue' || tx.accountType === 'receita' || tx.amount >= 0) ? 'entrada' : 'saida',
+                                    type: tx.amount >= 0 ? 'entrada' : 'saida',
                                     description: tx.description,
                                     category: tx.accountName || 'Sem categoria',
                                     amount: tx.amount,

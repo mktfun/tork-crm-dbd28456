@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2 } from 'lucide-react';
+import { Loader2, TrendingDown, TrendingUp, Landmark, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -108,17 +108,41 @@ export function AccountFormModal({ open, onOpenChange, account, accountType }: P
       ? 'Categoria de Despesa' 
       : 'Categoria de Receita';
 
+  const TypeBadge = () => {
+    if (accountType === 'asset') return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400">
+        <Landmark className="w-3 h-3" /> Banco
+      </span>
+    );
+    if (accountType === 'expense') return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400">
+        <TrendingDown className="w-3 h-3" /> Despesa
+      </span>
+    );
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+        <TrendingUp className="w-3 h-3" /> Receita
+      </span>
+    );
+  };
+
+  const selectedParent = parentIdValue !== 'none' ? parentCandidates.find(p => p.id === parentIdValue) : null;
+  const dialogTitle = isEditing ? `Editar ${typeLabel}` : selectedParent ? `Nova Subcategoria` : `Nova ${typeLabel}`;
+  const dialogDesc = isEditing
+    ? 'Altere os dados da conta abaixo.'
+    : selectedParent
+      ? `Será criada como subcategoria de: ${selectedParent.name}`
+      : `Preencha os dados para criar uma nova ${typeLabel.toLowerCase()}.`;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[440px]">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Editar' : 'Nova'} {typeLabel}</DialogTitle>
-          <DialogDescription>
-            {isEditing 
-              ? 'Altere os dados da conta abaixo.' 
-              : `Preencha os dados para criar uma nova ${typeLabel.toLowerCase()}.`
-            }
-          </DialogDescription>
+          <div className="flex items-center gap-2">
+            <DialogTitle>{dialogTitle}</DialogTitle>
+            <TypeBadge />
+          </div>
+          <DialogDescription>{dialogDesc}</DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
