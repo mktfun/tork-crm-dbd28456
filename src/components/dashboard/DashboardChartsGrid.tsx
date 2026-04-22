@@ -8,7 +8,7 @@ import { AppCard } from '@/components/ui/app-card';
 interface DashboardChartsGridProps {
   dateRange?: DateRange;
   chartType: 'bar' | 'line';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   metrics: Record<string, any>;
 }
 
