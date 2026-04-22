@@ -425,10 +425,6 @@ interface CategoriesSectionProps {
   isLoading: boolean;
 }
 
-interface FlattenedAccount extends FinancialAccount {
-  level: number;
-}
-
 function CategoriesSection({ accounts, onEdit, onDelete, isLoading }: CategoriesSectionProps) {
   const [showModal, setShowModal] = useState(false);
   const [seeding, setSeeding] = useState(false);
