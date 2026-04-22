@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ArrowDownRight, ArrowUpRight, Landmark } from "lucide-react";
-import { parseDateOnly } from "@/lib/utils";
+import { parseDateOnly, cn } from "@/lib/utils";
 
 export interface TableTransaction {
   id: string;
@@ -87,7 +87,11 @@ export function BankTransactionsTable({
             {transactions.map((transaction) => (
               <TableRow
                 key={transaction.id}
-                className={`hover:bg-muted/50 border-border ${onTransactionClick ? 'cursor-pointer' : ''}`}
+                className={cn(
+                  "hover:bg-muted/50 border-border",
+                  onTransactionClick && "cursor-pointer",
+                  transaction.reconciliationStatus === 'conciliado' && "opacity-60"
+                )}
                 onClick={() => onTransactionClick && onTransactionClick(transaction.id)}
               >
                 <TableCell className="pl-6 font-medium text-muted-foreground">

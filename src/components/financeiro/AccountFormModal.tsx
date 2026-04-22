@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, TrendingDown, TrendingUp, Landmark, Layers } from 'lucide-react';
+import { Loader2, TrendingDown, TrendingUp, Landmark, Layers, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -52,6 +52,7 @@ export function AccountFormModal({ open, onOpenChange, account, accountType }: P
   });
 
   const parentIdValue = watch('parentId');
+  const nameValue = watch('name');
 
   // Reset form quando o modal abrir/fechar ou mudar conta
   useEffect(() => {
@@ -144,6 +145,17 @@ export function AccountFormModal({ open, onOpenChange, account, accountType }: P
           </div>
           <DialogDescription>{dialogDesc}</DialogDescription>
         </DialogHeader>
+
+        {selectedParent && !isEditing && (
+          <div className="flex items-center gap-1.5 p-3 rounded-lg bg-muted/40 text-sm mt-2 border border-border/50">
+            <Layers className="w-4 h-4 text-muted-foreground" />
+            <span className="text-muted-foreground font-medium truncate max-w-[150px]">{selectedParent.name}</span>
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+            <span className="font-semibold truncate flex-1 text-primary">
+              {nameValue || 'Nova Subcategoria'}
+            </span>
+          </div>
+        )}
         
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
           <div className="space-y-2">

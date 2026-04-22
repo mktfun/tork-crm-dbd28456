@@ -19,6 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { useBankAccounts, useBankTransactions, BankAccount } from '@/hooks/useBancos';
 import { BankTransactionsTable } from '@/components/financeiro/bancos/BankTransactionsTable';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
+import { GlassKpiCard } from '@/components/financeiro/shared/GlassKpiCard';
 
 interface BankDashboardViewProps {
     bankId: string; // 'todos' para consolidado ou UUID
@@ -182,47 +183,33 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
             {/* KPIs */}
             {loadingTransactions ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Skeleton className="h-24" />
-                    <Skeleton className="h-24" />
-                    <Skeleton className="h-24" />
+                    <Skeleton className="h-24 rounded-xl" />
+                    <Skeleton className="h-24 rounded-xl" />
+                    <Skeleton className="h-24 rounded-xl" />
                 </div>
             ) : transactionsData && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="border-emerald-500/30 bg-emerald-500/5">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-2 text-emerald-500 mb-2">
-                                <TrendingUp className="w-5 h-5" />
-                                <span className="text-sm font-medium">Receitas</span>
-                            </div>
-                            <p className="text-2xl font-bold text-emerald-500">
-                                {formatCurrency(transactionsData.totalIncome)}
-                            </p>
-                        </CardContent>
-                    </Card>
+                    <GlassKpiCard
+                        title="Receitas"
+                        value={formatCurrency(transactionsData.totalIncome)}
+                        icon={TrendingUp}
+                        iconClassName="text-emerald-500"
+                        className="border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10"
+                    />
 
-                    <Card className="border-red-500/30 bg-red-500/5">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-2 text-red-500 mb-2">
-                                <TrendingDown className="w-5 h-5" />
-                                <span className="text-sm font-medium">Despesas</span>
-                            </div>
-                            <p className="text-2xl font-bold text-red-500">
-                                {formatCurrency(transactionsData.totalExpense)}
-                            </p>
-                        </CardContent>
-                    </Card>
+                    <GlassKpiCard
+                        title="Despesas"
+                        value={formatCurrency(transactionsData.totalExpense)}
+                        icon={TrendingDown}
+                        iconClassName="text-rose-500"
+                        className="border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10"
+                    />
 
-                    <Card className="border-border bg-muted/30">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                                <Hash className="w-5 h-5" />
-                                <span className="text-sm font-medium">Transações</span>
-                            </div>
-                            <p className="text-2xl font-bold">
-                                {transactionsData.totalCount}
-                            </p>
-                        </CardContent>
-                    </Card>
+                    <GlassKpiCard
+                        title="Transações"
+                        value={transactionsData.totalCount.toString()}
+                        icon={Hash}
+                    />
                 </div>
             )}
 
@@ -265,7 +252,7 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                                     id: tx.transactionId,
                                     date: tx.transactionDate,
                                     bankName: tx.bankName || undefined,
-                                    type: tx.amount >= 0 ? 'entrada' : 'saida',
+                                    type: (tx.accountType === 'expense' || tx.amount < 0) ? 'saida' : 'entrada',
                                     description: tx.description,
                                     category: tx.accountName || 'Sem categoria',
                                     amount: tx.amount,

@@ -15,7 +15,8 @@ import {
   TrendingUp,
   TrendingDown,
   FolderOpen,
-  Folder
+  Folder,
+  CornerDownRight
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -576,19 +577,17 @@ function CategoriesSection({ accounts, onEdit, onDelete, isLoading }: Categories
 
                     {/* Subcategorias (filhas) */}
                     {!isCollapsed && childCount > 0 && (
-                      <div className="border-t border-border">
+                      <div className="border-t border-border bg-muted/10">
                         {parent.children.map((child, idx) => (
                           <div
                             key={child.id}
-                            className={`flex items-center justify-between pl-8 pr-3 py-2.5 hover:bg-muted/30 transition-colors ${
+                            className={`flex items-center justify-between pl-10 pr-3 py-2 hover:bg-muted/40 transition-colors ${
                               idx < parent.children.length - 1 ? 'border-b border-border/50' : ''
                             }`}
                           >
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                              <div className={`w-0.5 h-4 rounded-full shrink-0 ${
-                                isExpense ? 'bg-rose-300 dark:bg-rose-600' : 'bg-emerald-300 dark:bg-emerald-600'
-                              }`} />
-                              <span className="text-sm truncate">{child.name}</span>
+                              <CornerDownRight className="w-4 h-4 text-muted-foreground/60 shrink-0" />
+                              <span className="text-sm truncate text-muted-foreground">{child.name}</span>
                               {child.code && (
                                 <span className="text-xs text-muted-foreground font-mono">{child.code}</span>
                               )}
