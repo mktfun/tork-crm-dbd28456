@@ -363,6 +363,19 @@ export async function getFinancialSummary(params: {
   startDate: string;
   endDate: string;
 }): Promise<FinancialSummaryWithComparison> {
+  const { data: userData } = await supabase.auth.getUser();
+
+  // Buscar os totais brutos usando a RPC correta com userID
+  let realPendingTotals: any = { total_receivables: 0, total_payables: 0 };
+  if (userData?.user?.id) {
+    const { data: ptData } = await supabase.rpc('get_pending_totals', {
+      p_user_id: userData.user.id
+    });
+    const ptResult = Array.isArray(ptData) ? ptData[0] : (ptData as any) || {};
+    realPendingTotals.total_receivables = Number(ptResult.total_receivables || ptResult.total_a_receber || ptResult.receivable || 0);
+    realPendingTotals.total_payables = Number(ptResult.total_payables || ptResult.total_a_pagar || ptResult.payable || 0);
+  }
+
   const { data, error } = await supabase.rpc('get_financial_summary', {
     p_start_date: params.startDate,
     p_end_date: params.endDate
@@ -372,7 +385,7 @@ export async function getFinancialSummary(params: {
 
   const result = data as any || {};
   
-  const mapSummary = (row: any): FinancialSummary => ({
+  const mapSummary = (row: any, isCurrent = false): FinancialSummary => ({
     totalIncome: Number(row.totalIncome) || 0,
     totalExpense: Number(row.totalExpense) || 0,
     netResult: Number(row.netResult) || 0,
@@ -382,13 +395,18 @@ export async function getFinancialSummary(params: {
     cashBalance: Number(row.cashBalance) || 0,
     operationalPendingIncome: Number(row.operationalPendingIncome) || 0,
     operationalPendingExpense: Number(row.operationalPendingExpense) || 0,
-    globalPendingIncome: Number(row.globalPendingIncome) || 0,
-    globalPendingExpense: Number(row.globalPendingExpense) || 0
+    // Use the real totals calculated from get_pending_totals if this is the current block
+    globalPendingIncome: isCurrent && realPendingTotals.total_receivables > 0 
+      ? realPendingTotals.total_receivables 
+      : Number(row.globalPendingIncome) || 0,
+    globalPendingExpense: isCurrent && realPendingTotals.total_payables > 0
+      ? realPendingTotals.total_payables
+      : Number(row.globalPendingExpense) || 0
   });
 
   return {
-    current: mapSummary(result.current || {}),
-    previous: mapSummary(result.previous || {})
+    current: mapSummary(result.current || {}, true),
+    previous: mapSummary(result.previous || {}, false)
   };
 }
 
