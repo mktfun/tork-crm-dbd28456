@@ -116,19 +116,20 @@ export function StatementImporter({ bankAccountId, onClose, onSuccess }: Stateme
 
             if (dateMatch && amountMatch) {
                 const dateStr = dateMatch[1];
-                const date = new Date(
-                    parseInt(dateStr.substring(0, 4)),
-                    parseInt(dateStr.substring(4, 6)) - 1,
-                    parseInt(dateStr.substring(6, 8))
-                );
+                const yearStr = dateStr.substring(0, 4);
+                const monthStr = dateStr.substring(4, 6);
+                const dayStr = dateStr.substring(6, 8);
+                
+                // Safe date string avoiding Date object timezone shifts (e.g. UTC-3 subtracting hours ending in previous day)
+                const strictDateString = `${yearStr}-${monthStr}-${dayStr}`;
 
                 const amountRaw = amountMatch[1].replace(',', '.');
                 const amount = parseFloat(amountRaw);
                 const description = (memoMatch?.[1] || nameMatch?.[1] || typeMatch?.[1] || 'Transação OFX').trim();
 
-                if (!isNaN(amount) && !isNaN(date.getTime())) {
+                if (!isNaN(amount) && yearStr && monthStr && dayStr) {
                     entries.push({
-                        transaction_date: date.toISOString().split('T')[0],
+                        transaction_date: strictDateString,
                         description,
                         amount,
                         reference_number: fitidMatch?.[1]?.trim(),

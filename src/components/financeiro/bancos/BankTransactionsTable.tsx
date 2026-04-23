@@ -54,12 +54,12 @@ export function BankTransactionsTable({
 
   const getReconciliationBadge = (status?: TableTransaction['reconciliationStatus']) => {
     const variants = {
-      conciliado: { className: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none", label: "Conciliado" },
-      pendente: { className: "bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none", label: "Pendente" },
-      divergente: { className: "bg-rose-100 text-rose-700 hover:bg-rose-100 border-none", label: "Divergente" },
+      conciliado: { className: "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20", label: "Conciliado" },
+      pendente: { className: "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 hover:bg-yellow-500/20", label: "Pendente" },
+      divergente: { className: "bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20", label: "Divergente" },
     };
     const config = variants[status || 'pendente'];
-    return <Badge className={config.className}>{config.label}</Badge>;
+    return <Badge className={config.className} variant="outline">{config.label}</Badge>;
   };
 
   return (
@@ -73,8 +73,8 @@ export function BankTransactionsTable({
       <CardContent className="p-0">
         <Table>
           <TableHeader>
-            <TableRow className="hover:bg-transparent border-border">
-              <TableHead className="pl-6 w-[120px] text-muted-foreground">Data</TableHead>
+            <TableRow className="hover:bg-transparent border-white/5">
+              <TableHead className="pl-6 w-[120px] text-muted-foreground/70">Data</TableHead>
               {showBankColumn && <TableHead className="w-[140px] text-muted-foreground">Banco</TableHead>}
               <TableHead className="w-[120px] text-muted-foreground">Tipo</TableHead>
               <TableHead className="text-muted-foreground">Descrição</TableHead>
@@ -88,7 +88,7 @@ export function BankTransactionsTable({
               <TableRow
                 key={transaction.id}
                 className={cn(
-                  "hover:bg-muted/50 border-border",
+                  "hover:bg-white/[0.02] border-white/5 transition-colors",
                   onTransactionClick && "cursor-pointer",
                   transaction.reconciliationStatus === 'conciliado' && "opacity-60"
                 )}
@@ -119,7 +119,7 @@ export function BankTransactionsTable({
                   {transaction.description}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="rounded-full px-3 py-0.5 font-normal text-muted-foreground border-border bg-background">
+                  <Badge variant="outline" className="rounded-full px-3 py-0.5 font-normal text-muted-foreground border-white/10 bg-transparent">
                     {transaction.category}
                   </Badge>
                 </TableCell>

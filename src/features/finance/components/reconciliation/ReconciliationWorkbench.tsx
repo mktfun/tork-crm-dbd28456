@@ -256,6 +256,35 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
     const createFromStatement = useCreateFromStatement();
     const reconcileAggregate = useReconcileAggregate();
 
+    // DRE Flattening logic for Selects
+    const flattenedCategories = useMemo(() => {
+        if (!accounts) return [];
+        const filtered = accounts.filter(a => a.type === 'revenue' || a.type === 'expense');
+        const accountMap = new Map();
+        filtered.forEach(a => accountMap.set(a.id, { ...a, children: [] }));
+        const roots: any[] = [];
+        filtered.forEach(a => {
+            if (a.parentId && accountMap.has(a.parentId)) {
+                accountMap.get(a.parentId).children.push(accountMap.get(a.id));
+            } else {
+                roots.push(accountMap.get(a.id));
+            }
+        });
+
+        const flatten = (nodes: any[], level = 0): any[] => {
+            let result: any[] = [];
+            nodes.forEach(node => {
+                result.push({ ...node, level });
+                if (node.children.length > 0) {
+                    result = result.concat(flatten(node.children, level + 1));
+                }
+            });
+            return result;
+        };
+
+        return flatten(roots);
+    }, [accounts]);
+
     // Insurance aggregate for consolidated mode
     const { data: insuranceAggregates = [], isLoading: isLoadingAggregates } = usePendingInsuranceAggregate();
 
@@ -969,7 +998,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
 
                             // Filter accounts by sign: positive → revenue, negative → expense
                             const allowedTypes = hasPositive ? ['revenue'] : ['expense'];
-                            const filteredAccounts = (accounts || []).filter((acc: any) => allowedTypes.includes(acc.type));
+                            const filteredAccounts = flattenedCategories.filter((acc: any) => allowedTypes.includes(acc.type));
 
                             return (
                                 <div>
@@ -980,10 +1009,13 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                         <SelectTrigger>
                                             <SelectValue placeholder="Selecione a categoria..." />
                                         </SelectTrigger>
-                                        <SelectContent>
+                                        <SelectContent className="max-h-[300px]">
                                             {filteredAccounts.map((acc: any) => (
-                                                <SelectItem key={acc.id} value={acc.id}>
-                                                    {acc.code ? `${acc.code} - ` : ''}{acc.name}
+                                                <SelectItem key={acc.id} value={acc.id} className="font-medium p-0">
+                                                    <div className="flex items-center w-full py-1.5 pr-2" style={{ paddingLeft: `${(acc.level * 1.5) + 0.5}rem` }}>
+                                                        {acc.level > 0 && <span className="text-muted-foreground ml-1 mr-1">↳</span>}
+                                                        {acc.code ? `${acc.code} - ` : ''}{acc.name}
+                                                    </div>
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
