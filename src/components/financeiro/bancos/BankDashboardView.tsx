@@ -214,87 +214,80 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
             )}
 
             {/* Histórico de Transações */}
-            <Card>
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">Histórico de Movimentações</CardTitle>
-                </CardHeader>
-                <Separator />
-                <CardContent className="p-0">
-                    {loadingTransactions ? (
-                        <div className="p-4 space-y-3">
-                            {[...Array(5)].map((_, i) => (
-                                <Skeleton key={i} className="h-16" />
-                            ))}
-                        </div>
-                    ) : transactionsError ? (
-                        <div className="text-center py-12 text-destructive">
-                            <p className="mb-2">Erro ao carregar transações</p>
-                            <Button variant="outline" size="sm" onClick={() => refetchTransactions()}>
-                                Tentar novamente
-                            </Button>
-                        </div>
-                    ) : transactionsData?.transactions.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                            <Landmark className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                            <p className="text-lg font-medium text-foreground">Nenhuma transação vinculada</p>
-                            <p className="text-sm mb-4">Para visualizar transações aqui, você precisa conciliar os lançamentos.</p>
-                            <Button
-                                variant="outline"
-                                onClick={() => navigate('/dashboard/financeiro?tab=conciliacao')}
-                            >
-                                Ir para Conciliação Bancária
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="max-h-[600px] overflow-auto">
-                            <BankTransactionsTable
-                                transactions={(transactionsData?.transactions || []).map(tx => ({
-                                    id: tx.transactionId,
-                                    date: tx.transactionDate,
-                                    bankName: tx.bankName || undefined,
-                                    type: (tx.accountType === 'expense' || tx.amount < 0) ? 'saida' : 'entrada',
-                                    description: tx.description,
-                                    category: tx.accountName || 'Sem categoria',
-                                    amount: tx.amount,
-                                    reconciliationStatus: 'conciliado' // Hardcoded conforme solicitação visual, já que status real é 'confirmed'
-                                }))}
-                                showBankColumn={isConsolidated}
-                                onTransactionClick={handleTransactionClick}
-                            />
-                        </div>
-                    )}
+            <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground px-1">Histórico de Movimentações</h3>
 
-                    {/* Paginação */}
-                    {transactionsData && transactionsData.pageCount > 1 && (
-                        <>
-                            <Separator />
-                            <div className="flex items-center justify-between p-4">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                                    disabled={page === 1}
-                                >
-                                    <ChevronLeft className="w-4 h-4 mr-1" />
-                                    Anterior
-                                </Button>
-                                <span className="text-sm text-muted-foreground">
-                                    Página {page} de {transactionsData.pageCount}
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setPage(p => Math.min(transactionsData.pageCount, p + 1))}
-                                    disabled={page >= transactionsData.pageCount}
-                                >
-                                    Próxima
-                                    <ChevronRight className="w-4 h-4 ml-1" />
-                                </Button>
-                            </div>
-                        </>
-                    )}
-                </CardContent>
-            </Card>
+                {loadingTransactions ? (
+                    <div className="space-y-3">
+                        {[...Array(5)].map((_, i) => (
+                            <Skeleton key={i} className="h-16" />
+                        ))}
+                    </div>
+                ) : transactionsError ? (
+                    <div className="text-center py-12 text-destructive">
+                        <p className="mb-2">Erro ao carregar transações</p>
+                        <Button variant="outline" size="sm" onClick={() => refetchTransactions()}>
+                            Tentar novamente
+                        </Button>
+                    </div>
+                ) : transactionsData?.transactions.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                        <Landmark className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p className="text-lg font-medium text-foreground">Nenhuma transação vinculada</p>
+                        <p className="text-sm mb-4">Para visualizar transações aqui, você precisa conciliar os lançamentos.</p>
+                        <Button
+                            variant="outline"
+                            onClick={() => navigate('/dashboard/financeiro?tab=conciliacao')}
+                        >
+                            Ir para Conciliação Bancária
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="max-h-[600px] overflow-auto">
+                        <BankTransactionsTable
+                            transactions={(transactionsData?.transactions || []).map(tx => ({
+                                id: tx.transactionId,
+                                date: tx.transactionDate,
+                                bankName: tx.bankName || undefined,
+                                type: (tx.accountType === 'expense' || tx.amount < 0) ? 'saida' : 'entrada',
+                                description: tx.description,
+                                category: tx.accountName || 'Sem categoria',
+                                amount: tx.amount,
+                                reconciliationStatus: 'conciliado' // Hardcoded conforme solicitação visual, já que status real é 'confirmed'
+                            }))}
+                            showBankColumn={isConsolidated}
+                            onTransactionClick={handleTransactionClick}
+                        />
+                    </div>
+                )}
+
+                {/* Paginação */}
+                {transactionsData && transactionsData.pageCount > 1 && (
+                    <div className="flex items-center justify-between pt-4 border-t border-border">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                        >
+                            <ChevronLeft className="w-4 h-4 mr-1" />
+                            Anterior
+                        </Button>
+                        <span className="text-sm text-muted-foreground">
+                            Página {page} de {transactionsData.pageCount}
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPage(p => Math.min(transactionsData.pageCount, p + 1))}
+                            disabled={page >= transactionsData.pageCount}
+                        >
+                            Próxima
+                            <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                    </div>
+                )}
+            </div>
 
             {/* Modal de detalhes da transação */}
             <TransactionDetailsSheet
