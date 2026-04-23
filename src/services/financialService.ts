@@ -393,9 +393,13 @@ export async function getFinancialSummary(params: {
     pendingExpense: Number(row.pendingExpense) || 0,
     transactionCount: Number(row.transactionCount) || 0,
     cashBalance: Number(row.cashBalance) || 0,
-    operationalPendingIncome: Number(row.operationalPendingIncome) || 0,
-    operationalPendingExpense: Number(row.operationalPendingExpense) || 0,
     // Use the real totals calculated from get_pending_totals if this is the current block
+    operationalPendingIncome: isCurrent && realPendingTotals.total_receivables > 0 
+      ? realPendingTotals.total_receivables 
+      : Number(row.operationalPendingIncome) || 0,
+    operationalPendingExpense: isCurrent && realPendingTotals.total_payables > 0
+      ? realPendingTotals.total_payables
+      : Number(row.operationalPendingExpense) || 0,
     globalPendingIncome: isCurrent && realPendingTotals.total_receivables > 0 
       ? realPendingTotals.total_receivables 
       : Number(row.globalPendingIncome) || 0,
