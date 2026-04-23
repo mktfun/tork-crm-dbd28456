@@ -387,19 +387,26 @@ export function usePendingTotals() {
   return useQuery({
     queryKey: ['pending-totals'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_pending_totals');
+      const { data: user } = await supabase.auth.getUser();
+      if (!user?.user) throw new Error('Usuário não autenticado');
+
+      const { data, error } = await supabase.rpc('get_pending_totals', {
+        p_start_date: null,
+        p_end_date: null
+      });
 
       if (error) {
         console.error('Error fetching pending totals:', error);
         throw error;
       }
 
-      // RPC retorna JSON { receivable, payable, receivable_count, payable_count }
-      const result = (data as any) || { receivable: 0, payable: 0 };
+      // RPC retorna JSON { total_a_receber, total_a_pagar, count_a_receber, count_a_pagar }
+      // Podendo ser um array [0] ou um obj direto se for single
+      const result = Array.isArray(data) ? data[0] : (data as any) || {};
 
       return {
-        receivable: Number(result.receivable || 0),
-        payable: Number(result.payable || 0)
+        receivable: Number(result.total_a_receber || result.receivable || 0),
+        payable: Number(result.total_a_pagar || result.payable || 0)
       };
     }
   });
@@ -923,10 +930,9 @@ export function useReceivablesBySeguradora() {
         .eq('user_id', user.id)
         .eq('is_void', false)
         .eq('archived', false)
-        .in('type', ['revenue', 'income', 'Entrada', 'entrada', 'Receita', 'receita'])
-        .not('status', 'in', '("ignored","cancelled")')
-        .or('reconciled.is.false,reconciled.is.null')
-        .or('is_confirmed.is.false,is_confirmed.is.null');
+        .not('type', 'in', '("expense","saida","pagamento")')
+        .not('status', 'in', '("ignored","cancelled","pago","paid","reconciled")')
+        .or('reconciled.is.false,reconciled.is.null');
 
       if (error) {
         console.error('Error fetching receivables by seguradora:', error);
