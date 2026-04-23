@@ -391,8 +391,7 @@ export function usePendingTotals() {
       if (!user?.user) throw new Error('Usuário não autenticado');
 
       const { data, error } = await supabase.rpc('get_pending_totals', {
-        p_start_date: null,
-        p_end_date: null
+        p_user_id: user.user.id
       });
 
       if (error) {
@@ -400,13 +399,12 @@ export function usePendingTotals() {
         throw error;
       }
 
-      // RPC retorna JSON { total_a_receber, total_a_pagar, count_a_receber, count_a_pagar }
-      // Podendo ser um array [0] ou um obj direto se for single
+      // RPC retorna JSON [{ total_receivables, total_payables }]
       const result = Array.isArray(data) ? data[0] : (data as any) || {};
 
       return {
-        receivable: Number(result.total_a_receber || result.receivable || 0),
-        payable: Number(result.total_a_pagar || result.payable || 0)
+        receivable: Number(result.total_receivables || result.total_a_receber || result.receivable || 0),
+        payable: Number(result.total_payables || result.total_a_pagar || result.payable || 0)
       };
     }
   });
@@ -925,7 +923,8 @@ export function useReceivablesBySeguradora() {
           due_date,
           transaction_date,
           insurance_company_id,
-          companies:insurance_company_id ( name )
+          companies:insurance_company_id ( name ),
+          financial_ledger ( amount )
         `)
         .eq('user_id', user.id)
         .eq('is_void', false)
@@ -944,8 +943,23 @@ export function useReceivablesBySeguradora() {
 
       (data || []).forEach((row: any) => {
         const companyId = row.insurance_company_id || '__SEM_SEGURADORA__';
-        const companyName = row.companies?.name || 'Sem Seguradora';
-        const amount = Number(row.total_amount) || 0;
+        const companyName = row.companies?.name || 'Não Especificada';
+        
+        // Sum absolute amounts from ledger if total_amount is 0 or missing
+        let amount = Number(row.total_amount) || 0;
+        if (amount === 0 && row.financial_ledger && row.financial_ledger.length > 0) {
+          // Typically revenues have one negative and one positive entry in ledger, we want the positive or absolute pending amount
+          const ledgerSum = row.financial_ledger.reduce((acc: number, l: any) => acc + Math.abs(Number(l.amount || 0)), 0);
+          amount = ledgerSum > 0 ? ledgerSum / 2 : 0; // Simple approximation since double entry adds up to 0 if properly balanced, but absolute sum is double the real amount
+          
+          if (amount === 0) {
+            // Some unbalanced inserts might just have one entry
+            amount = row.financial_ledger.reduce((acc: number, l: any) => acc + Math.abs(Number(l.amount || 0)), 0);
+          }
+        }
+        
+        if (amount <= 0) return; // Skip zero/negative amounts as they aren't real receivables
+
         const refDate = row.due_date || row.transaction_date;
 
         if (!grouped.has(companyId)) {
@@ -970,8 +984,7 @@ export function useReceivablesBySeguradora() {
         }
       });
 
-      return Array.from(grouped.values())
-        .sort((a, b) => b.totalPendente - a.totalPendente);
+      return Array.from(grouped.values()).sort((a, b) => b.totalPendente - a.totalPendente);
     },
     staleTime: 5 * 60 * 1000,
   });
