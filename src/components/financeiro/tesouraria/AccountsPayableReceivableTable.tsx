@@ -26,11 +26,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TransactionDetailsSheet } from "../TransactionDetailsSheet";
 
 export function AccountsPayableReceivableTable() {
   const [activeTab, setActiveTab] = useState<'receber' | 'pagar'>('receber');
   const [statusFilter, setStatusFilter] = useState<'all' | 'atrasado' | 'pendente' | 'pago'>('all');
   const [page, setPage] = useState(1);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const pageSize = 10;
 
   const { data: transactions, isLoading, error } = usePayableReceivableTransactions(
@@ -152,7 +154,11 @@ export function AccountsPayableReceivableTable() {
           </TableHeader>
           <TableBody>
             {paginatedTransactions.map((transaction) => (
-              <TableRow key={transaction.transactionId} className="hover:bg-muted/50 border-border">
+              <TableRow 
+                key={transaction.transactionId} 
+                className="hover:bg-muted/50 border-border cursor-pointer transition-colors"
+                onClick={() => setSelectedTransactionId(transaction.transactionId)}
+              >
                 <TableCell className="pl-6 font-medium text-muted-foreground">
                   {formatDate(transaction.dueDate)}
                   {transaction.daysOverdue > 0 && (
@@ -309,6 +315,12 @@ export function AccountsPayableReceivableTable() {
           </TabsContent>
         </Tabs>
       </CardContent>
+
+      <TransactionDetailsSheet 
+        transactionId={selectedTransactionId} 
+        open={!!selectedTransactionId} 
+        onClose={() => setSelectedTransactionId(null)} 
+      />
     </AppCard>
   );
 }

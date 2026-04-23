@@ -54,18 +54,10 @@ A tela de Tesouraria (`/dashboard/financeiro?tab=tesouraria`) está confusa e os
 - Reutilizar o `dateRange` que já é passado como prop (`TesourariaTabProps`)
 - Conectar ao `AccountsPayableReceivableTable` e `ReceivablesBySeguradora`
 
-## Open Questions
-
-> [!IMPORTANT]
-> **Marcos**: A gente quer manter o gráfico de pizza do "A Receber por Seguradora" ou preferir trocar por uma lista mais simples/tabela? O gráfico toma muito espaço e pode não ajudar muito quando tem muitas seguradoras.
-
-> [!IMPORTANT]
-> **Marcos**: Tem algum dado específico que você precisa ver na tela que não aparece hoje? (ex: nome do cliente na comissão, número da apólice, nome do produtor?)
-
 ## Critérios de Aceite
 
-1. ✅ KPIs de A Receber e A Pagar no topo com dados reais
-2. ✅ Comissões de apólice mostram nome do cliente e número da apólice  
-3. ✅ Clique em qualquer linha abre o `TransactionDetailsSheet`
-4. ✅ Dados consistentes entre todos os componentes (mesma fonte de verdade)
-5. ✅ Layout clean sem confusão visual
+1. ✅ KPIs de A Receber e A Pagar no topo com dados reais da RPC.
+2. ✅ Comissões de apólice mostram nome do cliente e número da apólice (se houver na transação).
+3. ✅ Clique em qualquer linha abrirá o `TransactionDetailsSheet`.
+4. ✅ Dados consistentes: refatorar `useReceivablesBySeguradora` para não omitir tipos válidos de receita e povoar corretamente o gráfico de pizza e a lista.
+5. ✅ Layout limpo mantendo o Gráfico de Pizza + Lista ao lado para a visão de Seguradoras.
