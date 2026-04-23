@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Client, Policy, Appointment, Transaction, Task } from '@/types';
-import { subDays } from 'date-fns';
+
 
 interface AppState {
   // Estado
@@ -104,7 +104,7 @@ export const useAppStore = create<AppState>()(
         
         if (policy.expirationDate) {
           const expirationDate = new Date(policy.expirationDate);
-          const reminderDate = subDays(expirationDate, 15); // 15 dias antes do vencimento
+          const reminderDate = expirationDate; // Data exata do vencimento
 
           const cliente = currentState.clients.find(c => c.id === policy.clientId);
           const clienteName = cliente?.name || 'Cliente não encontrado';

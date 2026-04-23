@@ -39,7 +39,6 @@ export function PolicyRenewalSection({
   if (!automaticRenewal) return null;
 
   const renewalDate = new Date(expirationDate);
-  renewalDate.setDate(renewalDate.getDate() - 15);
 
   return (
     <Card className="bg-slate-800 border-slate-700">
@@ -58,7 +57,7 @@ export function PolicyRenewalSection({
             <strong className="text-orange-400">
               {renewalDate.toLocaleDateString('pt-BR')}
             </strong>
-            {' '}(15 dias antes do vencimento)
+            {' '}(no dia do vencimento)
           </span>
         </div>
 

@@ -18,9 +18,8 @@ export function RenewalScheduleStatus({ policy }: RenewalScheduleStatusProps) {
   const expirationDate = new Date(policy.expirationDate);
   const daysUntilExpiration = differenceInDays(expirationDate, today);
   
-  // Data do agendamento (15 dias antes do vencimento)
+  // Data do agendamento = data exata do vencimento
   const scheduledDate = new Date(expirationDate);
-  scheduledDate.setDate(scheduledDate.getDate() - 15);
   
   const isScheduleActive = daysUntilExpiration <= 90 && daysUntilExpiration > 0;
   const isOverdue = daysUntilExpiration < 0;
