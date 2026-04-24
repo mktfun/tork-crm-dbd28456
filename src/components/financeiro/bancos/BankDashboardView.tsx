@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { useBankAccounts, useBankTransactions, BankAccount } from '@/hooks/useBancos';
+import { useBankAccounts, useBankTransactions, useUnbankedTransactions, BankAccount } from '@/hooks/useBancos';
 import { BankTransactionsTable } from '@/components/financeiro/bancos/BankTransactionsTable';
 import { TransactionDetailsSheet } from '@/components/financeiro/TransactionDetailsSheet';
 import { GlassKpiCard } from '@/components/financeiro/shared/GlassKpiCard';
@@ -48,6 +48,15 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
     const { data: bankData, isLoading: loadingAccounts, refetch: refetchAccounts } = useBankAccounts();
     const { data: transactionsData, isLoading: loadingTransactions, error: transactionsError, refetch: refetchTransactions } =
         useBankTransactions(bankAccountId, page, pageSize);
+
+    // Para visão consolidada: buscar transações não vinculadas a banco (gap global vs bancos)
+    const { data: unbankedData = [] } = useUnbankedTransactions(500);
+    const unbankedIncomeTotal = isConsolidated
+        ? unbankedData.filter(t => t.transactionType === 'receita').reduce((a, v) => a + v.amount, 0)
+        : 0;
+    const unbankedExpenseTotal = isConsolidated
+        ? unbankedData.filter(t => t.transactionType !== 'receita').reduce((a, v) => a + v.amount, 0)
+        : 0;
 
     // Encontrar o banco atual
     const currentBank: BankAccount | undefined = isConsolidated
@@ -188,28 +197,50 @@ export function BankDashboardView({ bankId, onBack }: BankDashboardViewProps) {
                     <Skeleton className="h-24 rounded-xl" />
                 </div>
             ) : transactionsData && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <GlassKpiCard
-                        title="Receitas"
-                        value={formatCurrency(transactionsData.totalIncome)}
-                        icon={TrendingUp}
-                        iconClassName="text-emerald-500"
-                        className="border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10"
-                    />
+                <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <GlassKpiCard
+                            title="Receitas"
+                            value={formatCurrency(transactionsData.totalIncome)}
+                            icon={TrendingUp}
+                            iconClassName="text-emerald-500"
+                            className="border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10"
+                        />
 
-                    <GlassKpiCard
-                        title="Despesas"
-                        value={formatCurrency(transactionsData.totalExpense)}
-                        icon={TrendingDown}
-                        iconClassName="text-rose-500"
-                        className="border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10"
-                    />
+                        <GlassKpiCard
+                            title="Despesas"
+                            value={formatCurrency(transactionsData.totalExpense)}
+                            icon={TrendingDown}
+                            iconClassName="text-rose-500"
+                            className="border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10"
+                        />
 
-                    <GlassKpiCard
-                        title="Transações"
-                        value={transactionsData.totalCount.toString()}
-                        icon={Hash}
-                    />
+                        <GlassKpiCard
+                            title="Transações"
+                            value={transactionsData.totalCount.toString()}
+                            icon={Hash}
+                        />
+                    </div>
+
+                    {/* Linha de não-bancarizado somente na visão consolidada */}
+                    {isConsolidated && (unbankedIncomeTotal > 0 || unbankedExpenseTotal > 0) && (
+                        <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 flex flex-wrap gap-4 items-center text-sm">
+                            <span className="text-amber-400 font-medium text-xs uppercase tracking-wide">Em Caixa Físico / Não Vinculado</span>
+                            {unbankedIncomeTotal > 0 && (
+                                <span className="text-emerald-400">
+                                    Receitas: <strong>{formatCurrency(unbankedIncomeTotal)}</strong>
+                                </span>
+                            )}
+                            {unbankedExpenseTotal > 0 && (
+                                <span className="text-rose-400">
+                                    Despesas: <strong>{formatCurrency(unbankedExpenseTotal)}</strong>
+                                </span>
+                            )}
+                            <span className="text-muted-foreground text-xs ml-auto">
+                                Vincule via alerta na aba Bancos
+                            </span>
+                        </div>
+                    )}
                 </div>
             )}
 
