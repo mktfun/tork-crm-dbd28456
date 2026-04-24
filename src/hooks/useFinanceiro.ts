@@ -188,10 +188,11 @@ export function useCashFlowData(startDate: string, endDate: string, granularity:
  * Hook para buscar resumo financeiro (KPIs)
  */
 export function useFinancialSummary(startDate: string, endDate: string) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['financial-summary', startDate, endDate],
-    queryFn: () => financialService.getFinancialSummary({ startDate, endDate }),
-    enabled: !!startDate && !!endDate
+    queryKey: ['financial-summary', startDate, endDate, user?.id],
+    queryFn: () => financialService.getFinancialSummary({ startDate, endDate, userId: user?.id }),
+    enabled: !!startDate && !!endDate && !!user?.id
   });
 }
 

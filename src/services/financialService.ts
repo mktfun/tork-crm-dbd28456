@@ -362,14 +362,13 @@ export async function getCashFlowData(params: {
 export async function getFinancialSummary(params: {
   startDate: string;
   endDate: string;
+  userId?: string;
 }): Promise<FinancialSummaryWithComparison> {
-  const { data: userData } = await supabase.auth.getUser();
-
-  // Buscar os totais brutos usando a RPC correta com userID
   let realPendingTotals: any = { total_receivables: 0, total_payables: 0 };
-  if (userData?.user?.id) {
+  
+  if (params.userId) {
     const { data: ptData } = await supabase.rpc('get_pending_totals', {
-      p_user_id: userData.user.id
+      p_user_id: params.userId
     });
     const ptResult = Array.isArray(ptData) ? ptData[0] : (ptData as any) || {};
     realPendingTotals.total_receivables = Number(ptResult.total_receivables || ptResult.total_a_receber || ptResult.receivable || 0);
