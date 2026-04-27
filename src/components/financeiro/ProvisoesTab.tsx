@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { format, addMonths, startOfDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import {
@@ -24,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { ProjectedCashFlowChart } from './ProjectedCashFlowChart';
 import { useProjectedCashFlow } from '@/hooks/useRecurringConfigs';
+import { ProjectedCashFlowPoint } from '@/types/recurring';
 
 interface ProvisoesTabProps {
   dateRange?: DateRange; // Mantido para compatibilidade, mas ignorado na lógica principal
@@ -31,11 +32,14 @@ interface ProvisoesTabProps {
 
 type GranularityOption = 'day' | 'week' | 'month';
 
-console.log('[ANTIGRAVITY] ProvisoesTab GLASS v2 LOADED');
+console.log('[ANTIGRAVITY] ProvisoesTab REACTIVE-KPIs v3 LOADED');
 
 export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
   const [granularity, setGranularity] = useState<GranularityOption>('day');
   const [horizonMonths, setHorizonMonths] = useState(3);
+
+  // KPIs derivados do viewport visível (não do horizonte total)
+  const [viewportData, setViewportData] = useState<ProjectedCashFlowPoint[]>([]);
 
   // Calcular período de projeção sempre a partir de HOJE (Futuro)
   const projectionPeriod = useMemo(() => {
@@ -57,23 +61,39 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
     granularity
   );
 
-  // Calcular totais para os cards de resumo
-  const summary = useMemo(() => {
-    if (!projectionData.length) return { income: 0, expense: 0, balance: 0 };
+  // Callback estável para quando o viewport do gráfico mudar
+  const handleViewportChange = useCallback((visible: ProjectedCashFlowPoint[]) => {
+    setViewportData(visible);
+  }, []);
 
-    const income = projectionData.reduce((acc, curr) => acc + curr.projected_income + curr.realized_income, 0);
-    const expense = projectionData.reduce((acc, curr) => acc + curr.projected_expense + curr.realized_expense, 0);
-    const lastPoint = projectionData[projectionData.length - 1];
+  // Callback estável para quando o zoom semântico mudar a granularidade
+  const handleGranularityChange = useCallback((g: GranularityOption) => {
+    setGranularity(g);
+  }, []);
+
+  // KPIs calculados sobre os pontos VISÍVEIS no viewport
+  const summary = useMemo(() => {
+    const source = viewportData.length > 0 ? viewportData : projectionData;
+    if (!source.length) return { income: 0, expense: 0, balance: 0 };
+
+    const income = source.reduce((acc, curr) => acc + curr.projected_income + curr.realized_income, 0);
+    const expense = source.reduce((acc, curr) => acc + curr.projected_expense + curr.realized_expense, 0);
+    const lastPoint = source[source.length - 1];
 
     return {
       income,
       expense,
       balance: lastPoint?.running_balance || 0
     };
-  }, [projectionData]);
+  }, [viewportData, projectionData]);
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+  // Label do período visível para contextualizar os KPIs
+  const viewportLabel = viewportData.length > 0
+    ? `${viewportData.length} ponto(s) visível(is)`
+    : 'horizonte completo';
 
   return (
     <div className="space-y-6">
@@ -144,7 +164,7 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
         </div>
       </div>
 
-      {/* Cards de Resumo */}
+      {/* Cards de Resumo — reativos ao viewport visível */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <AppCard>
           <CardContent className="p-4 flex flex-col gap-1">
@@ -152,7 +172,7 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
               <TrendingUp className="w-4 h-4 text-emerald-500" /> Receita Projetada
             </span>
             <span className="text-2xl font-bold text-emerald-600">{formatCurrency(summary.income)}</span>
-            <span className="text-xs text-muted-foreground">pendentes + recorrentes no horizonte</span>
+            <span className="text-xs text-muted-foreground">{viewportLabel}</span>
           </CardContent>
         </AppCard>
         <AppCard>
@@ -161,7 +181,7 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
               <TrendingDown className="w-4 h-4 text-rose-500" /> Despesa Projetada
             </span>
             <span className="text-2xl font-bold text-rose-600">{formatCurrency(summary.expense)}</span>
-            <span className="text-xs text-muted-foreground">despesas recorrentes no horizonte</span>
+            <span className="text-xs text-muted-foreground">{viewportLabel}</span>
           </CardContent>
         </AppCard>
         <AppCard>
@@ -172,7 +192,7 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
             <span className={`text-2xl font-bold ${summary.balance < 0 ? 'text-rose-600' : 'text-primary'}`}>
               {formatCurrency(summary.balance)}
             </span>
-            <span className="text-xs text-muted-foreground">saldo atual + receitas − despesas projetadas</span>
+            <span className="text-xs text-muted-foreground">{viewportLabel}</span>
           </CardContent>
         </AppCard>
       </div>
@@ -182,9 +202,9 @@ export function ProvisoesTab({ dateRange }: ProvisoesTabProps) {
         data={projectionData}
         isLoading={projectionLoading}
         granularity={granularity}
+        onGranularityChange={handleGranularityChange}
+        onViewportChange={handleViewportChange}
       />
-
-      {/* Configurações Recorrentes movidas para aba Despesas */}
     </div>
   );
 }

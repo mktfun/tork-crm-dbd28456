@@ -95,7 +95,7 @@ export function DreTable({ className }: DreTableProps) {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [compactMode, setCompactMode] = useState(false);
   const [auditTarget, setAuditTarget] = useState<DreAuditTarget | null>(null);
-  const { data: rows = [], isLoading } = useDreData(selectedYear, undefined, undefined);
+  const { data: rows = [], isLoading } = useDreData(selectedYear);
 
   const currentMonthIndex = new Date().getFullYear() === selectedYear ? new Date().getMonth() : -1;
 

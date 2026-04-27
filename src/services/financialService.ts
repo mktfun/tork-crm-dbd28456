@@ -417,8 +417,10 @@ export async function getFinancialSummary(params: {
 
 export async function getDreData(year?: number): Promise<DreRow[]> {
   const { data, error } = await supabase.rpc('get_dre_data', {
-    p_year: year || new Date().getFullYear()
-  });
+    p_year: year || new Date().getFullYear(),
+    p_start_date: null,
+    p_end_date: null
+  } as any);
 
   if (error) throw error;
 

@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from 'react';
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -25,10 +25,14 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ProjectedCashFlowPoint } from '@/types/recurring';
 
+type GranularityOption = 'day' | 'week' | 'month';
+
 interface ProjectedCashFlowChartProps {
   data: ProjectedCashFlowPoint[];
   isLoading: boolean;
-  granularity?: 'day' | 'week' | 'month';
+  granularity?: GranularityOption;
+  onGranularityChange?: (g: GranularityOption) => void;
+  onViewportChange?: (visibleData: ProjectedCashFlowPoint[]) => void;
 }
 
 function formatCurrency(value: number): string {
@@ -94,12 +98,18 @@ const MIN_VIEWPORT = 7;
 const MAX_VIEWPORT = 90;
 const INITIAL_VIEWPORT = 30;
 
-console.log('[ANTIGRAVITY] ProjectedCashFlowChart MAPS-LIKE v2 LOADED');
+// Thresholds para zoom semântico automático
+const WEEK_THRESHOLD = 14;   // span < 14 → day,  span >= 14 e < 60 → week
+const MONTH_THRESHOLD = 60;  // span >= 60 → month
+
+console.log('[ANTIGRAVITY] ProjectedCashFlowChart ZOOM-SEMANTIC v3 LOADED');
 
 export function ProjectedCashFlowChart({
   data,
   isLoading,
-  granularity = 'day'
+  granularity = 'day',
+  onGranularityChange,
+  onViewportChange,
 }: ProjectedCashFlowChartProps) {
   // ========== DATA ==========
   const chartData = useMemo(() => {
@@ -113,7 +123,7 @@ export function ProjectedCashFlowChart({
   const totalPoints = chartData.length;
   const hasData = totalPoints > 0;
 
-  // ========== VIEWPORT STATE (Maps-like) ==========
+  // ========== VIEWPORT STATE ==========
   const [viewStart, setViewStart] = useState(0);
   const [viewEnd, setViewEnd] = useState(Math.min(INITIAL_VIEWPORT, totalPoints));
 
@@ -131,7 +141,6 @@ export function ProjectedCashFlowChart({
     let e = Math.round(end);
     const span = e - s;
 
-    // Enforce min/max span
     if (span < MIN_VIEWPORT) {
       const mid = (s + e) / 2;
       s = Math.round(mid - MIN_VIEWPORT / 2);
@@ -143,7 +152,6 @@ export function ProjectedCashFlowChart({
       e = s + MAX_VIEWPORT;
     }
 
-    // Enforce bounds
     if (s < 0) { e -= s; s = 0; }
     if (e > totalPoints) { s -= (e - totalPoints); e = totalPoints; }
     if (s < 0) s = 0;
@@ -183,27 +191,76 @@ export function ProjectedCashFlowChart({
     isDragging.current = false;
   }, []);
 
-  // ========== ZOOM (Wheel) ==========
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const currentSpan = viewEnd - viewStart;
-    const zoomFactor = e.deltaY < 0 ? -0.1 : 0.1; // negative = zoom in
-    const delta = currentSpan * zoomFactor;
+  // ========== ZOOM SEMÂNTICO (wheel nativo não-passivo) ==========
+  // Usar useEffect com addEventListener(passive: false) em vez de onWheel React
+  // porque React 17+ registra wheel como passivo por padrão, impedindo preventDefault()
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-    const mid = (viewStart + viewEnd) / 2;
-    const newSpan = currentSpan + delta * 2;
-    const newStart = mid - newSpan / 2;
-    const newEnd = mid + newSpan / 2;
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault(); // bloqueia scroll da página — funciona pois listener não é passivo
+      e.stopPropagation();
 
-    const { s, e: end } = clampViewport(newStart, newEnd);
-    setViewStart(s);
-    setViewEnd(end);
-  }, [viewStart, viewEnd, clampViewport]);
+      setViewStart(prevStart => {
+        setViewEnd(prevEnd => {
+          const currentSpan = prevEnd - prevStart;
+          const zoomFactor = e.deltaY < 0 ? -0.15 : 0.15; // negativo = zoom in
+          const delta = currentSpan * zoomFactor;
+          const mid = (prevStart + prevEnd) / 2;
+          const newSpan = currentSpan + delta * 2;
+          const newStart = mid - newSpan / 2;
+          const newEnd = mid + newSpan / 2;
+          const { s, e: end } = clampViewport(newStart, newEnd);
+
+          // Zoom semântico: ajustar granularidade ao threshold
+          const span = end - s;
+          if (onGranularityChange) {
+            if (span < WEEK_THRESHOLD) {
+              onGranularityChange('day');
+            } else if (span < MONTH_THRESHOLD) {
+              onGranularityChange('week');
+            } else {
+              onGranularityChange('month');
+            }
+          }
+
+          // Atualizar viewEnd
+          return end;
+        });
+        // Atualizar viewStart — React batches estes updates
+        return -1; // sinaliza: será sobrescrito pelo setViewEnd que tem o s correto
+      });
+
+      // Re-aplicar corretamente em batch separado
+      const currentSpan = viewEnd - viewStart;
+      const zoomFactor = e.deltaY < 0 ? -0.15 : 0.15;
+      const delta = currentSpan * zoomFactor;
+      const mid = (viewStart + viewEnd) / 2;
+      const newSpan = currentSpan + delta * 2;
+      const newS = mid - newSpan / 2;
+      const newE = mid + newSpan / 2;
+      const { s, e: end } = clampViewport(newS, newE);
+      setViewStart(s);
+      setViewEnd(end);
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [viewStart, viewEnd, clampViewport, onGranularityChange]);
 
   // ========== SLICED DATA ==========
   const visibleData = useMemo(() => {
     return chartData.slice(viewStart, viewEnd);
   }, [chartData, viewStart, viewEnd]);
+
+  // ========== VIEWPORT CHANGE CALLBACK ==========
+  // Notifica o pai sempre que o viewport muda — alimenta os KPI cards
+  useEffect(() => {
+    if (onViewportChange) {
+      onViewportChange(visibleData);
+    }
+  }, [visibleData, onViewportChange]);
 
   // ========== ANALYSIS ==========
   const analysis = useMemo(() => {
@@ -320,7 +377,7 @@ export function ProjectedCashFlowChart({
           </div>
         ) : (
           <div className="space-y-2">
-            {/* Chart Container with drag/zoom */}
+            {/* Chart Container — drag para pan, scroll para zoom */}
             <div
               ref={containerRef}
               className="w-full select-none"
@@ -329,7 +386,6 @@ export function ProjectedCashFlowChart({
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
-              onWheel={handleWheel}
             >
               <div style={{ height: 400, width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
