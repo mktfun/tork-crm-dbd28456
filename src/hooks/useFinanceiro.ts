@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as financialService from '@/services/financialService';
 import { FinancialAccountType, BulkImportPayload } from '@/types/financeiro';
+import { useAuth } from '@/hooks/useAuth';
 
 /**
  * Hook para buscar contas financeiras
