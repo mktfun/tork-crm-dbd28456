@@ -464,6 +464,68 @@ async function callMistralLLM(markdown: string, apiKey: string): Promise<any> {
   return parsed;
 }
 
+const PROPOSAL_PROMPT = `Você é um assistente de IA especialista em extrair dados de ORÇAMENTOS (Propostas) de seguro em PDF.
+Sua tarefa é extrair as DIFERENTES OPÇÕES de orçamento disponíveis a partir do OCR em Markdown.
+
+Retorne APENAS um objeto JSON no formato exato:
+{
+  "client_name": "Nome do Cliente ou null",
+  "options": [
+    {
+      "insurer_name": "Nome da Seguradora",
+      "plan_name": "Nome do Plano",
+      "price_annual": 1500.50,
+      "price_monthly": 150.05,
+      "deductible": "Franquia: R$ 2.000,00",
+      "coverage_items": ["Danos Morais", "Colisão"],
+      "is_recommended": true
+    }
+  ]
+}
+
+Regras:
+1. price_annual e price_monthly devem ser NÚMEROS FLOAT sem R$ ou formatação (ex: 1500.50)
+2. Extraia TODAS as opções principais encontradas (diferentes seguradoras ou planos).
+3. Para cada opção, liste os nomes das coberturas em coverage_items.
+4. is_recommended true para a primeira opção.
+`;
+
+async function callMistralLLMProposal(markdown: string, apiKey: string): Promise<any> {
+  console.log('🧠 [LLM] Processing proposal extraction...');
+  
+  const response = await fetchWithRetry(`${MISTRAL_API_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'mistral-large-latest',
+      messages: [
+        { role: 'system', content: PROPOSAL_PROMPT },
+        { role: 'user', content: `Extraia os dados de opções do orçamento:\n\n${markdown}` }
+      ],
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Mistral LLM Proposal error: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  const content = result.choices?.[0]?.message?.content;
+  if (!content) throw new Error('Mistral LLM returned no content');
+  
+  try {
+    return JSON.parse(content);
+  } catch (e) {
+    throw new Error('LLM response is not valid JSON');
+  }
+}
+
 // ============================================================
 // MAIN HANDLER
 // ============================================================
@@ -549,7 +611,7 @@ serve(async (req) => {
       console.warn('⚠️ [OCR] Markdown too short or empty');
       return new Response(JSON.stringify({ 
         success: true,
-        data: { status: 'INCOMPLETO' },
+        data: body.mode === 'proposal' ? { options: [] } : { status: 'INCOMPLETO' },
         source: 'MISTRAL',
         fileName,
         durationMs: Date.now() - startTime,
@@ -560,8 +622,27 @@ serve(async (req) => {
     
     // ========== LLM Extraction ==========
     const llmStart = Date.now();
-    const extracted = await callMistralLLM(markdown, MISTRAL_API_KEY);
-    const llmDuration = Date.now() - llmStart;
+    let extracted;
+    let llmDuration;
+    
+    if (body.mode === 'proposal') {
+      extracted = await callMistralLLMProposal(markdown, MISTRAL_API_KEY);
+      llmDuration = Date.now() - llmStart;
+      
+      return new Response(JSON.stringify({
+        success: true,
+        data: extracted,
+        source: 'MISTRAL',
+        fileName,
+        durationMs: Date.now() - startTime,
+        _debug: { ocrDuration, llmDuration }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } else {
+      extracted = await callMistralLLM(markdown, MISTRAL_API_KEY);
+      llmDuration = Date.now() - llmStart;
+    }
     
     const totalDuration = Date.now() - startTime;
     

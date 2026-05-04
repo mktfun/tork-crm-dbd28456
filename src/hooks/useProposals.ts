@@ -47,7 +47,7 @@ export function useCreateProposal() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: { deal_id: string; title: string; client_name?: string; client_phone?: string; client_vehicle?: string; ramo?: string; token: string; options: Partial<ProposalOption>[] }) => {
+    mutationFn: async (payload: { deal_id?: string | null; title: string; client_name?: string; client_phone?: string; client_vehicle?: string; ramo?: string; token: string; options: Partial<ProposalOption>[] }) => {
       if (!user) throw new Error('Usuário não autenticado');
 
       // 1. Insert proposal
@@ -55,7 +55,7 @@ export function useCreateProposal() {
         .from('crm_proposals')
         .insert({
           user_id: user.id,
-          deal_id: payload.deal_id,
+          deal_id: payload.deal_id || null,
           title: payload.title,
           token: payload.token,
           client_name: payload.client_name,

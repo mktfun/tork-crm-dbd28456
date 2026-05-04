@@ -90,7 +90,8 @@ export function QuoteUploadButton({
             body: { 
               base64: base64Data,
               fileName: file.name,
-              mimeType: file.type
+              mimeType: file.type,
+              mode: 'proposal'
             }
           });
 
@@ -99,21 +100,30 @@ export function QuoteUploadButton({
 
         const mistralData = functionData.data;
 
-        // Mapeia o resultado do Mistral (Apólice) para o formato de Orçamento (Opções)
-        finalData = {
-          client_name: mistralData.nome_cliente || '',
-          options: [
-            {
-              insurer_name: mistralData.nome_seguradora || 'Seguradora a definir',
-              plan_name: 'Plano Principal',
-              price_annual: mistralData.premio_total || 0,
-              price_monthly: mistralData.premio_total ? +(mistralData.premio_total / 10).toFixed(2) : 0,
-              deductible: '',
-              coverage_items: ['Cobertura Principal Extraída via IA'],
-              is_recommended: true
-            }
-          ]
-        };
+        // Se o Mistral retornou opções (modo proposal), usamos diretamente
+        if (mistralData.options && Array.isArray(mistralData.options)) {
+          finalData = {
+            client_name: mistralData.client_name || mistralData.nome_cliente || '',
+            options: mistralData.options
+          };
+        } else {
+          // Fallback antigo (Mapeia o resultado de Apólice para Orçamento)
+          finalData = {
+            client_name: mistralData.nome_cliente || '',
+            options: [
+              {
+                insurer_name: mistralData.nome_seguradora || 'Seguradora a definir',
+                plan_name: 'Plano Principal',
+                price_annual: mistralData.premio_total || 0,
+                price_monthly: mistralData.premio_total ? +(mistralData.premio_total / 10).toFixed(2) : 0,
+                deductible: '',
+                coverage_items: ['Cobertura Principal Extraída via IA'],
+                is_recommended: true
+              }
+            ]
+          };
+        }
+
 
       } catch (ocrError: any) {
         console.warn('OCR Mistral falhou, acionando fallback local...', ocrError);
