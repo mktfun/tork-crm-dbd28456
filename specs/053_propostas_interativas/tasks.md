@@ -32,42 +32,44 @@
 
 ---
 
-## Fase 3 — PDF Parser (Client-side)
+## Fase 3 — PDF Parser (OCR + Fallback)
 
 - [ ] **3.1** Instalar `pdfjs-dist`: `npm install pdfjs-dist`
-- [ ] **3.2** Criar `src/lib/pdfProposalParser.ts`:
-  - `parsePDFProposal(file: File): Promise<ParsedProposal>` 
+- [ ] **3.2** Reutilizar a chamada de `extract-quote-data` (OCR via Edge Function) já existente em `QuoteUploadButton.tsx`
+- [ ] **3.3** Criar `src/lib/pdfProposalParser.ts` para o fallback client-side:
+  - `parsePDFLocalFallback(file: File): Promise<ParsedProposal>` 
   - Extrai texto, identifica seguradoras, planos, preços, coberturas e franquias
-  - Retorna array de até 3 `ProposalOptionDraft`
-- [ ] **3.3** Testar parser com o PDF "Orçamento Seguro Auto - Ana Beatriz.pdf"
+- [ ] **3.4** Criar orquestrador de extração: tenta o OCR primeiro; se falhar/vazio, chama o fallback. Dispara toast indicando o método que obteve sucesso.
 
 ---
 
 ## Fase 4 — UI Corretor (dentro de DealDetailsModal)
 
-- [ ] **4.1** Criar `src/components/crm/proposals/ProposalPDFImporter.tsx` (Stitch MCP):
-  - Dropzone de upload do PDF
+- [ ] **4.1** Interceptar criação de Orçamento em `PolicyFormModal.tsx`:
+  - Ao salvar com `status = 'Orçamento'`, chamar `onClose` e abrir o fluxo de Proposta Interativa automaticamente (via context ou state management).
+
+- [ ] **4.2** Criar `src/components/crm/proposals/ProposalPDFImporter.tsx` (Stitch MCP):
+  - Dropzone de upload do PDF integrado com a estratégia dupla (OCR + Fallback)
   - Preview das opções extraídas em cards editáveis
   - Campos: seguradora, plano, preço, coberturas (tags), franquia
   - Botão "Adicionar opção manual" (até 3)
 
-- [ ] **4.2** Criar `src/components/crm/proposals/ProposalSettingsForm.tsx`:
+- [ ] **4.3** Criar `src/components/crm/proposals/ProposalSettingsForm.tsx`:
   - Campos: título, validade, stage_aceite (dropdown), stage_recusa (dropdown)
   - Toggle "Habilitar comparativo com apólice anterior" (só aparece se cliente tiver apólice no mesmo ramo)
 
-- [ ] **4.3** Criar `src/components/crm/proposals/ProposalTimeline.tsx`:
+- [ ] **4.4** Criar `src/components/crm/proposals/ProposalTimeline.tsx`:
   - Lista de eventos com ícones e timestamps
   - Subscription realtime nos `crm_proposal_events`
 
-- [ ] **4.4** Criar `src/components/crm/proposals/ProposalAnalyticsDashboard.tsx` (Stitch MCP):
+- [ ] **4.5** Criar `src/components/crm/proposals/ProposalAnalyticsDashboard.tsx` (Stitch MCP):
   - Banner com link + botões "Copiar" e "WhatsApp"
   - KPI Cards: 👁 Views | ⏱ Tempo médio | 🔥 Termômetro | 📅 Enviada
   - `<ProposalTimeline />`
 
-- [ ] **4.5** Criar `src/components/crm/proposals/DealProposalsTab.tsx`:
+- [ ] **4.6** Criar `src/components/crm/proposals/DealProposalsTab.tsx`:
   - Orquestra: se `!proposal` → mostra importer. Se `proposal.status === 'draft'` → mostra form. Else → Analytics.
-
-- [ ] **4.6** Injetar `<DealProposalsTab dealId={deal.id} />` como nova Tab em `DealDetailsModal.tsx`
+  - Pode ser injetado no `DealDetailsModal` e também renderizado em um modal standalone quando chamado via `PolicyFormModal`.
 
 ---
 

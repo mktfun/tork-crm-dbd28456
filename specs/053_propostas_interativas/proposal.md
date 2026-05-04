@@ -16,6 +16,8 @@ O Módulo de Propostas Interativas transforma o fluxo atual de orçamentos (PDF 
 | US03 | Como corretor, copio o link ou abro o WhatsApp nativo com o texto já preenchido (sem automação) | Alta |
 | US04 | Como cliente, abro o link no celular, vejo as opções comparadas e clico em "Aceitar" | Alta |
 | US05 | Como sistema, ao aceitar: o Deal é movido para um stage definido pelo corretor (ex: "Proposta Aceita") | Alta |
+| US09 | Como corretor, ao criar uma nova apólice com status "Orçamento" no `PolicyFormModal`, sou redirecionado para a nova experiência de Proposta Interativa (não o form padrão) | Alta |
+| US10 | Como sistema, ao cliente aceitar a proposta via link, o status é automaticamente promovido de `Orçamento` para `Ativa` no banco de apólices | Alta |
 | US06 | Como sistema, ao recusar/ignorar: o corretor pode mover manualmente ou o sistema move para stage configurado | Média |
 | US07 | Como corretor, vejo métricas da proposta: Views, Tempo Leitura, Termômetro | Média |
 | US08 | Como corretor, se o cliente tiver apólice anterior do mesmo ramo, posso ativar comparativo | Baixa (Opcional) |
@@ -24,16 +26,29 @@ O Módulo de Propostas Interativas transforma o fluxo atual de orçamentos (PDF 
 
 ## 3. Clarificações de Negócio
 
-### 3.1 Importação do PDF
+### 3.1 Importação do PDF — Estratégia Dupla
 - O corretor faz **upload do PDF** de orçamento (ex: "Orçamento Seguro Auto - Ana Beatriz.pdf")
-- O sistema usa **extração simples de texto** (sem IA) + heurísticas para identificar as opções (seguradora, plano, preço)
+- **1ª tentativa — OCR (primary):** Envio para Edge Function Supabase que usa a API `extract-quote-data` já existente (OCR via IA). `QuoteUploadButton.tsx` já implementa esse fluxo.
+- **2ª tentativa — pdfjs-dist (fallback):** Se o OCR retornar erro ou dados vazios, o sistema automaticamente tenta extração client-side com `pdfjs-dist` + heurísticas de texto.
 - O corretor **revisa e ajusta** antes de publicar — nunca publica direto sem confirmação
 - Campos mínimos por opção: `Seguradora`, `Plano`, `Preço mensal`, `Coberturas (lista)`, `Franquia`
+- Toast informativo ao usuário indica qual método foi usado ("Dados extraídos via OCR" ou "Extração local usada como fallback")
 
 ### 3.2 Regras de CRM (Stages)
 - **Ao cliente aceitar:** Deal move para stage `accepted_stage_id` — configurado por proposta pelo corretor (dropdown de stages do pipeline)
 - **Ao cliente recusar:** Deal move para stage `rejected_stage_id` — também configurável
 - Os stages não são hardcoded; o corretor escolhe no formulário de criação da proposta
+
+### 3.2b Integração com PolicyFormModal
+- O `PolicyFormModal` atual já tem o pill de status **"Orçamento"** no Step 1
+- Quando o corretor seleciona `status = 'Orçamento'` e clica em **"Criar Apólice"**, em vez de criar uma apólice simples, o sistema:
+  1. Cria um registro de apólice com `status = 'Orçamento'` (mantém compatibilidade)
+  2. Abre imediatamente o **modal de Proposta Interativa** (`DealProposalsTab` em Dialog) com os dados do cliente pré-preenchidos
+- Quando o cliente **aceita via link público**, o sistema:
+  1. Atualiza `crm_proposals.status = 'accepted'`
+  2. Atualiza a **apólice vinculada** de `status = 'Orçamento'` para `status = 'Ativa'`
+  3. Move o Deal para o stage configurado
+- Isso respeita todo o fluxo existente de `BudgetConversionModal.tsx` e `usePolicyActions.ts`
 
 ### 3.3 WhatsApp — Fase Atual (Manual)
 - Botão **"Copiar Link"** — copia URL pública para clipboard

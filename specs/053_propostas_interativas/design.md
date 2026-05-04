@@ -91,27 +91,33 @@ create table crm_proposal_events (
 
 ---
 
-## 3. Extração do PDF
+## 3. Extração do PDF — Estratégia Dupla
 
-Usaremos a **Web File API + pdf.js** no browser para extrair texto puro do PDF. Heurísticas simples para identificar padrões recorrentes nos PDFs da corretora:
+Para garantir a melhor experiência na extração dos dados do PDF, usaremos uma abordagem de duas camadas (fallback):
+
+1. **OCR via IA (Primário):** Reutilizaremos a Edge Function `extract-quote-data` (já implementada em `QuoteUploadButton.tsx`) que usa IA para processar o PDF.
+2. **Web File API + pdf.js (Fallback):** Se o OCR falhar ou retornar dados incompletos, o sistema entra em modo fallback client-side. Usaremos heurísticas simples para identificar padrões no texto extraído:
 
 ```
-Padrão buscado:
+Padrão buscado no Fallback:
   - Linhas com valor em R$ → preço
   - Padrões como "PORTO SEGURO", "HDI", "ALLIANZ", "TOKIO" → seguradoras
   - Linhas com "cobertura", "RCF", "APP", "Assistência" → coberturas
   - Padrões como "Franquia R$" → franquia
 ```
 
-**Resultado:** Formulário pré-preenchido. Corretor revisa campo a campo antes de publicar. O extrator é `best-effort` — se não extrair algo, campo fica vazio para preenchimento manual.
-
-**Biblioteca:** `pdfjs-dist` (já popular, client-side, sem backend necessário)
+**Resultado:** O corretor revisa o formulário pré-preenchido campo a campo antes de publicar. Um toast informa qual método (OCR ou Fallback Local) foi utilizado.
 
 ---
 
 ## 4. UI — Visão Corretor
 
-### Aba "Proposta" no DealDetailsModal
+### Interceptação no PolicyFormModal
+Quando o usuário seleciona `Status = Orçamento` no passo 1 do `PolicyFormModal` e avança para a criação da apólice, o comportamento muda:
+1. Uma apólice com status `Orçamento` é salva no banco (mantendo a retrocompatibilidade com listagens de Orçamento).
+2. O modal atual fecha e o usuário é **redirecionado automaticamente** para o fluxo de "Criar Proposta Interativa" (o novo modal `DealProposalsTab`), com os dados do cliente e da apólice recém-criada pré-vinculados.
+
+### Aba "Proposta" no DealDetailsModal ou Standalone
 
 **Estado: sem proposta**
 ```
@@ -222,9 +228,11 @@ Banco
   RPC accept_proposal → move deal stage (UPDATE crm_deals.stage_id)
 
 Frontend CRM
+  PolicyFormModal
+    └── Redireciona para ProposalCreationModal se status === 'Orçamento'
   DealDetailsModal
     └── [NOVA] DealProposalsTab
-          ├── ProposalPDFImporter (pdfjs-dist)
+          ├── ProposalPDFImporter (OCR Edge Function + pdfjs-dist fallback)
           └── ProposalAnalyticsDashboard
                 └── ProposalTimeline (Supabase realtime)
 
