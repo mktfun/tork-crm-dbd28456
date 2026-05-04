@@ -46,7 +46,8 @@ export function QuoteUploadButton({
 
     try {
       // 1. Upload do PDF para o Storage
-      const fileName = `${Date.now()}-${file.name}`;
+      const safeName = file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9.-]/g, '_');
+      const fileName = `${Date.now()}-${safeName}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('quote-uploads')
         .upload(fileName, file, {

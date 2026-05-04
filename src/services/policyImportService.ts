@@ -1649,7 +1649,8 @@ export async function linkCarteirinhaToPolicy(
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
     // 1. Upload para storage
-    const path = `carteirinhas/${userId}/${policyId}/${Date.now()}_${carteirinhaFile.name}`;
+    const safeName = carteirinhaFile.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9.-]/g, '_');
+    const path = `carteirinhas/${userId}/${policyId}/${Date.now()}_${safeName}`;
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('policy-docs')
       .upload(path, carteirinhaFile, { upsert: true });
