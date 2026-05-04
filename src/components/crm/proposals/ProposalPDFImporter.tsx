@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { QuoteUploadButton } from './QuoteUploadButton';
+import { QuoteUploadButton } from '@/components/policies/QuoteUploadButton';
 import { ProposalOption } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
