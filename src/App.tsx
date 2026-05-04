@@ -61,6 +61,7 @@ import PortalNotFound from "./pages/portal/PortalNotFound";
 import PortalWizard from "./pages/portal/PortalWizard";
 import PortalSolicitacoes from "./pages/portal/PortalSolicitacoes";
 import PortalMobileStart from "./pages/portal/PortalMobileStart";
+import PublicProposal from "./pages/PublicProposal";
 import { supabase } from "./integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -249,6 +250,9 @@ function App() {
 
                   {/* Rota pública para Landing Page B2C (JJSeguros) */}
                   <Route path="/quote/:slug" element={<div className="min-h-screen flex items-center justify-center bg-background"><p className="text-muted-foreground">Landing Page — em breve</p></div>} />
+
+                  {/* Rota pública para Propostas Interativas (CRM Vibe) */}
+                  <Route path="/proposta/:token" element={<PublicProposal />} />
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>

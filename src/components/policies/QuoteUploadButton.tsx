@@ -3,6 +3,7 @@ import { Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { parsePDFLocalFallback } from '@/lib/pdfProposalParser';
 
 interface QuoteUploadButtonProps {
   onDataExtracted: (data: any) => void;
@@ -64,26 +65,44 @@ export function QuoteUploadButton({
 
       setUploadProgress('Extraindo dados com IA...');
 
-      // 3. Chamar Edge Function
-      const { data: functionData, error: functionError } = await supabase.functions
-        .invoke('extract-quote-data', {
-          body: { fileUrl: publicUrl }
-        });
+      // 3. Chamar Edge Function (OCR)
+      let finalData = null;
+      let usedFallback = false;
 
-      if (functionError) {
-        throw new Error(`Erro na extração: ${functionError.message}`);
-      }
+      try {
+        const { data: functionData, error: functionError } = await supabase.functions
+          .invoke('extract-quote-data', {
+            body: { fileUrl: publicUrl }
+          });
 
-      if (!functionData.success) {
-        throw new Error(functionData.error || 'Erro desconhecido na extração');
+        if (functionError) throw new Error(`Erro na extração: ${functionError.message}`);
+        if (!functionData.success) throw new Error(functionData.error || 'Erro desconhecido na extração');
+
+        finalData = functionData.data;
+      } catch (ocrError: any) {
+        console.warn('OCR falhou, acionando fallback local...', ocrError);
+        setUploadProgress('Extraindo dados localmente...');
+        
+        try {
+          finalData = await parsePDFLocalFallback(file);
+          usedFallback = true;
+        } catch (fallbackError) {
+          throw new Error('Falha na extração OCR e no Fallback local.');
+        }
       }
 
       // 4. Sucesso!
       setUploadProgress('Concluído!');
-      toast.success('Dados extraídos com sucesso!');
+      if (usedFallback) {
+        toast.success('Extração local (Fallback) usada com sucesso!', {
+          description: 'Revisão manual recomendada.',
+        });
+      } else {
+        toast.success('Dados extraídos via OCR com sucesso!');
+      }
       
       // Chamar callback com os dados processados
-      onDataExtracted(functionData.data);
+      onDataExtracted(finalData);
 
     } catch (error: any) {
       console.error('Erro no processamento:', error);

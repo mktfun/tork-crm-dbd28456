@@ -38,7 +38,7 @@ interface PolicyFormModalProps {
   policy?: Policy;
   isEditing?: boolean;
   onClose: () => void;
-  onPolicyAdded?: () => void;
+  onPolicyAdded?: (policy?: Policy) => void;
 }
 
 const STEPS = [
@@ -291,13 +291,14 @@ export function PolicyFormModal({ policy, isEditing = false, onClose, onPolicyAd
       };
       if (isEditing && policy) {
         await updatePolicy(policy.id, finalData);
+        onPolicyAdded?.(policy);
       } else {
-        await addPolicy(finalData);
+        const newPolicy = await addPolicy(finalData);
+        onPolicyAdded?.(newPolicy);
       }
       reset();
       setCurrentStep(1);
       setIsManualDueDate(false);
-      onPolicyAdded?.();
       onClose();
     } catch (error) {
       console.error('Erro ao salvar apólice:', error);

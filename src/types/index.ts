@@ -215,3 +215,55 @@ export interface Notification {
   created_at: string;
   updated_at: string;
 }
+
+// 🆕 INTERFACES PARA PROPOSTAS INTERATIVAS (053)
+export interface ProposalOption {
+  id: string;
+  proposal_id: string;
+  insurer_name: string;
+  plan_name: string;
+  price_monthly?: number | null;
+  price_annual?: number | null;
+  deductible?: string | null;
+  coverage_items?: string[] | null;
+  payment_terms?: string | null;
+  is_recommended: boolean;
+  sort_order: number;
+}
+
+export interface ProposalEvent {
+  id: string;
+  proposal_id: string;
+  event_type: 'view_started' | 'view_ended' | 'option_selected' | 'accepted' | 'rejected' | 'reminder';
+  metadata?: any;
+  ip_hash?: string;
+  created_at: string;
+}
+
+export interface Proposal {
+  id: string;
+  deal_id?: string | null;
+  user_id: string;
+  token: string;
+  title: string;
+  client_name?: string | null;
+  client_phone?: string | null;
+  client_vehicle?: string | null;
+  ramo: string;
+  valid_until?: string | null;
+  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+  accepted_option_id?: string | null;
+  accepted_stage_id?: string | null;
+  rejected_stage_id?: string | null;
+  enable_comparison: boolean;
+  total_views: number;
+  total_time_seconds: number;
+  warmth: 'cold' | 'warm' | 'hot';
+  sent_at?: string | null;
+  accepted_at?: string | null;
+  created_at: string;
+
+  // Joined/Relational data
+  options?: ProposalOption[];
+  events?: ProposalEvent[];
+}

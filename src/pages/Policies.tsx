@@ -32,6 +32,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useSupabaseRamos } from '@/hooks/useSupabaseRamos';
 import { AppCard } from '@/components/ui/app-card';
 import { PolicyDateFilterBar, PeriodType } from '@/components/policies/PolicyDateFilterBar';
+import { DealProposalsTab } from '@/components/crm/proposals/DealProposalsTab';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function Policies() {
   const { clients } = useClients();
@@ -43,6 +45,7 @@ export default function Policies() {
   const isMobile = useIsMobile();
   const [isNewPolicyModalOpen, setIsNewPolicyModalOpen] = useState(false);
   const [isAIImportModalOpen, setIsAIImportModalOpen] = useState(false);
+  const [interactiveProposalModal, setInteractiveProposalModal] = useState<{ isOpen: boolean; policyId?: string; clientId?: string }>({ isOpen: false });
   const [isExporting, setIsExporting] = useState(false);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -134,6 +137,17 @@ export default function Policies() {
 
   const handleCloseNewPolicyModal = () => {
     setIsNewPolicyModalOpen(false);
+  };
+
+  const handlePolicyAdded = (newPolicy?: any) => {
+    setIsNewPolicyModalOpen(false);
+    if (newPolicy && newPolicy.status === 'Orçamento') {
+      setInteractiveProposalModal({
+        isOpen: true,
+        policyId: newPolicy.id,
+        clientId: newPolicy.clientId
+      });
+    }
   };
 
   const handleExportCSV = async () => {
@@ -689,7 +703,7 @@ export default function Policies() {
               <div className="flex-1 overflow-y-auto">
                 <PolicyFormModal
                   onClose={handleCloseNewPolicyModal}
-                  onPolicyAdded={() => { }}
+                  onPolicyAdded={handlePolicyAdded}
                 />
               </div>
             </div>
@@ -701,6 +715,26 @@ export default function Policies() {
           open={isAIImportModalOpen}
           onOpenChange={setIsAIImportModalOpen}
         />
+
+        {/* Modal Proposta Interativa */}
+        <Dialog 
+          open={interactiveProposalModal.isOpen} 
+          onOpenChange={(open) => setInteractiveProposalModal(prev => ({ ...prev, isOpen: open }))}
+        >
+          <DialogContent className="max-w-4xl bg-background border-border p-0 overflow-hidden rounded-3xl">
+            <DialogHeader className="p-6 pb-2">
+              <DialogTitle className="text-xl">Gerar Proposta Interativa</DialogTitle>
+            </DialogHeader>
+            <div className="px-6 pb-6 max-h-[85vh] overflow-y-auto">
+              <DealProposalsTab 
+                clientName={clients.find(c => c.id === interactiveProposalModal.clientId)?.name}
+                clientPhone={clients.find(c => c.id === interactiveProposalModal.clientId)?.phone}
+                // No dealId yet, passing null allows the UI to handle creation
+                dealId={null} 
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </div>
