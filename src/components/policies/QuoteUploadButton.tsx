@@ -67,20 +67,43 @@ export function QuoteUploadButton({
         .from('quote-uploads')
         .getPublicUrl(uploadData.path);
 
-      setUploadProgress('Extraindo dados do PDF...');
+      setUploadProgress('Extraindo dados com IA...');
 
-      // 3. Extração Local Direta (sem usar IA/Gemini)
+      // 3. Chamar Edge Function (OCR focado em Múltiplas Opções)
       let finalData = null;
+      let usedFallback = false;
 
       try {
-        finalData = await parsePDFLocalFallback(file);
-      } catch (fallbackError) {
-        throw new Error('Falha na leitura e extração do PDF.');
+        const { data: functionData, error: functionError } = await supabase.functions
+          .invoke('extract-proposal-options', {
+            body: { fileUrl: publicUrl }
+          });
+
+        if (functionError) throw new Error(`Erro na extração: ${functionError.message}`);
+        if (!functionData.success) throw new Error(functionData.error || 'Erro desconhecido na extração');
+
+        finalData = functionData.data;
+      } catch (ocrError: any) {
+        console.warn('OCR falhou, acionando fallback local...', ocrError);
+        setUploadProgress('Extraindo dados localmente (Fallback)...');
+        
+        try {
+          finalData = await parsePDFLocalFallback(file);
+          usedFallback = true;
+        } catch (fallbackError) {
+          throw new Error('Falha na extração OCR e no Fallback local.');
+        }
       }
 
       // 4. Sucesso!
       setUploadProgress('Concluído!');
-      toast.success('Dados extraídos do PDF com sucesso!');
+      if (usedFallback) {
+        toast.success('Extração local (Fallback) usada com sucesso!', {
+          description: 'Revisão manual recomendada.',
+        });
+      } else {
+        toast.success('Dados estruturados extraídos via IA com sucesso!');
+      }
       
       // Chamar callback com os dados processados
       onDataExtracted(finalData);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProposalByDeal, useCreateProposal } from '@/hooks/useProposals';
+import { usePolicies } from '@/hooks/useAppData';
 import { ProposalAnalyticsDashboard } from '@/components/crm/proposals/ProposalAnalyticsDashboard';
 import { ProposalPDFImporter } from '@/components/crm/proposals/ProposalPDFImporter';
 import { BudgetConversionModal } from '@/components/policies/BudgetConversionModal';
@@ -9,6 +10,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   ArrowLeft,
   Copy,
@@ -20,6 +32,7 @@ import {
   Mail,
   ArrowRight,
   CalendarDays,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -32,9 +45,21 @@ export function BudgetDetailsView({ policy, client }: BudgetDetailsViewProps) {
   const navigate = useNavigate();
   const { data: proposal, isLoading, refetch } = useProposalByDeal(policy.id);
   const createProposal = useCreateProposal();
+  const { deletePolicy } = usePolicies();
   const [isCreatingProposal, setIsCreatingProposal] = useState(false);
   const [showPDFImporter, setShowPDFImporter] = useState(false);
   const [extractedOptions, setExtractedOptions] = useState<Partial<ProposalOption>[]>([]);
+
+  const handleDelete = async () => {
+    try {
+      await deletePolicy(policy.id);
+      toast.success('Orçamento excluído com sucesso');
+      navigate('/dashboard/policies');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao excluir orçamento');
+    }
+  };
 
   const buildWhatsAppLink = () => {
     if (!proposal) return;
@@ -105,9 +130,33 @@ export function BudgetDetailsView({ policy, client }: BudgetDetailsViewProps) {
             </p>
           </div>
         </div>
-        <Badge className="bg-blue-500/15 text-blue-400 border border-blue-500/30 text-sm px-3 py-1">
-          🔵 Em Orçamento
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge className="bg-blue-500/15 text-blue-400 border border-blue-500/30 text-sm px-3 py-1">
+            🔵 Em Orçamento
+          </Badge>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir Orçamento</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza que deseja excluir este orçamento permanentemente? Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       {/* ─── LAYOUT GRID ─── */}
