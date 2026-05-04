@@ -18,6 +18,7 @@ import { RenewPolicyModal } from '@/components/policies/RenewPolicyModal';
 import { PolicyFormModal } from '@/components/policies/PolicyFormModal';
 import { AutoRenewalIndicator } from '@/components/policies/AutoRenewalIndicator';
 import { PolicyRenewalSection } from '@/components/policies/PolicyRenewalSection';
+import { BudgetDetailsView } from '@/components/policies/BudgetDetailsView';
 import type { Policy, Client } from '@/types';
 import { CommissionExtract } from '@/components/policies/CommissionExtract';
 import { useToast } from '@/hooks/use-toast';
@@ -144,6 +145,11 @@ export default function PolicyDetails() {
         </div>
       </div>
     );
+  }
+
+  // ⭐ Branch: Orçamento usa o BudgetDetailsView
+  if (isBudget) {
+    return <BudgetDetailsView policy={policy} client={client ?? null} />;
   }
 
   const hasPdf = !!(policy.pdfAnexado || policy.pdfUrl);

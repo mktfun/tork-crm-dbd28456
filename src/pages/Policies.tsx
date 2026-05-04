@@ -34,6 +34,7 @@ import { AppCard } from '@/components/ui/app-card';
 import { PolicyDateFilterBar, PeriodType } from '@/components/policies/PolicyDateFilterBar';
 import { DealProposalsTab } from '@/components/crm/proposals/DealProposalsTab';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { BudgetCreationFlow } from '@/components/policies/BudgetCreationFlow';
 
 export default function Policies() {
   const { clients } = useClients();
@@ -45,6 +46,8 @@ export default function Policies() {
   const isMobile = useIsMobile();
   const [isNewPolicyModalOpen, setIsNewPolicyModalOpen] = useState(false);
   const [isAIImportModalOpen, setIsAIImportModalOpen] = useState(false);
+  const [isModeSelectOpen, setIsModeSelectOpen] = useState(false);
+  const [isBudgetFlowOpen, setIsBudgetFlowOpen] = useState(false);
   const [interactiveProposalModal, setInteractiveProposalModal] = useState<{ isOpen: boolean; policyId?: string; clientId?: string }>({ isOpen: false });
   const [isExporting, setIsExporting] = useState(false);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
@@ -412,9 +415,8 @@ export default function Policies() {
                 <Sparkles className="w-4 h-4 text-primary" />
                 Importar via IA
               </Button>
-
               <Button
-                onClick={() => setIsNewPolicyModalOpen(true)}
+                onClick={() => setIsModeSelectOpen(true)}
                 variant="default"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -685,7 +687,40 @@ export default function Policies() {
 
         {/* Modais */}
 
-        {/* Modal Nova Apólice */}
+        {/* Modal de Seleção: Orçamento vs Apólice */}
+        <Dialog open={isModeSelectOpen} onOpenChange={setIsModeSelectOpen}>
+          <DialogContent className="max-w-sm bg-background border-border rounded-3xl">
+            <DialogHeader>
+              <DialogTitle className="text-xl text-center mb-2">O que você quer criar?</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-3 pb-2">
+              <button
+                onClick={() => { setIsModeSelectOpen(false); setIsBudgetFlowOpen(true); }}
+                className="flex flex-col items-start gap-1 p-5 rounded-2xl border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-all text-left"
+              >
+                <span className="text-2xl mb-1">📄</span>
+                <span className="font-bold text-foreground">Criar Orçamento Interativo</span>
+                <span className="text-sm text-muted-foreground">Importa um PDF, gera um link e envia pro cliente pelo WhatsApp.</span>
+              </button>
+              <button
+                onClick={() => { setIsModeSelectOpen(false); setIsNewPolicyModalOpen(true); }}
+                className="flex flex-col items-start gap-1 p-5 rounded-2xl border border-border hover:bg-muted/50 transition-all text-left"
+              >
+                <span className="text-2xl mb-1">🛡️</span>
+                <span className="font-bold text-foreground">Registrar Apólice</span>
+                <span className="text-sm text-muted-foreground">Cadastra uma apólice ativa, aguardando ou cancelada.</span>
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Fluxo de Criação de Orçamento */}
+        <BudgetCreationFlow
+          isOpen={isBudgetFlowOpen}
+          onClose={() => setIsBudgetFlowOpen(false)}
+        />
+
+        {/* Modal Nova Apólice (clássico) */}
         {isNewPolicyModalOpen && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
             <div className="bg-background w-full sm:max-w-2xl sm:rounded-[2rem] rounded-t-[2rem] rounded-b-none border-0 shadow-[0_-20px_60px_rgba(0,0,0,0.2)] max-h-[92vh] overflow-hidden flex flex-col">
