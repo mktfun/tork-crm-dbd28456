@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatDate } from '@/utils/dateUtils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -833,7 +834,7 @@ export function ReconciliationPage() {
                                             />
                                         </TableCell>
                                         <TableCell className="whitespace-nowrap font-medium text-muted-foreground">
-                                            {format(new Date(item.transaction_date), 'dd/MM/yyyy')}
+                                            {formatDate(item.transaction_date)}
                                         </TableCell>
                                         {isConsolidated && (
                                             <TableCell className="text-sm text-muted-foreground">
@@ -1252,7 +1253,7 @@ export function ReconciliationPage() {
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-sm font-medium line-clamp-2">{entry.description}</p>
                                                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                                                    <span>{entry.transaction_date}</span>
+                                                    <span>{formatDate(entry.transaction_date)}</span>
                                                     <Badge variant={entry.reconciliation_status === 'matched' ? 'secondary' : 'outline'} className="text-[10px]">
                                                         {entry.reconciliation_status === 'matched' ? 'Conciliado' : 'Pendente'}
                                                     </Badge>

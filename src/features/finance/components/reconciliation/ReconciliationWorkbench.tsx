@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
+import { formatDate } from '@/utils/dateUtils';
 import {
     ArrowUpRight, ArrowDownRight, CheckCircle2, AlertTriangle,
     Plus, X, Zap, Wand2, Loader2, Search, Unlink, Landmark, Building2
@@ -92,7 +93,7 @@ function EntryCard({
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-muted-foreground">
-                            {format(new Date(item.transaction_date), 'dd/MM/yyyy')}
+                            {formatDate(item.transaction_date)}
                         </span>
                         {item.reference_number && (
                             <span className="text-[10px] text-muted-foreground/70 font-mono">
@@ -212,7 +213,7 @@ function SystemEntryCard({
 
             {/* Date */}
             <span className="text-[10px] text-muted-foreground">
-                {format(new Date(item.transaction_date), 'dd/MM/yyyy')}
+                {formatDate(item.transaction_date)}
             </span>
         </button>
     );
@@ -968,7 +969,7 @@ export function ReconciliationWorkbench({ bankAccountId, dateRange, bankAccounts
                                             <div key={item.id} className="flex justify-between p-2 bg-muted/50 rounded text-sm border border-border/50">
                                                 <div className="min-w-0">
                                                     <p className="font-medium truncate">{item.description}</p>
-                                                    <p className="text-xs text-muted-foreground">{item.transaction_date}</p>
+                                                    <p className="text-xs text-muted-foreground">{formatDate(item.transaction_date)}</p>
                                                 </div>
                                                 <p className={cn('font-semibold shrink-0 ml-2', item.amount >= 0 ? 'text-emerald-400' : 'text-red-400')}>
                                                     {formatCurrency(item.amount)}
