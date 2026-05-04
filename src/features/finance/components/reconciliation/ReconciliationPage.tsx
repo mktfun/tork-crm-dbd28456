@@ -79,6 +79,8 @@ import {
     useBulkReconcile,
     useMatchSuggestions,
     useReconcileManual,
+    useBulkDeleteStatementEntries,
+    useBulkDeleteSystemTransactions,
     useImportHistory,
     useImportBatchEntries,
     type PaginatedStatementItem,
@@ -369,6 +371,8 @@ export function ReconciliationPage() {
     const unreconcileMutation = useUnreconcileTransaction();
     const bulkReconcileMutation = useBulkReconcile();
     const reconcileManualMutation = useReconcileManual();
+    const bulkDeleteStatementEntries = useBulkDeleteStatementEntries();
+    const bulkDeleteSystemTransactions = useBulkDeleteSystemTransactions();
 
     // Match Suggestions
     const { data: matchSuggestions = [], refetch: refetchSuggestions } = useMatchSuggestions(
@@ -419,6 +423,51 @@ export function ReconciliationPage() {
             { transactionIds: selectedIds, bankAccountId: selectedBulkBank },
             { onSuccess: () => setSelectedIds([]) }
         );
+    };
+
+    const handleBatchDelete = () => {
+        if (selectedIds.length === 0) return;
+        
+        // Separa os IDs entre entradas de extrato (lixo bancário) e transações do sistema
+        // Entradas de extrato geralmente começam com prefixos UUID padrão ou tem tipo "extrato"
+        // Como o selectedIds contém IDs mistos, vamos tentar deletar de ambos, ou checar o tipo se possível
+        // Mas o mais seguro é pegar os itens selecionados e ver o que são
+        const selectedItems = items.filter(i => selectedIds.includes(i.id));
+        
+        // Se a transação tem 'status_display' como Pendente/Importado e NÃO é sistema (type é taxa/etc), é extrato
+        const statementIds = selectedItems
+            .filter(i => i.type === 'statement' || (!i.category_name && i.status_display === 'Importado'))
+            .map(i => i.id);
+            
+        const transactionIds = selectedItems
+            .filter(i => i.type !== 'statement' && (i.category_name || i.status_display !== 'Importado'))
+            .map(i => i.id);
+            
+        // Se a maioria for extrato ou não conseguimos discernir perfeitamente pelo type, vamos chutar baseado no que temos
+        // No PaginatedStatementItem não temos a fonte exata, então vamos deletar do sistema se tiver categoria, senão do extrato
+        
+        if (statementIds.length > 0) {
+            bulkDeleteStatementEntries.mutate(statementIds, {
+                onSuccess: () => {
+                    if (transactionIds.length === 0) setSelectedIds([]);
+                }
+            });
+        }
+        
+        if (transactionIds.length > 0) {
+            bulkDeleteSystemTransactions.mutate(transactionIds, {
+                onSuccess: () => {
+                    setSelectedIds([]);
+                }
+            });
+        }
+        
+        // Fallback: se os filtros não pegaram nada, tentamos deletar do extrato por padrão (comum para lixo)
+        if (statementIds.length === 0 && transactionIds.length === 0) {
+            bulkDeleteStatementEntries.mutate(selectedIds, {
+                onSuccess: () => setSelectedIds([])
+            });
+        }
     };
 
     const handleToggleSelect = (id: string) => {
@@ -1010,6 +1059,23 @@ export function ReconciliationPage() {
                                 {bulkReconcileMutation.isPending
                                     ? 'Processando...'
                                     : `Conciliar ${selectedIds.length}`}
+                            </Button>
+
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                className="gap-2 font-semibold"
+                                onClick={() => {
+                                    if (window.confirm(`Tem certeza que deseja excluir ${selectedIds.length} iten(s)? Esta ação não pode ser desfeita.`)) {
+                                        handleBatchDelete();
+                                    }
+                                }}
+                                disabled={bulkDeleteStatementEntries.isPending || bulkDeleteSystemTransactions.isPending}
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                {(bulkDeleteStatementEntries.isPending || bulkDeleteSystemTransactions.isPending)
+                                    ? 'Excluindo...'
+                                    : `Excluir`}
                             </Button>
 
                             <Button

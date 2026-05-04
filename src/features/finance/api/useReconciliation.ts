@@ -867,6 +867,63 @@ export function useBulkReconcile() {
     });
 }
 
+// ============ BULK DELETE ============
+
+export function useBulkDeleteStatementEntries() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (entryIds: string[]) => {
+            const { error } = await supabase
+                .from('bank_statement_entries')
+                .delete()
+                .in('id', entryIds);
+
+            if (error) throw error;
+            return true;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
+            toast.success(`Entradas excluídas com sucesso!`);
+        },
+        onError: (error: Error) => {
+            toast.error(`Erro ao excluir entradas: ${error.message}`);
+        },
+    });
+}
+
+export function useBulkDeleteSystemTransactions() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (transactionIds: string[]) => {
+            const { error } = await supabase
+                .from('financial_transactions')
+                .delete()
+                .in('id', transactionIds);
+
+            if (error) throw error;
+            return true;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
+            queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['account-balances'] });
+            queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
+            toast.success(`Transações excluídas com sucesso!`);
+        },
+        onError: (error: Error) => {
+            toast.error(`Erro ao excluir transações: ${error.message}`);
+        },
+    });
+}
+
 // ============ IMPORT HISTORY ============
 
 export interface ImportHistoryItem {
