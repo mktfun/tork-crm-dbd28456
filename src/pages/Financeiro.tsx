@@ -3,7 +3,8 @@ import FinanceiroERP from "./FinanceiroERP";
 
 const Financeiro = () => {
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full w-full overflow-hidden p-4 md:p-6">
+      <div className="space-y-6 flex flex-col h-full w-full max-w-[1800px] mx-auto">
       {/* Header Unificado */}
       <div className="flex items-center gap-3">
         <div className="p-2 bg-primary/10 rounded-lg">
@@ -19,6 +20,7 @@ const Financeiro = () => {
 
       {/* Conteúdo Unificado - Apenas o ERP com tabs internas */}
       <FinanceiroERP />
+      </div>
     </div>
   );
 };
