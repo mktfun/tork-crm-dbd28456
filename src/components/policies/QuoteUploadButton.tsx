@@ -69,29 +69,61 @@ export function QuoteUploadButton({
 
       setUploadProgress('Extraindo dados com IA...');
 
-      // 3. Chamar Edge Function (OCR focado em Múltiplas Opções)
+      // 3. Chamar Edge Function Mistral (a mesma usada no bulk import)
       let finalData = null;
       let usedFallback = false;
 
       try {
+        // Converte o arquivo para base64 para o Mistral
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1]);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
         const { data: functionData, error: functionError } = await supabase.functions
-          .invoke('extract-proposal-options', {
-            body: { fileUrl: publicUrl }
+          .invoke('analyze-policy-mistral', {
+            body: { 
+              base64: base64Data,
+              fileName: file.name,
+              mimeType: file.type
+            }
           });
 
-        if (functionError) throw new Error(`Erro na extração: ${functionError.message}`);
-        if (!functionData.success) throw new Error(functionData.error || 'Erro desconhecido na extração');
+        if (functionError) throw new Error(`Erro na extração Mistral: ${functionError.message}`);
+        if (!functionData?.success || !functionData?.data) throw new Error(functionData?.error || 'Erro desconhecido na extração Mistral');
 
-        finalData = functionData.data;
+        const mistralData = functionData.data;
+
+        // Mapeia o resultado do Mistral (Apólice) para o formato de Orçamento (Opções)
+        finalData = {
+          client_name: mistralData.nome_cliente || '',
+          options: [
+            {
+              insurer_name: mistralData.nome_seguradora || 'Seguradora a definir',
+              plan_name: 'Plano Principal',
+              price_annual: mistralData.premio_total || 0,
+              price_monthly: mistralData.premio_total ? +(mistralData.premio_total / 10).toFixed(2) : 0,
+              deductible: '',
+              coverage_items: ['Cobertura Principal Extraída via IA'],
+              is_recommended: true
+            }
+          ]
+        };
+
       } catch (ocrError: any) {
-        console.warn('OCR falhou, acionando fallback local...', ocrError);
+        console.warn('OCR Mistral falhou, acionando fallback local...', ocrError);
         setUploadProgress('Extraindo dados localmente (Fallback)...');
         
         try {
           finalData = await parsePDFLocalFallback(file);
           usedFallback = true;
         } catch (fallbackError) {
-          throw new Error('Falha na extração OCR e no Fallback local.');
+          throw new Error('Falha na extração OCR Mistral e no Fallback local.');
         }
       }
 
