@@ -340,29 +340,36 @@ export function ReconciliationPage() {
     const handleDeleteBatch = async () => {
         if (!deletingBatchId) return;
         setIsDeletingBatch(true);
+        const batchIdToDelete = deletingBatchId;
+        // Close dialog immediately so UI feels responsive
+        setDeletingBatchId(null);
         try {
             const { error: entriesErr } = await supabase
                 .from('bank_statement_entries')
                 .delete()
-                .eq('import_batch_id', deletingBatchId);
+                .eq('import_batch_id', batchIdToDelete);
             if (entriesErr) throw entriesErr;
 
             const { error: historyErr } = await supabase
                 .from('bank_import_history')
                 .delete()
-                .eq('id', deletingBatchId);
+                .eq('id', batchIdToDelete);
             if (historyErr) throw historyErr;
 
             toast.success('Extrato excluído com sucesso');
+            // Remove cache immediately so item disappears without waiting staleTime
+            queryClient.removeQueries({ queryKey: ['import-history'] });
+            queryClient.removeQueries({ queryKey: ['import-batch-entries'] });
             queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
             queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
-            queryClient.invalidateQueries({ queryKey: ['import-history'] });
         } catch (err: any) {
             toast.error('Erro ao excluir extrato: ' + (err.message || 'Erro desconhecido'));
+            // Re-open dialog if it failed so user knows it didn't work
+            setDeletingBatchId(batchIdToDelete);
         } finally {
             setIsDeletingBatch(false);
-            setDeletingBatchId(null);
         }
     };
 
