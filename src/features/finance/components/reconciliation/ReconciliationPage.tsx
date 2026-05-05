@@ -432,48 +432,32 @@ export function ReconciliationPage() {
         );
     };
 
-    const handleBatchDelete = () => {
+    const handleBatchDelete = async () => {
         if (selectedIds.length === 0) return;
-        
-        // Separa os IDs entre entradas de extrato (lixo bancário) e transações do sistema
-        // Entradas de extrato geralmente começam com prefixos UUID padrão ou tem tipo "extrato"
-        // Como o selectedIds contém IDs mistos, vamos tentar deletar de ambos, ou checar o tipo se possível
-        // Mas o mais seguro é pegar os itens selecionados e ver o que são
-        const selectedItems = items.filter(i => selectedIds.includes(i.id));
-        
-        // Se a transação tem 'status_display' como Pendente/Importado e NÃO é sistema (type é taxa/etc), é extrato
-        const statementIds = selectedItems
-            .filter(i => i.type === 'statement' || (!i.category_name && i.status_display === 'Importado'))
-            .map(i => i.id);
-            
-        const transactionIds = selectedItems
-            .filter(i => i.type !== 'statement' && (i.category_name || i.status_display !== 'Importado'))
-            .map(i => i.id);
-            
-        // Se a maioria for extrato ou não conseguimos discernir perfeitamente pelo type, vamos chutar baseado no que temos
-        // No PaginatedStatementItem não temos a fonte exata, então vamos deletar do sistema se tiver categoria, senão do extrato
-        
-        if (statementIds.length > 0) {
-            bulkDeleteStatementEntries.mutate(statementIds, {
-                onSuccess: () => {
-                    if (transactionIds.length === 0) setSelectedIds([]);
-                }
-            });
-        }
-        
-        if (transactionIds.length > 0) {
-            bulkDeleteSystemTransactions.mutate(transactionIds, {
-                onSuccess: () => {
-                    setSelectedIds([]);
-                }
-            });
-        }
-        
-        // Fallback: se os filtros não pegaram nada, tentamos deletar do extrato por padrão (comum para lixo)
-        if (statementIds.length === 0 && transactionIds.length === 0) {
-            bulkDeleteStatementEntries.mutate(selectedIds, {
-                onSuccess: () => setSelectedIds([])
-            });
+
+        const idsToDelete = [...selectedIds];
+        setSelectedIds([]); // limpa seleção otimisticamente
+
+        try {
+            // Deleta das DUAS tabelas em paralelo — UUIDs são únicos, a tabela errada deleta 0 linhas sem erro
+            await Promise.all([
+                supabase.from('financial_transactions').delete().in('id', idsToDelete),
+                supabase.from('bank_statement_entries').delete().in('id', idsToDelete),
+            ]);
+
+            toast.success(`${idsToDelete.length} item(ns) excluído(s) com sucesso!`);
+
+            // Remove o cache imediatamente para os itens sumirem da lista
+            queryClient.removeQueries({ queryKey: ['bank-statement-paginated'] });
+            queryClient.removeQueries({ queryKey: ['bank-statement-entries'] });
+            queryClient.removeQueries({ queryKey: ['bank-statement-detailed'] });
+            queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
+            queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
+            queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
+        } catch (err: any) {
+            toast.error(`Erro ao excluir: ${err.message || 'Erro desconhecido'}`);
+            setSelectedIds(idsToDelete); // restaura seleção se falhou
         }
     };
 

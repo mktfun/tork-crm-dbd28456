@@ -882,13 +882,14 @@ export function useBulkDeleteStatementEntries() {
             if (error) throw error;
             return true;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
-            queryClient.invalidateQueries({ queryKey: ['bank-statement-entries'] });
+        onSuccess: (_, entryIds) => {
+            // removeQueries limpa o cache imediatamente sem esperar staleTime
+            queryClient.removeQueries({ queryKey: ['bank-statement-paginated'] });
+            queryClient.removeQueries({ queryKey: ['bank-statement-entries'] });
             queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
             queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
-            toast.success(`Entradas excluídas com sucesso!`);
+            toast.success(`${entryIds.length} entrada(s) excluída(s) com sucesso!`);
         },
         onError: (error: Error) => {
             toast.error(`Erro ao excluir entradas: ${error.message}`);
@@ -909,14 +910,16 @@ export function useBulkDeleteSystemTransactions() {
             if (error) throw error;
             return true;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['bank-statement-paginated'] });
+        onSuccess: (_, transactionIds) => {
+            // removeQueries limpa o cache imediatamente sem esperar staleTime
+            queryClient.removeQueries({ queryKey: ['bank-statement-paginated'] });
+            queryClient.removeQueries({ queryKey: ['bank-statement-detailed'] });
             queryClient.invalidateQueries({ queryKey: ['financial-transactions'] });
             queryClient.invalidateQueries({ queryKey: ['pending-reconciliation'] });
             queryClient.invalidateQueries({ queryKey: ['reconciliation-kpis'] });
             queryClient.invalidateQueries({ queryKey: ['account-balances'] });
             queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
-            toast.success(`Transações excluídas com sucesso!`);
+            toast.success(`${transactionIds.length} transação(ões) excluída(s) com sucesso!`);
         },
         onError: (error: Error) => {
             toast.error(`Erro ao excluir transações: ${error.message}`);
