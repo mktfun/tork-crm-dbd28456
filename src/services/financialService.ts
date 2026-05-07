@@ -154,7 +154,8 @@ export async function registerExpense(payload: {
     p_is_confirmed: payload.isConfirmed ?? false,
     p_ramo_id: payload.ramoId || null,
     p_insurance_company_id: payload.insuranceCompanyId || null,
-    p_producer_id: payload.producerId || null
+    p_producer_id: payload.producerId || null,
+    p_type: 'expense'  // FIX: tipo explícito para evitar inferência incorreta
   });
 
   if (error) throw error;
@@ -198,7 +199,8 @@ export async function registerRevenue(payload: {
     p_is_confirmed: payload.isConfirmed ?? false,
     p_ramo_id: payload.ramoId || null,
     p_insurance_company_id: payload.insuranceCompanyId || null,
-    p_producer_id: payload.producerId || null
+    p_producer_id: payload.producerId || null,
+    p_type: 'revenue'  // FIX: tipo explícito para evitar inferência incorreta
   });
 
   if (error) throw error;
